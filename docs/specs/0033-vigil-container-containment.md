@@ -1,12 +1,12 @@
 ---
 number: "0033"
-title: 交付面容器化围堵：vigil 专用容器（零宿主挂载、容器内自 clone）+ 出口代理 allowlist + 观测游标改跟 origin/main
+title: "Delivery-surface container containment: a vigil-specific container (zero host mounts, self-cloning inside the container) + egress proxy allowlist + observation cursor tracking origin/main"
 issue: 0
 slug: vigil-container-containment
-summary: spec-0032 换轨后交付面的 coding agent 是进程外的 claude CLI（bypassPermissions），nexau 时代的进程内 workspace_jail 够不着它——WSL/宿主裸跑时嵌套 agent 可读整个文件系统（编排仓、data/sessions 过拟合信道）且出网无限制，现存兜底（凭证隔离/boundary 钩子/repo_guard 绊线）只管「改了什么、推到哪」，不管「看了什么」。本 spec 把 spec-0021/0022 定下的「进程内 jail 靠不住 → 环境级围堵（无凭证 + 网络出口 allowlist）」完整落地：vigil 跑进专用容器（openagents + claude CLI + git），工作目录为**容器内自 clone 的 harness 仓**——零宿主挂载，「只能看到 harness 仓」从软件承诺变成文件系统边界；网络上 vigil 容器只挂 internal 网络（可达 gitea），外网经 egress 代理 allowlist（仅放行 Anthropic API 域）。可行性关键：两面（需求面/交付面）的唯一交互媒介本来就是 Gitea（issue 标签 + push/merge + main SHA），vigil 不需要宿主文件系统的任何东西；容器每 run 重建 = clone 与 .openagents 运行态自动归零（原 rmtree 重置语义保留）。连带修一个现存 bug：spec-0032 后推进 main 的是 Gitea 上的 server-side merge，而 orchestrator c 步与 launcher 读的是**本地** harness 仓的 main——本地永远停在 seed，游标不前进、用户永远跑 v0；_resolve_head 改为先 fetch origin 再解析 origin/main（无 origin 时退化本地，兼容既有测试与 Fake 场景）。宿主 subprocess 直跑模式保留为显式 opt-in（VIGIL_MODE=subprocess，仅限盯屏联调），容器为缺省。
+summary: "After the spec-0032 route change, the delivery-surface coding agent is the out-of-process claude CLI (bypassPermissions), which the in-process workspace_jail from the nexau era cannot reach. When run bare on WSL/the host, the nested agent can read the entire filesystem (the orchestration repository and data/sessions overfitting channel), with unrestricted network egress. Existing safeguards (credential isolation/boundary hooks/repo_guard tripwires) only govern “what was changed and where it was pushed”, not “what was read”. This spec fully implements the “in-process jail is unreliable → environment-level containment (no credentials + network egress allowlist)” established by spec-0021/0022: run vigil in a dedicated container (openagents + claude CLI + git), with the working directory as a **harness repository self-cloned inside the container**. With zero host mounts, “can only see the harness repository” becomes a filesystem boundary rather than a software promise. On the network, the vigil container attaches only to the internal network (reachable to gitea), while external access goes through an egress proxy allowlist (only the Anthropic API domain is permitted). The key feasibility point is that the sole interaction medium between the two planes (requirements surface/delivery surface) is already Gitea (issue labels + push/merge + main SHA); vigil does not need anything from the host filesystem. Rebuilding the container for every run automatically resets the clone and the .openagents runtime state (preserving the original rmtree reset semantics). This also fixes an existing bug: after spec-0032, main is advanced by a server-side merge on Gitea, while orchestrator step c and the launcher read the main of the **local** harness repository. The local repository therefore remains at the seed forever, the cursor does not advance, and the user always runs v0. Change _resolve_head to fetch origin first and then resolve origin/main (fall back to local when there is no origin, preserving compatibility with existing tests and Fake scenarios). Retain host subprocess direct-run mode as explicit opt-in (VIGIL_MODE=subprocess, limited to watch-the-screen integration debugging); the container is the default."
 tasks:
   - id: T1
-    title: vigil 容器与网络基建：Dockerfile/entrypoint/build + internal 网络 + egress 代理 allowlist
+    title: "vigil container and network infrastructure: Dockerfile/entrypoint/build + internal network + egress proxy allowlist"
     status: done
     priority: P1
     tags: []
@@ -19,10 +19,10 @@ tasks:
       - backend/deploy/vigil/build.sh
       - backend/deploy/gitea/docker-compose.yml
       - backend/deploy/gitea/egress-proxy.conf
-    scope: 新建 deploy/vigil/——Dockerfile（基底 python 3.12 bookworm 含 git；native 安装 claude CLI；以本地 OpenAgents checkout 为 build context 装 openagents，pin 由 checkout 决定）、entrypoint.sh（从 env 取内网 Gitea 地址与 token clone harness 仓到容器私有工作目录 → 把只读挂载的 /config/openagents.yml 拷入 .openagents/ → exec openagents vigil --parallel $K）、build.sh <openagents-path>（构建入口，校验路径存在）。docker-compose.yml：新增 internal 网络 vigil-net（internal true，挂 gitea 与 egress-proxy）；新增 egress-proxy 服务（tinyproxy/squid 任一，配置文件 egress-proxy.conf 只放行 Anthropic API 域（含 ANTHROPIC_BASE_URL 自定义域的注释指引），同时挂 vigil-net 与可出网的默认网络）。gitea 服务加挂 vigil-net（host 端口映射照旧走原网络，不受 internal 影响）。vigil 容器本身不进 compose（生命周期随 run，由 run.py docker run 拉起，见 T2），但其网络/代理依赖在此就位。
-    acceptance: build.sh 在带 OpenAgents checkout 的机器上构建成功；容器内 openagents/claude/git 可执行；vigil-net 上 vigil 容器可达 gitea 3000、直连外网被拒、经代理仅 allowlist 域可达（生产机实证）；compose config 校验通过。
+    scope: "Create deploy/vigil/ — Dockerfile (based on python 3.12 bookworm with git; install claude CLI natively; install openagents using the local OpenAgents checkout as the build context, with the pin determined by the checkout), entrypoint.sh (read the internal Gitea address and token from env, clone the harness repository into a private container working directory → copy the read-only-mounted /config/openagents.yml into .openagents/ → exec openagents vigil --parallel $K), and build.sh <openagents-path> (build entry point, validating that the path exists). docker-compose.yml: add an internal network vigil-net (internal true, attached to gitea and egress-proxy); add an egress-proxy service (either tinyproxy/squid, with egress-proxy.conf allowing only the Anthropic API domain, including comment guidance for a custom ANTHROPIC_BASE_URL domain), attached to vigil-net and the default network with external access. The vigil container itself is not included in compose (its lifecycle follows each run and is started by run.py via docker run, see T2), but its network/proxy dependencies are provisioned here. Add vigil-net to the gitea service (host port mappings continue to use the original network and are unaffected by internal)."
+    acceptance: "build.sh succeeds on a machine with an OpenAgents checkout; openagents/claude/git are executable inside the container; on vigil-net, the vigil container can reach gitea 3000, direct external access is denied, and only allowlisted domains are reachable through the proxy (verified on the production machine); compose config validation passes."
   - id: T2
-    title: run.py 双模式接线：容器缺省（docker run 生命周期/日志/env 注入）+ subprocess 显式 opt-in
+    title: "Wire run.py for dual modes: container by default (docker run lifecycle/logs/env injection) + explicit subprocess opt-in"
     status: done
     priority: P1
     tags: []
@@ -33,10 +33,10 @@ tasks:
     files:
       - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/tests/test_run_vigil.py
-    scope: VIGIL_MODE env（container 缺省 / subprocess 显式 opt-in 且打醒目告警「无围堵，仅限盯屏联调」）。container 模式：start_vigil 改为 docker run -d --rm --name ahe-beta-vigil --network vigil-net、只读挂载 staging 配置目录到 /config、env 注入 GITEA_TOKEN + claude 凭证三选一（ANTHROPIC_API_KEY（API 计费）/ ANTHROPIC_AUTH_TOKEN（网关 Bearer，配 ANTHROPIC_BASE_URL——须为 Anthropic 协议端点，网关域加进 egress 白名单）/ CLAUDE_CODE_OAUTH_TOKEN（订阅计费，宿主 claude setup-token 生成的长效 headless token））+ HTTPS_PROXY=egress-proxy + 并发 K + 内网仓地址；全缺时预检 fail-loud；日志经 docker logs -f 子进程落 data/vigil.log；stop_vigil = docker rm -f（--rm 兜底自清理）。write_openagents_config 改写到 staging 目录（不再写进 HARNESS_REPO——容器内自 clone，宿主仓与交付面脱钩），gitea.base_url 用内网地址（VIGIL_GITEA_INTERNAL_URL 缺省 http gitea 3000），host 侧 .env 的 localhost 地址仅编排面自用。预检从「PATH 有 openagents」按模式分叉：container 模式改查 docker 可用 + 镜像存在（缺镜像给 build.sh 提示）。subprocess 模式保留既有行为（含写配置进 HARNESS_REPO）。
-    acceptance: 两模式的 start/stop/config 落点/预检各有单测（mock subprocess/docker，不触真容器）；container 模式下 HARNESS_REPO 内不再出现 .openagents/；token/key 只经 env 不落盘断言保留；生产机容器模式端到端跑通一轮（承接 spec-0032/T5 的冒烟验收）。
+    scope: "VIGIL_MODE env (container by default / subprocess explicit opt-in, with a prominent warning: “No containment; only for watch-the-screen integration debugging”). Container mode: change start_vigil to docker run -d --rm --name ahe-beta-vigil --network vigil-net, read-only mount the staging configuration directory at /config, and inject GITEA_TOKEN + one of three claude credentials (ANTHROPIC_API_KEY (API billing) / ANTHROPIC_AUTH_TOKEN (gateway Bearer, with ANTHROPIC_BASE_URL — must be an Anthropic-protocol endpoint, and the gateway domain must be added to the egress allowlist) / CLAUDE_CODE_OAUTH_TOKEN (subscription billing, a long-lived headless token generated by the host’s claude setup-token)) + HTTPS_PROXY=egress-proxy + concurrency K + the internal repository address. Fail loudly during preflight if all are missing. Logs are streamed through a docker logs -f subprocess into data/vigil.log. stop_vigil = docker rm -f (--rm provides cleanup as a fallback). Change write_openagents_config to write to the staging directory (no longer write into HARNESS_REPO — the container self-clones, decoupling the host repository from the delivery surface). Set gitea.base_url to the internal address (VIGIL_GITEA_INTERNAL_URL defaults to http gitea 3000); the localhost address in the host-side .env is used only by the orchestration surface. Split preflight from “openagents is on PATH” by mode: container mode checks that docker is available and the image exists (if the image is missing, provide a build.sh hint). Subprocess mode retains existing behavior (including writing configuration into HARNESS_REPO)."
+    acceptance: "Add unit tests for start/stop/config destinations/preflight in both modes (mock subprocess/docker; do not touch a real container). Assert that .openagents/ no longer appears inside HARNESS_REPO in container mode; retain assertions that tokens/keys pass only through env and are not written to disk. Run one end-to-end round in container mode on the production machine (carrying forward the smoke acceptance from spec-0032/T5)."
   - id: T3
-    title: 观测游标改跟 origin/main：_resolve_head 先 fetch（无 origin 退化本地）
+    title: "Change the observation cursor to track origin/main: _resolve_head fetches first (falls back to local when there is no origin)"
     status: done
     priority: P1
     tags: []
@@ -46,10 +46,10 @@ tasks:
     files:
       - backend/ahe_beta/loop/orchestrator.py
       - backend/tests/loop/test_orchestrator.py
-    scope: 修 spec-0032 引入的现存 bug——推进 main 的是 Gitea server-side merge，本地 harness 仓的 main 停在 seed，c 步游标与 launcher 的会话快照永远解析到 v0（老模型 dev 在本地仓 commit+push、本地即真身，故无此问题；换轨后真身在 Gitea）。_resolve_head：先 git fetch origin <ref>（把远端对象与游标取回本地，launcher 按 SHA checkout 因此可解析），解析优先 refs/remotes/origin/<ref>、无 origin/fetch 失败时退化本地 <ref>（容忍离线/Fake/单仓测试场景，行为与今天等价）。fetch 失败不抛——观测游标宁可停滞也不废轮，失败打印告警。
-    acceptance: 新增测试：本地仓 + bare origin，外部向 origin 推进 main（模拟 vigil merge）→ run_round 回灌 SHA 前进且 launcher 收到的 launch ref 为新 SHA；无 origin 的既有测试全部不回归（退化路径）；fetch 失败（origin 不可达）不抛、返回本地 SHA。
+    scope: "Fix the existing bug introduced by spec-0032: main is advanced by a Gitea server-side merge, while the main of the local harness repository remains at the seed, so the c-step cursor and the launcher’s session snapshot always resolve to v0 (the old-model dev committed and pushed in the local repository, which was therefore the source of truth; after the route change, the source of truth is Gitea). _resolve_head: first run git fetch origin <ref> (retrieve the remote object and cursor locally so the launcher can checkout by SHA), then resolve preferentially from refs/remotes/origin/<ref>. If there is no origin or fetch fails, fall back to local <ref> (tolerating offline/Fake/single-repository test scenarios and preserving behavior equivalent to today). Do not raise on fetch failure — the observation cursor should stall rather than abort the round; print a warning on failure."
+    acceptance: "Add a test: with a local repository + bare origin, advance main on origin externally (simulating a vigil merge) → run_round feeds back an advancing SHA and the launch ref received by the launcher is the new SHA; existing tests without an origin do not regress (fallback path); fetch failure (origin unreachable) does not raise and returns the local SHA."
   - id: T4
-    title: 文档与 spec 制品：CLAUDE.md 围堵段收口 + render/graph
+    title: "Documentation and spec artifacts: close out the containment section in CLAUDE.md + render/graph"
     status: done
     priority: P2
     tags: []
@@ -59,90 +59,91 @@ tasks:
     parallel: true
     files:
       - CLAUDE.md
-    scope: CLAUDE.md 交付面描述补围堵形态（vigil 容器化、零挂载自 clone、egress allowlist、VIGIL_MODE 双模式与使用纪律「subprocess 仅限盯屏联调」）；OVERVIEW/ARCHITECTURE 随 render/graph 再生成。
-    acceptance: CLAUDE.md 与实况一致；spec validate/render/graph 全绿。
+    scope: "Complete the delivery-surface description in CLAUDE.md with the containment model (vigil containerization, zero mounts and self-cloning, egress allowlist, VIGIL_MODE dual modes, and the usage discipline “subprocess only for watch-the-screen integration debugging”); regenerate OVERVIEW/ARCHITECTURE with render/graph."
+    acceptance: "CLAUDE.md matches reality; spec validate/render/graph all pass."
 ---
 
-# 0033: 交付面容器化围堵：vigil 专用容器 + 出口代理 allowlist + 观测游标改跟 origin/main
+# 0033: Container containment for the delivery plane: dedicated vigil container + egress proxy allowlist + observation cursor tracking origin/main
 
 ## Summary
 
-把交付面（OpenAgents vigil + 嵌套 claude CLI）关进专用容器：**零宿主挂载、容器内自 clone harness 仓**，「只能看到 harness 仓」从软件承诺变成文件系统边界；网络上只挂 internal 网络（可达本地 Gitea），外网经 egress 代理 allowlist（仅 Anthropic API）。这是 spec-0021/0022「进程内 jail 靠不住 → 环境级围堵」的完整落地。连带修一个现存 bug：观测游标与 launcher 改跟 `origin/main`（server-side merge 后本地 main 不再是真身）。
+Confine the delivery plane (OpenAgents vigil + nested claude CLI) to a dedicated container: **zero host mounts, with the harness repository cloned inside the container**, turning “can only see the harness repository” from a software promise into a filesystem boundary; attach it only to an internal network (with access to local Gitea), with external access routed through an egress proxy allowlist (Anthropic API only). This fully implements the spec-0021/0022 conclusion: “in-process jails are unreliable → environment-level containment.” Also fix an existing bug: switch the observation cursor and launcher to track `origin/main` (after a server-side merge, local main is no longer authoritative).
 
 ## Motivation
 
-spec-0032 换轨后，交付面 coding agent 是进程外的 `claude -p`（headless 需 `bypassPermissions`），nexau 时代挂在工具层的 `workspace_jail` 中间件够不着它：宿主/WSL 裸跑时，嵌套 agent 可读整个文件系统——编排仓、`data/sessions/`（体感与会话全量，**过拟合信道**：spec-0015 沉下 sandbox 目录防的正是这个）——且出网无任何限制。现存三层兜底（凭证隔离 / boundary 钩子 + CI 边界 / repo_guard 绊线）都作用在「改了什么、推到哪」，对「看了什么」零约束。
+After the spec-0032 transition, the delivery-plane coding agent is the out-of-process `claude -p` (headless requires `bypassPermissions`), beyond the reach of the `workspace_jail` middleware attached to the tool layer in the nexau era: when running directly on the host/WSL, the nested agent can read the entire filesystem—the orchestration repository and `data/sessions/` (all experience scores and sessions, an **overfitting channel**: this is precisely what moving spec-0015 into the sandbox directory was meant to prevent)—and has unrestricted network access. The existing three layers of safeguards (credential isolation / boundary hooks + CI boundaries / repo_guard tripwire) all constrain “what was changed and where it was pushed,” with zero constraints on “what was read.”
 
-进程内软闸不是出路：0021 事故已实证 dev 能用 python heredoc 隧道绕过路径扫描；0022 因此把围堵需求定为**环境级**——无凭证 + 网络出口 allowlist。换轨没有制造这个需求，只是把它从「建议」变成「必须」。
+In-process soft gates are not a solution: incident 0021 demonstrated that dev could bypass path scanning through a python heredoc tunnel; 0022 therefore defined containment requirements at the **environment level**—no credentials + a network egress allowlist. The transition did not create this requirement; it merely changed it from “recommended” to “mandatory.”
 
 ## Guide-level explanation
 
-### 为什么「零挂载」可行——媒介本来就是 Gitea
+### Why “zero mounts” works—the medium is already Gitea
 
-疑问「harness 仓每轮在变，容器只挂它够吗」的答案是：**连挂都不用挂**。两面的全部交互都经 Gitea：
-
-```
-需求面（宿主进程）                     交付面（vigil 容器）
- Owner 打 openagents 标签 ──issue──►  _intake 发现、盖 ready
- c 步 fetch origin/main   ◄──merge──  PR 合并落 Gitea main
- launcher 按 SHA checkout（本地仓=编排面自己的观测/种子副本）
-```
-
-vigil 需要的只是「一个 harness 仓的 git 工作目录」——容器 entrypoint 自己从 `http://gitea:3000` clone 一份即可，宿主的 `HARNESS_REPO` 与交付面彻底脱钩（退化为编排面的种子推送源 + 观测副本）。挂载方案反而有害：每 run 的 rmtree 重置会拆掉容器的工作目录、宿主路径耦合进容器。零挂载还白送一个性质：**容器每 run 重建 = clone 和 `.openagents/` 运行态（队列 db/claims）自动归零**，原「rmtree 重置世界」语义原样保留。
-
-### 围堵形态
+The answer to “the harness repository changes every round; is mounting only that repository enough?” is: **it does not even need to be mounted**. All interaction between the two planes goes through Gitea:
 
 ```
-宿主：run.py（需求面照旧）─ docker run ─► vigil 容器（openagents+claude+git）
-                                            │ 文件系统：只有容器私有 clone —— 编排仓/sessions 物理不存在
-                                            │ 网络：仅 vigil-net（internal）
-                                            ├──► gitea:3000（issue/push/merge）
-                                            └──► egress-proxy ──allowlist──► api.anthropic.com（仅此）
+Demand plane (host process)                         Delivery plane (vigil container)
+ Owner applies openagents label       ──issue──►   _intake discovers and marks ready
+ step c: fetch origin/main            ◄──merge──   PR merge lands on Gitea main
+ launcher checkout by SHA (local repository = orchestration plane's own observation/seed copy)
 ```
 
-`bypassPermissions` 在这个盒子里开着也无所谓——能读的只有它本来就该改的仓，能连的只有它本来就该连的两个端点。凭证面：容器内只有 harness 仓的 Gitea token + claude 凭证（`ANTHROPIC_API_KEY`（API 计费）/ `ANTHROPIC_AUTH_TOKEN`（网关 Bearer，配 `ANTHROPIC_BASE_URL`，网关域同步进 egress 白名单）/ `CLAUDE_CODE_OAUTH_TOKEN`（订阅计费，宿主 `claude setup-token` 生成）三选一，皆 env 注入不落盘、专用可轮换），宿主的 `~/.claude` 登录态与 gh 凭证不进容器。
+All vigil needs is “a git working directory for the harness repository”—the container entrypoint can clone one from `http://gitea:3000` itself, completely decoupling the host's `HARNESS_REPO` from the delivery plane (reducing it to a seed push source for the orchestration plane + an observation copy). Mounting is actually harmful: the per-run rmtree reset would tear down the container's working directory and couple host paths into the container. Zero mounts also provide a free property: **rebuilding the container for each run automatically resets the clone and `.openagents/` runtime state (queue db/claims) to zero**, preserving the original “reset the world with rmtree” semantics unchanged.
 
-### 使用纪律
+### Containment structure
 
-容器模式为缺省；`VIGIL_MODE=subprocess` 保留宿主直跑（带醒目告警），**仅限人盯着日志的一次性联调**——长跑闭环必须容器模式。
+```
+Host: run.py (demand plane unchanged) ─ docker run ─► vigil container (openagents+claude+git)
+                                                    │ Filesystem: private container clone only;
+                                                    │             no orchestration repository or sessions
+                                                    │ Network: only vigil-net (internal)
+                                                    ├──► gitea:3000 (issue/push/merge)
+                                                    └──► egress-proxy ──allowlist──► api.anthropic.com (only this)
+```
+
+Leaving `bypassPermissions` enabled inside this box is harmless—it can read only the repository it is supposed to modify, and connect only to the two endpoints it is supposed to reach. Credentials: the container holds only the harness repository's Gitea token + claude credentials (one of `ANTHROPIC_API_KEY` (API billing) / `ANTHROPIC_AUTH_TOKEN` (gateway Bearer, paired with `ANTHROPIC_BASE_URL`, with the gateway domain also added to the egress allowlist) / `CLAUDE_CODE_OAUTH_TOKEN` (subscription billing, generated by `claude setup-token` on the host), all injected through env without being written to disk, dedicated and rotatable); the host's `~/.claude` login state and gh credentials do not enter the container.
+
+### Usage discipline
+
+Container mode is the default; `VIGIL_MODE=subprocess` retains direct host execution (with a prominent warning), **solely for one-off integration debugging with a human watching the logs**—long-running closed loops must use container mode.
 
 ## Reference-level explanation
 
-- **镜像**（T1）：python 3.12 bookworm（自带 git）+ claude CLI（native 安装器）+ openagents（以本地 OpenAgents checkout 为 build context 安装，版本 pin 由 checkout 决定，与「uv tool 钉版本」同一纪律）。构建入口 `build.sh <openagents-path>`。
-- **配置注入**（T2）：`write_openagents_config` 改写到宿主 staging 目录、只读挂载到容器 `/config`，entrypoint clone 后拷入 `.openagents/`；`gitea.base_url` 用容器内网地址（`VIGIL_GITEA_INTERNAL_URL` 缺省 `http://gitea:3000`），宿主 `.env` 的 localhost 地址仅编排面自用。这是「同一份配置、两个可达性域」的唯一分叉点。
-- **出口 allowlist**（T1）：vigil-net 置 `internal: true`（无 NAT，直连外网物理不通）；egress-proxy 双网络（vigil-net + 可出网默认网络），allowlist 仅 Anthropic API 域；vigil 容器经 `HTTPS_PROXY` 走代理（claude CLI 尊重代理变量）。自定义 `ANTHROPIC_BASE_URL` 时 allowlist 需同步（配置文件注释给出指引）。
-- **生命周期**（T2）：`docker run -d --rm --name ahe-beta-vigil` 随 run 起、`docker rm -f` 随 run 收，日志经 `docker logs -f` 落 `data/vigil.log`（观测面不变）。
-- **游标修复**（T3）：`_resolve_head` 先 `git fetch origin <ref>`（同时取回对象，launcher 按 SHA checkout 得以解析），解析优先 `origin/<ref>`、失败退化本地（离线/Fake/单仓测试等价于今天）。fetch 失败告警不抛——游标宁可停滞不废轮。
+- **Image** (T1): python 3.12 bookworm (includes git) + claude CLI (native installer) + openagents (installed using the local OpenAgents checkout as the build context, with the version pin determined by the checkout, following the same discipline as “pin versions with uv tool”). Build entry point: `build.sh <openagents-path>`.
+- **Configuration injection** (T2): rewrite `write_openagents_config` into a host staging directory, mount it read-only at `/config` in the container, and copy it into `.openagents/` after the entrypoint clones the repository; `gitea.base_url` uses the container's internal network address (`VIGIL_GITEA_INTERNAL_URL` defaults to `http://gitea:3000`), while the localhost address in the host's `.env` is used only by the orchestration plane. This is the sole divergence point for “one configuration, two reachability domains.”
+- **Egress allowlist** (T1): set `internal: true` on vigil-net (no NAT, making direct external network access physically unavailable); egress-proxy uses two networks (vigil-net + a default network with external access), with only Anthropic API domains allowlisted; the vigil container uses the proxy through `HTTPS_PROXY` (claude CLI respects proxy variables). When customizing `ANTHROPIC_BASE_URL`, update the allowlist accordingly (configuration comments provide guidance).
+- **Lifecycle** (T2): `docker run -d --rm --name ahe-beta-vigil` starts with the run, `docker rm -f` shuts down with the run, and logs are written through `docker logs -f` to `data/vigil.log` (the observation plane remains unchanged).
+- **Cursor fix** (T3): `_resolve_head` first performs `git fetch origin <ref>` (also retrieving objects so the launcher can resolve checkout by SHA), prioritizes `origin/<ref>` for resolution, and falls back to local resolution on failure (offline/Fake/single-repository tests remain equivalent to today). A fetch failure produces a warning without raising—the cursor should stall rather than invalidate the round.
 
 ## Drawbacks
 
-1. 多一个镜像要构建维护（OpenAgents 升级需重 build）；首次构建拉 claude CLI 需外网。
-2. egress 代理是新的单点：代理挂了交付面全停（needs-human/看门狗兜不到这层，靠日志观测）。
-3. Anthropic API key 进入被围堵容器——盒内 agent 理论上可滥用该 key（调 API 本身）；爆炸半径限于 API 费用与该 key，可单独发放/限额/轮换。
-4. Windows 原生仍不能跑交付面（不变）；容器模式要求宿主有 docker。
+1. One more image to build and maintain (OpenAgents upgrades require a rebuild); the initial build needs external network access to download claude CLI.
+2. The egress proxy is a new single point of failure: if it goes down, the entire delivery plane stops (needs-human/watchdog safeguards do not cover this layer; observation relies on logs).
+3. The Anthropic API key enters the contained container—the agent inside could theoretically abuse that key (by calling the API itself); the blast radius is limited to API costs and that key, which can be issued, capped, and rotated independently.
+4. Native Windows still cannot run the delivery plane (unchanged); container mode requires docker on the host.
 
 ## Rationale and alternatives
 
-- **零挂载 vs 挂载宿主仓**：见 Guide——媒介是 Gitea，挂载徒增 rmtree 竞态与路径耦合，且围堵上挂载点就是逃逸面。
-- **弃案：`.claude/settings.json` 软闸（allow/deny 工具白名单）**：便宜但仍是 claude 自我执行的进程内约束，与被 0021 实证击穿的 jail 同一信任模型；用户裁决直接做硬闸。容器就位后如仍想叠加纵深，可作后续可选层。
-- **弃案：给 vigil-net 直接开外网、跳过代理**：allowlist 就没了——出口白名单正是 0022 两条硬需求之一，不可省。
-- **弃案：挂载宿主 `~/.claude` 解决 claude 登录**：把整个个人账号登录态交进围堵盒——egress 拦得住外传，却拦不住 agent 把读到的 token 写进 commit/PR 正文经 Gitea「抄」出盒；且 claude 需写该目录（token 刷新），容器与宿主登录态互相污染。围堵原则：只给非给不可的、且每样可单独作废——env 注入的专用 key/长效 token 满足，个人登录态不满足。
-- **fetch 放 orchestrator 而非 launcher**：游标解析是 c 步唯一入口（launcher 只按给定 SHA checkout），在源头取回对象一处修完两个消费者。
+- **Zero mounts vs. mounting the host repository**: see the Guide—the medium is Gitea; mounting only adds rmtree races and path coupling, and mount points are an escape surface for containment.
+- **Rejected: `.claude/settings.json` soft gate (allow/deny tool allowlist)**: inexpensive, but still an in-process constraint enforced by claude itself, sharing the trust model of the jail demonstrably breached in 0021; the user decided to implement a hard gate directly. Once the container is in place, this can be an optional follow-up layer if additional defense in depth is desired.
+- **Rejected: give vigil-net direct external access and skip the proxy**: this removes the allowlist—an egress allowlist is precisely one of the two hard requirements in 0022 and cannot be omitted.
+- **Rejected: mount the host's `~/.claude` to handle claude login**: this hands the entire personal account login state to the containment box—egress filtering can prevent external transmission, but cannot stop the agent from writing a token it reads into a commit/PR body and “copying” it out through Gitea; claude also needs to write to this directory (token refresh), causing container and host login state to contaminate each other. Containment principle: provide only what is indispensable, and ensure each item can be revoked independently—dedicated keys/long-lived tokens injected through env meet this requirement; personal login state does not.
+- **Put fetch in the orchestrator rather than the launcher**: cursor resolution is the sole entry point for step c (the launcher only checks out the given SHA); fetching objects at the source fixes both consumers in one place.
 
 ## Prior art
 
-- spec-0021（dev 逃逸事故与三层兜底）/ spec-0022（围堵硬需求=无凭证+出口 allowlist）：本 spec 是其环境级结论在换轨后的落地。
-- spec-0032 §4.5：换轨时明记「jail 变弱需正视、网络出口 allowlist 仍是环境级建议」——本 spec 收掉这笔债。
-- deploy/gitea 既有形态（Gitea + act_runner 容器化、命名网络）：vigil 只是同一基建里的第三类容器。
+- spec-0021 (dev escape incident and three layers of safeguards) / spec-0022 (hard containment requirements = no credentials + egress allowlist): this spec implements their environment-level conclusion after the transition.
+- spec-0032 §4.5: the transition explicitly recorded that “the weakened jail must be acknowledged, and a network egress allowlist remains an environment-level recommendation”—this spec pays off that debt.
+- Existing deploy/gitea setup (containerized Gitea + act_runner, named networks): vigil is simply the third container type in the same infrastructure.
 
 ## Unresolved questions
 
-1. egress-proxy 选型（tinyproxy 够用/squid 更可控）与 allowlist 的域名通配细节——T1 实施时按最小可用定，生产实证后固化。
-2. claude CLI 在容器内的首跑体验（native 安装器的更新自检、telemetry 出网点是否需要加白）——生产实证清单。
-3. act_runner 的 job 容器（CI 冒烟）是否也应迁到 internal 网络——checkout 经 gitea 内网已可达，但 catthehacker 镜像内 action 生态可能有出网期待；观察后定。
+1. Choice of egress-proxy (tinyproxy is sufficient/squid offers more control) and domain wildcard details for the allowlist—choose the minimum viable option during T1 implementation and finalize after production validation.
+2. First-run experience for claude CLI inside the container (whether the native installer's update checks and telemetry endpoints need allowlisting)—production validation checklist.
+3. Whether act_runner job containers (CI smoke tests) should also move to the internal network—checkout can already reach gitea over the internal network, but the action ecosystem in the catthehacker image may expect external access; decide after observation.
 
 ## Future possibilities
 
-- 多 vigil 容器横向扩（--parallel 之外的仓级并行）；
-- egress 代理日志作为交付面行为审计面（谁在什么时候连了什么）；
-- 需求面（user sim/生成器）同法容器化，编排仓最终只剩编排本体。
+- Scale horizontally with multiple vigil containers (repository-level parallelism beyond --parallel);
+- Use egress proxy logs as a behavioral audit surface for the delivery plane (who connected to what and when);
+- Containerize the demand plane (user sim/generator) in the same way, eventually leaving only orchestration itself in the orchestration repository.

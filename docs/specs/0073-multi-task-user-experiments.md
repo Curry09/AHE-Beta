@@ -1,12 +1,12 @@
 ---
 number: '0073'
-title: 统一入口的多任务与多用户实验
+title: "Multi-task and Multi-user Experiments Through the Unified Entry Point"
 issue: 0
 slug: multi-task-user-experiments
-summary: 将任务目录和逐轮会话计划冻结到统一实验入口，支持同任务多用户与普通任务/SWE 混合编排，并隔离每个会话的工作区。
+summary: "Freeze the task catalog and per-round session plans into the unified experiment entry point, supporting multiple users on the same task and mixed orchestration of ordinary tasks/SWE, with isolated workspaces for each session."
 tasks:
   - id: T1
-    title: 统一任务目录与冻结会话计划
+    title: "Unified task catalog and frozen session plans"
     status: done
     priority: P1
     tags: []
@@ -22,10 +22,10 @@ tasks:
       - backend/tests/test_experiment_config_v2.py
       - backend/tests/test_experiment_materials.py
       - backend/tests/test_experiment_workload.py
-    scope: 增加 task_packages 输入分支，统一 TaskCatalog/SessionPlan 和 context，冻结分任务材料及 workload 契约版本，保留旧输入与已冻结材料的只读兼容边界。
-    acceptance: 离线检查通过旧 N1、同任务 N4/N8 与多任务显式/默认计划，拒绝重复 ID/非法引用与半成品；实际冻结各任务不同源码/setup/指令并校验所有摘要，旧 manifest/hash 不被转换或改写。
+    scope: "Add a task_packages input branch, unify TaskCatalog/SessionPlan and context, freeze per-task materials and the workload contract version, and preserve the read-only compatibility boundary for old inputs and frozen materials."
+    acceptance: "Offline checks pass for old N1, same-task N4/N8, and explicit/default multi-task plans, and reject duplicate IDs/invalid references and incomplete inputs; actually freeze distinct source code/setup/instructions for each task and validate all digests, without converting or rewriting old manifests/hashes."
   - id: T2
-    title: local 多任务镜像与独立会话容器
+    title: "Local multi-task images and independent session containers"
     status: done
     priority: P1
     tags: []
@@ -39,10 +39,10 @@ tasks:
       - backend/ahe_beta/user/sim/sources/docker_seed.py
       - backend/tests/test_experiment_local_backend.py
       - backend/tests/user/sim/test_docker_seed_source.py
-    scope: 按任务内容与配方建立 seed image/工作区映射，独立容器绑定会话与任务身份，扩展逐任务 preflight 和 ownership 清理。
-    acceptance: 普通/SWE 选中自身镜像和依赖；相同任务两会话 repo/venv 修改不互相污染，资源摘要错配拒绝；stop/destroy 不影响其他 run 或共享镜像，单任务 seed_image 合同保留。
+    scope: "Build seed image/workspace mappings based on task contents and recipes, bind independent containers to session and task identities, and extend per-task preflight and ownership cleanup."
+    acceptance: "ordinary/SWE select their own images and dependencies; repo/venv modifications in two sessions of the same task do not contaminate each other, and resource digest mismatches are rejected; stop/destroy do not affect other runs or shared images, and the single-task seed_image contract is retained."
   - id: T3
-    title: E2B 多任务基线与独立会话环境
+    title: "E2B multi-task baselines and independent session environments"
     status: done
     priority: P1
     tags: []
@@ -62,10 +62,10 @@ tasks:
       - backend/tests/user/sim/test_multitask_workspace.py
       - backend/ahe_beta/harness/launcher.py
       - backend/tests/harness/test_launcher.py
-    scope: 建立任务准备映射，复制纯源码并在 run 所属 session/attempt 目录重建独立 venv，复用内容寻址依赖缓存，保护旧 prebuilt 调用免于共享链接写入。
-    acceptance: 实际并发两任务依赖/同任务 editable import 指向各自目录，baseline/已发布缓存 artifact 不被改写且缓存新增原子发布；setup 子进程超时先终止再清理整个 attempt，无全局环境竞争；管理/执行身份、LOST 行为及旧冻结资源契约保留。
+    scope: "Establish task preparation mappings, copy only source code and rebuild independent venvs in session/attempt directories belonging to the run, reuse content-addressed dependency caches, and protect old prebuilt invocations from writes through shared links."
+    acceptance: "In actual concurrent execution, dependencies for two tasks/editable imports for the same task point to their respective directories; baseline/published cache artifacts are not rewritten, and new cache entries are published atomically; on setup subprocess timeout, terminate it before cleaning up the entire attempt, with no contention over the global environment; retain management/execution identities, LOST behavior, and old frozen resource contracts."
   - id: T4
-    title: 合并控制器并贯通逻辑会话身份
+    title: "Merge controllers and carry logical session identity throughout"
     status: done
     priority: P1
     tags: []
@@ -106,10 +106,10 @@ tasks:
       - tools/dev/replay/replay_architect_owner_from_repo.py
       - tools/dev/replay/replay_roles_from_sessions.py
       - tools/dev/replay/replay_owner_from_repo.py
-    scope: 新运行只装配一套控制器与角色，删除当前 ordinary/SWE 双份实现；冻结 round/key/input 使用逻辑绑定，setup 前建立会话身份，两交互模式复用原闭环并保留 L1 任务来源。
-    acceptance: 实际 Orchestrator 运行同任务 N4/N8、混合任务及失败恢复，活跃会话不超上限；资源坐标不改变逻辑恢复输入，完整 session 不重复执行/发 Issue；live/usage/L1 与保存结果同源，交付闸、分组、背压、末轮只试用均通过回归。
+    scope: "Assemble only one set of controllers and roles for new runs, removing the current duplicate ordinary/SWE implementations; use logical bindings for frozen round/key/input, establish session identity before setup, reuse the original closed loop for both interaction modes, and retain L1 task provenance."
+    acceptance: "Run same-task N4/N8, mixed tasks, and failure recovery through the actual Orchestrator, with active sessions staying within the limit; resource coordinates do not change logical recovery inputs, and complete sessions are not re-executed or issued duplicate Issues; live/usage/L1 and saved results share the same source, and the delivery gate, grouping, backpressure, and trial-only final round all pass regression tests."
   - id: T5
-    title: 生命周期兼容与多任务观察
+    title: "Lifecycle compatibility and multi-task observation"
     status: done
     priority: P1
     tags: []
@@ -131,10 +131,10 @@ tasks:
       - frontend/src/components/AgentColumn.tsx
       - frontend/src/components/detail/SessionDetail.tsx
       - frontend/src/components/detail/SessionDetail.test.tsx
-    scope: 校验新/旧冻结 recipe 并从各自 source 启动，扩展逐任务与逐轮 status/collection 信息及 dashboard 会话归属展示，保留运行所有权和快照 generation guard。
-    acceptance: 旧 module/script run 从原 archive/context 启动且 hash 不变，未知 recipe 拒绝；status 由账本证明数量并能报告 unknown；多会话 UI/API 不串 task/persona/session，E2B 明示快照且 collection 完整保留关联材料、排除私密缓存。
+    scope: "Validate new/old frozen recipes and launch from their respective sources, extend per-task and per-round status/collection information and dashboard session attribution displays, and retain run ownership and the snapshot generation guard."
+    acceptance: "Old module/script runs launch from their original archive/context with unchanged hashes, and unknown recipes are rejected; status substantiates counts using the ledger and can report unknown; multi-session UI/API do not mix up task/persona/session, and E2B explicitly identifies snapshots while collection fully retains associated materials and excludes private caches."
   - id: T6
-    title: 公开 N4 示例与双后端闭环验收
+    title: "Public N4 examples and end-to-end acceptance on both backends"
     status: done
     priority: P1
     tags: []
@@ -170,38 +170,38 @@ tasks:
       - backend/tests/test_experiment_multitask_e2e.py
       - CLAUDE.md
       - research/inventory.json
-    scope: 保留 N1 示例、增加两种后端完整 N4 混合任务配置与受维护普通任务，双语解释材料、计划、成本和隔离边界，提供统一入口离线集成及真实后端验证报告。
-    acceptance: 全部公开示例从仓库可离线检查且无占位 persona/私人路径/历史入口；集成脚本真正运行编译/分派/恢复；local/E2B 各完成两轮 N4 的非空交付及停止恢复实测，若缺执行条件报告未验证而非宣称通过。
+    scope: "Retain N1 examples, add complete N4 mixed-task configurations for both backends and maintained ordinary tasks, explain materials, plans, costs, and isolation boundaries bilingually, and provide reports on unified-entry-point offline integration and actual backend verification."
+    acceptance: "All public examples can be checked offline from the repository and contain no placeholder personas/private paths/historical entry points; integration scripts actually execute compilation/dispatch/recovery; local/E2B each complete actual tests of nonempty delivery over two N4 rounds and stop/recovery; if execution prerequisites are missing, report them as unverified rather than claiming they passed."
 ---
 
-# 0073 · 统一入口的多任务与多用户实验
+# 0073 · Multi-task and Multi-user Experiments Through a Unified Entry Point
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a nine-section rust-RFC overview for the group. -->
 
 ## Summary
 
-为 `schema_version: 2` 入口增加任务包列表，将单任务和多任务输入统一编译成冻结任务目录与逐轮会话计划。支持 N1/N4/N8 等用户数量、同一任务由多个用户试用，以及普通任务与 SWE 任务混合运行。local + 本地 Gitea、E2B + Gitea.com 继续使用同一套生命周期命令。所有会话围绕同一个 Harness 仓库迭代，每个会话拥有独立的可写代码和任务虚拟环境。
+Add a task package list to the `schema_version: 2` entry point, compiling single-task and multi-task inputs into a frozen task catalog and per-round session plan. Support user counts such as N1/N4/N8, multiple users trying the same task, and mixed runs of ordinary and SWE tasks. local + local Gitea and E2B + Gitea.com continue to use the same lifecycle commands. All sessions iterate on the same Harness repository, with each session having independent writable code and a task virtual environment.
 
-本组同时将 ordinary/SWE 两个重复控制器收敛为一个控制器，任务差异留在任务包与工作区准备阶段。现有单任务配置继续可用；已经冻结的实验继续由自己的源码和启动配方恢复。设计已通过审阅；实施与验收状态由 frontmatter 任务状态及验收报告记录。
+This group also consolidates the duplicate ordinary/SWE controllers into one controller, leaving task differences in task packages and workspace preparation. Existing single-task configurations remain usable; already frozen experiments continue to recover using their own source code and launch recipes. The design has passed review; implementation and acceptance status are recorded in frontmatter task statuses and acceptance reports.
 
 ## Motivation
 
-公开入口已支持冻结源码、凭证引用、角色策略、模拟用户与直接任务交互，以及同一 run 的停止与恢复。旧研究脚本已经归档，不能让用户通过旧脚本才能使用多用户功能。但目前存在四处单任务假设：
+The public entry point already supports frozen source code, credential references, role policies, simulated users and direct task interaction, and stopping and resuming the same run. The old research scripts have been archived; users must not have to use old scripts to access multi-user functionality. However, four single-task assumptions currently remain:
 
-- `materials.check_materials()` 要求 `sessions_per_round=1`，计划禁止同轮重复 task ID，连“多个用户试同一个任务”也被禁止。
-- 源码、指令、setup、锁、任务包及后端 workspace 都只有一个槽位。SWE 控制器在统一入口路径会忽略当前任务 metadata，返回唯一冻结场景；只放开任务池可能重复跑第一个任务。
-- ordinary/SWE 控制器分别装配角色、交付与轮次回调。再增加 mixed 控制器会形成第三份重复流程。
-- Orchestrator 已有并发、恢复、交付闸和 round seal，但观察槽使用 `user-{persona}`，恢复操作键包含场景中的资源参数。当前正常恢复使用已记录资源与冻结场景，并没有已证实的身份漂移；新任务绑定必须继续保证逻辑身份与资源坐标分离。
+- `materials.check_materials()` requires `sessions_per_round=1`, and the plan prohibits duplicate task IDs in the same round, even preventing “multiple users trying the same task.”
+- Source code, instructions, setup, locks, task packages, and backend workspaces each have only one slot. On the unified entry-point path, the SWE controller ignores the current task metadata and returns the sole frozen scenario; merely enabling a task pool could run the first task repeatedly.
+- The ordinary/SWE controllers separately assemble roles, delivery, and round callbacks. Adding a mixed controller would create a third copy of the workflow.
+- The Orchestrator already has concurrency, recovery, delivery gates, and round seals, but observation slots use `user-{persona}`, and recovery operation keys include resource parameters from the scenario. Normal recovery currently uses recorded resources and frozen scenarios, with no confirmed identity drift; new task bindings must continue to keep logical identity separate from resource coordinates.
 
-目标是恢复有价值的历史编排能力，同时保持一个公开入口和一条执行链。跨任务反馈用于改进通用 Harness，不分别维护多份 Harness，不把旧实验脚本搬回主目录。
+The goal is to restore valuable historical orchestration capabilities while retaining one public entry point and one execution chain. Cross-task feedback improves the general-purpose Harness; separate copies of the Harness are not maintained, and old experiment scripts are not moved back into the main directory.
 
 ## Guide-level explanation
 
-### 准备什么材料
+### Materials to prepare
 
-用户准备实验配置、persona 库和一个或多个 `task-package-v1`。每个包包含唯一 ID、`ordinary`/`swebench` 类型、指令、固定源码、setup 和依赖锁。普通任务声明 `not_in_benchmark=true`，SWE 保留固定 Git revision/repo；任务包的 `interaction` 选择 `simulated_user` 或 `direct`，缺省仍为前者。
+Users prepare an experiment configuration, a persona library, and one or more `task-package-v1`. Each package contains a unique ID, an `ordinary`/`swebench` type, instructions, fixed source code, setup, and a dependency lock. Ordinary tasks declare `not_in_benchmark=true`, while SWE retains a fixed Git revision/repo; the task package's `interaction` selects `simulated_user` or `direct`, with the former remaining the default.
 
-旧单任务配置原样可用：
+Existing single-task configurations work unchanged:
 
 ```json
 "workload": {
@@ -212,7 +212,7 @@ tasks:
 }
 ```
 
-新配置使用列表，各任务类型由包决定，不再填一个代表全实验的 `kind`：
+New configurations use a list, with each task's type determined by its package; they no longer specify a single `kind` representing the entire experiment:
 
 ```json
 "workload": {
@@ -240,19 +240,19 @@ tasks:
 }
 ```
 
-以上是配置片段，persona ID 是解释用占位值，真实配置必须引用库中的 ID。实现阶段提供 local/E2B 两份完整 N4 示例，引用四张已有卡和两个受维护任务包；普通任务使用小型 MIT 示例代码。保留现有两份 N1 示例。N8 按相同格式增加 persona 与会话数量，不新增入口或 schema。
+These are configuration excerpts; persona IDs are explanatory placeholders, and real configurations must reference IDs in the library. Implementation will provide two complete N4 examples, for local and E2B, referencing four existing cards and two maintained task packages; the ordinary task uses a small MIT-licensed code example. Retain the two existing N1 examples. N8 increases the number of personas and sessions using the same format, without adding an entry point or schema.
 
-`task_package + kind` 与 `task_packages` 必须二选一；列表非空，单元素列表也走统一模型。同轮允许重复 task，但本组规定每个 persona 同轮只出现一次；后续轮次可以换任务。会话数等于每轮计划长度，不超过选中 persona 数；并发上限不超过会话数。
+Exactly one of `task_package + kind` and `task_packages` must be selected; the list must be nonempty, and single-element lists also use the unified model. Tasks may repeat within a round, but this group requires each persona to appear only once per round; tasks may change in subsequent rounds. The session count equals the length of each round's plan and must not exceed the number of selected personas; the concurrency limit must not exceed the session count.
 
-没有显式计划时确定性生成：第 r 轮从 1 开始、槽位 i 从 0 开始，`k=(r-1)*sessions_per_round+i`，依次选择 `persona_ids[k % persona_count]` 与 `task_packages[k % task_count]`。不使用随机数或宿主环境。单用户、两张 persona 卡仍得到 ABAB。这是顺序轮转，不承诺覆盖全部用户×任务组合；对照实验用显式计划指定交叉分配、AABB 或固定分配。
+When no explicit plan is provided, generate one deterministically: round r starts at 1, slot i starts at 0, `k=(r-1)*sessions_per_round+i`, selecting `persona_ids[k % persona_count]` and `task_packages[k % task_count]` in order. Do not use randomness or the host environment. A single user with two persona cards still produces ABAB. This is sequential rotation and does not guarantee coverage of all user × task combinations; controlled experiments use explicit plans to specify cross-assignment, AABB, or fixed assignment.
 
-### 一轮怎样执行
+### How a round executes
 
-同轮所有用户试用同一冻结 Harness SHA，各自从对应任务的干净基线创建工作区。最多 `max_parallel_users` 局同时运行，其余按冻结槽位排队。反馈保留 task/persona/session/round 归属，整轮共用分诊、综合、发散、准入和一次交付闸；完成代码交付、合并与 seal 后，下一轮试用新 Harness。最后一轮仍只试用，不产生额外交付。
+All users in the same round try the same frozen Harness SHA, each creating a workspace from the clean baseline of the corresponding task. At most `max_parallel_users` sessions run simultaneously; the rest queue in frozen slot order. Feedback retains task/persona/session/round attribution, and the entire round shares triage, synthesis, divergence, admission, and one delivery gate; after code delivery, merge, and seal are complete, the next round tries the new Harness. The final round still only performs trials and produces no additional delivery.
 
-N4 表示一轮四局，不表示四条独立进化流水线。一次交付仍改 Harness，不将用户工作区修改合并为被测项目的公共源码。
+N4 means four sessions in one round, not four independent evolution pipelines. Each delivery still changes the Harness; user workspace changes are not merged into the shared source code of the project under test.
 
-命令不变，新示例使用方式：
+Commands remain unchanged. Usage of the new examples:
 
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py check --config examples/experiments/u4-local.json --offline
@@ -262,108 +262,108 @@ uv run --locked --extra experiments python backend/scripts/experiment.py status 
 uv run --locked --extra experiments python backend/scripts/experiment.py collect RUN_ID
 ```
 
-`check --offline` 展示任务清单和逐轮分配预览，明确标记尚未冻结；不启动容器、不联网、不调用模型；`prepare` 冻结并准备全部任务。status 区分逐任务准备、逐轮会话状态和配置并发。local 仪表盘读取本 run 的实时材料；E2B 继续读取最近收集快照，明确标注采集时间。
+`check --offline` displays the task list and a preview of per-round assignments, clearly marking them as not yet frozen; it does not start containers, access the network, or call models. `prepare` freezes and prepares all tasks. status distinguishes per-task preparation, per-round session status, and configured concurrency. The local dashboard reads live materials for this run; E2B continues to read the most recently collected snapshot, clearly labeling the collection time.
 
 ## Reference-level explanation
 
-### 1. 输入与冻结契约
+### 1. Input and freezing contracts
 
-新增 `experiment/workload.py`，只定义 TaskCatalog/SessionPlan 和其校验，不引入通用插件。新输入在 config/materials 边界转换一次，后续均消费唯一内部形态：
+Add `experiment/workload.py`, defining only TaskCatalog/SessionPlan and their validation, without introducing general-purpose plugins. Convert new inputs once at the config/materials boundary; all subsequent stages consume a single internal representation:
 
-- TaskCatalog：`contract_version: 1`，保留配置任务顺序，并构建 `tasks_by_id`。全局任务 ID 唯一，包字段、源码 snapshot、指令、setup 和依赖锁共同形成内容摘要。
-- SessionPlan：`contract_version: 1`，逐轮有序条目包含 round、slot、persona ID、task ID、任务摘要与解析后的 interaction。公开计划继续接受已有 `[persona_id, task_id]`，不新增另一种计划语言。
-- 新冻结 config 使用规范化任务列表，列表顺序参与默认计划与 hash。目录摘要由完整任务材料决定，计划绑定目录/任务摘要进入恢复身份，避免源码变化而身份仍相同。
-- 引用、轮数、每轮槽位数量、persona 同轮唯一、任务 ID 唯一、路径、源码声明与本地 setup/指令均在离线检查时校验。远程 Git 在此阶段只校验无凭证 URL、固定 revision 和包结构；prepare 拉取并核对 revision 后才生成完整源码清单、目录内容摘要和最终计划绑定，不能用占位摘要作为恢复身份。允许 task 同轮和跨轮重复，错误指出字段或任务 ID。
+- TaskCatalog: `contract_version: 1`, preserving the configured task order and building `tasks_by_id`. Task IDs are globally unique, and package fields, source snapshots, instructions, setup, and dependency locks jointly form the content digest.
+- SessionPlan: `contract_version: 1`, with ordered entries for each round containing round, slot, persona ID, task ID, task digest, and resolved interaction. Public plans continue to accept the existing `[persona_id, task_id]`; no additional plan language is introduced.
+- Newly frozen configs use a normalized task list whose order contributes to the default plan and hash. The catalog digest is determined by the complete task materials, and the plan binds catalog/task digests into recovery identity, preventing source changes from retaining the same identity.
+- References, round counts, per-round slot counts, persona uniqueness within each round, task ID uniqueness, paths, source declarations, and local setup/instructions are all validated during offline checks. For remote Git, this stage validates only credential-free URLs, fixed revisions, and package structure; only after prepare fetches and verifies the revision are the complete source inventory, catalog content digest, and final plan bindings generated. Placeholder digests must not be used as recovery identities. Tasks may repeat within and across rounds, and errors identify the field or task ID.
 
-材料布局为 `materials/task-catalog.json`、`materials/session-plan.json`，以及 `materials/tasks/<task_id>/` 下的包、指令、setup、锁和源码 archive；源码树同样按 task 分组。ID 是安全的单路径段，沿用现有合法 SWE ID，包括 `__`，禁止按文件名猜任务身份。各文件注册到现有 hash 清单，一次成功后原子发布；第二个任务冻结失败不能留下可启动半成品。
+The material layout consists of `materials/task-catalog.json`, `materials/session-plan.json`, and packages, instructions, setup, locks, and source archives under `materials/tasks/<task_id>/`; source trees are likewise grouped by task. IDs are safe single path segments, retaining existing valid SWE IDs, including `__`; task identity must not be inferred from filenames. Register all files in the existing hash inventory and publish atomically after the entire operation succeeds; failure to freeze the second task must not leave a launchable partial result.
 
-新 manifest 保持外层 schema 2，增加 `workload_contract_version: 1` 和 `catalog_hash`，plan_hash 指向新 SessionPlan，source_snapshot.entrypoint 指向统一控制器。明确版本而不是凭文件存在猜格式；未知版本拒绝。读取旧冻结 manifest 不走新输入转换，不改原 config/plan/source hash，不补写材料。
+The new manifest retains outer schema 2 and adds `workload_contract_version: 1` and `catalog_hash`; plan_hash points to the new SessionPlan, and source_snapshot.entrypoint points to the unified controller. Use explicit versions rather than inferring formats from file existence; reject unknown versions. Reading old frozen manifests does not invoke the new input conversion, alter original config/plan/source hashes, or backfill materials.
 
-### 2. 任务资源与会话资源分开
+### 2. Separate task resources from session resources
 
-实际资源使用 `resources.task_workspaces[task_id]`，每项记录目录摘要、准备 recipe 摘要、source revision/hash、状态和验证结果。context 引用冻结目录、计划与工作区描述文件。任务资源映射必须与 catalog 集合相等，缺失、错配、旧 recipe 在模型调用前拒绝。凭证仍用现有私有环境传递，不进入冻结材料。
+Actual resources use `resources.task_workspaces[task_id]`, with each entry recording the catalog digest, preparation recipe digest, source revision/hash, status, and verification results. context references the frozen catalog, plan, and workspace descriptor files. The task resource mapping must equal the catalog set; reject missing entries, mismatches, and outdated recipes before model calls. Credentials continue to be passed through the existing private environment and are not included in frozen materials.
 
-task baseline 保存原源码与已验证依赖配方，session workspace 是从它创建的新可写实例。任何用户修改都不进入 baseline，也不被其他用户或下一轮继承。未完成会话重试从干净 baseline 开始，已完整落盘会话通过 reconciliation 跳过。
+The task baseline stores the original source code and verified dependency recipe; a session workspace is a new writable instance created from it. No user changes enter the baseline or are inherited by other users or subsequent rounds. Retries of incomplete sessions start from a clean baseline, while fully persisted sessions are skipped through reconciliation.
 
-缓存键至少覆盖源码、setup、锁、解释器、平台与构建 recipe；可以共享下载缓存、wheel 和 Docker 基础层，不共享可写 repo/venv/editable 元数据，不使用可写硬链接。缓存初始化串行或按内容键加锁，不以 task ID 作为跨 run 缓存证明。缓存允许正常新增内容，但已发布 artifact 不被会话改写，新内容按原子发布规则写入。
+Cache keys must cover at least source code, setup, locks, interpreter, platform, and build recipe; download caches, wheels, and Docker base layers may be shared, but writable repos/venvs/editable metadata must not be shared, and writable hard links must not be used. Cache initialization is serialized or locked by content key; task IDs are not proof of cross-run cache identity. Normal additions to caches are allowed, but published artifacts must not be modified by sessions, and new content is written according to atomic publication rules.
 
-### 3. local 后端
+### 3. local backend
 
-保留每局一个 runnable Docker 容器。共享 controller/OpenAgents/Harness 基础镜像，每任务按固定源码和 setup 构建 seed image；普通/SWE 都消费同一任务包准备合同。资源表保存不可变 image ID/digest，不使用可变 tag 证明身份。任务与 Harness 解释器分离，原 worker 身份、代理与 ownership 校验保留。
+Retain one runnable Docker container per session. Share the controller/OpenAgents/Harness base image, and build a seed image for each task from fixed source code and setup; both ordinary and SWE tasks consume the same task package preparation contract. The resource table stores immutable image IDs/digests, and mutable tags are not used as proof of identity. Separate task and Harness interpreters, retaining existing worker identity, proxy, and ownership checks.
 
-`runtime.local.seed_image` 对单任务保留含义；多任务列表长度大于 1 时若填写该字段，离线报错说明目前不支持一个手工镜像覆盖多任务。自动构建可用，不增加另一套公开 image 列表配置。
+`runtime.local.seed_image` retains its meaning for single tasks; when a multi-task list has more than 1 element, specifying this field causes an offline error explaining that using one manual image for multiple tasks is currently unsupported. Automatic builds remain available, without adding another public image-list configuration.
 
-session 按 task ID 选镜像、启动独立容器，标签绑定 run/config/session/task/round/attempt。逐任务探测实际 source 和依赖；会话容器不挂载其他任务可写目录。stop/destroy 只清理本 run 所有资源，共享镜像缓存不随一个 run 销毁而删除。
+Each session selects an image by task ID and starts an independent container, with labels binding run/config/session/task/round/attempt. Probe actual source code and dependencies for each task; session containers do not mount writable directories for other tasks. stop/destroy cleans up only all resources belonging to this run; shared image caches are not deleted when an individual run is destroyed.
 
-### 4. E2B 后端
+### 4. E2B backend
 
-本组沿用一个实验一个 sandbox。把唯一 `workspace/task` 改为逐任务 baseline 与资源表。准备阶段验证各任务 setup 和依赖；会话执行时复制纯源码，在最终 session 目录重新创建独立 `.venv` 并运行冻结 setup，复用下载/wheel 缓存。setup 明确绑定 `UV_LINK_MODE=copy` 或经过验证的同等隔离机制，禁止 hardlink/symlink 安装模式，验收修改一局 site-packages 不改变另一局或已发布缓存。**不默认搬迁已安装 venv**，避免 editable 安装、shebang、二进制绝对路径与符号链接污染其他会话。
+This group retains one sandbox per experiment. Replace the sole `workspace/task` with per-task baselines and a resource table. During preparation, verify each task's setup and dependencies; during session execution, copy only source code, recreate an independent `.venv` in the final session directory, and run the frozen setup, reusing download/wheel caches. setup explicitly binds `UV_LINK_MODE=copy` or a verified equivalent isolation mechanism; hardlink/symlink installation modes are prohibited, and acceptance verifies that modifying one session's site-packages does not change another session or published caches. **Do not relocate installed venvs by default**, to prevent editable installations, shebangs, absolute binary paths, and symbolic links from contaminating other sessions.
 
-现有 PrebuiltSource 文本替换可能沿着保留的符号链接修改共享目标；新合同不进入该搬迁路径。当前 checkout 的旧 prebuilt 调用接口也增加防共享写入保护及回归测试；旧冻结 run 仍执行自己归档的实现，此保护不声称修复其旧源码。源码复制禁止指向可写 baseline/cache 的外部链接；如有必要内部链接必须解析到本会话范围。验证 `.pth`、PEP660 finder、console-script、import.__file__ 指向本 session，baseline 与已发布缓存 artifact 不被改写，缓存正常填充另行记录。
+Existing PrebuiltSource text replacement may modify shared targets through retained symbolic links; the new contract does not enter that relocation path. Also add protection against shared writes and regression tests to the old prebuilt call interface in the current checkout; old frozen runs still execute their own archived implementations, and this protection does not claim to fix their old source code. Source copying prohibits external links pointing to writable baselines/caches; any necessary internal links must resolve within the current session. Verify that `.pth`, the PEP660 finder, console-script, and import.__file__ point to the current session, and that baselines and published cache artifacts are not modified; record normal cache population separately.
 
-session 工作区位于本 run 私有目录，按 session/attempt 记录所有权，执行完回收整个 attempt 目录，不在 `/tmp` 留无主父目录。setup、launch 之前绑定身份，失败也有对应资源诊断；超时或取消先按 attempt 的 PID/进程组身份终止并确认子进程退出，再删除目录，不能只在 finally 中删目录而留下安装进程；无法确认进程退出时保留诊断并拒绝复用该 attempt。管理操作使用管理身份；用户/Harness/交付保留已有非 root 契约。
+Session workspaces reside in this run's private directory, with ownership recorded by session/attempt. Reclaim the entire attempt directory after execution, leaving no orphaned parent directories in `/tmp`. Bind identity before setup and launch, ensuring corresponding resource diagnostics exist even on failure; on timeout or cancellation, first terminate processes using the attempt's PID/process-group identity and confirm that child processes have exited, then delete the directory. Merely deleting directories in finally while leaving installation processes running is prohibited; if process exit cannot be confirmed, retain diagnostics and reject reuse of that attempt. Management operations use the management identity; users/Harness/delivery retain the existing non-root contract.
 
-禁止线程改 `os.environ`、进程 cwd 或全局 profile 来切换任务；PATH/VIRTUAL_ENV/cwd 与元数据绑定在会话 runtime。准备可顺序构建任务，用户阶段按冻结并发上限运行，不自动扩缩容。仍使用现有固定 Python 版本，不新增每任务自选解释器字段；不同依赖不代表支持任意 Python 版本。
+Threads must not change `os.environ`, process cwd, or global profiles to switch tasks; PATH/VIRTUAL_ENV/cwd and metadata are bound to the session runtime. Preparation may build tasks sequentially; the user phase runs according to the frozen concurrency limit, without automatic scaling. Continue using the existing fixed Python version, without adding a field for tasks to select their own interpreters; different dependencies do not imply support for arbitrary Python versions.
 
-独立目录保证正常并发修改与依赖导入互不污染，**不提供同 Unix 用户之间的恶意跨目录访问防护**。本组不新增每 session sandbox/UID，不承诺 Docker 等价安全边界。E2B sandbox 丢失仍按现有 LOST 处理，不顺带新增失效沙箱自动重建/历史追加轮能力。
+Independent directories prevent normal concurrent modifications and dependency imports from contaminating each other; **they do not protect against malicious cross-directory access by the same Unix user**. This group does not add per-session sandboxes/UIDs or promise a Docker-equivalent security boundary. Loss of an E2B sandbox continues to be handled as LOST under existing behavior; automatic rebuilding of failed sandboxes and appending rounds to historical runs are not added as incidental features.
 
-收集准备/会话诊断、结果及环境摘要，继续排除 `.venv`、私有 HOME、凭证和下载缓存，不把完整依赖环境加入证据包。
+Collect preparation/session diagnostics, results, and environment summaries, continuing to exclude `.venv`, private HOME directories, credentials, and download caches; do not include complete dependency environments in evidence bundles.
 
-### 5. 统一控制器与逻辑会话身份
+### 5. Unified controller and logical session identity
 
-新增 `controllers/unified.py`；共同设施移入 `controllers/runtime.py`，只负责上下文、Harness/Tracker、角色工厂、Vigil 与清理。删除当前 checkout 的 ordinary/SWE 双份控制器，更新维护中的导入与测试；旧实验已冻结这两个模块，不保留 forwarding wrapper。现有 loop 和 seed source 继续复用。
+Add `controllers/unified.py`; move shared facilities into `controllers/runtime.py`, responsible only for context, Harness/Tracker, role factories, Vigil, and cleanup. Delete the duplicate ordinary/SWE controllers from the current checkout and update maintained imports and tests; old experiments have frozen these two modules, so no forwarding wrappers are retained. Continue reusing the existing loop and seed source.
 
-根据 catalog 组装场景，逐轮计划决定 persona/task 分配，交给同一个 Orchestrator。控制器另外传入从冻结 catalog 派生的只读 `task_kinds` 映射，使缓存核验在解析工作区前也能比对任务类型；此映射不增加会话计划字段或改变操作键。沿用 mixed session factory 路由 direct/simulated，不再从一个全局 TASK_PACKAGE 生成所有场景。需求角色、分组策略、预算、背压、交付闸、超时诊断、最后一轮只试用和 round seal 共用一条流程。
+Assemble scenarios from the catalog, use per-round plans to determine persona/task assignments, and pass them to the same Orchestrator. The controller also passes a read-only `task_kinds` mapping derived from the frozen catalog so cache verification can compare task types even before workspace resolution; this mapping neither adds session plan fields nor changes operation keys. Retain mixed session factory routing for direct/simulated sessions, and stop generating all scenarios from a single global TASK_PACKAGE. Required roles, grouping policies, budgets, backpressure, delivery gates, timeout diagnostics, trial-only final rounds, and round seals share one workflow.
 
-稳定 session ID 仍由 Orchestrator/RecoveryStore 一处生成，逻辑输入为冻结 round、slot、persona、task 摘要和 interaction，置于对应 run 的命名空间。资源路径、容器/sandbox ID、临时 tag、时间不参与该身份。需同时将 **round frozen plan、用户 unit key、unit input_digest** 改为相同逻辑绑定，不能只换 key 而保留含动态路径的 unit input。动态 WorkspaceSpec 在未完成会话执行前由 catalog 和验证后的资源表解析；现有非实验 loop 调用继续支持原协议。
+Stable session IDs continue to be generated in one place by Orchestrator/RecoveryStore, with logical inputs consisting of frozen round, slot, persona, task digest, and interaction, within the corresponding run's namespace. Resource paths, container/sandbox IDs, temporary tags, and timestamps do not contribute to this identity. **round frozen plan, user unit key, and unit input_digest** must all be changed to use the same logical binding; changing only the key while retaining unit input containing dynamic paths is insufficient. Dynamic WorkspaceSpec is resolved from the catalog and verified resource table before an incomplete session executes; existing non-experiment loop calls continue to support the original protocol.
 
-materialize/setup/launch 和首次模型回调前就绑定 session/task/persona/round/slot/本轮 Harness SHA。同一 session ID 用于恢复、SessionStore、usage、live 与 Issue→证据关联；live 槽为 `user-{session_id}`，persona 是标签，direct/simulated 都有开始、完成和异常状态。mixed wrapper 必须转发 `load_completed_session`，保留 reconciliation 快路径。
+Bind session/task/persona/round/slot/this round's Harness SHA before materialize/setup/launch and the first model callback. Use the same session ID for recovery, SessionStore, usage, live, and Issue→evidence associations; the live slot is `user-{session_id}`, with persona as a label, and both direct/simulated sessions have started, completed, and exception states. The mixed wrapper must forward `load_completed_session`, preserving the reconciliation fast path.
 
-Session/scenario 和索引中的任务归属增量加入兼容元数据，旧数据仍可读取。需求证据 L1 摘要增加 task ID/digest/kind，防止跨任务合成时丢失来源；不加入资源路径或把某用户体感自动升级为已确认事实。新结果的归属必须与冻结计划一致。
+Incrementally add compatible metadata for session/scenario and task ownership in the index; old data must remain readable. The requirements-evidence L1 summary adds task ID/digest/kind to prevent loss of provenance when synthesizing across tasks; do not add resource paths or automatically promote a user's experience into a confirmed fact. New result ownership must match the frozen plan.
 
-复用结果前比对 session/persona/task/digest/round/slot 与冻结 binding；只有 session ID 相同不构成来源证明，错配结果不得完成 unit 或生成 L1。已完成且归属相符的 SessionStore 结果先修复索引再跳过执行；两局完成第三局因 provision/setup/未捕获 runner 异常而 unit 未完成，只重试未完成局和后续依赖。存在未终结 unit 时不能进入需求/交付或 sealed。任务没完成、用户不满意，以及已被 runner 保存为终结结果的 `infrastructure_failure` 与执行异常不同：保留其 outcome/evaluation 状态和证据准入语义，不能当作成功通过，也不能阻止所有失败反馈进入需求。本组不增加最终 Session 的自动重试/晋升协议；完整文件 reconciliation 不改写同 ID 的最终内容。stop 清理活跃 session 与工具进程，重复 resume 不复制 Issue 或用户结果。实际 provider 丢失按原生命周期处理，不能把逻辑身份独立于路径误当成自动恢复一切资源。
+Before reusing a result, compare session/persona/task/digest/round/slot with the frozen binding; a matching session ID alone does not prove provenance, and mismatched results must not complete a unit or generate L1. For completed SessionStore results with matching ownership, repair the index first and then skip execution; if two sessions are complete and the third is incomplete because of provision/setup/an uncaught runner exception, retry only the incomplete session and its downstream dependencies. When any unit is not finalized, do not enter requirements/delivery or sealed. A task that is incomplete or unsatisfactory to the user, and `infrastructure_failure` already saved by the runner as a terminal result, are different from an execution exception: preserve their outcome/evaluation states and evidence-admission semantics, do not treat them as successful passes, and do not prevent all failure feedback from entering requirements. This group does not add an automatic retry/promotion protocol for the final Session; full-file reconciliation must not rewrite the final content for the same ID. stop cleans up active sessions and tool processes; repeated resume must not duplicate Issues or user results. Actual provider loss follows the original lifecycle and must not treat logical identity independent of the path as automatic recovery of all resources.
 
-### 6. 启动、观察与收集
+### 6. Startup, Observation, and Collection
 
-engine 根据明确 workload 契约版本、已知 recipe 和冻结源码清单，启动新统一模块或旧 module/script。禁止任意模块、当前 checkout 回退。兼容范围仅为既有 schema-2 module/script 配方，不包括退出的 v1 CLI 或历史研究产物导入。旧运行使用原 context/env、单任务资源与后端配方；新运行使用 catalog/plan/resource map。兼容分支限定在 manifest/recipe/backend 边界，不贯穿用户与需求核心。
+The engine starts a new unified module or an old module/script according to an explicit workload contract version, known recipe, and frozen source manifest. Arbitrary modules and fallback to the current checkout are prohibited. Compatibility is limited to existing schema-2 module/script recipes and does not include retired v1 CLI or historical research artifact imports. Old runs use the original context/env, single-task resources, and backend recipe; new runs use catalog/plan/resource map. The compatibility branch is confined to the manifest/recipe/backend boundary and does not extend through the user and requirements core.
 
-status 从恢复账本派生逐轮已完成/运行中/待运行/失败局数，并显示逐任务准备结果。无账本或 provider 不可访问时报告 unknown，不用配置数量假装已完成数量。dashboard 的用户条目、会话详情显示 task/persona/session/round/Harness SHA；E2B 继续执行 collection generation 检查，快照与实时状态标识不变。
+status derives the completed/running/pending/failed session counts round by round from the recovery ledger and displays per-task preparation results. When there is no ledger or the provider is inaccessible, report unknown rather than pretending the number of configurations is the number completed. The dashboard's user entries and session details display task/persona/session/round/Harness SHA; E2B continues to perform the collection generation check, and snapshot and live-state markers remain unchanged.
 
-collect 包含冻结目录与计划、所有会话与轨迹、角色调用、轮次 seal、准备/失败诊断和原证据材料。仍以 SessionStore/RecoveryStore 等现有材料为权威，不增加第二份结果数据库。冻结 manifest 不记录动态事实，动态数据进入 runtime/resources/receipts；销毁前收集检查保持原合同。
+collect includes the frozen directory and plan, all sessions and traces, role calls, round seals, preparation/failure diagnostics, and original evidence materials. SessionStore/RecoveryStore and other existing materials remain authoritative; do not add a second results database. The frozen manifest must not record dynamic facts; dynamic data goes into runtime/resources/receipts; the pre-destruction collection check retains its original contract.
 
-### 7. 验收与任务分解
+### 7. Acceptance and Task Breakdown
 
-离线闭环脚本：`backend/scripts/e2e-spec-0073-multi-task-users.sh`。调用真正的配置编译、用户分派、Orchestrator、SessionStore 与恢复逻辑，provider 替身仅模拟 Docker/E2B 边界，不能直接预写用户结果当作通过。
+Offline end-to-end script: `backend/scripts/e2e-spec-0073-multi-task-users.sh`. Invoke the actual configuration compilation, user assignment, Orchestrator, SessionStore, and recovery logic; provider substitutes may simulate only the Docker/E2B boundary and must not directly prewrite user results as a pass.
 
-| 场景 | 可验证结果 |
+| Scenario | Verifiable result |
 | --- | --- |
-| 旧 N1 输入、ABAB/AABB | 新 prepare 走统一 controller，顺序及原策略/凭证语义保留 |
-| 单任务 N4/N8 | 4/8 个不同用户的独立 session，实测活跃数不超并发上限，全部完成前不交付 |
-| ordinary + SWE、direct + simulated | 实际选对源码、指令、setup、依赖和交互工厂，不能只断言列表有两个 ID |
-| 同 task 两用户 | 改一份 repo/venv/导入对象，另一份与 baseline 保持不变；证据归属正确 |
-| 不同依赖并发 | shell 各自找到任务环境，editable import/entrypoint 指向各自 session，环境切换无全局变量竞争 |
-| 中断及一局执行异常恢复 | 完整结果不重跑、ID 不变、无重复 Issue；仅未完成 unit 重试，随后正确交付/seal；已保存的失败反馈仍按原准入进入需求 |
-| 逻辑绑定与资源参数分离 | 改替身中的工作区坐标，round/key/input_digest 不漂移；不声称支持 LOST 云沙箱重建 |
-| setup 派生子进程后超时 | 按 attempt 终止完整进程组再清理，无遗留安装进程修改缓存/其他会话 |
-| 正确 session ID、错误 task/digest 的缓存结果 | reconciliation 拒绝复用和 L1 生成，不冒认用户 unit 完成 |
-| freeze/provision 中途失败 | 不发布半成品，错误关联具体 task；只清理本 run 资源，不串缓存 |
-| 单包/列表并存、重复 ID、未知契约或目录/计划不匹配 | 离线或启动前明确拒绝，不能回退第一任务 |
-| 材料或资源被替换 | 模型调用前拒绝错配，收集不混其他 run |
-| 旧冻结 module/script | 原 manifest/hash/context/source 不变，从 archive 启动；未知版本/recipe 拒绝 |
-| 观察与证据 | live 不覆盖，session/task/persona/round 全链路相符，L1 保留 task 来源，E2B 标注采集快照 |
+| Old N1 input, ABAB/AABB | New prepare uses the unified controller while preserving ordering and the original strategy/credential semantics |
+| Single-task N4/N8 | 4/8 independent sessions for different users, measured active count does not exceed the concurrency limit, and delivery does not occur until all are complete |
+| ordinary + SWE, direct + simulated | The correct source, instructions, setup, dependencies, and interaction factory are actually selected; it is not enough to assert that two IDs exist in a list |
+| Two users on the same task | Modify one repo/venv/imported object while the other remains unchanged from baseline; evidence ownership is correct |
+| Concurrent runs with different dependencies | Each shell finds its own task environment; editable import/entrypoint points to its own session; environment switching has no global-variable race |
+| Interruption and recovery from an execution exception in one session | Complete results are not rerun, IDs remain unchanged, and no duplicate Issue is created; only incomplete units are retried, followed by correct delivery/seal; saved failure feedback enters requirements according to the original admission rules |
+| Separation of logical binding and resource parameters | Changing workspace coordinates in the substitute does not drift round/key/input_digest; do not claim support for reconstructing LOST cloud sandboxes |
+| Timeout after setup spawns child processes | Terminate the complete process group by attempt before cleanup, with no leftover installation process modifying the cache or other sessions |
+| Correct session ID with incorrect task/digest cached result | Reconciliation rejects reuse and L1 generation and does not falsely claim that the user unit is complete |
+| Failure midway through freeze/provision | Do not publish a partial result; associate the error with the specific task; clean up only resources from this run and do not cross-contaminate caches |
+| Single package/list coexistence, duplicate IDs, unknown contract, or directory/plan mismatch | Reject clearly offline or before startup; do not fall back to the first task |
+| Materials or resources replaced | Reject the mismatch before model invocation; collection must not mix in another run |
+| Old frozen module/script | Keep the original manifest/hash/context/source unchanged and start from the archive; reject unknown versions/recipes |
+| Observation and evidence | Live data is not overwritten; session/task/persona/round match across the full chain; L1 retains task provenance; E2B labels collection snapshots |
 
-真实后端另需 local/E2B 各两轮 N4、至少两任务、并发 2，包含停止与恢复；首轮反馈进入非空需求/交付，记录下一轮 Harness seal/试用结果。记录模型、任务、时刻、环境摘要和 run ID，不能用 provider mock 或零 Issue 空交付冒充完整闭环实测。环境/模型不可用时明确报告未验证，不宣称通过。
+The real backend additionally requires two N4 rounds each on local/E2B, at least two tasks, and concurrency 2, including stop and recovery. First-round feedback must enter non-empty requirements/delivery, and the next round's Harness seal/trial results must be recorded. Record the model, tasks, timestamp, environment summary, and run ID; do not present a complete end-to-end live test using provider mocks or an empty-Issue delivery. When the environment/model is unavailable, explicitly report that it was not verified and do not claim a pass.
 
-文件完整分配在 frontmatter，集合互不重叠；下表说明职责：
+The complete file allocation is in frontmatter, and the sets must not overlap; the table below describes responsibilities:
 
-| Task | 职责 | 依赖 |
+| Task | Responsibility | Dependencies |
 | --- | --- | --- |
-| T1 | 输入 schema、TaskCatalog/SessionPlan、冻结/context、配置与材料测试 | 无 |
-| T2 | local 任务镜像/工作区映射、Docker session 身份与隔离测试 | T1 |
-| T3 | E2B 初始化、session 环境重建、prebuilt 保护与隔离测试 | T1 |
-| T4 | controller 合并、逻辑身份、两种交互、SessionStore/live/usage、证据归属 | T1、T2、T3 |
-| T5 | recipe/旧运行兼容、status/collect、dashboard/API/UI | T4 |
-| T6 | N4 示例、普通任务、双语教程、仓库检查、集成脚本、验收报告 | T5 |
+| T1 | Input schema, TaskCatalog/SessionPlan, freeze/context, configuration and material tests | None |
+| T2 | Local task mirroring/workspace mapping, Docker session identity and isolation tests | T1 |
+| T3 | E2B initialization, session environment reconstruction, prebuilt protection and isolation tests | T1 |
+| T4 | Controller integration, logical identity, two interactions, SessionStore/live/usage, evidence ownership | T1, T2, T3 |
+| T5 | Recipe/old-run compatibility, status/collect, dashboard/API/UI | T4 |
+| T6 | N4 examples, ordinary tasks, bilingual tutorials, repository checks, integration scripts, acceptance report | T5 |
 
 ```mermaid
 flowchart LR
@@ -378,37 +378,37 @@ flowchart LR
 
 ## Drawbacks
 
-多任务增加冻结、依赖构建、磁盘和模型成本。E2B 每局重新 setup 比复制可搬迁环境慢，但避免不可靠路径替换；优先正确性，以下载/wheel 缓存减轻成本。选择 N8 不等于有足够内存，本组不自动提高 CPU/内存或并发。
+Multiple tasks increase the cost of freezing, dependency builds, disk space, and models. Re-running setup for each E2B session is slower than copying a portable environment, but avoids unreliable path replacement; prioritize correctness and mitigate the cost with download/wheel caches. Choosing N8 does not imply sufficient memory; this group does not automatically increase CPU/memory or concurrency.
 
-控制器合并和旧冻结契约兼容有一次性重构成本，真实交付验证也比检查 JSON 耗时。为限制长期复杂度，新 N1 也走统一控制器，兼容仅服务旧冻结 run，不维护三条新业务链。
+Merging the controller and maintaining compatibility with old frozen contracts impose one-time refactoring costs, and verifying real delivery also takes longer than checking JSON. To limit long-term complexity, new N1 also goes through the unified controller; compatibility serves only old frozen runs, and three new business pipelines are not maintained.
 
-persona 同轮唯一不覆盖“同一个用户同轮做多个任务”；E2B 同 sandbox 不提供不可信用户之间的安全隔离。这两点写入公开文档，不作为隐藏承诺。
+Uniqueness of a persona within a round does not cover “the same user performing multiple tasks in the same round”; an E2B sandbox does not provide security isolation between untrusted users. These two points are stated in public documentation and are not hidden promises.
 
 ## Rationale and alternatives
 
-- **仅放开用户数量**：简单，但不能保证任务选择、依赖隔离与证据归属，因此不采用。
-- **另加 mixed/N4/N8 控制器或脚本**：短期适配快，长期每次恢复/预算修复要更新多份。选择一个控制器，任务差异在 workspace 供给端结束。
-- **公开旧 pool/parquet/seed 配置**：让用户理解多套材料。选择 task-package-v1 列表，旧单包输入只在边界转换；历史导入另行设计。
-- **强制 schema 3 和重写 N1**：本组是受控增加，旧字段语义不变。维持 schema 2，新增明确冻结材料版本，旧运行不重写。
-- **每任务独立 Harness 流水线**：会变成多条实验。本组同轮共享 Harness SHA，反馈聚合后一次交付。
-- **复制任意 venv 或每 session 一个 E2B sandbox**：前者不能可靠保证 editable/链接隔离，后者扩大资源生命周期。本组 session 重建环境，保留单 sandbox 并明确安全边界。
+- **Only increase the number of users**: Simple, but it cannot guarantee task selection, dependency isolation, or evidence ownership, so this is not adopted.
+- **Add a separate mixed/N4/N8 controller or script**: Fast to adapt in the short term, but every recovery/budget fix would require updating multiple copies in the long term. Use one controller, with task differences ending at the workspace provisioning layer.
+- **Expose the old pool/parquet/seed configurations**: This would make users understand multiple sets of materials. Choose the task-package-v1 list; convert old single-package input only at the boundary; design historical imports separately.
+- **Require schema 3 and rewrite N1**: This group is a controlled addition, and the semantics of old fields remain unchanged. Keep schema 2, add an explicit frozen-material version, and do not rewrite old runs.
+- **Independent Harness pipeline for each task**: This would become multiple experiments. This group shares one Harness SHA within a round and delivers once after aggregating feedback.
+- **Copy an arbitrary venv or use one E2B sandbox per session**: The former cannot reliably guarantee isolation for editable/link-based imports, while the latter expands the resource lifecycle. This group reconstructs the environment per session, retains a single sandbox, and makes the security boundary explicit.
 
-不添加 provider 插件框架、任务模式注册中心或任意回调 DSL；新增模型只表达任务材料、逻辑会话绑定与实际资源三种事实。
+Do not add a provider plugin framework, task-mode registry, or arbitrary callback DSL; the new model expresses only three facts: task materials, logical session binding, and actual resources.
 
 ## Prior art
 
-本仓 Orchestrator 已支持 fixed_set/逐轮计划、用户线程池、共享 Harness SHA、RecoveryStore、SessionStore reconciliation 与交付闸。DockerSeedSource 每次 provision 启动独立容器；PrebuiltSource 已能复制目录，但任意 venv 文本搬迁不作为新合同的正确性基础。
+This repository's Orchestrator already supports fixed_set/per-round plans, a user thread pool, shared Harness SHA, RecoveryStore, SessionStore reconciliation, and the delivery gate. DockerSeedSource starts an independent container for each provision; PrebuiltSource can copy directories, but arbitrary venv text relocation is not a correctness basis for the new contract.
 
-task-package-v1 已统一 ordinary/SWE 来源、指令和 setup，mixed session factory 已按 interaction 分派。此组补齐材料、资源、控制器与观察端的单任务假设，复用现有闭环。
+task-package-v1 already unifies ordinary/SWE sources, instructions, and setup, and the mixed session factory dispatches by interaction. This group fills in the single-task assumptions in the materials, resources, controller, and observation layers while reusing the existing end-to-end loop.
 
 ## Unresolved questions
 
-草案没有悬而未决的接口选择；审阅重点是三项已写明取舍：新列表不填全局 kind、persona 同轮唯一、E2B 单 sandbox 且各 session 重建环境。若修改，需同步公开校验、生命周期与验收，不能只改示例。
+The draft has no unresolved interface choices; review should focus on the three explicit tradeoffs: the new list does not populate a global kind, persona uniqueness within a round, and one E2B sandbox with environment reconstruction per session. If changed, public validation, lifecycle, and acceptance must be updated together; changing only the examples is insufficient.
 
-真实后端/模型是否可用属于验收执行前提，不改变配置合同；未完成的在线验证明确写进报告。
+Whether the real backend/model is available is a prerequisite for acceptance execution and does not change the configuration contract; incomplete online verification must be explicitly recorded in the report.
 
 ## Future possibilities
 
-历史产物导入与新 run lineage、追加轮次、批量实验薄封装、基于封存 Harness SHA 的独立官方评分，分别作为后续组，依赖稳定任务目录与会话归属，不成为本组实施条件。
+Historical artifact imports and new-run lineage, appended rounds, a thin batch-experiment wrapper, and independent official scoring based on an archived Harness SHA are separate future groups. They depend on a stable task catalog and session ownership and are not implementation conditions for this group.
 
-同 persona 同轮多任务、E2B 独立会话 sandbox、CI runner、纯文本任务、旧 seed 库转换及任意自托管 Gitea 都单独明确边界。本组不恢复归档入口，不修改研究 archive 来声称历史迁移完成，也不将全部历史功能一次塞入 schema。
+Multiple tasks for the same persona in the same round, independent E2B session sandboxes, CI runners, plain-text tasks, old seed-library conversion, and arbitrary self-hosted Gitea each require an explicitly separate boundary. This group does not restore archive entry points, modify the research archive to claim historical migration is complete, or put all historical functionality into the schema at once.

@@ -1,4 +1,4 @@
-# Spec-0047/T3：mock Docker 的双实验隔离与 destroy 确认。
+# Spec-0047/T3: mock Docker dual-experiment isolation and destroy confirmation.
 from __future__ import annotations
 
 import re
@@ -120,7 +120,7 @@ def test_provision_stop_destroy_use_project_and_labels(tmp_path: Path) -> None:
             },
             run=docker,
         )
-    with pytest.raises(InfrastructureError, match="不一致"):
+    with pytest.raises(InfrastructureError, match="do not match"):
         destroy_stack(
             dest=dest,
             experiment_id="exp-a",

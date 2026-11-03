@@ -1,9 +1,12 @@
-# Spec-0032/T4：需求面编排——生成段两拍（triage 分片∥divergent → architect）→ Owner 准入。
-# Spec-0050/T3：非末轮准入后等本轮 admitted 票终态；末轮只跑用户，不再需求/交付。
-"""闭环编排 orchestrator（需求面）。
+# Spec-0032/T4: requirement-plane orchestration — two phases of generation (triage partitioning ∥ divergent → architect) → owner admission.
+# Spec-0050/T3: after non-final-round admission, wait for this round's admitted tickets to reach terminal state; final round runs user sessions only, no generation/delivery gates.
+"""Orchestrate demand generation and delivery across evolution rounds.
 
-非末轮：用户测当前 main → 生成两拍 → Owner 准入 → 等待本轮 admitted 票终态 → 回灌 sealed SHA。
-末轮：只跑用户，不调生成/Owner/交付闸。卡死抛 RoundDeliveryBlocked，不开下一轮用户。
+Non-final rounds: users test current main, proposals are generated in two stages, Owner admits
+issues, and the round waits for those issues to reach terminal states before returning the
+sealed SHA as feedback. The final round runs user sessions only, without generation, Owner,
+or delivery gates. A blocked delivery raises RoundDeliveryBlocked and prevents the next
+round's user sessions from starting.
 """
 
 from __future__ import annotations
@@ -48,10 +51,12 @@ type SessionPlan = Sequence[SessionPair] | Callable[[], Sequence[SessionPair]]
 
 
 class SessionRunner(Protocol):
-    """跑一局会话：(persona, scenario, harness) -> 任意（产物由实现落盘/提交，编排不关心返回）。
+    """Run a session for (persona, scenario, harness); the return value is unrestricted.
 
-    Spec-0008/T1 v2：可选 keyword `workspace_dir`——orchestrator 每局先 materialize 的共享工作区，
-    既经 launcher 注入 harness，也由此传给会话实现绑定内层 client（缺省 None 退化为今天行为）。
+    The implementation persists or submits outputs; orchestration does not consume the return value.
+    Spec-0008/T1 v2: optional keyword `workspace_dir` is the shared workspace materialized by the
+    orchestrator before each session. The launcher supplies it to the harness, and the session
+    implementation uses it to bind the inner client. None preserves the legacy behavior.
     """
 
     def __call__(
@@ -65,7 +70,7 @@ class SessionRunner(Protocol):
 
 
 class Orchestrator:
-    """把 a→b→c 串成可重复进化轮次。各部件依赖注入。"""
+    """Chain a→b→c into repeatable evolution rounds. Each component uses dependency injection."""
 
     def __init__(
         self,
@@ -94,27 +99,28 @@ class Orchestrator:
     ) -> None:
         self._round_assessment = round_assessment
         self._launcher = launcher
-        self._harness_repo = harness_repo  # Spec-0007/T2：解析 main HEAD SHA 用的 harness 仓
-        # 固定列表 = 每轮同一套；callable = 每轮重新抽（如有放回随机 persona×task）。
+        # Spec-0007/T2: harness repository used to parse main HEAD SHA
+        self._harness_repo = harness_repo
+        # Fixed list = same set per round; callable = re-drawn per round (e.g., random sampling with replacement over persona×task).
         self._fixed_set = fixed_set
-        # 生成段两拍：第一拍 triage 分片 ∥ divergent；第二拍 architect；然后 Owner 唯一准入。
+        # Two phases of generation: first phase triage partitioning ∥ divergent; second phase architect; then owner does the single admission.
         self._triagers = triagers or []
         self._architects = architects or []
         self._divergents = divergents or []
-        # Owner（Spec-0029/T6，恒 1）：None = 跳过准入段（提案积压，向后兼容旧测/无 Owner 场景）。
+        # Owner (Spec-0029/T6, always 1): None = skip admission phase (proposal backlog accumulates, backward compatible with old tests/scenarios without owner).
         self._owner = owner
         self._run_session = run_session_fn
-        self._initial_ref = initial_ref  # 跟踪的主干分支名（trunk = "main"），每局解析其 HEAD SHA
-        # 轮次观测回调（可选）：round 从 1 起；end 时携带本轮 main 最新 SHA。看板运行态由此得知轮数。
+        self._initial_ref = initial_ref  # Tracked trunk branch name (trunk = "main"), parse its HEAD SHA per session
+        # Round observability callback (optional): round starts from 1; end carries this round's latest main SHA. Dashboard run state is determined from this.
         self._on_round_start = on_round_start
         self._on_round_end = on_round_end
-        # Spec-0017/T3：a 段用户会话并发度（并发单元=整局会话）。默认 1 = 与旧串行行为等价。
-        # 注：生成段在同轮内线程池并行（只读 harness + 写 tracker），不碰 git push。
+        # Spec-0017/T3: concurrency level for phase-a user sessions (concurrency unit = entire session). Defaults to 1 = equivalent to old serial behavior.
+        # Note: generation phase parallelizes within the same round using thread pool (read-only harness + write tracker), no git push.
         self._max_parallel_users = max(1, max_parallel_users)
-        # Spec-0021/T1：编排仓完整性绊线（可选）。每轮末调用一次——本进程内 agent（生成器/Owner）
-        # 或同机交付面 agent 逃逸改动编排仓即抛错中止本轮（fail-closed）。None 则跳过。
+        # Spec-0021/T1: orchestration repo integrity tripwire (optional). Invoked once per round end — agents within this process (generators/owner)
+        # or delivery-plane agents on same machine escape and modify orchestration repo → raise error and abort this round (fail-closed). None = skip.
         self._integrity_guard = integrity_guard
-        # Spec-0050/T3：读单票状态供交付闸；测试可注入 wait_delivery 避免真轮询。
+        # Spec-0050/T3: read single ticket state for delivery gate; tests can inject wait_delivery to avoid real polling.
         self._fetch_issue = fetch_issue
         self._wait_delivery = wait_delivery
         # Spec-0064/T2: when present, run_round delegates to the durable stage
@@ -196,20 +202,20 @@ class Orchestrator:
             if number is None:
                 raise ValueError("recoverable run_round requires round_no or a bound round context")
             return self._run_recoverable_round(ref=ref, deliver=deliver, round_no=number)
-        # Spec-0007/T2：传入的 ref 仅为「上一轮观测游标」透传（供 harbor runner 的 checkpoint 续跑链），
-        # trunk 永远跟 live main、不据此 pin——本轮起始解析 main 当前 HEAD SHA 作会话级快照锚点。
+        # Spec-0007/T2: passed ref is merely last round's observation cursor (forwarded for harbor runner's checkpoint resumption chain),
+        # trunk always follows live main, not pinned by this — this round parses current main HEAD SHA as session-level snapshot anchor point.
         sha = self._resolve_head(ref=self._initial_ref)
 
-        # a：固定集每个 (persona, scenario) 按该 main SHA launch 跑一局，产 issue（→tracker）+ 体感（→store）。
-        #    launcher 按 SHA checkout → 同一会话内多轮 send 跑同一 SHA 快照，harness 不在脚下变。
-        #    Spec-0008/T1 v2：每局先备一份**共享工作区**，同一目录既经 launcher 注入 harness
-        #    （SANDBOX_WORK_DIR）又传给会话绑定内层 client——harness 改、用户 agent 同目录核实。
-        #    git/fixture 型种子 materialize + ensure_deps；纯文本卡（workspace=None）也开一个空的
-        #    scratch（每局新建、隔离），确保用户 agent 落到 harness 同一工作目录真核实，而非只凭
-        #    harness 回复"嘴上验"（否则无环境时会脑补"测试通过"污染体感）。
-        #    Spec-0017/T3：拆两阶段——阶段一串行备工作区（materialize/ensure_deps 走 git clone 缓存
-        #    等共享资源，前移规避并发竞争）；阶段二线程池并行跑会话（launch + run_session 一整包，
-        #    并发单元=整局会话，信封内部时序不动）。max_parallel_users=1 时行为与旧串行等价。
+        # Phase a: each fixed-set (persona, scenario) launches one session against that main SHA, produces issues (→tracker) + subjective experience (→store).
+        #    launcher checkouts by SHA → multiple send calls within same session run the same SHA snapshot, harness does not change under foot.
+        #    Spec-0008/T1 v2: prepare one **shared workspace** per session, same directory is both injected via launcher into harness
+        #    (SANDBOX_WORK_DIR) and passed to session implementation binding inner client — harness changes, user agent validates in same directory.
+        #    git/fixture-type seeds materialize + ensure_deps; plain-text cards (workspace=None) also open one empty
+        #    scratch (fresh per session, isolated), ensuring user agent validates in same directory as harness, not just "mouth-verified"
+        #    harness replies (else when environment missing, confabulates "test passed" polluting subjective experience).
+        #    Spec-0017/T3: split into two phases — phase one serially prepares workspace (materialize/ensure_deps uses git clone cache
+        #    shared resources, moved forward to avoid concurrent contention); Phase 2 uses thread pool to run sessions in parallel (launch + run_session as a complete unit,
+        #    concurrency unit = entire session, envelope-internal sequencing unchanged). When max_parallel_users=1, behavior is equivalent to the old serial mode.
         prepared: list[tuple[Persona, SeedScenario, WorkspaceRuntime]] = []
         planned = list(self._session_plan())
         for persona, scenario in planned:
@@ -218,17 +224,17 @@ class Orchestrator:
                     workspace_dir = as_runtime(
                         materialize_workspace(scenario.workspace), owns_tmp=True
                     )
-                    # Spec-0009/T3：materialize 之后、launch 之前按 scenario.workspace.setup 备好依赖
-                    # （约定建 per-workspace .venv）——两侧共享的这个目录开跑前就绪。
+                    # Spec-0009/T3: After materialize and before launch, prepare dependencies per scenario.workspace.setup
+                    # (convention: create per-workspace .venv) -- this shared directory is ready before launch.
                     ensure_deps(workspace_dir, scenario.workspace)
                 else:
                     workspace_dir = make_empty_runtime()
             except Exception:  # noqa: BLE001
-                # 单局 clone/setup 失败（如老仓 pip 装不上）先记日志跳过；若整轮都失败，
-                # 下面的 all-user-sessions-failed 闸会阻止本轮继续。
+                # Single session clone/setup failure (e.g., pip install fails on old repo) is logged and skipped; if the entire round fails,
+                # the all-user-sessions-failed gate below will prevent this round from continuing.
                 print(
-                    f"[orchestrator] 备工作区失败（persona={persona.identity}），"
-                    "跳过该局，同轮其余会话继续："
+                    f"[orchestrator] Workspace preparation failed (persona={persona.identity}); "
+                    "skipping this session; other sessions in the round continue: "
                 )
                 traceback.print_exc()
                 continue
@@ -258,18 +264,18 @@ class Orchestrator:
                     try:
                         fut.result()
                     except Exception:  # noqa: BLE001
-                        # 0012 后 harness 故障已在会话内转 [harness error] 信号（不上抛），这里只剩
-                        # launch/落盘类意外——单会话失败记日志跳过，不废整轮、不阻塞其余会话。
+                        # After 0012, harness failures are converted to [harness error] signals within the session (not re-raised); only
+                        # launch/persistence-related exceptions remain -- single session failure is logged and skipped, does not fail the round or block other sessions.
                         print(
-                            f"[orchestrator] 用户会话异常（persona="
-                            f"{futures[fut].identity}），跳过该局，同轮其余会话继续："
+                            f"[orchestrator] User session failed (persona="
+                            f"{futures[fut].identity}); skipping this session; other sessions in the round continue: "
                         )
                         traceback.print_exc()
 
         if planned and successful_sessions == 0:
             raise RoundDeliveryBlocked(numbers=[], reason="all-user-sessions-failed")
 
-        # Spec-0050/T3：末轮只测用户，跳过提案/准入/交付闸。
+        # Spec-0050/T3: In the final round, only test users; skip proposal/admission/delivery gates.
         if not deliver:
             if self._integrity_guard is not None:
                 self._integrity_guard()
@@ -279,10 +285,10 @@ class Orchestrator:
             return self._run_legacy_feedback()
 
     def _run_legacy_feedback(self) -> str:
-        # 生成段·第一拍（Spec-0029/T8）：triage 分片 ∥ divergent，同一线程池并行。
-        # 二者都只依赖 a 段产物（triage 吃 report、divergent 吃会话证据）、互不依赖；产出全为不可领
-        # proposal（PM 独立交给 Owner，Architect 仅吸收非 PM 来源）→ 分片自由。
-        # 单个生成器崩溃记日志跳过、不废整轮。
+        # Generation phase, first wave (Spec-0029/T8): triage sharding ∥ divergent, running in parallel in the same thread pool.
+        # Both only depend on phase a artifacts (triage consumes reports, divergent consumes session evidence), no interdependency; all outputs are unclaimed
+        # proposals (PM independently handed to Owner, Architect only absorbs non-PM sources) → sharding is unrestricted.
+        # Individual generator crash is logged and skipped, does not fail the round.
         beat1: list[tuple[str, Callable[[], object]]] = []
         n_triagers = len(self._triagers)
         triage_shards: list[list] | None = None
@@ -310,23 +316,25 @@ class Orchestrator:
             beat1.append(("divergent", divergent.propose_once))
         self._run_parallel(beat1)
 
-        # 生成段·第二拍：architect（跑在 triage 全部收尾之后——要看本轮新升的 from-triage 提案，
-        # 结构综合不滞后一轮）。启用分组时，入口提供一个协调器：全池只分类一次，
-        # 再由已有 Architect workers 领取互斥组，避免多个 worker 各自处理整池。
+        # Generation phase, second wave: architect (runs after all triage completes -- must see this round's newly promoted from-triage proposals,
+        # structural synthesis does not lag a round). When grouping is enabled, the entry point provides a coordinator: the entire pool classifies once,
+        # then existing Architect workers pick up mutually exclusive groups, avoiding multiple workers each processing the entire pool.
         beat2: list[tuple[str, Callable[[], object]]] = [
             ("architect", architect.propose_once) for architect in self._architects
         ]
         self._run_parallel(beat2)
 
-        # Owner 汇合独立 PM 与交付路线，标注交付重叠但保留独立验收；Architect 仅处理非 PM covers。
-        # Owner 是唯一准入权威；其失败必须阻断本轮，不能以空等待集伪装成功。
+        # Owner consolidates independent PM and delivery routes, marks delivery overlap but preserves independent acceptance; Architect handles only non-PM coverage.
+        # Owner is the sole admission authority; its failure must block this round, cannot be masked as success with an empty wait set.
         admitted: list[int] = []
         if self._owner is not None:
             try:
                 outcome = self._owner.admit_once()
                 admitted = [int(n) for n in (getattr(outcome, "admitted", None) or [])]
             except Exception as exc:  # noqa: BLE001
-                print("[orchestrator] owner 准入异常，跳过，本轮继续：")
+                print(
+                    "[orchestrator] Owner admission failed; skipping it and continuing this round: "
+                )
                 traceback.print_exc()
                 # Owner is the sole admission authority.  Continuing with an
                 # empty wait set would incorrectly mark the round successful
@@ -335,29 +343,30 @@ class Orchestrator:
                     numbers=[], reason="owner-failed:admission did not complete"
                 ) from exc
 
-        # Spec-0050/T3：等本轮准入票终态。空名单立即成功。卡死向上抛，不开下一轮用户。
+        # Spec-0050/T3: Wait for this round's admission ticket to reach final state. Empty list succeeds immediately. Deadlock is re-raised, does not start the next user round.
         self._await_round_delivery(numbers=admitted)
 
-        # 编排仓完整性绊线（Spec-0021，fail-closed）。
+        # Orchestration repo integrity tripwire (Spec-0021, fail-closed).
         if self._integrity_guard is not None:
             self._integrity_guard()
 
-        # 闸成功后的 origin/main = 本轮 sealed SHA（空等待集时可能仍是 user SHA）。
+        # After gate succeeds, origin/main = this round's sealed SHA (may still be user SHA if wait set was empty).
         return self._resolve_head(ref=self._initial_ref)
 
     def run(self, n_rounds: int, *, start_round: int = 1) -> list[str]:
         if n_rounds <= 0:
-            raise ValueError(f"n_rounds 须为正：{n_rounds}")
+            raise ValueError(f"n_rounds must be positive: {n_rounds}")
         if not 1 <= start_round <= n_rounds:
-            raise ValueError(f"start_round 必须在 1..{n_rounds} 内：{start_round}")
+            raise ValueError(f"start_round must be within 1..{n_rounds}: {start_round}")
         refs: list[str] = []
-        ref = self._initial_ref  # 起始游标 = main 分支名；首轮 run_round 即解析其 HEAD SHA
+        # Starting cursor = main branch name; first run_round immediately resolves its HEAD SHA
+        ref = self._initial_ref
         for i in range(start_round - 1, n_rounds):
             is_last = i == n_rounds - 1
             with bind_usage_context(round_no=i + 1):
                 if self._on_round_start is not None:
                     self._on_round_start(i + 1)
-                # Spec-0050/T3：末轮 deliver=False。闸抛错则本循环不再进入下一轮。
+                # Spec-0050/T3: In the final round, deliver=False. If the gate raises an error, this loop does not enter the next round.
                 if getattr(self, "_recovery", None) is not None:
                     ref = self.run_round(ref, deliver=not is_last, round_no=i + 1)
                 else:
@@ -688,13 +697,16 @@ class Orchestrator:
         wait_round_delivery(numbers=numbers, fetch_issue=fetch)
 
     def _session_plan(self) -> Sequence[SessionPair]:
-        """本轮要跑的 (persona, scenario) 列表；fixed_set 为 callable 时每轮重抽。"""
+        """List of (persona, scenario) pairs to run this round; when fixed_set is callable, re-sample each round."""
         plan = self._fixed_set
         return plan() if callable(plan) else plan
 
     @staticmethod
     def _run_parallel(jobs: list[tuple[str, Callable[[], object]]]) -> None:
-        """线程池并行跑一拍生成器；单个崩溃记 traceback 跳过（产物是非约束提案，丢一路不废整轮）。"""
+        """Run one generation stage in a thread pool; log and skip individual failures.
+
+        The outputs are non-binding proposals, so losing one generator does not invalidate the round.
+        """
         if not jobs:
             return
         with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
@@ -704,16 +716,18 @@ class Orchestrator:
                 try:
                     fut.result()
                 except Exception:  # noqa: BLE001
-                    print(f"[orchestrator] {name} 异常，跳过，本轮继续：")
+                    print(f"[orchestrator] {name} failed; skipping it and continuing this round: ")
                     traceback.print_exc()
 
     def _resolve_head(self, *, ref: str) -> str:
-        """解析 harness 仓某 ref（trunk 下恒为 main）的当前 HEAD commit SHA；非法 ref 抛 RuntimeError。
+        """Resolve a harness repo ref to its current HEAD commit SHA; trunk always uses main.
 
-        Spec-0033/T3：先 fetch origin 再**优先解析 origin/<ref>**——spec-0032 后推进 main 的是 Gitea
-        上的 server-side merge，本地 main 停在 seed 不再是真身；fetch 同时把远端对象取回本地，launcher
-        按该 SHA checkout 才解析得到。无 origin 或无可用远端跟踪 ref 时退化本地 <ref>；但若已有
-        origin/<ref> 且本次 fetch 失败，拒绝使用可能过期的远端游标，避免静默重复旧轮次。
+        An invalid ref raises RuntimeError. Spec-0033/T3: fetch origin first and **prefer origin/<ref>**.
+        Since spec-0032, Gitea performs server-side merges into main while local main remains at the seed.
+        Fetching also retrieves the commit objects required for the launcher's checkout by SHA.
+        Fall back to local <ref> when there is no origin or usable remote-tracking ref. If origin/<ref>
+        already exists but fetch fails, reject that potentially stale cursor to avoid silently repeating
+        an earlier round.
         """
         remotes = subprocess.run(
             ["git", "-C", self._harness_repo, "remote"], capture_output=True, text=True
@@ -728,7 +742,7 @@ class Orchestrator:
             if fetched.returncode != 0:
                 fetch_failed = True
                 print(
-                    f"[orchestrator] fetch origin {ref} 失败（游标可能停滞）："
+                    f"[orchestrator] fetch origin {ref} failed (the cursor may be stale): "
                     f"{fetched.stderr.strip()[:200]}"
                 )
         for candidate in (f"refs/remotes/origin/{ref}", ref):
@@ -746,6 +760,8 @@ class Orchestrator:
             )
             if result.returncode == 0:
                 if fetch_failed and candidate.startswith("refs/remotes/origin/"):
-                    raise RuntimeError(f"origin/{ref} fetch 失败，拒绝使用可能过期的远端游标")
+                    raise RuntimeError(
+                        f"origin/{ref} fetch failed; refusing to use a potentially stale remote cursor"
+                    )
                 return result.stdout.strip()
-        raise RuntimeError(f"解析 main ref {ref!r} 失败：{result.stderr[:200]}")
+        raise RuntimeError(f"Failed to resolve main ref {ref!r}: {result.stderr[:200]}")

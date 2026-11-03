@@ -1,12 +1,12 @@
 ---
 number: "0035"
-title: stdout 可见 harness 状态与主 loop 等待/打断动作
+title: "stdout-visible harness state and main-loop waiting/interrupt actions"
 issue: 0
 slug: stdout-visible-harness-state
-summary: 用户侧状态反馈帮助用户理解当前状况并决定下一步；接缝层按顺序展示真实 stdout，主 loop 支持等待与打断，v0 harness 显示排队状态；与 0061 维护者诊断观测分别定义目标和验收。
+summary: "User-facing state feedback helps users understand the current situation and decide what to do next; the seam layer displays real stdout in order, the main loop supports waiting and interruption, and the v0 harness displays queued status; goals and acceptance criteria are defined separately from 0061 maintainer diagnostic observability."
 tasks:
   - id: T1
-    title: 写 0035 活快照
+    title: "Write the 0035 active snapshot"
     status: done
     priority: P1
     tags: []
@@ -15,10 +15,10 @@ tasks:
     parallel: false
     files:
       - docs/specs/0035-stdout-visible-harness-state.md
-    scope: 写清回复轮次滞后弱感知的机制问题与边界：接缝层不做 request/reply 配对、不固化当前 harness 队列模型；stdout 是 harness 用户可见界面；主 loop 补 keep_waiting/interrupt；v0 harness busy 输入输出 queued/status；说明该设计如何保留 harness 进化空间。
-    acceptance: spec validate 通过；正文含 Summary/Motivation/Reference-level explanation/Rationale and alternatives；明确与 0022 未决问题的关系；明确不要求接缝层猜测 reply 归属。
+    scope: "Clearly describe the mechanism and boundaries for weak perception of reply-turn latency: the seam layer does not pair requests and replies or hard-code the current harness queue model; stdout is the harness user-visible interface; the main loop adds keep_waiting/interrupt; the v0 harness exposes busy input/output queued/status; explain how this design preserves room for harness evolution."
+    acceptance: "spec validate passes; the body contains Summary/Motivation/Reference-level explanation/Rationale and alternatives; the relationship to the unresolved questions in 0022 is explicit; it explicitly states that the seam layer is not required to infer reply ownership."
   - id: T2
-    title: 用户主 loop：常驻等待与打断动作
+    title: "User main loop: persistent waiting and interrupt actions"
     status: done
     priority: P1
     tags: []
@@ -33,10 +33,10 @@ tasks:
       - backend/ahe_beta/user/sim/loop.py
       - backend/tests/user/sim/test_action_space.py
       - backend/tests/user/sim/test_heartbeat.py
-    scope: ACTIVE 主 loop 动作空间常驻 keep_waiting/interrupt；prompt 区分 send_message 可能排队、keep_waiting 等下一条 harness 输出、interrupt 立即停止 ongoing work；route 支持主 loop keep_waiting/interrupt，interrupt ack 回到主 loop 可见。
-    acceptance: ACTIVE action_space 含 keep_waiting/interrupt；OPENING 仍只能 send_message；interrupt 后返回 harness 可见信息并回主 loop；keep_waiting 不发新 message；相关 pytest 通过。
+    scope: "The ACTIVE main-loop action space persistently includes keep_waiting/interrupt; the prompt distinguishes send_message, which may be queued, keep_waiting for the next harness output, and interrupt, which immediately stops ongoing work; routing supports main-loop keep_waiting/interrupt, and the interrupt ack returns to the main loop and remains visible."
+    acceptance: "The ACTIVE action_space includes keep_waiting/interrupt; OPENING still permits only send_message; after interrupt, the flow returns to harness-visible information and then the main loop; keep_waiting does not send a new message; the relevant pytest tests pass."
   - id: T3
-    title: 接缝层可见事件：扩充用户感知为 stdout 事件流
+    title: "Seam-layer visible events: expand user perception into a stdout event stream"
     status: done
     priority: P1
     tags: []
@@ -50,10 +50,10 @@ tasks:
       - backend/ahe_beta/models.py
       - backend/tests/harness/test_launcher.py
       - backend/tests/harness/test_connector.py
-    scope: 接缝层不推断 request/reply 配对；持续收集 harness stdout 的 reply/progress/status/ack/error 等用户可见事件，并暴露给用户 sim/观测层作为按观察顺序排列的事件流；保留现有 last_progress/last_sideband 兼容。
-    acceptance: 非 reply stdout 事件不会丢失；reply 后可短 drain 紧邻 status/progress；事件记录标明 source=harness_stdout；无 answers/reply_to 推断字段；launcher/connector 单测覆盖事件收集。
+    scope: "The seam layer does not infer request/reply pairing; it continuously collects user-visible events such as reply/progress/status/ack/error from harness stdout and exposes them to the user simulation/observation layer as an event stream ordered by observation sequence; existing last_progress/last_sideband compatibility is retained."
+    acceptance: "Non-reply stdout events are not lost; after a reply, a short drain may collect adjacent status/progress events; event records identify source=harness_stdout; no answers/reply_to inference fields are added; launcher/connector unit tests cover event collection."
   - id: T4
-    title: v0 harness：busy 输入 queued/status 可见性
+    title: "v0 harness: busy-input queued/status visibility"
     status: done
     priority: P1
     tags: []
@@ -66,10 +66,10 @@ tasks:
       - backend/harness_template/RUNTIME.md
       - backend/harness_template/HELP.md
       - backend/harness_template/tests/test_smoke.py
-    scope: 初始 harness 在 busy 期间收到新 message 时通过 stdout 如实输出 queued ack；当前回复结束后开始处理 queued message 时输出 status/progress，描述正在处理/运行什么；不宣称 request/reply 配对，不要求 /btw 同轮语义。
-    acceptance: busy 输入不再静默排队；stdout 可见 [queued]/status 事件；开始处理 queued message 时有可见状态；smoke 覆盖 queued ack/status；RUNTIME/HELP 说明 busy 输入行为。
+    scope: "When the initial harness receives a new message while busy, it truthfully outputs a queued ack through stdout; after the current reply finishes and processing of the queued message begins, it outputs status/progress describing what is being processed/run; it does not claim request/reply pairing and does not require /btw same-turn semantics."
+    acceptance: "Busy input is no longer queued silently; stdout exposes [queued]/status events; a visible status is shown when processing the queued message begins; smoke tests cover queued ack/status; RUNTIME/HELP describe busy-input behavior."
   - id: T5
-    title: divergent PM 用户可见契约观察 lens
+    title: "User-visible contract observation lens for divergent PM"
     status: done
     priority: P2
     tags: []
@@ -79,61 +79,61 @@ tasks:
     parallel: false
     files:
       - backend/agent_defs/divergent_pm/systemprompt.md
-    scope: 给 divergent PM 增加中性分层分析框架：先区分上下文、证据、解释与候选；用户可见契约作为观察 lens，不预设问题或方案；优先跨会话/跨 persona 或强证据模式，避免换名重复候选。
-    acceptance: 相关 architect/PM 测试通过；对同一批 user-only sessions 的自然 PM 回放能产出可追溯 session 证据的候选；不直接喂 soft gap evidence。
+    scope: "Add a neutral layered analysis framework for the divergent PM: first distinguish context, evidence, interpretation, and candidates; use the user-visible contract as an observation lens without presupposing a problem or solution; prioritize cross-session/cross-persona or strongly evidenced patterns, and avoid duplicate candidates that merely rename the same thing."
+    acceptance: "The relevant architect/PM tests pass; natural PM replay of the same batch of user-only sessions can produce candidates with traceable session evidence; soft gap evidence is not fed directly."
 ---
 
-# 0035 · stdout 可见 harness 状态与主 loop 等待/打断动作
+# 0035 · stdout-visible harness state and main loop wait/interrupt actions
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is structured source data (including the tasks DAG), and the body is a nine-section group-level rust-RFC overview. -->
 
 ## Summary
 
-本组解决用户模拟对 harness 回复轮次滞后的弱感知问题。现行心跳允许用户在 harness 忙碌时继续 `send_message`，但 v0 harness 会把这条消息排到后续处理；当上一条主回复先返回时，用户容易把会话误判为空闲并继续发新消息，后续回复又可能来自之前排队的输入。用户和设计师因此只能看到「证据不够 / 回答含糊」，难以捕捉真实体验问题：harness 当前正在处理什么、用户输入是否静默排队、输出顺序是否让人困惑。
+This group addresses the limited visibility that the user simulation has into lagging harness reply turns. The current heartbeat allows the user to continue to `send_message` while the harness is busy, but the v0 harness queues that message for later processing; when the previous main reply arrives first, the user can easily mistake the session for idle and send another message, while subsequent replies may come from previously queued inputs. As a result, users and designers can see only 「insufficient evidence / ambiguous answers」 and have difficulty capturing the actual user experience: what the harness is currently processing, whether user input is silently queued, and whether the output order is confusing.
 
-本组不让接缝层做 request/reply 配对，也不固化当前 v0 harness 的 FIFO 队列模型。原则是：stdout 是 harness 的用户可见界面；接缝层只按观察顺序收集并展示 harness stdout 上真实出现的 reply/progress/status/ack/error 等可见事件；用户 agent 根据这些事件自行判断是继续等待、打断、追问还是验收。为使用户在主 loop 中也能表达真实 CLI 行为，ACTIVE 动作空间常驻 `keep_waiting` 与 `interrupt`。v0 harness 则补最小 busy 输入可见性：busy 时收到新 message 不再静默排队，而是输出 queued/status 事件，如实说明收到、排队、正在处理或正在运行什么。
+This group does not make the seam layer pair requests and replies, nor does it cement the current v0 harness FIFO queue model. The principle is: stdout is the harness's user-visible interface; the seam layer only collects and presents visible events such as reply/progress/status/ack/error that actually appear on harness stdout, in observation order; the user agent decides from these events whether to continue waiting, interrupt, ask a follow-up, or accept the result. To allow the user to express actual CLI behavior in the main loop as well, `keep_waiting` and `interrupt` are always available in the ACTIVE action space. The v0 harness adds minimal visibility into busy input: when a new message arrives while busy, it is no longer silently queued; instead, the harness emits queued/status events that accurately describe what was received, queued, being processed, or running.
 
 ## Motivation
 
-### 与诊断观测的目标边界
+### Boundary with diagnostic observability goals
 
-本组的用户侧状态反馈服务于使用当下的判断：用户在何时需要知道什么，才能决定继续等待、
-补充要求、打断或接受结果。0061 的设计开发侧诊断观测服务于维护者还原经过、区分原因和
-验证改动。分类依据是信息服务谁、支持什么判断；发现者的角色和底层事件来源不决定类别。
+This group's user-side state feedback supports decisions at the time of use: what users need to know and when, so they can decide whether to continue waiting,
+add requirements, interrupt, or accept the result. The design and development diagnostic observability in 0061 helps maintainers reconstruct what happened, distinguish causes, and
+verify changes. The classification depends on whom the information serves and what decisions it supports; the discoverer's role and the underlying event source do not determine the category.
 
-用户反馈不足沿用普通 report → Triage proposal 或独立 PM proposal 路线，可以凭用户实际
-收到的内容和时序成立，不以先查清内部根因为前置条件。维护者缺少证据则按 0061 提交诊断
-观测补强；用户体验正常时也可以独立成立。同一问题同时涉及两者时，可以关联提案或共享
-一次实现，但交接和验收分别保留目标，不自动建立依赖或要求拆票。
+Insufficient user feedback follows the ordinary report → Triage proposal or independent PM proposal route, and can be established from what the user actually
+received and when, without first determining the internal root cause. When maintainers lack evidence, they submit diagnostic
+observability improvements under 0061; these can also stand independently when the user experience is normal. When the same issue involves both, proposals may be linked or
+an implementation shared, but handoff and acceptance retain separate goals, with no automatic dependency or requirement to split issues.
 
-用户反馈验收检查真实界面在决策时刻是否给出准确、及时、足以支持所需判断的信息；后台
-存在日志、维护者事后能够解释经过，不能代替此项验收。反过来，进度提示也不能证明诊断
-记录足够。沿用工程行为验证，用户体感继续作为观测，不恢复体感发版门禁。
+User feedback acceptance checks whether the actual interface provides accurate, timely information sufficient to support the required decision at the decision point; the existence of backend
+logs and maintainers' ability to explain what happened afterward cannot substitute for this acceptance check. Conversely, progress indicators cannot prove that diagnostic
+records are sufficient. Engineering behavior verification remains in use, and user experience continues to be observed without reinstating an experience-based release gate.
 
-### 回复轮次滞后的机制问题
+### The mechanism behind lagging reply turns
 
-现行 0022 明确承认：in-flight `emit_message` 在 v0 entry 上可能排入下一轮请求队列，且「是否要协调主线 reply 与排队 mid-flight message 以免抢 reply」仍是未决问题。实际链路如下：
+The current 0022 explicitly acknowledges that an in-flight `emit_message` may be queued for the next request round on the v0 entry, and that 「whether to coordinate the main reply with queued mid-flight messages to prevent them from racing for the reply」 remains unresolved. The actual flow is as follows:
 
 ```text
-用户发 #1：处理 A
-harness 忙碌中
-用户 waiting 发 #2：核实 A
-harness 先回 #1：得到 B
-用户看到 B 后发 #3：核实 B
-harness 后续输出可能仍来自 #2
+User sends #1: handle A
+harness is busy
+While waiting, user sends #2: verify A
+harness first replies to #1: got B
+After seeing B, user sends #3: verify B
+Subsequent harness output may still come from #2
 ```
 
-如果用户模拟只把 latest final reply 作为感知输入，就会错过真实 CLI 中可见的持续状态：busy 输入是否收到、是否排队、当前是否正在处理 queued work、是否正在跑测试或执行过时命令。用户会把旧回复当作当前状态的一部分，设计师也难以把低分或追问归因到「轮次滞后 / 状态不可知」。
+If the user simulation uses only the latest final reply as perceptual input, it will miss ongoing state visible in a real CLI: whether busy input was received, whether it was queued, whether queued work is currently being processed, and whether tests or obsolete commands are running. Users will treat an old reply as part of the current state, and designers will have difficulty attributing low scores or follow-up questions to 「turn lag / unknown state」.
 
-### 不让接缝层配对
+### Do not pair at the seam layer
 
-一个直接方案是让接缝层给每条用户消息和 harness reply 做 `answers #N` 配对。但这会把当前 v0 harness 的串行 FIFO 模型固化进平台。一旦 harness 未来进化出 `/btw`、ack/status/reply 分层、并发处理、乱序完成、一条回复覆盖多个用户消息等产品语义，接缝层推断就可能误导用户。
+One straightforward approach is to have the seam layer perform `answers #N` pairing for each user message and harness reply. But this would cement the current v0 harness's serial FIFO model into the platform. If the harness later evolves product semantics such as `/btw`, ack/status/reply layering, concurrent processing, out-of-order completion, or one reply covering multiple user messages, seam-layer inference could mislead users.
 
-因此本组选择暴露可见事实而非推断语义：harness 如实通过 stdout 表达自己正在做什么；接缝层原样收集；用户和设计师从事件流中判断体验。
+This group therefore chooses to expose visible facts rather than infer semantics: the harness truthfully expresses what it is doing through stdout; the seam layer collects it as is; users and designers judge the experience from the event stream.
 
 ## Guide-level explanation
 
-用户会话上下文从「只看上一条 harness_output」扩展为「看自上次决策以来的 harness 可见事件」。事件来自 harness stdout，按客户端观察顺序排列，例如：
+The user session context expands from 「seeing only the previous harness_output」 to 「seeing harness-visible events since the last decision」. Events come from harness stdout and are ordered by client observation, for example:
 
 ```text
 [+90s] harness status: [queued] I am still working on your previous request; this message has been queued.
@@ -141,41 +141,41 @@ harness 后续输出可能仍来自 #2
 [+131s] harness progress: Running: pytest tests/test_validation.py -q
 ```
 
-接缝层不写：
+The seam layer does not write:
 
 ```text
 harness reply answers #2
 #3 is still pending
 ```
 
-除非这些语义是 harness 自己在 stdout 中说出来的。否则用户只看到真实事件，并自行判断。
+unless the harness itself expresses those semantics on stdout. Otherwise, the user sees only actual events and makes their own judgment.
 
-主 loop 中，用户除了继续 `send_message`、验收或终止，也可以：
+In the main loop, in addition to continuing to `send_message`, accepting the result, or terminating, the user can:
 
-- `keep_waiting`：不发新消息，等下一条 harness 输出。适用于 stdout 显示 harness 正在做用户想要的工作，例如正在跑验证测试。
-- `interrupt`：立即停止当前或 ongoing harness 工作，不等待 harness 读到一条新的聊天消息。适用于 stdout 显示 harness 正在做过时、跑偏或用户不再想要的工作，例如已撤回的 formatting rewrite。
+- `keep_waiting`: Send no new message and wait for the next harness output. Appropriate when stdout shows the harness doing work the user wants, such as running verification tests.
+- `interrupt`: Immediately stop current or ongoing harness work without waiting for the harness to read a new chat message. Appropriate when stdout shows the harness doing obsolete or off-track work, or work the user no longer wants, such as a formatting rewrite that has been withdrawn.
 
-例如，history 中用户已撤回 formatting，stdout 如实显示：
+For example, the user has withdrawn formatting in history, and stdout truthfully shows:
 
 ```text
 [+131s] progress: Running: black .
 [+132s] progress: Rewriting files for formatting...
 ```
 
-用户可选择 `interrupt`。反之，若用户要求验证 B，stdout 如实显示：
+The user can choose `interrupt`. Conversely, if the user requested verification of B and stdout truthfully shows:
 
 ```text
 [+131s] progress: Running: pytest tests/test_validation.py -q
 [+132s] progress: Collecting validation tests...
 ```
 
-用户可选择 `keep_waiting`。
+The user can choose `keep_waiting`.
 
 ## Reference-level explanation
 
-### 用户侧动作空间
+### User-side action space
 
-`ACTIVE` 阶段动作空间常驻：
+The following are always available in the `ACTIVE` phase action space:
 
 ```text
 send_message
@@ -187,22 +187,22 @@ file_issue
 give_up
 ```
 
-`OPENING` 仍只允许 `send_message`，避免还未发任务就验收或等待。
+`OPENING` still allows only `send_message`, to avoid accepting a result or waiting before a task has been sent.
 
-动作语义：
+Action semantics:
 
-| action | 语义 |
+| action | Semantics |
 |---|---|
-| `send_message` | 向 harness 发送一条自然语言消息；若 harness 正忙，该消息可能稍后才被读到。 |
-| `keep_waiting` | 不发送新消息，等待下一条 harness stdout 可见输出。 |
-| `interrupt` | 立即停止当前或 ongoing harness 工作，不等待 harness 读到新消息；返回 interrupt ack 后回到主 loop。 |
-| terminal actions | 会话收场，不驱动 harness。 |
+| `send_message` | Send a natural-language message to the harness; if the harness is busy, the message may not be read until later. |
+| `keep_waiting` | Send no new message and wait for the next visible harness stdout output. |
+| `interrupt` | Immediately stop current or ongoing harness work without waiting for the harness to read a new message; return to the main loop after the interrupt ack is returned. |
+| terminal actions | Close the session without driving the harness. |
 
-`interrupt` 后 harness 返回的信息作为可见输出进入下一轮主 loop；它不是会话终止。
+Information returned by the harness after `interrupt` enters the next main loop iteration as visible output; it does not terminate the session.
 
-### 接缝层 stdout 事件
+### Seam-layer stdout events
 
-接缝层维护「可见事件流」，事件来源为 harness stdout。事件至少包括：
+The seam layer maintains a 「visible event stream」 sourced from harness stdout. Events include at least:
 
 ```text
 reply
@@ -212,59 +212,59 @@ ack
 error
 ```
 
-每个事件保留：
+Each event retains:
 
 ```text
 type / text / observed_at / source=harness_stdout / raw payload
 ```
 
-接缝层不新增 `answers_utterance_id`、`reply_to`、`pending_user_messages` 等配对推断字段。已有 TurnLog 的 utterance 观测字段可保留作历史兼容，但用户感知与 architect 机制信号不依赖接缝层配对。
+The seam layer does not add pairing inference fields such as `answers_utterance_id`, `reply_to`, or `pending_user_messages`. Existing TurnLog utterance observation fields may be retained for historical compatibility, but user perception and architect mechanism signals do not depend on seam-layer pairing.
 
-收到 terminal reply 后，接缝层可以短暂 drain 已经到达的旁路 stdout 事件，以捕捉紧邻的 status/progress，例如：
+After receiving a terminal reply, the seam layer may briefly drain side-channel stdout events that have already arrived to capture immediately adjacent status/progress, for example:
 
 ```text
 reply: A complete
 status: Now handling queued message...
 ```
 
-该 drain 不等待下一条 terminal reply，不主动向 harness 查询，不改变 harness 编排。
+This drain does not wait for the next terminal reply, actively query the harness, or change harness orchestration.
 
-### v0 harness busy 输入可见性
+### v0 harness busy input visibility
 
-v0 harness 需要补最小用户可见性，而不是补复杂协议。busy 期间 `_stdin_reader` 收到新 message 时，harness 应通过 stdout 输出 queued/status 事件，例如：
+The v0 harness needs minimal user-visible feedback, not a complex protocol. When `_stdin_reader` receives a new message while busy, the harness should emit a queued/status event through stdout, for example:
 
 ```text
 [queued] I am still working on the previous request; this message has been queued.
 ```
 
-当前 reply 结束后，主 loop 开始处理 queued message 时，输出如实 status/progress：
+After the current reply ends, when the main loop begins processing the queued message, emit truthful status/progress:
 
 ```text
 [status] Now handling queued message: <message preview>
 ```
 
-或更低层的真实动作：
+Or a lower-level actual action:
 
 ```text
 Running: pytest tests/test_validation.py -q
 Running: black .
 ```
 
-v0 不需要实现 `/btw` 同轮旁路问答，也不需要输出 request/reply 配对；它只需要避免 busy 输入静默排队，让用户能看到 harness 当前正在做什么。
+v0 does not need to implement `/btw` same-turn side-channel Q&A or output request/reply pairing; it only needs to avoid silently queuing busy input and let users see what the harness is currently doing.
 
 ### Discovery-side consumption
 
-stdout 可见事件与主 loop 等待/打断动作会改变 PM 可观察到的会话证据形态。divergent PM 因此补一层中性的发现 lens，但不直接喂 soft gap 结论：分析会话时先区分上下文、证据、解释与候选；上下文包括用户画像与目标、任务与环境约束，证据包括用户行为、harness 可见输出、harness 实际执行轨迹，解释阶段比较证据是否一致并识别跨会话稳定模式，候选阶段只在证据足够且指向可改进产品行为时形成提案。
+stdout-visible events and main loop wait/interrupt actions change the form of session evidence observable by the PM. The divergent PM therefore adds a neutral discovery lens, but is not directly fed soft gap conclusions: when analyzing sessions, first distinguish context, evidence, interpretation, and candidates; context includes user personas and goals, and task and environment constraints; evidence includes user behavior, harness-visible output, and the harness's actual execution trace; the interpretation stage compares evidence for consistency and identifies stable cross-session patterns; the candidate stage forms proposals only when evidence is sufficient and points to improvable product behavior.
 
-用户可见契约仅作为组织观察的 lens，覆盖请求接收/排队、状态可见性、控制/steering、验证证据、恢复连续性、完成交接、可发现性与能力边界；该 lens 不预设这些方面一定存在问题，也不预设具体方案。候选应优先来自跨会话重复、跨 persona 重复，或单局影响强且证据清楚的模式，并描述可独立验证的产品行为变化，避免换名重复。
+The user-visible contract is only a lens for organizing observations, covering request receipt/queuing, state visibility, control/steering, verification evidence, recovery continuity, completion handoff, discoverability, and capability boundaries; this lens does not assume that these areas necessarily have problems or prescribe specific solutions. Candidates should primarily come from patterns repeated across sessions or personas, or patterns with a strong impact in a single session and clear evidence, and should describe independently verifiable product behavior changes while avoiding duplicates under different names.
 
 ### DAG / file allocation
 
 ```mermaid
 graph LR
-  T1[T1 写 spec]
-  T2[T2 用户主 loop 动作]
-  T3[T3 接缝层 stdout 事件]
+  T1[T1 Write spec]
+  T2[T2 User main loop actions]
+  T3[T3 Seam layer stdout events]
   T4[T4 v0 harness busy status]
   T5[T5 divergent PM lens]
   T1 --> T2
@@ -273,15 +273,15 @@ graph LR
   T1 --> T5
 ```
 
-| Task | 职责 | files |
+| Task | Responsibility | files |
 |---|---|---|
-| T1 | 写活快照 | `docs/specs/0035-stdout-visible-harness-state.md` |
-| T2 | 主 loop 常驻 `keep_waiting` / `interrupt`，动作语义与 route | `user/sim/actions.py`, `action_space.py`, `prompt.py`, `loop.py`, user sim tests |
-| T3 | 接缝层收集 stdout 可见事件流，不做配对推断 | `harness/launcher.py`, `connector.py`, `models.py`, harness tests |
-| T4 | v0 harness busy 输入 queued/status 可见性 | `harness_template/entry.py`, `RUNTIME.md`, `HELP.md`, smoke tests |
-| T5 | divergent PM 分层发现 lens | `backend/agent_defs/divergent_pm/systemprompt.md` |
+| T1 | Write the live snapshot | `docs/specs/0035-stdout-visible-harness-state.md` |
+| T2 | Always make `keep_waiting` / `interrupt` available in the main loop, including action semantics and routing | `user/sim/actions.py`, `action_space.py`, `prompt.py`, `loop.py`, user sim tests |
+| T3 | Have the seam layer collect the stdout-visible event stream without pairing inference | `harness/launcher.py`, `connector.py`, `models.py`, harness tests |
+| T4 | v0 harness busy input queued/status visibility | `harness_template/entry.py`, `RUNTIME.md`, `HELP.md`, smoke tests |
+| T5 | divergent PM layered discovery lens | `backend/agent_defs/divergent_pm/systemprompt.md` |
 
-### 验证路径
+### Verification path
 
 ```bash
 .venv/bin/python -m pytest backend/tests/user/sim/test_action_space.py backend/tests/user/sim/test_heartbeat.py
@@ -289,61 +289,61 @@ graph LR
 .venv/bin/python -m pytest backend/harness_template/tests/test_smoke.py
 ```
 
-行为探针应覆盖：
+Behavioral probes should cover:
 
-- stdout 显示正在跑用户想要的验证测试 → 用户倾向 `keep_waiting`。
-- history 显示用户已撤回 formatting，stdout 仍显示 `black .` → 用户可选择 `interrupt`。
-- stdout 含糊或无状态 → 用户可继续 `send_message` 追问；这是有效体感信号。
+- stdout shows that the harness is running verification tests the user wants → the user tends to choose `keep_waiting`.
+- history shows that the user has withdrawn formatting, but stdout still shows `black .` → the user can choose `interrupt`.
+- stdout is ambiguous or has no state information → the user can continue to `send_message` to ask a follow-up; this is a valid user experience signal.
 
 ## Drawbacks
 
-- v0 harness 需要增加少量 stdout 状态输出，种子不再是完全沉默的串行队列。
-- 用户可见事件流比单 `harness_output` 更长，prompt 与前端展示需要控制摘要长度。
-- `keep_waiting` 常驻 ACTIVE 后，少数场景可能空等；route 必须把 idle wait 作为安全 no-op 或短等待处理。
-- stdout status 的质量由 harness 决定；若 harness 不输出状态，用户仍只能从 reply 文本判断。这是保留进化空间的代价。
-- divergent PM 的用户可见契约 lens 可能改变候选分布：更稳定地发现恢复/完成/交接类机会，但也可能弱化 focused verification 等执行策略类机会；需要多轮观察。
+- The v0 harness needs to add a small amount of stdout status output; the seed is no longer a completely silent serial queue.
+- The user-visible event stream is longer than a single `harness_output`, so prompt and frontend presentation need to control summary length.
+- Once `keep_waiting` is always available in ACTIVE, a few scenarios may involve waiting idly; the route must handle idle wait as a safe no-op or a short wait.
+- The quality of stdout status is determined by the harness; if the harness emits no status, the user can still judge only from reply text. This is the cost of preserving room for evolution.
+- The divergent PM's user-visible contract lens may change the distribution of candidates: it may more consistently uncover recovery/completion/handoff opportunities, but may also weaken execution-strategy opportunities such as focused verification; observation over multiple rounds is needed.
 
 ## Rationale and alternatives
 
-### 为什么不在接缝层配对 reply
+### Why not pair replies at the seam layer
 
-配对方案能短期提升用户感知，但会把平台绑定到当前 harness 的 FIFO 假设。ahe-beta 的被进化对象是 harness 产品本身，未来它应能自由进化 busy 输入、旁路问答、并发、ack/status/final 分层等交互。接缝层若抢先解释「这条 reply 回答 #N」，会成为新的错误来源。
+Pairing can improve user perception in the short term, but it would bind the platform to the current harness's FIFO assumption. The object of evolution in ahe-beta is the harness product itself; in the future it should be free to evolve interactions such as busy input, side-channel Q&A, concurrency, and ack/status/final layering. If the seam layer preemptively interprets 「this reply answers #N」, it will become a new source of error.
 
-### 为什么选择 stdout 可见事件
+### Why choose stdout-visible events
 
-stdout 是 harness 对用户的真实界面。真实 CLI 用户不是只看到 final reply，还会看到 progress、queued ack、status、正在运行的命令等流式状态。把这些事件提供给用户模拟，能让用户自然判断是等待、打断还是追问，也能让 architect 从用户行为中看到状态可知性问题。
+stdout is the harness's actual interface to the user. Real CLI users see not only final replies, but also streaming state such as progress, queued ack, status, and commands being run. Providing these events to the user simulation lets users naturally decide whether to wait, interrupt, or ask a follow-up, and lets the architect see state visibility problems in user behavior.
 
-### 为什么主 loop 也需要 keep_waiting/interrupt
+### Why the main loop also needs keep_waiting/interrupt
 
-收到一个 terminal reply 不等于 harness 已经 idle。若紧随其后有 stdout status 表明 harness 正在处理 queued work，用户仍处于「等待下一条可见结果」状态。主 loop 若没有 `keep_waiting` / `interrupt`，用户只能继续 `send_message` 或终止，容易把队列越堆越乱。
+Receiving a terminal reply does not mean the harness is already idle. If a stdout status immediately afterward indicates that the harness is processing queued work, the user is still 「waiting for the next visible result」. Without `keep_waiting` / `interrupt` in the main loop, the user can only continue to `send_message` or terminate, making the queue increasingly chaotic.
 
-### 为什么 v0 需要 busy status
+### Why v0 needs busy status
 
-理论上 harness 可自发进化出 busy 输入可见性，但如果种子静默排队，用户和设计师会长期只看到「证据不足 / 回答含糊」，不容易定位到状态不可知性。busy 输入可见性是最小 CLI 产品起点：用户在工具忙时继续输入，工具至少应告诉用户该输入已收到、排队或正在处理。
+In theory, the harness could spontaneously evolve busy input visibility, but if the seed silently queues inputs, users and designers will continue to see only 「insufficient evidence / ambiguous answers」 for a long time, making it difficult to identify the lack of state visibility. Busy input visibility is a minimal starting point for a CLI product: when a user continues typing while the tool is busy, the tool should at least tell the user that the input has been received, queued, or is being processed.
 
-### 为什么给 divergent PM 加 lens 而不是喂 soft gap evidence
+### Why add a lens for the divergent PM instead of feeding it soft gap evidence
 
-人工整理 soft gap evidence 能证明 PM 能理解这类证据，但会把注意力预先筛到某类行为。T5 只给 PM 一个中性的分层观察方法和用户可见契约 lens，不给具体结论、功能名或命令名；PM 仍需从体感曲线和 timeline 工具中自行下钻、比较证据并决定是否形成候选。
+Manually curated soft gap evidence can demonstrate that the PM can understand this kind of evidence, but it would pre-filter attention toward certain kinds of behavior. T5 gives the PM only a neutral layered observation method and a user-visible contract lens, not specific conclusions, feature names, or command names; the PM must still drill down using the experience score curve and timeline tools, compare evidence, and decide whether to form a candidate.
 
 ## Prior art
 
-- 0012：心跳与等待决策。
-- 0013：present/progress 与 interrupt 语义。
-- 0022：用户↔harness 内外通道，明确 in-flight `emit_message` 可能排入 v0 下一轮，并把「协调主线 reply 与排队 mid-flight message」列为未决问题。
-- 0024：TurnLog 中的 `utterance_id/queued_behind/answers_*` 观测字段；本组不废弃这些字段，但不把它们作为用户感知的配对真相。
-- Claude Code / Codex 类 CLI：busy 时用户输入通常会有 queued/next-turn/ongoing work 的可见状态或行为反馈。
+- 0012: Heartbeat and wait decisions.
+- 0013: present/progress and interrupt semantics.
+- 0022: User↔harness internal and external channels, explicitly acknowledging that in-flight `emit_message` may be queued for the next v0 turn and listing 「coordinating the main reply with queued mid-flight messages」 as an unresolved question.
+- 0024: `utterance_id/queued_behind/answers_*` observation fields in TurnLog; this group does not deprecate these fields, but does not treat them as pairing ground truth for user perception.
+- Claude Code / Codex-like CLIs: User input while busy usually has visible queued/next-turn/ongoing work status or behavioral feedback.
 
 ## Unresolved questions
 
-- stdout 事件流在 session 存储中的长期字段名与截断策略：是否新增 `harness_events`，或先复用 `harness_steps/last_progress`。
-- reply 后短 drain 的窗口多长合适，如何避免拖慢大量并发 session。
-- v0 busy status 是纯文本 `[queued]` / `[status]`，还是结构化 JSON `type=status`；初始可先兼容两者。
-- 前端/设计师侧是否需要专门突出 `keep_waiting` / `interrupt` 触发前后的 stdout 事件。
+- Long-term field name and truncation policy for the stdout event stream in session storage: whether to add `harness_events` or reuse `harness_steps/last_progress` initially.
+- How long the short drain window after reply should be, and how to avoid slowing down large numbers of concurrent sessions.
+- Whether v0 busy status should be plain text `[queued]` / `[status]` or structured JSON `type=status`; initially, both can be supported.
+- Whether the frontend/architect side needs to specifically highlight stdout events before and after `keep_waiting` / `interrupt` is triggered.
 
 ## Future possibilities
 
-- harness 自行进化 `/btw` 旁路问答：仍通过 stdout 可见事件表达，不要求接缝层配对。
-- harness 未来若自愿输出 `reply_to` / `relates_to`，接缝层可原样展示为 harness 声明的产品语义，但不作为平台推断。
-- 设计师 timeline 可聚合「用户因 stdout 跑偏而 interrupt」「用户因 stdout 正在验证而 keep_waiting」等体验信号。
-- 前端会话详情以事件流方式展示 harness stdout，帮助人类观察用户为什么等待、打断或追问。
-- 接缝层统一写入口（去 begin/emit 二分）、以 `type=reply` 为软唤醒：见后续 spec「unify-harness-stdin-write」。
+- The harness independently evolves `/btw` side-channel Q&A: still expressed through stdout-visible events, without requiring pairing by the seam layer.
+- If the harness voluntarily outputs `reply_to` / `relates_to` in the future, the seam layer can display them unchanged as product semantics declared by the harness, without treating them as platform inferences.
+- The architect timeline can aggregate experience signals such as “the user interrupted because stdout went off track” and “the user chose keep_waiting because stdout showed verification in progress.”
+- Frontend session details display harness stdout as an event stream, helping humans observe why users wait, interrupt, or ask follow-up questions.
+- A unified write entry point in the seam layer (removing the begin/emit split), with `type=reply` as a soft wake-up: see the subsequent spec “unify-harness-stdin-write”.

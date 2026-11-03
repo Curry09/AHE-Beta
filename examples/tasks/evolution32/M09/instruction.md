@@ -1,1 +1,1 @@
-先给出分阶段实施计划并开始执行。第二阶段依赖的工具在当前环境不可用时，不要假装成功；说明阻塞并给出可验证的替代计划。
+First provide a phased implementation plan and begin execution. If a tool on which the second phase depends is unavailable in the current environment, do not pretend that it succeeded; explain the blocker and provide a verifiable alternative plan.

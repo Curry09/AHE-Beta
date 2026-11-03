@@ -1,15 +1,15 @@
 """
 actions.py
-动作模型 —— 框架的核心。根除 run_once 的归属歧义。
+Action model—the framework's core. Eliminate ambiguity in run_once ownership.
 
-三根属性轴(任何动作必须同时声明):
-  executor 执行者:  PERSONA_LOCAL / HARNESS / FRAMEWORK
-  channel  信道:    EMIT (发 B 线 NL) / SILENT (内部动作, 不发话)
-  effect   效果:    ADVANCE (推进) / VERIFY (核查) / TERMINATE (终止)
+Three attribute axes (any action must declare all three):
+  executor executor:  PERSONA_LOCAL / HARNESS / FRAMEWORK
+  channel  channel:   EMIT (send B-line NL) / SILENT (internal action, no utterance)
+  effect   effect:    ADVANCE (progress) / VERIFY (check) / TERMINATE (end)
 
-消息不是信道的同义词：终止动作可以有可选的用户说明，但该说明不应被投影成
-harness 消息。因此每个动作还声明 message_policy：required / optional / forbidden。
-违反由 assert_channel() 强校验。
+Message is not synonymous with channel: a terminate action may have optional user explanation,
+but that explanation should not be projected as a harness message. Therefore each action also
+declares message_policy: required / optional / forbidden. Violations enforced by assert_channel().
 """
 
 from __future__ import annotations
@@ -19,18 +19,18 @@ from enum import StrEnum
 
 
 class Executor(StrEnum):
-    PERSONA_LOCAL = "persona_local"  # 用户本地心智动作(发话/接受/放弃)
-    HARNESS = "harness"  # 通过 B 线驱动 harness 执行
-    FRAMEWORK = "framework"  # 框架代 persona 执行, 取 ground truth 后按能力掩码过滤
+    PERSONA_LOCAL = "persona_local"  # User local mental action (speak/accept/abandon)
+    HARNESS = "harness"  # Drive harness execution via B-line
+    FRAMEWORK = "framework"  # Framework executes on behalf of persona, filters ground truth by capability mask
 
 
 class Channel(StrEnum):
-    EMIT = "emit"  # 产生一句给 harness 的自然语言
-    SILENT = "silent"  # 内部动作, B 线无消息
+    EMIT = "emit"  # Generate natural language utterance for harness
+    SILENT = "silent"  # Internal action, no message on B-line
 
 
 class MessagePolicy(StrEnum):
-    """动作正文策略，与是否存在外部信道正交。"""
+    """Action body policy, orthogonal to whether external channel exists."""
 
     REQUIRED = "required"
     OPTIONAL = "optional"
@@ -38,14 +38,14 @@ class MessagePolicy(StrEnum):
 
 
 class Effect(StrEnum):
-    ADVANCE = "advance"  # 推进对话
-    VERIFY = "verify"  # 核查动作
-    TERMINATE = "terminate"  # 终止 loop
+    ADVANCE = "advance"  # Advance conversation
+    VERIFY = "verify"  # Verify action
+    TERMINATE = "terminate"  # Terminate loop
 
 
 class Phase(StrEnum):
-    OPENING = "opening"  # 尚未发出首个任务
-    ACTIVE = "active"  # 已有来回
+    OPENING = "opening"  # First task not yet issued
+    ACTIVE = "active"  # Already has exchanges
 
 
 @dataclass(frozen=True)
@@ -54,16 +54,16 @@ class ActionSpec:
     executor: Executor
     channel: Channel
     effect: Effect
-    end_reason: str | None = None  # 仅 TERMINATE 动作有
+    end_reason: str | None = None  # Only TERMINATE action has this
     message_policy: MessagePolicy = MessagePolicy.OPTIONAL
 
 
 # --------------------------------------------------------------------------
-# 动作目录 (六属性钉死：executor/channel/effect/end_reason/message_policy + id)
+# Action directory (six properties fixed: executor/channel/effect/end_reason/message_policy + id)
 # --------------------------------------------------------------------------
 CATALOG: dict[str, ActionSpec] = {
-    # 与 harness 的外部交互以自然语言消息为主；“查验/读文件/跑命令”是
-    # 用户 agent 的私有内层行为，不是外层 action。
+    # External interaction with harness is primarily natural language messages; 'verify/read file/run command' are
+    # private inner behaviors of the user agent, not outer actions.
     "send_message": ActionSpec(
         "send_message",
         Executor.HARNESS,
@@ -71,7 +71,7 @@ CATALOG: dict[str, ActionSpec] = {
         Effect.ADVANCE,
         message_policy=MessagePolicy.REQUIRED,
     ),
-    # 用户也可像真实 CLI 一样不追加新消息而继续等待，或打断仍在运行/排队的 harness 工作。
+    # User can also wait without appending new messages like a real CLI, or interrupt harness work still running/queued.
     "keep_waiting": ActionSpec(
         "keep_waiting",
         Executor.PERSONA_LOCAL,
@@ -86,7 +86,7 @@ CATALOG: dict[str, ActionSpec] = {
         Effect.ADVANCE,
         message_policy=MessagePolicy.FORBIDDEN,
     ),
-    # —— 终止 ——
+    # —— Terminate ——
     "accept": ActionSpec(
         "accept",
         Executor.PERSONA_LOCAL,
@@ -95,8 +95,8 @@ CATALOG: dict[str, ActionSpec] = {
         "accepted",
         message_policy=MessagePolicy.OPTIONAL,
     ),
-    # 接受但有保留：照样交付(end_reason=accepted)，同时以本人口吻留一条体感落差 issue。
-    # 把「提 issue」从「失败终止」解耦——完成了但不达预期，也该说出体感（由模型自行决定选它）。
+    # Accept with reservations: deliver as is (end_reason=accepted), and leave an issue in first person about the experiential gap.
+    # Decouple 'filing an issue' from 'failed termination'—completed but fell short of expectations, should still voice the experience (model decides whether to pick it).
     "accept_with_reservations": ActionSpec(
         "accept_with_reservations",
         Executor.PERSONA_LOCAL,
@@ -127,7 +127,7 @@ TERMINAL_IDS = {aid for aid, s in CATALOG.items() if s.effect is Effect.TERMINAT
 
 
 def assert_channel(action_id: str, message: str) -> None:
-    """校验动作正文策略；终止动作的 optional message 不会路由到 harness。"""
+    """Validate action body policy; optional message on terminate action does not route to harness."""
     spec = CATALOG[action_id]
     msg = (message or "").strip()
     if spec.message_policy is MessagePolicy.REQUIRED and not msg:

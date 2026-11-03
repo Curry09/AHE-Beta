@@ -1,12 +1,12 @@
 ---
 number: "0006"
-title: Persona 管线：采集（蒸馏）与注入 sim
+title: "Persona pipeline: collection (distillation) and injection into sim"
 issue: 0
 slug: persona-pipeline
-summary: 本组实现 persona 管线：把「从真实数据采集 persona」与「把 persona 注入控制信封 sim」串成一条链， 为 0005 的用户侧重型实现供给真实画像。对应 CLAUDE.md「蒸馏模块」，落实约束「persona 来自真实数据、 不依据 benchmark 或轨迹构造」。
+summary: "This group implements the persona pipeline: linking “collect personas from real data” with “inject personas into the control envelope sim” in a single chain to supply real user profiles to 0005's heavyweight user-side implementation. This corresponds to the CLAUDE.md “distillation module” and enforces the constraint that “personas come from real data and are not constructed from benchmarks or trajectories”."
 tasks:
   - id: T1
-    title: Persona 采集（蒸馏，skill 形式）
+    title: "Persona collection (distillation, in skill form)"
     status: pending
     priority: P1
     tags: []
@@ -22,10 +22,10 @@ tasks:
       - tools/persona-distill/extract-selfreport-persona/recruitment/seeds.md
       - backend/ahe_beta/distill/library.py
       - backend/tests/distill/test_library.py
-    scope: 按轮辐式落地采集侧并定义 persona 卡库格式。本步范围：① card-schema.md（唯一公共契约：卡 schema + 枚举 + D5 词表 + 注入分布 + 真实性门原则，source-agnostic）；② extract-selfreport-persona（薄 skill，从第一人称自述提取，引用契约）；③ library.py 读写。不接具体数据源、不做卡→sim 注入映射（归 T2）。cc/so/未来源作同契约的后续薄 skill，留待补入（见 open-questions）。
-    acceptance: card-schema.md 为唯一 source-agnostic 公共契约（卡 schema + 枚举 + D5 词表 + 注入分布 + 真实性门原则）；extract-selfreport-persona 为薄 skill，只引用契约、无 skill→skill 依赖、无悬空引用；library 按契约读写多条卡库、可按 id 取、对未知键前向兼容；卡记录不含任何 benchmark/轨迹派生字段；D5.area 为受控词表单 token。
+    scope: "Implement the collection side using a hub-and-spoke architecture and define the persona card library format. Scope of this step: ① card-schema.md (the sole public contract: card schema + enums + D5 vocabulary + injection distributions + authenticity gate principles, source-agnostic); ② extract-selfreport-persona (a thin skill that extracts from first-person self-reports and references the contract); ③ library.py read/write. Do not integrate specific data sources or implement card→sim injection mapping (belongs to T2). cc/so/not-yet-sourced are later thin skills under the same contract, to be added later (see open-questions)."
+    acceptance: "card-schema.md is the sole source-agnostic public contract (card schema + enums + D5 vocabulary + injection distributions + authenticity gate principles); extract-selfreport-persona is a thin skill that only references the contract, with no skill→skill dependencies or dangling references; library reads and writes a library of multiple cards according to the contract, supports retrieval by id, and is forward-compatible with unknown keys; card records contain no benchmark/trajectory-derived fields; D5.area is a single token from a controlled vocabulary."
   - id: T2
-    title: Persona 注入 sim
+    title: "Persona injection into sim"
     status: pending
     priority: P1
     tags: []
@@ -41,10 +41,10 @@ tasks:
     files:
       - backend/ahe_beta/user/sim/persona_io.py
       - backend/tests/user/sim/test_persona_io.py
-    scope: 把 persona 卡（0006/T1）注入 sim：card_to_persona 映射卡 → dimensions.Persona，grounded 轴透传、finalize_persona 只填卡未 ground 的派生维度（覆盖派生）；处理 6 维卡↔9 维的字段对齐、枚举并轨（surface↔shallow 等）、缺省与校验。不改卡格式（归 T1）；sim 维度模型仅做「finalize 降为 fallback-only」的配套修正（契约见 0005/T1，本组依赖）。不构造 harness/client（0005/T6）。
-    acceptance: card_to_persona 对合法卡产出完整不可变 Persona：grounded 的 d3(卡 D2)/trust(卡 D4) 原样保留、卡未 ground 的派生维（d3/trust/d6 中缺的）经 finalize_persona 填齐；expert×over-trust 卡注入后 trust 仍为 over-trust 映射值（不被 derive_trust 改写成 skeptical）；缺字段/非法枚举显式报错；注入结果可直接喂 0005/T5 run_session 跑通一局。
+    scope: "Inject persona cards (0006/T1) into sim: card_to_persona maps a card → dimensions.Persona, passes grounded axes through unchanged, and finalize_persona fills only derived dimensions not grounded in the card (grounded values override derived values); handle field alignment between 6-dimensional cards↔9 dimensions, enum alignment (surface↔shallow, etc.), defaults, and validation. Do not change the card format (belongs to T1); make only the supporting change to the sim dimension model to make finalize fallback-only (contract in 0005/T1, a dependency of this group). Do not construct harness/client (0005/T6)."
+    acceptance: "card_to_persona produces a complete immutable Persona for a valid card: grounded d3 (card D2)/trust (card D4) are preserved unchanged, and derived dimensions not grounded in the card (those missing among d3/trust/d6) are filled by finalize_persona; after injection of an expert×over-trust card, trust remains the mapped value for over-trust (not overwritten to skeptical by derive_trust); missing fields/invalid enums raise explicit errors; the injection result can be fed directly to 0005/T5 run_session to complete a session."
   - id: T3
-    title: 观测型 persona spoke：SO / GitHub 收编（含局限声明）
+    title: "Observational persona spokes: SO / GitHub integration (including limitations statements)"
     status: done
     priority: P1
     tags:
@@ -64,164 +64,100 @@ tasks:
       - tools/persona-distill/extract-github-persona/recruitment/domains.md
       - tools/persona-distill/extract-github-persona/recruitment/swe-bench.md
       - tools/persona-distill/extract-github-persona/recruitment/terminal-bench.md
-    scope: "改造并实现两个**观测型** spoke（照 T1 的 extract-selfreport-persona 结构），本 task 范围：\n① extract-github-persona（源 extract-cc-user-persona；真实来源是 GitHub 足迹 repos/issues/PRs）——含\nSKILL.md + reference.md + recruitment/（domains.md 域登记 + swe-bench.md + terminal-bench.md）；\n② extract-stackoverflow-persona（源 extract-so-user-persona；Stack Overflow API）——含 SKILL.md +\nreference.md。三项改造：引契约去 spoke→spoke、补 basis、态度轴降 injected（SO 的 D1 降 medium）。\n两个 spoke 各写「局限与缺陷」段，显著记录观测型方法内容质量边界。**不改** card-schema.md（契约，归 T1）、\n不改 extract-selfreport-persona/（归 T1）、不改 backend 代码（library.py/validate_card/persona_io.py 归 T1/T2）、\n不改动 NexAU 原件（vendored 改造版进本仓）。库侧硬门（basis 强制 / 观测源态度轴强制 injected）本 task 不做，\n见 open-questions。"
-    acceptance: "两个 spoke 落在 tools/persona-distill/ 下、结构对齐 extract-selfreport-persona，只引用 ../card-schema.md、\n无 spoke→spoke 的 schema 反向引用、无自带整套 schema、无悬空引用；每个 grounded 维封套带 basis（观测型为\nobserved），injected 维不带 basis 且 confidence=low；GitHub spoke 的 D4/无一手证据 D2 默认 injected、\nD1/D5 grounded；SO spoke 的 D1 grounded 封顶 medium、D4 默认 injected、D1/D5 grounded；两个 spoke 各含\n显著的「局限与缺陷」段（记录 D1×D5 可靠、态度轴注入/外推、来源偏差、使用边界）；两个 spoke 的\nworked-example 卡过 PersonaLibrary.validate_card 且可被 card_to_persona 消费；改名对齐 extract-<source>-persona。"
+    scope: "Adapt and implement two **observational** spokes (following the T1 extract-selfreport-persona structure), within this task's scope:\n① extract-github-persona (source: extract-cc-user-persona; actual source is GitHub activity in repos/issues/PRs) — includes\nSKILL.md + reference.md + recruitment/ (domains.md domain registry + swe-bench.md + terminal-bench.md);\n② extract-stackoverflow-persona (source: extract-so-user-persona; Stack Overflow API) — includes SKILL.md +\nreference.md. Three changes: reference the contract and remove spoke→spoke dependencies, add basis, and downgrade attitude axes to injected (downgrade SO's D1 to medium).\nEach spoke must have a “Limitations and Defects” section that prominently records the content-quality boundaries of observational methods. **Do not modify** card-schema.md (the contract, belongs to T1),\ndo not modify extract-selfreport-persona/ (belongs to T1), do not modify backend code (library.py/validate_card/persona_io.py belong to T1/T2),\nand do not modify the NexAU originals (the vendored adapted versions go into this repository). Library-side hard gates (mandatory basis / mandatory injected attitude axes for observational sources) are out of scope for this task;\nsee open-questions."
+    acceptance: "Both spokes are located under tools/persona-distill/, structurally aligned with extract-selfreport-persona, and reference only ../card-schema.md;\nno spoke→spoke reverse schema references, no bundled complete schema, and no dangling references; each grounded dimension envelope has basis (observed for observational sources), while injected dimensions have no basis and have confidence=low; the GitHub spoke defaults D4/D2 without firsthand evidence to injected, with D1/D5 grounded; the SO spoke caps grounded D1 at medium, defaults D4 to injected, and has D1/D5 grounded; each spoke contains a prominent “Limitations and Defects” section (documenting D1×D5 reliability, attitude-axis injection/extrapolation, source bias, and usage boundaries); each spoke's worked-example card passes PersonaLibrary.validate_card and can be consumed by card_to_persona; rename to conform to extract-<source>-persona."
 ---
 
-# 0006 · Persona 管线：采集（蒸馏）与注入 sim
+# 0006 · Persona Pipeline: Collection (Distillation) and Injection into sim
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: the frontmatter is structured source data (including the tasks DAG), and the body is a group-level rust-RFC 9-section overview. -->
 
 ## Summary
 
-本组实现 persona 管线：把「从真实数据采集 persona」与「把 persona 注入控制信封 sim」串成一条链，
-为 0005 的用户侧重型实现供给真实画像。对应 CLAUDE.md「蒸馏模块」，落实约束「persona 来自真实数据、
-不依据 benchmark 或轨迹构造」。
+This group implements the persona pipeline: it connects “collecting personas from real data” with “injecting personas into the control-envelope sim” as one chain, supplying the user-focused implementation in 0005 with real profiles. It corresponds to the “distillation module” in CLAUDE.md and implements the constraint that “personas come from real data and are not constructed from benchmarks or trajectories.”
 
-数据流脊柱：
+Data-flow backbone:
 
 ```
-真实使用数据(第一人称自述 · GitHub 足迹 · Stack Overflow · 未来源)
-        │  采集/归纳（T1，轮辐式：共享卡契约 + 薄抽取 skill）
+Real usage data (first-person self-reports · GitHub activity · Stack Overflow · future sources)
+        │  collection/synthesis (T1, hub-and-spoke: shared card contract + thin extraction skills)
         ▼
-   persona 卡库（6 维行为卡：D1–D6 + authenticity/era/provenance）
-        │  注入（T2，card_to_persona：grounded 轴透传 + 覆盖派生）
+   persona card library (6-dimensional behavioral cards: D1–D6 + authenticity/era/provenance)
+        │  injection (T2, card_to_persona: pass grounded axes through + override derived values)
         ▼
-   spec-0005 dimensions.Persona ─► 0005/T5 run_session 跑一局 ─► 体感 + issue
+   spec-0005 dimensions.Persona ─► 0005/T5 run_session runs one session ─► user experience + issue
 ```
 
-读图即读任务：**T1** 定「采集什么、卡长什么样」——不另造 skill，而是收编既有的真实抽取方法（此前写在 NexAU 仓库里、非 NexAU 自身的方法），并按
-**轮辐式**组织：唯一公共契约 `card-schema.md`（6 维卡 schema + 枚举 + D5 词表 + 注入分布 + 真实性门原则，
-source-agnostic）+ 各「薄抽取 skill」只描述「从某类来源提取 + ground 哪几维」、只依赖契约、彼此不依赖。本步
-先落契约 + `extract-selfreport-persona`（第一人称自述，唯一 ground 信任轴 D4 且带 card_to_persona 覆盖规则）；
-cc/so/未来源作同契约的后续薄 skill 插入。库 schema 即该契约。**T2** 定「卡如何变成 sim 能跑的 Persona」
-（唯一桥接层 card_to_persona）。
+The diagram defines the tasks: **T1** specifies “what to collect and what the card looks like”—it does not create another skill, but incorporates the existing real extraction methods (previously written in the NexAU repository, not methods belonging to NexAU itself), organized in a **hub-and-spoke** structure: the sole shared contract `card-schema.md` (6-dimensional card schema + enums + D5 vocabulary + injection distributions + two-way authenticity-gate principles, source-agnostic) + each “thin extraction skill” describes only “extract from a given source type + which dimensions to ground,” depends only on the contract, and does not depend on the others. This step first lands the contract + `extract-selfreport-persona` (first-person self-report, the only grounding-trust axis for D4 and including card_to_persona override rules); cc/so/unsupported sources are added later as thin skills under the same contract. The library schema is this contract. **T2** specifies “how a card becomes a Persona that sim can run” (the sole bridging layer, card_to_persona).
 
-**覆盖派生（关键约束）**：6 维卡是「正交 ground 的真实画像」，每维各自有证据；sim 9 维里 d3/trust/d6 原是
-「从 D1/D5 派生」。注入时 **卡里 grounded 的 验收 D2 → sim d3、信任 D4 → sim trust 直接写入、不被 derive_*
-改写**（这两个正是 sim 的派生维），finalize_persona 只填卡未 ground 的派生维——否则 expert×over-trust
-（selfreport 例 C / Karpathy）会被模拟成 skeptical×rigorous 的反面。此约束在 extract-selfreport-persona
-reference 例 C 已写明（card_to_persona），并要求 0005/T1 把 finalize_persona 降为 fallback-only（本组同改）。
-注：卡 D6 自主 → sim D5Autonomy 是采样维（直接写入，本无 derive）；sim 的派生维 D6Authz 卡中无对应来源，
-仍按 D5Autonomy + task_risk 派生（见 T2）。
+**Derived-dimension override (key constraint)**: the 6-dimensional card is a “real profile with orthogonal grounding,” with evidence for each dimension; among sim’s 9 dimensions, d3/trust/d6 were originally “derived from D1/D5.” During injection, **the grounded acceptance D2 in the card → sim d3, and trust D4 → sim trust directly; they must not be overwritten by derive_*** (these two are precisely sim’s derived dimensions). finalize_persona only fills derived dimensions that are not grounded in the card—otherwise expert×over-trust (selfreport example C / Karpathy) would be simulated as the opposite, skeptical×rigorous. This constraint is stated in the extract-selfreport-persona reference example C (card_to_persona), and requires 0005/T1 to reduce finalize_persona to fallback-only (the same change is made in this group).
+Note: card D6 autonomy → sim D5Autonomy is a sampling dimension (written directly; it has no derive function). sim’s derived dimension D6Authz has no corresponding source in the card, so it is still derived from D5Autonomy + task_risk (see T2).
 
-与 0005 的关系：本组是 0005（控制信封用户模拟器）的上游供给。6 维卡 ↔ sim 9 维 ↔ spec-0001 models.Persona
-的最终并轨记在各 Task open-questions，待真实数据与下游需求收敛后定。
+Relationship to 0005: this group is the upstream provider for 0005 (the control-envelope user simulator). The final integration of the 6-dimensional card ↔ sim’s 9 dimensions ↔ spec-0001 models.Persona is recorded in each Task’s open-questions and will be determined after real data and downstream requirements converge.
 
 ## Motivation
 
-整条进化的训练信号取自「模拟真实使用」分布上的用户体感，其真实性根植于 persona 是否来自真实数据。既有的
-三个真实抽取方法（此前写在 NexAU 仓库里，非 NexAU 自身的方法：extract-selfreport-persona、
-extract-cc-user-persona、extract-so-user-persona）已沉淀「证据或弃 / 维度正交 / 双向真实性门」——重写必失真，
-故收编而非另起炉灶（T1 收编 selfreport，T3 收编另两个观测型方法）。更关键是**可扩展性**：这些方法现状把
-公共 schema 只写在 cc、so/selfreport 反向引用 cc（skill→skill 依赖），这正是 basis/provenance 在三者间漂移
-的根因。轮辐式把公共部分抽成唯一契约、各 spoke 只依赖契约且彼此独立——契约改一处全员生效，加新来源只是
-新增一个薄 spoke，不碰别人；T1 先落契约与首个 spoke，T3 按此规划补入另外两个。
+The training signal for the entire evolution comes from user experience on the “simulated real-use” distribution, and its authenticity is rooted in whether personas come from real data. The three existing real extraction methods (previously written in the NexAU repository, not methods belonging to NexAU itself: extract-selfreport-persona, extract-cc-user-persona, extract-so-user-persona) have already established “evidence or discard / orthogonal dimensions / two-way authenticity gates”—rewriting them would inevitably lose fidelity, so they are incorporated rather than recreated (T1 incorporates selfreport; T3 incorporates the other two observation-based methods). More importantly, this supports **extensibility**: currently these methods write the shared schema only in cc, while so/selfreport reference cc in reverse (skill→skill dependency), which is the root cause of basis/provenance drift among the three. The hub-and-spoke structure extracts the shared portion into a single contract; each spoke depends only on the contract and remains independent of the others—a contract change takes effect for all of them in one place, and adding a source requires only adding a thin spoke without touching the others. T1 first lands the contract and the first spoke; T3 adds the other two according to this plan.
 
-T3 在收编之外还需按内容评审收紧态度轴：观测型源（GitHub 足迹、Stack Overflow 问答）可靠观测到的只有
-能力与领域，把信任/验收/自主从外部行为反推（例如从 CVE 卫生、auto-merge 记录反推信任）是脆弱外推，
-须显式降 injected 并在文档记录质量边界，避免单卡被误当真人「态度」锚使用而污染训练信号真实性。
+In addition to incorporation, T3 must tighten the attitude axis through content review: observation-based sources (GitHub activity and Stack Overflow answers) reliably observe only capability and domain. Inferring trust/acceptance/autonomy from external behavior (for example, inferring trust from CVE hygiene or auto-merge records) is fragile extrapolation. These dimensions must be explicitly downgraded to injected, with the quality boundary documented, to prevent a single card from being mistaken for a real-person “attitude” anchor and contaminating the authenticity of the training signal.
 
-在采集之后，注入层（T2）面对的是另一重矛盾：采集产出的是「正交 ground 的真实画像」，sim 消费的是「9 维
-结构化系数」，两者格式不一，需一层显式、可测的映射。更关键的是，sim 的 d3/trust/d6 原是「从 D1/D5 派生」，
-若注入时一律 finalize，会把卡里真实 ground 的信任/验收/授权改写成合成值——例如 expert×over-trust 的
-Karpathy（selfreport 例 C）会被模拟成 skeptical×rigorous 的反面，直接污染训练信号的真实性。故注入层必须
-让 grounded 值覆盖派生。
+After collection, the injection layer (T2) faces another tension: collection produces a “real profile with orthogonal grounding,” while sim consumes “9-dimensional structured coefficients.” The formats differ, so an explicit, measurable mapping layer is required. More importantly, sim’s d3/trust/d6 were originally “derived from D1/D5.” If injection always calls finalize, it will rewrite the card’s real grounded trust/acceptance/authorization values with synthetic values—for example, Karpathy’s expert×over-trust (selfreport example C) would be simulated as the opposite, skeptical×rigorous, directly contaminating the authenticity of the training signal. The injection layer must therefore allow grounded values to override derived values.
 
 ## Guide-level explanation
 
-采集（蒸馏）侧按**轮辐式**组织，不另造大 skill：唯一公共契约 card-schema.md（source-agnostic）定义
-6 维行为卡 schema（D1–D6 + authenticity + era + provenance）+ 维度枚举 + D5.area 受控词表 + 注入分布 +
-双向真实性门原则，采既有 selfreport skill 的最新约定（每维 source+basis+confidence、provenance 并集、
-value 键）。三个薄抽取 spoke 各只依赖该契约、彼此不依赖：extract-selfreport-persona（T1）从第一人称
-自述（博客/访谈/演讲/推文长贴）提取，是唯一能 ground 态度轴 D4 信任的来源；extract-github-persona 与
-extract-stackoverflow-persona（T3，改造自既有的 extract-cc-user-persona / extract-so-user-persona，改名
-对齐 extract-<source>-persona 约定）观测 GitHub 足迹与 Stack Overflow 问答，可靠 ground 的是 D1 能力与
-D5 领域·栈，态度轴（D2 验收、D3 交互、D4 信任、D6 自主）在观测型源里默认降为 injected（SO 的 D1 因证据
-弱进一步封顶 medium），避免单卡被误当真人态度锚。本步先落契约 + selfreport（T1），cc/so 作同契约后续
-薄 spoke 插入（T3 兑现），未来源留待补入。三个 spoke 交付的卡记录由 library.py（T1）统一读写，按契约
-存取，供注入层消费。
+The collection side uses a **hub-and-spoke** structure and does not create a large new skill: the sole shared contract, card-schema.md (source-agnostic), defines the 6-dimensional behavior card schema (D1–D6 + authenticity + era + provenance), dimension enums, the controlled vocabulary for D5.area, injection distributions, and two-way authenticity-gate principles. It incorporates the latest conventions from the existing selfreport skill (source+basis+confidence for each dimension, provenance union, value keys). The three thin extraction spokes each depend only on this contract and not on one another: extract-selfreport-persona (T1) extracts from first-person self-reports (blogs/interviews/talks/long-form posts), and is the only source that can ground the attitude axis D4 trust; extract-github-persona and extract-stackoverflow-persona (T3, adapted from the existing extract-cc-user-persona / extract-so-user-persona and renamed to align with the extract-<source>-persona convention) observe GitHub activity and Stack Overflow answers. The dimensions reliably grounded are D1 capability and D5 domain·stack; the attitude axes (D2 acceptance, D3 interaction, D4 trust, D6 autonomy) are downgraded to injected by default for observation-based sources (D1 for SO is additionally capped at medium because the evidence is weak), preventing a single card from being mistaken for a real-person attitude anchor. This step first lands the contract + selfreport (T1); cc/so are added later as thin spokes under the same contract (T3 fulfillment), while unsupported sources remain for later addition. The card records delivered by the three spokes are read and written uniformly by library.py (T1), stored according to the contract, and consumed by the injection layer.
 
-把采集到的 persona 卡注入控制信封 sim 是唯一桥接层（T2）：card_to_persona 将一条卡映射为 sim 的
-dimensions.Persona —— 卡里 grounded 的轴直接透传，finalize_persona 仅填卡未 ground 的派生维度（即
-「覆盖派生」：grounded 的验收/信任/授权不被 derive_* 改写）。产物直接交 spec-0005/T5 run_session 使用。
+Injecting a collected persona card into the control-envelope sim is the sole bridging layer (T2): card_to_persona maps one card to sim’s dimensions.Persona—grounded axes in the card are passed through directly, while finalize_persona fills only derived dimensions that are not grounded in the card (the “derived-dimension override”: grounded acceptance/trust/authorization are not overwritten by derive_*). The resulting artifact is passed directly to spec-0005/T5 run_session.
 
 ## Reference-level explanation
 
-### 采集侧：轮辐式契约与三个抽取 spoke（T1、T3）
+### Collection side: the hub-and-spoke contract and three extraction spokes (T1, T3)
 
-采集侧落地范围是「唯一公共契约 + 三个彼此独立的薄抽取 spoke + 一个读写库」，均在 tools/persona-distill/
-下按轮辐式组织：
+The collection-side implementation consists of “one shared contract + three independent thin extraction spokes + one read/write library,” all organized in a hub-and-spoke structure under tools/persona-distill/:
 
 ```
 tools/persona-distill/
-  card-schema.md                     唯一公共契约（hub，source-agnostic，归 T1）
-  extract-selfreport-persona/        自述型 spoke（T1，grounds 态度轴 D2/D3/D4/D6）
-  extract-github-persona/            观测型 spoke（T3，grounds D1/D5）
-  extract-stackoverflow-persona/     观测型 spoke（T3，grounds D1/D5 低端）
+  card-schema.md                     sole shared contract (hub, source-agnostic, owned by T1)
+  extract-selfreport-persona/        self-report spoke (T1, grounds attitude axes D2/D3/D4/D6)
+  extract-github-persona/            observational spoke (T3, grounds D1/D5)
+  extract-stackoverflow-persona/     observational spoke (T3, grounds the low end of D1/D5)
 ```
 
-铁律：spoke 只依赖契约，**彼此不依赖 schema**（杜绝 spoke→spoke 与多副本漂移）——这是修复既有方法
-「公共 schema 只写在 cc、so/selfreport 反向引用 cc」导致 basis/provenance 漂移的关键设计。
+Hard rule: spokes depend only on the contract and **do not depend on one another’s schemas** (preventing spoke→spoke dependencies and drift among multiple copies)—this is the key design that fixes the root cause of the existing methods, where the “shared schema is written only in cc, while so/selfreport reference cc in reverse,” causing basis/provenance drift.
 
-card-schema.md（T1，公共契约）定义 6 维行为卡：D1 评估能力 | D2 验收门槛(primary+flags) | D3 交互
-(delegation·supervision·on_offtrack) | D4 信任 | D5 领域(area+depth+stack+weak) | D6 自主期望；每维携
-{value | (primary,flags), source(grounded|injected), basis(observed|stated|stated+observed), confidence}；
-meta 含 authenticity / era{value,basis} / provenance（并集：layers? · sources? · self_report? · reputation? +
-evidence_quotes[{quote,source}]）；另含 D1–D6 枚举取值、D5.area 受控词表、注入分布、双向真实性门原则。
+card-schema.md (T1, the shared contract) defines the 6-dimensional behavior card: D1 capability assessment | D2 acceptance threshold (primary+flags) | D3 interaction (delegation·supervision·on_offtrack) | D4 trust | D5 domain (area+depth+stack+weak) | D6 autonomy expectation; each dimension carries {value | (primary,flags), source(grounded|injected), basis(observed|stated|stated+observed), confidence}; meta contains authenticity / era{value,basis} / provenance (union: layers? · sources? · self_report? · reputation? + evidence_quotes[{quote,source}]); it also includes D1–D6 enum values, the controlled vocabulary for D5.area, injection distributions, and two-way authenticity-gate principles.
 
-三个 spoke 各只描述「从某类来源提取 + ground 哪几维」，彼此互补，合起来使每轴至少被一个源观测或自述
-ground：extract-selfreport-persona（T1）从第一人称自述提取，强 ground D2/D3/D4/D6（验收/交互/信任/自主），
-D1/D5 为 medium 需佐证，含 stated→confidence 规则与 performative/promotional/second-hand 真实性门，是唯一
-能 ground 信任轴 D4 的来源。extract-github-persona 与 extract-stackoverflow-persona（T3，分别改造自既有
-的 extract-cc-user-persona 与 extract-so-user-persona，改名对齐 extract-<source>-persona 约定——"cc" 原指
-驱动的 harness 而非来源，真实来源是 GitHub 足迹）观测行为轨迹，可靠 ground D1 能力与 D5 领域·栈；态度轴
-按内容评审收紧：GitHub 的 D4 信任、缺一手证据的 D2 验收默认降 injected（改掉此前「从 CVE 卫生/auto-merge
-推 D4 grounded」的写法，仅有一手信任/验收陈述才 grounded），SO 的 D4 保持默认 injected、D1 由单帖+
-reputation 弱信号封顶 medium（不再 blind@high）。T3 的改造同时做了两项结构清理：① 删除两个 spoke 原有的
-「公共 schema 只写在 cc、so 反向引用 cc」整套 schema 表与反向引用（漂移根因），改引 ../card-schema.md；
-② 为每个 grounded 维补 basis（观测型 grounded 值记 observed，区分转录事实与评审判断；injected 维不带
-basis）。两个观测型 spoke 各含显著的「局限与缺陷」段：只有 D1×D5 由一手观测可靠支撑，态度轴 D2/D3/D4/D6
-在观测型源里是注入先验/外推、单卡不忠于真人态度，来源存在偏差（SO 偏卡住来问者/幸存者自选择，GitHub
-偏公开活跃），使用边界是「适合铺 D1×D5 覆盖网格，态度轴真人锚须来自 selfreport」。GitHub spoke 附带的
-recruitment 多源 profile（swe-bench.md / terminal-bench.md / domains.md）是共享招募数据（决定看谁），SO
-spoke 引用其 pools.stackoverflow；这不构成 schema 契约，不算 schema 漂移。
+Each of the three spokes describes only “extract from a given source type + which dimensions to ground.” They complement one another; together they ensure that every axis is observed or self-report-grounded by at least one source: extract-selfreport-persona (T1) extracts from first-person self-reports and strongly grounds D2/D3/D4/D6 (acceptance/interaction/trust/autonomy); D1/D5 require corroboration and are medium, with stated→confidence rules and performative/promotional/second-hand authenticity gates. It is the only source that can ground the trust axis D4. extract-github-persona and extract-stackoverflow-persona (T3, respectively adapted from the existing extract-cc-user-persona and extract-so-user-persona and renamed to align with the extract-<source>-persona convention—“cc” originally referred to the driver harness rather than the source; the actual source is GitHub activity) observe behavior trajectories and reliably ground D1 capability and D5 domain·stack. The attitude axes are tightened through content review: GitHub’s D4 trust and D2 acceptance without first-hand evidence are downgraded to injected by default (replacing the earlier wording that inferred grounded D4 from CVE hygiene/auto-merge; only first-hand trust/acceptance statements are grounded); SO’s D4 remains injected by default, and D1 is capped at medium based on the weak signal from a single post + reputation (no longer blind@high). The T3 adaptations also perform two structural cleanups: ① delete the complete “shared schema is written only in cc, while so references cc in reverse” schema table and reverse reference from both spokes (the root cause of drift), replacing them with a reference to ../card-schema.md; ② add basis to every grounded dimension (grounded values from observation are marked observed, distinguishing transcriptional facts from review judgments; injected dimensions do not carry basis). Each observation-based spoke includes a prominent “Limitations and defects” section: only D1×D5 is reliably supported by first-hand observation; the attitude axes D2/D3/D4/D6 are injected priors/extrapolations in observation-based sources, and a single card is not faithful to a real person’s attitude. The sources are biased (SO toward people who get stuck and ask questions / survivor self-selection, GitHub toward public and active users). The usage boundary is “suitable for laying out a D1×D5 coverage grid; real-person anchors for attitude axes must come from selfreport.” The recruitment multi-source profiles attached to the GitHub spoke (swe-bench.md / terminal-bench.md / domains.md) are shared recruitment data (determining whom to look at); the SO spoke references its pools.stackoverflow. This does not constitute a schema contract and does not count as schema drift.
 
-三个 spoke 产出的卡记录由 library.py（T1）统一读写：一个库文件承载多条卡记录，纯数据，可双向序列化，
-对未知键前向兼容（演化友好），提供 load / get(id) / add 最小读写。卡格式与 sim 9 维 Persona 解耦——卡是
-「采集到的真实画像（正交 ground）」，到 sim 维度的映射归注入层（T2）。
+The card records produced by the three spokes are read and written uniformly by library.py (T1): one library file holds multiple card records; the records are pure data, bidirectionally serializable, forward-compatible with unknown keys (evolution-friendly), and provide the minimal load / get(id) / add read/write operations. The card format is decoupled from sim’s 9-dimensional Persona—the card is a “collected real profile (with orthogonal grounding),” and mapping to sim dimensions belongs to the injection layer (T2).
 
-**接口**
+**Interface**
 
 ```
 PersonaLibrary(root|path)
-- load() -> list[dict]            # 读全库（卡记录）
-- get(persona_id: str) -> dict    # 按 id 取一条卡
-- add(record: dict) -> None       # 追加一条卡记录
+- load() -> list[dict]            # Read the entire library (card records)
+- get(persona_id: str) -> dict    # Retrieve one card by ID
+- add(record: dict) -> None       # Append a card record
 ```
 
-卡 schema 由 card-schema.md（唯一契约）定义；与 spec-0001 models.Persona 的并轨见 Unresolved questions。
-两个观测型 spoke（T3）不引入新代码接口，产出 card-schema.md 定义的同一卡形状，可被
-PersonaLibrary.validate_card 校验、被 T2 的 card_to_persona 消费。
+The card schema is defined by card-schema.md (the sole contract); its integration with spec-0001 models.Persona is covered under Unresolved questions.
+The two observation-based spokes (T3) introduce no new code interfaces. They produce the same card shape defined by card-schema.md, which can be validated by PersonaLibrary.validate_card and consumed by T2’s card_to_persona.
 
-**测试**
+**Tests**
 
-单测（T1，library.py）：
-- PersonaLibrary 读写：add 后 load 含该条、get(id) 取回等价记录；空库 load 返回空列表。
-- 卡 schema round-trip：含 source/basis/confidence 与 provenance 并集字段的记录 to/from dict 字段级一致；
-  遇未知键忽略不报错（前向兼容）。
-- 约束校验：卡记录不含 benchmark/轨迹派生字段（字段白名单断言）；D5.area ∈ card-schema.md 受控词表。
+Unit tests (T1, library.py):
+- PersonaLibrary read/write: after add, load contains the added record, get(id) retrieves an equivalent record, and load on an empty library returns an empty list.
+- Card schema round-trip: for a record containing source/basis/confidence and provenance-union fields, to/from dict preserves fields identically; unknown keys are ignored without errors (forward compatibility).
+- Constraint validation: card records contain no benchmark/trajectory-derived fields (field allowlist assertion); D5.area ∈ the controlled vocabulary in card-schema.md.
 
-验证（T3，spoke 收编，doc/skill 层面，不新增库侧代码/测试）：
-- 两个 spoke 的 worked-example 卡（github 例 A、stackoverflow 例 A）实跑 PersonaLibrary.validate_card 通过、
-  card_to_persona 产出可用 Persona（grounded 轴透传、injected 态度轴交 finalize 派生）。
-- 静态核验：spoke 内无 spoke→spoke 的 schema 反向引用、无自带 schema 表；grounded 维均带 basis；
-  D5.area ∈ card-schema.md 受控词表。
-- spec validate 无 error、spec render 无 drift。
+Verification (T3, spoke incorporation, doc/skill level, with no new library-side code/tests):
+- The worked-example cards from both spokes (GitHub example A, Stack Overflow example A) run through PersonaLibrary.validate_card successfully and card_to_persona produces a usable Persona (grounded axes pass through, while injected attitude axes are finalized through derived values).
+- Static checks: neither spoke contains a spoke→spoke reverse schema reference or its own schema table; every grounded dimension includes basis; D5.area ∈ the controlled vocabulary in card-schema.md.
+- spec validate has no errors, and spec render has no drift.
 
-**文件（单一 writer 所有权）**
+**Files (single-writer ownership)**
 
-T1：
+T1:
   - `tools/persona-distill/card-schema.md`
   - `tools/persona-distill/extract-selfreport-persona/SKILL.md`
   - `tools/persona-distill/extract-selfreport-persona/reference.md`
@@ -229,7 +165,7 @@ T1：
   - `backend/ahe_beta/distill/library.py`
   - `backend/tests/distill/test_library.py`
 
-T3：
+T3:
   - `tools/persona-distill/extract-stackoverflow-persona/SKILL.md`
   - `tools/persona-distill/extract-stackoverflow-persona/reference.md`
   - `tools/persona-distill/extract-github-persona/SKILL.md`
@@ -238,134 +174,134 @@ T3：
   - `tools/persona-distill/extract-github-persona/recruitment/swe-bench.md`
   - `tools/persona-distill/extract-github-persona/recruitment/terminal-bench.md`
 
-### 注入侧：card_to_persona 桥接层（T2）
+### Injection side: card_to_persona bridge layer (T2)
 
-采集到的卡进入 sim 前需经唯一桥接层 card_to_persona（T2）：按字段映射把卡翻成 sim 维度——
+Collected cards must pass through the sole bridge layer card_to_persona (T2) before entering sim: field mappings translate cards into sim dimensions—
 
-| 卡维度 | sim 维度 | 说明 |
+| Card dimension | sim dimension | Description |
 |---|---|---|
-| D1 评估能力 | D1Eval | surface↔shallow 并轨 |
-| D5 领域(area/depth/stack/weak) | D2Domain + D2Depth | |
-| D2 验收门槛(primary) | D3Accept | 派生维，grounded 时直接写入（覆盖派生） |
-| D3 交互(delegation/supervision/on_offtrack) | D41Grain / D42Supervise / D43Correct | |
-| D4 信任(over-trust/balanced/skeptical) | trust(blind/balanced/skeptical；over-trust↔blind) | 派生维，grounded 时直接写入（覆盖派生） |
-| D6 自主期望(advisory/collaborative/agentic) | D5Autonomy | 采样维，直接写入 |
+| D1 Evaluation ability | D1Eval | Unify surface↔shallow |
+| D5 Domain(area/depth/stack/weak) | D2Domain + D2Depth | |
+| D2 Acceptance threshold(primary) | D3Accept | Derived dimension; write directly when grounded (override derivation) |
+| D3 Interaction(delegation/supervision/on_offtrack) | D41Grain / D42Supervise / D43Correct | |
+| D4 Trust(over-trust/balanced/skeptical) | trust(blind/balanced/skeptical; over-trust↔blind) | Derived dimension; write directly when grounded (override derivation) |
+| D6 Autonomy expectations(advisory/collaborative/agentic) | D5Autonomy | Sampled dimension; write directly |
 
-卡里 source=grounded 的轴直接写入对应 sim 维；其中 D2→d3、D4→trust 落在 sim 的派生维上，其余
-（D1/D5/D3/D6）落在采样维上、本就直接写入；缺的派生维交 spec-0005/T1 finalize_persona 填齐。
+Axes with source=grounded in the card are written directly to the corresponding sim dimensions; among them, D2→d3 and D4→trust map to sim's derived dimensions, while the others
+(D1/D5/D3/D6) map to sampled dimensions and are already written directly; missing derived dimensions are filled in by spec-0005/T1 finalize_persona.
 
-**覆盖派生**是本层的核心设计：sim 的派生维只有 d3/trust/d6 三个，其中 d3（来自卡 D2）、trust（来自卡 D4）
-在卡已 ground 时直接写入、不被 derive_d3/derive_trust 改写——否则 expert×over-trust（selfreport 例 C /
-Karpathy）会被模拟成 skeptical×rigorous 的反面。此设计依赖 spec-0005/T1 把 finalize_persona 降为
-fallback-only（只填卡未提供的派生维），本组对该处做配套修正。sim D6Authz（授权尺度，派生维）卡中无对应
-轴——卡 D6 语义是「期望 agent 扮什么角色」而非「授权它能做什么」，故不 ground 它，仍由 finalize 按
-D5Autonomy + task_risk 派生填齐。非法/缺失枚举值显式报错（不静默兜底），把采集质量问题暴露在注入边界；
-批量入口 card_to_personas(library)。
+**Overriding derivation** is the core design of this layer: sim has only three derived dimensions, d3/trust/d6. Of these, d3 (from card D2) and trust (from card D4)
+are written directly when already grounded in the card and are not rewritten by derive_d3/derive_trust—otherwise, expert×over-trust (selfreport example C /
+Karpathy) would be simulated as its opposite, skeptical×rigorous. This design depends on spec-0005/T1 reducing finalize_persona to
+fallback-only (filling only derived dimensions not supplied by the card); this task group makes the corresponding adjustment there. sim D6Authz (authorization scope, a derived dimension) has no corresponding
+axis in the card—the semantics of card D6 are “what role the agent is expected to play” rather than “what it is authorized to do,” so it is not grounded and is still filled in by finalize through derivation from
+D5Autonomy + task_risk. Invalid/missing enum values raise explicit errors (no silent fallback), exposing
+collection quality issues at the injection boundary; the batch entry point is card_to_personas(library).
 
-**接口**
+**Interface**
 
 ```
-card_to_persona(record: dict) -> Persona        # 单条卡 → sim Persona；grounded 轴透传、其余 finalize 派生
+card_to_persona(record: dict) -> Persona        # Single card → sim Persona; pass grounded axes through, derive the rest via finalize
 card_to_personas(library: PersonaLibrary) -> list[Persona]
 ```
 
-**测试**
+**Tests**
 
-单测：
-- 覆盖派生（核心）：selfreport 例 C / Karpathy（D1=expert、D4=over-trust、D2=ship-fast，均 grounded）注入后
-  Persona.trust = over-trust 映射值（非 derive_trust(expert)=skeptical）、d3 非 rigorous —— 即 grounded 值未被改写。
-- 透传+派生：grounded 轴透传；未提供的派生轴由 finalize 正确填齐、可复现。
-- 枚举并轨/校验：surface↔shallow 等映射正确；非法/缺失枚举值 → 显式报错（不静默兜底）。
-- 端到端：注入产物喂 0005/T5 run_session（离线 ScriptedPersonaClient + 脚本化 harness）跑通一局。
-- 批量：card_to_personas 把多条卡映射为等长 Persona 列表。
+Unit tests:
+- Overriding derivation (core): after injecting selfreport example C / Karpathy (D1=expert, D4=over-trust, D2=ship-fast, all grounded),
+  Persona.trust = the mapped value of over-trust (not derive_trust(expert)=skeptical), and d3 is not rigorous—that is, grounded values have not been rewritten.
+- Pass-through + derivation: grounded axes pass through; missing derived axes are correctly and reproducibly filled in by finalize.
+- Enum unification/validation: mappings such as surface↔shallow are correct; invalid/missing enum values → explicit errors (no silent fallback).
+- End-to-end: feed the injection output to 0005/T5 run_session (offline ScriptedPersonaClient + scripted harness) and complete one session.
+- Batch: card_to_personas maps multiple cards to a Persona list of the same length.
 
-**文件（单一 writer 所有权）**
+**Files (single-writer ownership)**
 
   - `backend/ahe_beta/user/sim/persona_io.py`
   - `backend/tests/user/sim/test_persona_io.py`
 
-依赖 DAG：`T1 → T2`，`0005/T1 → T2`，`T1 → T3`
+Dependency DAG: `T1 → T2`, `0005/T1 → T2`, `T1 → T3`
 
 ## Drawbacks
 
-本方案的代价集中在四处：① 采集侧把三个真实抽取方法收编为 vendored 改造版而非直接复用源仓，需要人工
-同步——若源方法此前的存放处（NexAU 仓库）后续演进契约，本仓 card-schema.md 不会自动跟随，需另行移植；
-② 观测型来源（GitHub / Stack Overflow）能可靠 ground 的仅 D1 能力与 D5 领域·栈，态度轴（D2/D3/D4/D6）
-几乎全部降为 injected，观测型 spoke 扩大的是覆盖广度而非态度深度，训练信号里真人态度锚的多样性仍依赖
-selfreport 单一来源；③ 注入层（T2）为保留 grounded 值不被派生覆盖，需按 source 显式区分
-grounded/injected 并对非法枚举报错，比"卡与 sim 同构"的方案更复杂，且依赖 spec-0005/T1 finalize_persona
-降级为 fallback-only 这一外部前置条件；④ 本组明确未给契约加库侧硬门（basis 强制校验、观测型源态度轴
-强制 injected），短期内契约的强制力依赖各 spoke 作者自觉遵守，而非工具校验兜底。
+The costs of this proposal are concentrated in four areas: ① On the collection side, the three real extraction methods are incorporated as vendored adaptations rather than reused directly from the source repository, requiring manual
+synchronization—if the methods' previous location (the NexAU repository) later evolves the contract, this repository's card-schema.md will not follow automatically and will require a separate port;
+② Observational sources (GitHub / Stack Overflow) can reliably ground only D1 ability and D5 domain·stack; attitude axes (D2/D3/D4/D6)
+are almost entirely downgraded to injected. Observational spokes expand coverage breadth rather than attitude depth, and diversity in
+real-person attitude anchors in the training signal still depends on selfreport as the sole source; ③ To preserve grounded values against derivation overrides, the injection layer (T2) must explicitly distinguish
+grounded/injected by source and raise errors for invalid enums. This is more complex than a design in which "cards and sim are isomorphic," and depends on the external prerequisite that spec-0005/T1 finalize_persona
+be reduced to fallback-only; ④ This task group explicitly does not add library-side hard gates to the contract (mandatory basis validation and mandatory
+injected attitude axes for observational sources). In the short term, contract enforcement depends on each spoke author's voluntary compliance rather than tool-based validation as a backstop.
 
 ## Rationale and alternatives
 
-- **轮辐式公共契约 vs 各 spoke 自带 schema**：选轮辐式（T1 建 hub，T3 扩充 spoke 时遵循同一模式）。各自带
-  必漂移——既有方法现状把公共 schema 只写在 cc、so/selfreport 反向引用 cc，basis/provenance 已在三者间
-  漂移；契约一处改全员生效，新来源只插一个薄 spoke、彼此解耦可扩展。代价是要先把公共部分抽成契约（T1），
-  且 T3 收编两个观测型 spoke 时需同步删除其自带 schema 表与反向引用。
-- **收编真实方法 vs 重写**：选收编（T1 的 selfreport、T3 的 GitHub/StackOverflow 均如此）。既有方法已沉淀
-  「证据或弃 / 维度正交 / 双向真实性门（观测型源体现为 trace-floor 真实性门）」，重写必失真且违背
-  「persona 来自真实数据」的约束；代价是带进跨仓制品需 vendored 并标注来源，不改动原件。
-- **先 selfreport 单一切片 vs 三源齐上**：选 selfreport 首切片（T1），cc/so 作同契约后续薄 spoke 插入
-  （T3 兑现）。selfreport 唯一 ground 信任轴 D4、且带 card_to_persona 覆盖派生规则（正是 T2 所需），避免
-  首切片体量过大。
-- **观测型源态度轴降 injected vs 保留从行为反推 grounded**（T3）：选降 injected。从 CVE 卫生/auto-merge/
-  reputation 反推信任/验收是脆弱外推，会把合成态度当真人态度污染训练信号；代价是观测型卡的态度轴几乎全
-  injected（这正确反映「观测型源观测不到态度」的事实），真人态度锚交给 selfreport。
-- **recruitment profile 放 github spoke 供 SO 引用 vs 各自复制**（T3）：选前者。profile 天然多源（一份同列
-  github repos 与 SO tags），复制会引入多副本漂移；跨 spoke 只剩这一处共享招募数据引用，且非 schema 契约。
-- **T3 只做文档/skill 收编、不加库侧硬门**：选先文档。硬门（basis 强制、观测源态度轴强制 injected）属库侧
-  加固，改 validate_card，风险与范围更大，归后续（见 Unresolved questions）。
-- **grounded 覆盖派生 vs 一律 finalize**（T2）：选覆盖。一律 finalize 会丢弃卡里真实 ground 的信任/验收/
-  授权，把正交真实画像压成 sim 的派生面（违背训练信号真实性，见 selfreport 例 C）；代价是注入层要按
-  source 区分 grounded/injected。
-- **显式映射表 vs 卡与 sim 同构（免映射）**（T2）：选显式映射。卡保留真实画像原貌、sim 用受控枚举，映射层
-  吸收差异。
-- **非法值报错 vs 安全缺省**（T2）：选报错——缺省会把劣质采集悄悄变成"看似合法"的 persona，污染信号。
+- **Hub-and-spoke shared contract vs each spoke carrying its own schema**: choose hub-and-spoke (T1 establishes the hub, and T3 follows the same pattern when expanding the spokes). Separate schemas
+  inevitably drift—the existing methods currently define the shared schema only in cc, with so/selfreport referencing cc, and basis/provenance have already
+  drifted across the three; a contract change in one place takes effect for all, and each new source adds only a thin spoke, keeping them decoupled and extensible. The cost is first extracting the shared parts into a contract (T1),
+  and, when T3 incorporates the two observational spokes, simultaneously removing their bundled schema tables and reverse references.
+- **Incorporate real methods vs rewrite**: choose incorporation (for both T1's selfreport and T3's GitHub/StackOverflow). The existing methods already encode
+  “evidence or abstention / orthogonal dimensions / bidirectional authenticity gates (represented by the trace-floor authenticity gate for observational sources).” Rewriting would inevitably distort them and violate
+  the constraint that “personas come from real data”; the cost is that artifacts brought in from another repository must be vendored with their origins identified, without modifying the originals.
+- **A selfreport-only first slice vs all three sources at once**: choose selfreport as the first slice (T1), with cc/so inserted later as thin spokes under the same contract
+  (delivered by T3). selfreport is the only source that grounds trust axis D4 and includes card_to_persona rules for overriding derivation (exactly what T2 needs), avoiding
+  an oversized first slice.
+- **Downgrade observational-source attitude axes to injected vs retain grounded values inferred from behavior** (T3): choose downgrading to injected. Inferring trust/acceptance from CVE hygiene/auto-merge/
+  reputation is fragile extrapolation that would contaminate the training signal by treating synthetic attitudes as real-person attitudes; the cost is that attitude axes in observational cards are almost all
+  injected (correctly reflecting the fact that “observational sources cannot observe attitudes”), with real-person attitude anchors left to selfreport.
+- **Place the recruitment profile in the github spoke for SO to reference vs duplicate it in each** (T3): choose the former. The profile is inherently multi-source (one profile lists both
+  github repos and SO tags), and duplication would introduce drift across copies; this leaves only one cross-spoke reference to shared recruitment data, which is not a schema contract.
+- **T3 only incorporates documentation/skills, without adding library-side hard gates**: choose documentation first. Hard gates (mandatory basis and mandatory injected attitude axes for observational sources) are library-side
+  hardening that changes validate_card, with greater risk and scope; defer to follow-up work (see Unresolved questions).
+- **Grounded values override derivation vs always finalize** (T2): choose overriding. Always finalizing would discard genuinely grounded trust/acceptance/
+  authorization in the card, collapsing an orthogonal real profile onto sim's derived surface (violating the authenticity of the training signal; see selfreport example C); the cost is that the injection layer must distinguish
+  grounded/injected by source.
+- **Explicit mapping table vs cards and sim being isomorphic (no mapping)** (T2): choose explicit mapping. Cards retain the original real profiles, sim uses controlled enums, and the mapping layer
+  absorbs the differences.
+- **Errors for invalid values vs safe defaults** (T2): choose errors—defaults would silently turn poor-quality collection into "apparently valid" personas, contaminating the signal.
 
 ## Prior art
 
-本组三个 task 的源头都是此前存放于 NexAU 仓库、但非 NexAU 自身方法的一组真实抽取方法：
-extract-cc-user-persona（GitHub 足迹 L0–L5，公共 schema/枚举/D5.area 词表/注入分布原出处，本组改名为
-extract-github-persona）、extract-so-user-persona（Stack Overflow API，改名为
-extract-stackoverflow-persona）、extract-selfreport-persona（第一人称自述；reference 例 C 写明
-card_to_persona 须以 grounded D2/D4 覆盖 derive_trust/derive_d3，否则真实人物被模拟成其反面——这正是
-T2 覆盖派生设计的直接依据）。T1 以 extract-selfreport-persona 的最新约定为模板（结构与文风），把三者的
-公共部分收敛为唯一契约 tools/persona-distill/card-schema.md（6 维卡 + 枚举 + D5 词表 + 注入分布 + 真实性门 +
-basis 四元 + 铁律：grounded 须有 evidence_quote、injected confidence=low）；T3 将 vendored 改造版进本仓、
-不改动原件，把另两个方法收编为遵循同一契约的观测型 spoke。T2 的注入层依赖 spec-0005/T1
-dimensions.Persona 与 finalize_persona（fallback-only 契约，本组依赖其降级）、spec-0005/T5 run_session
-入口；消费侧确认可消费、不改的还有 backend/ahe_beta/distill/library.py（PersonaLibrary/
-validate_card）。整体对应 CLAUDE.md「蒸馏模块」与「persona 来自真实数据、不依据 benchmark 或轨迹构造」的
-约束，以及 spec-0001/T1 的 Persona 字段约定。
+The three tasks in this group all originate from a set of real extraction methods previously stored in the NexAU repository, but not methods of NexAU itself:
+extract-cc-user-persona (GitHub traces L0–L5, the original source of the shared schema/enums/D5.area vocabulary/injection distributions, renamed in this group to
+extract-github-persona), extract-so-user-persona (Stack Overflow API, renamed to
+extract-stackoverflow-persona), and extract-selfreport-persona (first-person self-reports; reference example C explicitly states that
+card_to_persona must use grounded D2/D4 to override derive_trust/derive_d3, otherwise real people are simulated as their opposites—this is precisely
+the direct basis for T2's design for overriding derivation). T1 uses the latest conventions of extract-selfreport-persona as its template (structure and writing style), consolidating the shared parts of all three
+into the sole contract tools/persona-distill/card-schema.md (6-dimensional card + enums + D5 vocabulary + injection distributions + authenticity gates +
+basis quadruple + iron rules: grounded must have evidence_quote, injected confidence=low); T3 brings vendored adaptations into this repository,
+without modifying the originals, incorporating the other two methods as observational spokes that follow the same contract. T2's injection layer depends on spec-0005/T1
+dimensions.Persona and finalize_persona (the fallback-only contract; this group depends on its reduction to that role), and the spec-0005/T5 run_session
+entry point; on the consumer side, backend/ahe_beta/distill/library.py (PersonaLibrary/
+validate_card) is also confirmed able to consume the output and is not modified. Overall, this corresponds to CLAUDE.md's “distillation module” and the constraint that “personas come from real data, not constructed from benchmarks or trajectories,”
+as well as the Persona field conventions in spec-0001/T1.
 
 ## Unresolved questions
 
-- **来源覆盖率（T1/T3）**：cc/so 已由 T3 兑现补入；「未来源」作同契约后续薄 spoke 何时/是否补入仍未定。
-- **契约的库侧强制力（T3）**：是否给 card-schema.md 补库侧硬门（basis 字段强制校验 / 观测型源态度轴强制
-  injected 的加固）？本组明确不做（用户暂不做库侧硬门），归后续，届时改 card-schema.md 契约 +
-  validate_card（T1 文件）。
-- **T2 的前置依赖**：覆盖派生依赖 spec-0005/T1 把 finalize_persona 降为 fallback-only（本组同改）；若未
-  就绪则覆盖派生无法生效。
-- **卡 schema 与 sim/models.Persona 的最终并轨**：6 维行为卡、spec-0001 models.Persona（五元组）、sim
-  9 维三者如何最终并轨尚未定；6 维卡 → 9 维枚举映射表细则随 T1 契约演进收敛，sim D6Authz 作注入轴的派生
-  规则待定；若后续并轨为共用一套 Persona，T2 注入层可退化为薄校验或被移除。
-- **recruitment profile 的跨 spoke 共享（T3）**：SO spoke 引用 github spoke 的 pools.stackoverflow 是否
-  进一步抽到中立位置，以彻底消除仅剩的这一处 spoke→spoke 引用？当前判定：招募数据天然多源、非 schema
-  契约，暂保留。
-- **源仓是否同步重构**：这些方法此前的存放处（NexAU 仓库）是否也重构为轮辐式（公共契约 + 薄 skill，补
-  basis/统一 provenance/补 card_to_persona 覆盖注记）？此为改其源仓，属另一件事；本仓 card-schema.md
-  统一以 T1 selfreport 最新约定为准。
-- **种子场景库**：是否同时蒸馏「种子场景库」(SeedScenario)？CLAUDE.md 蒸馏模块含场景库，本组先聚焦
-  persona，场景库另议。
+- **Source coverage (T1/T3)**: cc/so have been added by T3; when/whether “future sources” will be added as subsequent thin spokes under the same contract remains undecided.
+- **Library-side enforcement of the contract (T3)**: should library-side hard gates be added to card-schema.md (hardening through mandatory basis field validation / mandatory
+  injected attitude axes for observational sources)? This group explicitly does not do so (the user is deferring library-side hard gates); this is follow-up work, which will change the card-schema.md contract +
+  validate_card (T1 files).
+- **T2 prerequisites**: overriding derivation depends on spec-0005/T1 reducing finalize_persona to fallback-only (changed alongside this group); if it is not
+  ready, overriding derivation cannot take effect.
+- **Eventual unification of the card schema and sim/models.Persona**: how to ultimately unify the 6-dimensional behavioral card, spec-0001 models.Persona (a quintuple), and sim's
+  9 dimensions remains undecided; details of the 6-dimensional card → 9-dimensional enum mapping table will converge as the T1 contract evolves, and the derivation
+  rules for sim D6Authz as an injection axis remain undecided; if they are later unified into a shared Persona, the T2 injection layer can be reduced to thin validation or removed.
+- **Cross-spoke sharing of the recruitment profile (T3)**: should pools.stackoverflow, which the SO spoke references in the github spoke,
+  be further extracted to a neutral location to fully eliminate this last spoke→spoke reference? Current assessment: recruitment data is inherently multi-source and is not a schema
+  contract, so retain it for now.
+- **Whether to refactor the source repository as well**: should the methods' previous location (the NexAU repository) also be refactored into hub-and-spoke form (shared contract + thin skills, adding
+  basis/unifying provenance/adding card_to_persona override notes)? This would change their source repository and is a separate matter; this repository's card-schema.md
+  consistently follows T1's latest selfreport conventions.
+- **Seed scenario library**: should a “seed scenario library” (SeedScenario) also be distilled? CLAUDE.md's distillation module includes a scenario library; this group focuses first on
+  personas, with the scenario library to be discussed separately.
 
 ## Future possibilities
 
-后续可扩展方向包括：① 按同一契约继续插入更多来源的薄 spoke（除已收编的 selfreport / GitHub / Stack
-Overflow 外的「未来源」）；② 给 card-schema.md 补库侧硬门（basis 字段强制校验、观测型源态度轴强制
-injected 的加固），把当前依赖文档自律的约束升级为 validate_card 强制；③ 把 6 维行为卡、spec-0001
-models.Persona（五元组）与 sim 9 维最终并轨为一套共用 Persona 表示，届时 T2 注入层可退化为薄校验甚至
-移除；④ 将这些方法此前的存放处（NexAU 仓库）中的对应源方法同步重构为轮辐式（公共契约 + 薄 skill），
-使两侧契约长期保持一致；⑤ 在 persona 之外同时蒸馏「种子场景库」(SeedScenario)，覆盖 CLAUDE.md 蒸馏
-模块的另一半范围。
+Future extensions include: ① Continue adding thin spokes for more sources under the same contract (“future sources” beyond the already incorporated selfreport / GitHub / Stack
+Overflow); ② Add library-side hard gates to card-schema.md (hardening through mandatory basis field validation and mandatory
+injected attitude axes for observational sources), upgrading constraints that currently depend on voluntary adherence to documentation into enforcement by validate_card; ③ Ultimately unify the 6-dimensional behavioral card, spec-0001
+models.Persona (a quintuple), and sim's 9 dimensions into one shared Persona representation, at which point the T2 injection layer can be reduced to thin validation or even
+removed; ④ Refactor the corresponding source methods in their previous location (the NexAU repository) into hub-and-spoke form as well (shared contract + thin skills),
+keeping the contracts on both sides aligned over the long term; ⑤ Distill a “seed scenario library” (SeedScenario) alongside personas, covering the other half of the scope of CLAUDE.md's distillation
+module.
 

@@ -1,6 +1,6 @@
-"""IssueTracker 协议（spec-0001/T5）：issue 提交去向的抽象，用户侧不绑定具体后端。
+"""IssueTracker protocol (spec-0001/T5): abstraction for issue submission destinations, decoupling user side from specific backend.
 
-测试用 FakeTracker（同目录 fake.py），运行时注入 GiteaTracker（spec-0002），二者对 run_session 等价。
+Use FakeTracker for testing (fake.py in same directory); inject GiteaTracker (spec-0002) at runtime. Both are equivalent for run_session.
 """
 
 from __future__ import annotations
@@ -46,14 +46,14 @@ def issue_payload_digest(draft: IssueDraft) -> str:
 
 @runtime_checkable
 class IssueTracker(Protocol):
-    """issue 后端契约（结构化子类型）。number 由后端单调发号，语义对齐 Gitea。"""
+    """Issue backend contract (structured subtyping). number is issued monotonically by backend, semantics align with Gitea."""
 
     def ensure_labels(self, names: list[str]) -> None:
-        """确保给定标签均存在。幂等；空列表为 no-op。"""
+        """Ensure all given labels exist. Idempotent; empty list is a no-op."""
         ...
 
     def create_issue(self, draft: IssueDraft) -> IssueRef:
-        """按 draft 建 issue，返回带号回执 IssueRef（初始 state="open"）。不去重。"""
+        """Create issue from draft, return receipt IssueRef with assigned number (initial state="open"). No deduplication."""
         ...
 
     def create_issue_once(self, draft: IssueDraft, *, operation_key: str) -> IssueRef:
@@ -61,7 +61,7 @@ class IssueTracker(Protocol):
         ...
 
     def list_open_issues(self) -> list[OpenIssue]:
-        """读路径：列出当前 open 的 issue（供开发者侧 spec-0003/T3 领取）。无则空列表。"""
+        """Read path: list currently open issues (for developer side to claim per spec-0003/T3). Empty list if none."""
         ...
 
     def get_issue(self, *, number: int) -> dict[str, Any]:
@@ -69,7 +69,7 @@ class IssueTracker(Protocol):
         ...
 
     def add_comment(self, number: int, body: str) -> None:
-        """向指定 issue 追加评论。number 不存在抛 KeyError。"""
+        """Append a comment to the specified issue. Raises KeyError if number does not exist."""
         ...
 
     def add_comment_once(self, number: int, body: str, *, operation_key: str) -> None:
@@ -77,20 +77,21 @@ class IssueTracker(Protocol):
         ...
 
     def set_state(self, number: int, state: str, reason: str) -> None:
-        """改状态。state ∈ {open, closed}，非法抛 ValueError；number 不存在抛 KeyError。"""
+        """Change state. state ∈ {open, closed}; raises ValueError if invalid; raises KeyError if number does not exist."""
         ...
 
     def set_labels(self, number: int, labels: list[str]) -> None:
-        """整组替换某 issue 的标签为 labels（Spec-0025/T3a：triage 去 needs-triage 加 triaged 用）。
+        """Wholesale replace labels on an issue to labels (Spec-0025/T3a: triage removes needs-triage and adds triaged).
 
-        替换语义（非增量）——调用方自己算好目标标签集。未知标签先 ensure 存在。number 不存在抛 KeyError。
+        Replacement semantics (not incremental)—caller computes the target label set. Unknown labels are ensured first.
+        Raises KeyError if number does not exist.
         """
         ...
 
     def update_issue(self, number: int, *, title: str, body: str, labels: list[str]) -> None:
-        """以一个可重试语义操作替换标题、正文和标签；后端分步实现必须失败回滚。"""
+        """Replace title, body, and labels with retryable semantics; backend implementations must roll back on failure."""
         ...
 
     def transition_issue(self, number: int, *, state: str, labels: list[str]) -> None:
-        """以一个可重试语义操作替换状态与标签；后端分步实现必须失败回滚。"""
+        """Replace state and labels with retryable semantics; backend implementations must roll back on failure."""
         ...

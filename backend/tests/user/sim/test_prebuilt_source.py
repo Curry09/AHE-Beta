@@ -56,7 +56,7 @@ def test_prebuilt_requires_existing_source(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="params.source"):
         seed_source.provision(WorkspaceSpec(kind="prebuilt"))
-    with pytest.raises(FileNotFoundError, match="不存在"):
+    with pytest.raises(FileNotFoundError, match="does not exist"):
         seed_source.provision(
             WorkspaceSpec(kind="prebuilt", params={"source": str(tmp_path / "missing")})
         )

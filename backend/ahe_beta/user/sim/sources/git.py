@@ -1,21 +1,25 @@
-"""git SeedSource（spec-0009/T4）。
+"""git SeedSource (spec-0009/T4).
 
-Spec-0009/T4: git 源（repo@commit 快照工作区）
+Spec-0009/T4: git source (repo@commit snapshot workspace)
 
-provision 返回「某仓库停在某 commit」的干净快照目录——真实 repo 任务（SWE-bench 的
-base_commit 未修复态、funcy@某版本等）的起点。repo/commit（及可选 ref/depth）全落
-`WorkspaceSpec.params`，不扩 schema、kind="git"。
+provision returns a clean snapshot directory of a repository pinned to a specific commit—the
+starting point for real repo tasks (SWE-bench base_commit unfixed state, funcy@some-version, etc.).
+repo/commit (and optional ref/depth) are fully contained in `WorkspaceSpec.params`; schema and
+kind="git" are not extended.
 
-网络策略（大仓 + 慢网下的生存性）：缓存按**仓库**共享（backend/data/repo_cache/<slug>/repo），
-每个目标 commit 只联网取一次——`git fetch --depth 1 <repo> <sha>:refs/seeds/<sha>` 按 SHA
-定向浅取（GitHub 支持 reachable SHA fetch；同仓第二个 commit 起走增量 delta，只有几 MB）；
-服务端不支持按 SHA 取时回退全量 clone 重建缓存（兼容本地裸路径仓）。之后每局 provision
-copytree 该缓存 + 在副本里 checkout 目标 commit，每局仍是独立目录、互不串状态
-（隔离语义与「每局 fresh clone」等价）。
+Network policy (survival under large repos + slow networks): cache is shared per **repository**
+(backend/data/repo_cache/<slug>/repo), with each target commit fetched from the network only once—
+`git fetch --depth 1 <repo> <sha>:refs/seeds/<sha>` performs targeted shallow fetch by SHA (GitHub
+supports reachable SHA fetch; subsequent commits in the same repo use incremental delta, only a
+few MB). When the server does not support SHA-based fetch, the backend falls back to full clone
+to rebuild the cache (compatible with local bare-repository paths). Thereafter, each provision
+copytrees the cache + checks out the target commit in the copy; each session remains an isolated
+directory with no cross-session state pollution (isolation semantics equivalent to "fresh clone
+per session").
 
-可插拔证明：接入它只新增本模块——靠 spec-0009/T1 的 sources/ 自动发现注册，seed_source /
-models / workspace 与消费侧（orchestrator / sim_user / Sandbox）一律不改。
-"""
+Pluggable proof: integrating it only adds this module—auto-discovered and registered by
+spec-0009/T1's sources/ mechanism; seed_source / models / workspace and the consumer side
+(orchestrator / sim_user / Sandbox) remain unchanged."""
 
 from __future__ import annotations
 
@@ -28,7 +32,7 @@ from pathlib import Path
 from ahe_beta.models import WorkspaceSpec
 from ahe_beta.user.sim.seed_source import register
 
-# 仓库缓存根：backend/data/repo_cache（运行产物，随 data/ 整体 .gitignore）。
+# Repository cache root: backend/data/repo_cache (runtime artifacts, globally .gitignored under data/).
 _CACHE_ROOT = Path(__file__).resolve().parents[4] / "data" / "repo_cache"
 
 
@@ -37,30 +41,35 @@ class GitSource:
     kind = "git"
 
     def provision(self, spec: WorkspaceSpec, dest_root: str | None = None) -> str:
-        """Provision an isolated working tree of repo@commit（缓存命中则纯本地复制）。
+        """Provision an isolated working tree of repo@commit (pure local copy on cache hit).
 
-        Spec-0009/T4: 从 spec.params 读 repo（必填）、commit（必填）、可选 ref/depth；
-        确保 commit 对象进本仓缓存后 copytree 到隔离目录并 checkout，返回该目录绝对路径。
+        Spec-0009/T4: read repo (required), commit (required), and optional ref/depth from spec.params;
+        ensure the commit object is in the repository cache, then copytree to an isolated directory
+        and checkout, returning the absolute path to that directory.
         """
-        # 1. 读并自校验 params（不扩 WorkspaceSpec，字段完整性由本源保证）。
+        # 1. Read and self-validate params (do not expand WorkspaceSpec; field completeness guaranteed by source).
         repo = spec.params.get("repo")
         commit = spec.params.get("commit")
         if not repo:
-            raise ValueError("git 源需要非空 params.repo（可 clone 的 URL 或本地路径）")
+            raise ValueError(
+                "git source requires non-empty params.repo (a cloneable URL or local path)"
+            )
         if not commit:
-            raise ValueError("git 源需要非空 params.commit（要恢复的快照 sha/ref）")
+            raise ValueError(
+                "git source requires non-empty params.commit (the snapshot sha/ref to restore)"
+            )
         ref = spec.params.get("ref")
         depth = spec.params.get("depth")
 
         cache = _ensure_commit_cached(repo=str(repo), commit=str(commit), ref=ref, depth=depth)
 
-        # 2. 每局 fresh：从缓存复制一份独立目录再 checkout，跨局互不污染、可清理。
+        # 2. Fresh per session: copy an independent directory from the cache and checkout; no cross-session pollution, cleanable.
         base = dest_root or tempfile.mkdtemp(prefix="sim_ws_git_")
         dest = Path(base) / "repo"
         shutil.copytree(cache, dest, symlinks=True)
 
-        # 3. checkout 到目标 commit；浅克隆可能取不到任意历史 commit，
-        #    回退为 fetch --unshallow 全量拉取后重试（浅克隆 + 任意 commit 的兼容）。
+        # 3. Checkout to the target commit; shallow clone may not fetch arbitrary historical commits,
+        #    fall back to fetch --unshallow for full fetch and retry (compatibility for shallow clone + arbitrary commit).
         try:
             _run_git(cmd=["git", "checkout", "-q", str(commit)], cwd=str(dest))
         except RuntimeError:
@@ -73,12 +82,16 @@ class GitSource:
 
 
 def _ensure_commit_cached(*, repo: str, commit: str, ref: str | None, depth: int | None) -> Path:
-    """确保 commit 对象在 repo 的共享缓存里并返回缓存路径；只有 miss 时才碰网络。
+    """Ensure the commit object is in the repository's shared cache and return the cache path;
+    network access only on cache miss.
 
-    取法优先级：① `fetch --depth 1 <repo> <sha>:refs/seeds/<sha>` 按 SHA 定向浅取并落 ref
-    锚住对象（防 gc），同仓多 commit 增量复用已有对象；② 首个 commit 且服务端拒绝按 SHA 取
-    （本地裸路径仓/老服务端）时回退全量 clone 重建缓存。每个 commit 成功后落 shas/<sha> 标记，
-    命中即跳过网络；缓存本体不 checkout（copytree 只搬 .git，工作树由 provision 副本里生成）。
+    Fetch priority: ① `fetch --depth 1 <repo> <sha>:refs/seeds/<sha>` performs targeted shallow
+    fetch by SHA and anchors the object with a ref (preventing gc); incremental delta reuse for
+    multiple commits in the same repo; ② on first commit, if the server rejects SHA-based fetch
+    (local bare-repository path / old server), fall back to full clone to rebuild cache. After each
+    commit succeeds, a marker is placed in shas/<sha>; cache hit skips network access. The cache
+    itself is not checked out (copytree only moves .git; the working tree is generated by the copy
+    in the provision step).
     """
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", repo).strip("-")[-60:] or "repo"
     entry = _CACHE_ROOT / slug
@@ -88,11 +101,12 @@ def _ensure_commit_cached(*, repo: str, commit: str, ref: str | None, depth: int
     if marker.is_file() and (cache / ".git").is_dir():
         return cache
     markers.mkdir(parents=True, exist_ok=True)
-    if not (cache / ".git").is_dir():  # 首建或上次构建的残骸
+    if not (cache / ".git").is_dir():  # First creation or remnant from previous build
         shutil.rmtree(cache, ignore_errors=True)
         _run_git(cmd=["git", "init", "-q", str(cache)], cwd=None)
 
-    if _has_commit(cache=cache, commit=commit):  # 既有对象（如全量回退已带回）→ 零网络
+    # Existing objects (e.g., already retrieved via full fallback) → zero network
+    if _has_commit(cache=cache, commit=commit):
         marker.touch()
         return cache
 
@@ -103,14 +117,14 @@ def _ensure_commit_cached(*, repo: str, commit: str, ref: str | None, depth: int
         )
     except RuntimeError:
         if any(markers.iterdir()):
-            # 缓存已有既往内容、仅新 commit 按 SHA 取失败 → 全量 fetch 更新；
-            # 可及性最终由 provision 副本里的 checkout 诊断。
+            # Cache has prior content, only new commit's SHA-based fetch failed → full fetch to update;
+            # Reachability is ultimately diagnosed by checkout in the provision copy.
             _run_git(
                 cmd=["git", "fetch", repo, "+refs/heads/*:refs/seeds/heads/*"],
                 cwd=str(cache),
             )
         else:
-            # 回退：全量 clone（老路径），可选 depth/ref 加速（兼容本地路径仓/老服务端）。
+            # Fallback: full clone (legacy path); optional depth/ref for acceleration (compatible with local repository paths / old servers).
             shutil.rmtree(cache)
             clone_cmd = ["git", "clone"]
             if depth:
@@ -125,7 +139,8 @@ def _ensure_commit_cached(*, repo: str, commit: str, ref: str | None, depth: int
 
 
 def _has_commit(*, cache: Path, commit: str) -> bool:
-    """cache 仓里是否已有该 commit 对象（cat-file -e；任何失败视为无）。"""
+    """Check whether the commit object already exists in the cache repository (cat-file -e;
+    any failure is treated as non-existent)."""
     try:
         _run_git(cmd=["git", "cat-file", "-e", f"{commit}^{{commit}}"], cwd=str(cache))
         return True
@@ -136,15 +151,14 @@ def _has_commit(*, cache: Path, commit: str) -> bool:
 def _run_git(*, cmd: list[str], cwd: str | None) -> subprocess.CompletedProcess[str]:
     """Run a git subprocess, raising with diagnostics on failure.
 
-    Spec-0009/T4: clone/checkout 失败时抛 RuntimeError 并携带失败命令 + returncode +
-    截断 stderr 的诊断（对齐 T3 deps.py 报错风格）。
+    Spec-0009/T4: on clone/checkout failure, raise RuntimeError with diagnostics carrying failed command + returncode + truncated stderr (aligned with T3 deps.py error style).
     """
     proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
     if proc.returncode != 0:
         stderr = (proc.stderr or "").strip()
         if len(stderr) > 2000:
-            stderr = stderr[:2000] + "…(stderr 截断)"
+            stderr = stderr[:2000] + "…(stderr truncated)"
         raise RuntimeError(
-            f"git 命令失败：{' '.join(cmd)}（returncode={proc.returncode}）\nstderr: {stderr}"
+            f"git command failed: {' '.join(cmd)} (returncode={proc.returncode})\nstderr: {stderr}"
         )
     return proc

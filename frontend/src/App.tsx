@@ -27,22 +27,22 @@ import type { AgentRole, Selection, ViewMode } from "./types";
 
 const POLL_MS = 3000;
 
-// 顺序对齐需求面 a → 第一拍(triage∥divergent) → 第二拍(architect) → Owner 准入（Spec-0029/0032）。
-// divergent 默认编制 0 → 该房间仅在有活动/归档时显示，避免常驻空列。
-// Spec-0032/T7：开发者列退役（交付面在进程外 vigil）——列位保留给历史归档回看（旧 run 的 dev_run），
-// 新交付进度看侧栏「交付面 · PR」面板。
+// Order follows the demand flow: a → first beat (triage∥divergent) → second beat (architect) → Owner admission (Spec-0029/0032).
+// Divergent defaults to zero agents; show its room only when active or archived work exists to avoid a persistent empty column.
+// Spec-0032/T7: the developer column is retired (delivery runs in the external vigil process); keep it for historical dev_run archives.
+// New delivery progress appears in the sidebar's delivery / PR panel.
 const ROLES: { role: AgentRole; name: string }[] = [
-  { role: "user", name: "用户" },
-  { role: "triager", name: "分诊" },
-  { role: "divergent", name: "发散" },
-  { role: "architect", name: "架构师" },
-  { role: "owner", name: "准入" },
-  { role: "developer", name: "交付面" },
+  { role: "user", name: "User" },
+  { role: "triager", name: "Triage" },
+  { role: "divergent", name: "Divergent PM" },
+  { role: "architect", name: "Architect" },
+  { role: "owner", name: "Owner" },
+  { role: "developer", name: "Delivery" },
 ];
 const OPTIONAL_ROLES: AgentRole[] = ["divergent", "developer"];
 const ROLE_KEYS = ROLES.map(({ role }) => role);
 
-// 看板状态 ↔ URL 查询串（?done=1&round=2&sel=issue:7）：刷新/分享不丢上下文。
+// Dashboard state ↔ URL query string (?done=1&round=2&sel=issue:7): preserve context across refreshes and sharing.
 function parseSelection(raw: string | null): Selection | null {
   if (!raw) return null;
   const [type, ...rest] = raw.split(":");
@@ -96,7 +96,7 @@ export default function App() {
   const commits = usePolling(getCommits, POLL_MS);
   const config = usePolling(getConfig, POLL_MS);
   const overview = usePolling(getOverview, POLL_MS);
-  const delivery = usePolling(getDelivery, POLL_MS); // Spec-0032/T7：交付面（PR + needs-human）
+  const delivery = usePolling(getDelivery, POLL_MS); // Spec-0032/T7: delivery view (PR + needs-human)
 
   const [view, setView] = useState<ViewMode>(() =>
     parseView(new URLSearchParams(location.search).get("view")),
@@ -136,7 +136,7 @@ export default function App() {
   }, [view, selectedFloor, showDone, round, selection]);
 
   const items = useMemo(() => history?.items ?? [], [history]);
-  // 可选轮次 = 归档里出现过的轮 ∪ 当前轮（运行中还没归档也能选）。
+  // Selectable rounds = archived rounds ∪ current round (selectable while running, even before archiving).
   const rounds = useMemo(() => {
     const set = new Set<number>(items.map((it) => it.round));
     for (const issue of issues?.issues ?? []) {

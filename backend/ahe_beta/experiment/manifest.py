@@ -1,4 +1,4 @@
-# Spec-0047/T2：不可变 manifest 与 append-only journal。
+# Spec-0047/T2: Immutable manifest and append-only journal.
 """Spec-0071/T3: immutable input manifests and shared append-only runtime facts."""
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ def create_manifest(*, path: Path, data: dict[str, Any]) -> None:
     try:
         fd = os.open(path, flags, 0o644)
     except FileExistsError as exc:
-        raise ManifestError(f"manifest 已存在，拒绝覆盖：{path}") from exc
+        raise ManifestError(f"Manifest already exists; refusing to overwrite: {path}") from exc
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(payload)
@@ -46,10 +46,10 @@ def create_manifest(*, path: Path, data: dict[str, Any]) -> None:
 
 def read_manifest(*, path: Path) -> dict[str, Any]:
     if not path.is_file():
-        raise ManifestError(f"缺少 manifest：{path}")
+        raise ManifestError(f"Missing manifest: {path}")
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
-        raise ManifestError(f"manifest 必须为 JSON object：{path}")
+        raise ManifestError(f"Manifest must be a JSON object: {path}")
     return value
 
 
@@ -60,7 +60,9 @@ def recovery_identity(manifest: dict[str, Any]) -> dict[str, str]:
     missing = [field for field, value in values.items() if not value]
     if missing:
         raise ManifestError(
-            "manifest 缺恢复身份字段：" + ", ".join(missing) + "；旧实验不能直接细粒度续跑"
+            "Manifest is missing recovery identity fields: "
+            + ", ".join(missing)
+            + "; legacy experiments cannot directly use fine-grained resume"
         )
     return values
 
@@ -68,7 +70,9 @@ def recovery_identity(manifest: dict[str, Any]) -> dict[str, str]:
 def assert_immutable(*, path: Path, expected: dict[str, Any]) -> None:
     current = read_manifest(path=path)
     if current != expected:
-        raise ManifestError("manifest 漂移：禁止把动态事实写回 manifest")
+        raise ManifestError(
+            "Manifest drift: dynamic facts must not be written back to the manifest"
+        )
 
 
 def append_journal(

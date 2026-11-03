@@ -1,10 +1,8 @@
-"""skill 占位接口（spec-0008/T3）。
+"""Skill placeholder interface (spec-0008/T3).
 
-为高深度 persona 预留「领域 playbook」扩展位：D2 深度驱动地挂上一些**通用方法论**片段，
-拼进内层 system。本轮仅占位——只给极简内置通用集合，不接真实 playbook 库。
+Reserved for high-depth persona: "domain playbook" extension—D2 depth-driven attachment of some **generic methodologies** fragments, woven into inner system. Placeholder this round—only minimal built-in generic set, no real playbook library.
 
-红线（held-out）：skill 必须是通用、可迁移的工作方法，**绝不**含具体 bug、答案、
-benchmark 或场景特定知识。
+Red line (held-out): skills must be generic, transferable work methods, **never** containing specific bugs, answers, benchmarks, or scenario-specific knowledge.
 """
 
 from __future__ import annotations
@@ -16,13 +14,13 @@ from .dimensions import D2Depth, Persona
 
 @dataclass(frozen=True)
 class Skill:
-    """一段通用方法论片段：name 标识，prompt 注入内层 system。"""
+    """One generic methodology fragment: name identifies it; prompt is injected into inner system."""
 
     name: str
     prompt: str
 
 
-# 通用、非场景特定的方法论（占位集合）。仅 senior 深度挂载，演示扩展位。
+# Generic, scenario-agnostic methodology (placeholder collection). Mounted only at senior depth; demonstration extension point.
 _SENIOR_PLAYBOOK: list[Skill] = [
     Skill(
         "reproduce-first",
@@ -38,7 +36,7 @@ _SENIOR_PLAYBOOK: list[Skill] = [
 
 
 def select_skills(persona: Persona) -> list[Skill]:
-    """按 persona 的 D2 深度选 skill（占位）。senior -> 通用 playbook；其余 -> 空。"""
+    """Select skills by persona D2 depth (placeholder). senior -> generic playbook; others -> empty."""
     if persona.d2.depth == D2Depth.SENIOR:
         return list(_SENIOR_PLAYBOOK)
     return []

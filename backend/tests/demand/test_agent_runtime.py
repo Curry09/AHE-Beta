@@ -1,12 +1,11 @@
-# Spec-0029/T2：agent_runtime 公共运行时单测（不跑真 nexau，只测纯逻辑部分）。
-"""read_submit 四路（正常/再编码/散文/未调 submit）、run_with_timeout 跨线程 contextvars、norm_label。"""
+# Spec-0029/T2: unit tests for the agent_runtime shared runtime (does not run real nexau; only the pure-logic parts are tested).
+"""read_submit four paths (normal/re-encoded/prose/submit not called), run_with_timeout cross-thread contextvars."""
 
 from __future__ import annotations
 
 import json
 
 from ahe_beta.demand.agent_runtime import (
-    norm_label,
     read_submit,
     run_agent_def,
     run_with_timeout,
@@ -27,13 +26,15 @@ def test_read_submit_double_encoded() -> None:
 
 
 def test_read_submit_empty_array_is_valid() -> None:
-    assert read_submit('{"proposals": []}', "proposals") == []  # 合法的「本轮无产出」
+    assert read_submit('{"proposals": []}', "proposals") == []  # Legitimate "no output this round"
 
 
 def test_read_submit_no_submit_returns_none() -> None:
-    assert read_submit("我没调 submit 就跑完了", "dispositions") is None  # 散文
+    assert (
+        read_submit("I did not tune it submit It completed running", "dispositions") is None
+    )  # Prose
     assert read_submit("", "dispositions") is None
-    assert read_submit('{"other": []}', "dispositions") is None  # 键不对
+    assert read_submit('{"other": []}', "dispositions") is None  # Wrong keys
     assert read_submit('{"dispositions": "not-a-list"}', "dispositions") is None
 
 
@@ -43,13 +44,13 @@ def test_read_submit_filters_non_dict_items() -> None:
 
 
 def test_run_with_timeout_propagates_contextvars(tmp_path) -> None:
-    """bind_session_store 注入的 store 须能被 worker 线程里的 tool 读到（copy_context 跨线程）。"""
+    """The store injected by bind_session_store must be readable by the tool in the worker thread (copy_context across threads)."""
     store = SessionStore(tmp_path / "sessions")
     with bind_session_store(store):
         out = run_with_timeout(lambda: get_session_timeline(session_id="nope"), 10)
     assert out["ok"] is False
-    assert "not bound" not in out["error"]  # store 已跨线程绑定上
-    assert "not found" in out["error"]  # 到了「查不到该 session」这步 = 绑定成功
+    assert "not bound" not in out["error"]  # The store is bound across threads
+    assert "not found" in out["error"]  # Reaching the "session not found" step = binding succeeded
 
 
 def test_run_agent_def_uses_explicit_role_instead_of_directory_name(tmp_path, monkeypatch) -> None:
@@ -100,7 +101,7 @@ def test_run_with_timeout_raises_on_timeout() -> None:
 
     try:
         run_with_timeout(lambda: time.sleep(5), 1)
-        raise AssertionError("应抛 TimeoutError")
+        raise AssertionError("Should throw TimeoutError")
     except TimeoutError:
         pass
 
@@ -194,7 +195,7 @@ def test_run_agent_def_timeout_still_records(tmp_path, monkeypatch) -> None:
             subject={"kind": "round", "id": "1"},
             on_history=captured.append,
         )
-        raise AssertionError("应抛 TimeoutError")
+        raise AssertionError("Should throw TimeoutError")
     except TimeoutError:
         pass
     data = json.loads(next((tmp_path / "demand").glob("*.json")).read_text(encoding="utf-8"))
@@ -221,7 +222,7 @@ def test_run_agent_def_no_submit_status(tmp_path, monkeypatch) -> None:
             self.config = config
 
         def run(self, *, message):
-            return "我没调 submit"
+            return "I did not tune it submit"
 
     monkeypatch.setattr(nexau, "AgentConfig", FakeAgentConfig)
     monkeypatch.setattr(nexau, "Agent", FakeAgent)
@@ -238,11 +239,6 @@ def test_run_agent_def_no_submit_status(tmp_path, monkeypatch) -> None:
         timeout=5,
         subject={"kind": "round", "id": "1"},
     )
-    assert out == "我没调 submit"
+    assert out == "I did not tune it submit"
     data = json.loads(next((tmp_path / "demand").glob("*.json")).read_text(encoding="utf-8"))
     assert data["output"]["status"] == "no_submit"
-
-
-def test_norm_label_whitespace_tolerant() -> None:
-    assert norm_label("涉及 issue") == norm_label("涉及issue") == "涉及issue"
-    assert norm_label("  根因  区域 ") == "根因区域"

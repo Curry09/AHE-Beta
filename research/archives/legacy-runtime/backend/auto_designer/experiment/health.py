@@ -1,4 +1,4 @@
-# Spec-0047/T5：实验级滚动错误率保护——只暂停本实验。
+# Spec-0047/T5: Experiment-level rolling error-rate protection—pause only this experiment.
 """Rolling success/error window. Trip pauses this experiment, not the shared endpoint."""
 
 from __future__ import annotations

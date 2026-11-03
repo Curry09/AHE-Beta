@@ -51,7 +51,7 @@ def _docker(args: list[str], *, check: bool = True) -> subprocess.CompletedProce
     proc = subprocess.run(["docker", *args], capture_output=True, text=True)
     if check and proc.returncode != 0:
         raise RuntimeError(
-            f"docker 命令失败：docker {' '.join(args)}（rc={proc.returncode}）\n"
+            f"docker command failed: docker {' '.join(args)} (rc={proc.returncode})\n"
             f"stderr: {(proc.stderr or '').strip()[:2000]}"
         )
     return proc
@@ -69,19 +69,19 @@ class DockerSeedSource:
         image = str(spec.params.get("image", "")).strip()
         instance_id = str(spec.params.get("instance_id", "")).strip()
         if not image:
-            raise ValueError("docker-seed 源需要非空 params.image")
+            raise ValueError("docker-seed source requires non-empty params.image")
         if not instance_id:
-            raise ValueError("docker-seed 源需要非空 params.instance_id")
+            raise ValueError("docker-seed source requires non-empty params.instance_id")
         if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", instance_id) is None:
-            raise ValueError("docker-seed params.instance_id 必须是安全的单路径段")
+            raise ValueError("docker-seed params.instance_id must be a single safe path segment")
 
         inspected = _docker(["image", "inspect", image])
         image_info = json.loads(inspected.stdout)[0]
         labels = (image_info.get("Config") or {}).get("Labels") or {}
         if labels.get(RUNTIME_LABEL) != RUNTIME_VERSION:
             raise RuntimeError(
-                f"seed image {image!r} 不是 runnable v{RUNTIME_VERSION}；"
-                "旧 storage-only image 禁止回退 docker cp，请先构建 runtime image"
+                f"seed image {image!r} is not runnable v{RUNTIME_VERSION}; "
+                "falling back to docker cp for legacy storage-only images is prohibited; build a runtime image first"
             )
         image_digest = str(image_info.get("Id") or image)
         workspace = f"/workspace/{instance_id}/repo"
@@ -156,7 +156,7 @@ class DockerSeedSource:
         )
         container_id = started.stdout.strip()
         if not container_id:
-            raise RuntimeError(f"docker run 未返回 container id：{image}")
+            raise RuntimeError(f"docker run returned no container ID: {image}")
         runtime = DockerWorkspaceRuntime(
             container_id=container_id,
             container_name=name,
@@ -171,7 +171,7 @@ class DockerSeedSource:
                 raise KeyError(instance_id)
         except Exception as exc:
             runtime.close()
-            raise RuntimeError(f"seed image 不含 instance {instance_id!r}") from exc
+            raise RuntimeError(f"seed image does not contain instance {instance_id!r}") from exc
         try:
             _docker(
                 [
@@ -185,7 +185,7 @@ class DockerSeedSource:
             )
         except Exception as exc:
             runtime.close()
-            raise RuntimeError(f"无法将 session 隔离到 instance {instance_id!r}") from exc
+            raise RuntimeError(f"Cannot isolate the session to instance {instance_id!r}") from exc
         if harness_python:
             runtime.evidence["harness_python"] = harness_python
         if proxy_environment:

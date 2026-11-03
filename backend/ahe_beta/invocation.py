@@ -1,4 +1,4 @@
-# Spec-0049/T2：角色调用 fail-open 落盘 + 实验切片 manifest。
+# Spec-0049/T2: fail-open role invocation persistence and experiment slice manifests.
 """Persist one JSON file per role invocation under ROLE_RUNS_DIR.
 
 Missing ROLE_RUNS_DIR or I/O errors never raise to the caller. Manifest rounds record

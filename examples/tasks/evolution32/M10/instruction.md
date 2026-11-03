@@ -1,1 +1,1 @@
-完成修复后先运行验证器。验证器会检查一个容易遗漏的回归条件；若失败，请根据证据修订实现并重新验证。
+Run the validator first after completing the fix. The validator checks a regression condition that is easy to miss; if it fails, revise the implementation based on the evidence and validate again.

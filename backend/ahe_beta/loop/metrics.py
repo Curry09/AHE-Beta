@@ -1,14 +1,16 @@
-"""metrics（spec-0003/T6，曲线口径 spec-0025/T7）：统计体感与 issue backlog 随时间的曲线。
+"""Observe user experience and issue backlog over time (spec-0003/T6; definitions in spec-0025/T7).
 
-只读、不自建存储（避免与权威源双写漂移）。feeling_trend 取每局体感分与时间（本地 SessionStore）；
-issue_curve 取**可执行 backlog** 随时间（Gitea 全状态 issue 的开/关事件）。benchmark 不进入任何
-run_round 决策，仅作旁路观测，不在此投票。
+This module is read-only and creates no storage, avoiding duplicate writes that could diverge
+from authoritative data. feeling_trend reads session experience scores and timestamps from
+local SessionStore. issue_curve derives **executable backlog** from open/close events across
+all Gitea issue states. Benchmark results are observational only and never influence run_round.
 
-issue_curve 口径（Spec-0025/T7）：只数「可执行 backlog」= 未关闭的 triaged issue + RFC，排除
-needs-triage（未处理）与 rejected / needs-info（已否）与 superseded（被 RFC 取代）。曲线的
-「积压不降」正是 CLAUDE.md 要看的退化信号（issue 长期不下降 = harness 在退化）。需 tracker 的全状态
-读能力（list_issues，带 created_at/closed_at/labels）；无则回退空序列（本地 SessionStore 不含标签/
-关闭时间，给不出 backlog 口径）。
+Spec-0025/T7 defines executable backlog as unclosed triaged issues + RFCs. It excludes
+needs-triage (pending), rejected / needs-info (declined), and superseded (replaced by an RFC).
+CLAUDE.md treats a persistently non-decreasing backlog as a harness degradation signal.
+This requires list_issues with created_at/closed_at/labels for all issue states. If the tracker
+cannot supply them, return an empty sequence: local SessionStore lacks labels and closure
+timestamps, so it cannot calculate this backlog measure.
 """
 
 from __future__ import annotations
@@ -25,14 +27,14 @@ from ahe_beta.user.session_store import SessionStore
 
 
 class Metrics:
-    """从 Gitea 与本地 session 统计观测曲线（MVP 仅消费本地 SessionStore 索引）。"""
+    """Compute observation curves from Gitea and local sessions (MVP only consumes local SessionStore index)."""
 
     def __init__(self, tracker: IssueTracker, store: SessionStore) -> None:
         self._tracker = tracker
         self._store = store
 
     def feeling_trend(self) -> list[tuple[str, int]]:
-        """体感随时间：[(created_at, score)]，按时间升序。空数据源返回空序列。"""
+        """Subjective experience over time: [(created_at, score)], sorted in ascending order by time. Returns empty sequence for empty data sources."""
         rows = sorted(self._store.index(), key=lambda e: e["created_at"])
         return [(e["created_at"], e["score"]) for e in rows if type(e.get("score")) is int]
 
@@ -51,13 +53,13 @@ class Metrics:
         return groups
 
     def issue_curve(self) -> list[tuple[str, int, int]]:
-        """可执行 backlog ~ 时间：[(timestamp, delta, backlog)]，backlog 为该时刻累计未关闭的
-        triaged + RFC 数（含跨轮积压）。口径见模块 docstring（Spec-0025/T7）。
+        """Executable backlog over time: [(timestamp, delta, backlog)], where backlog is the cumulative count of unclosed
+        triaged + RFC items at that moment (including cross-round carry-over). See specification in module docstring (Spec-0025/T7).
 
-        从 tracker 全状态 issue 的开/关事件累计：每条可执行 backlog issue 在 created_at 计 +1、
-        （若已关）在 closed_at 计 -1，按时间排序后滚动求和。用「当前/最终标签」判定它是否属可执行
-        backlog（MVP 近似：不重建历史标签轨迹）。tracker 无 list_issues 能力（Fake / 无 Gitea）或
-        读取失败 → 空序列（不抛）。
+        Accumulated from open/close events across all tracker issue states: each executable backlog issue counts +1 at created_at,
+        and -1 at closed_at (if closed), then sorted by time and rolled-up. Uses current/final labels to determine if it belongs to
+        executable backlog (MVP approximation: does not reconstruct historical label trajectories). If tracker lacks list_issues capability
+        (Fake / no Gitea) or read fails → returns empty sequence (does not raise).
         """
         fetch_all = getattr(self._tracker, "list_issues", None)
         if not callable(fetch_all):
@@ -85,14 +87,16 @@ class Metrics:
         return curve
 
     def open_issue_count(self) -> int:
-        """当前 open issue 数（从 tracker 读路径取一个即时点，供观测）。"""
+        """Current open issue count (read from tracker at a single point in time for observability)."""
         return len(self._tracker.list_open_issues())
 
     def funnel(self) -> dict[str, int]:
-        """三平面漏斗当前量（Spec-0029/T9）：open 票按 plane 计数 report/proposal/ready。
+        """Count open issues in each plane: report/proposal/ready (Spec-0029/T9).
 
-        proposal 深度对应「准入太严或生成太滥」、ready 深度对应「dev 消化不动=退化信号」——
-        与 run.py 背压告警同口径。tracker 读失败返回全 0（观测降级不抛）。
+        A deep proposal queue suggests overly strict admission or excessive generation; a deep ready
+        queue suggests developers cannot keep up, a degradation signal. These definitions match the
+        backpressure alerts in run.py. Return all zeros if tracker reads fail; observation failure
+        does not raise.
         """
         counts = {"report": 0, "proposal": 0, "ready": 0}
         try:

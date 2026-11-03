@@ -1,6 +1,6 @@
 import { useTheme } from "../hooks/useTheme";
 
-// 顶栏主题开关（Spec-0026/T2）：深色态显示太阳（点它回浅色），浅色态显示月亮。
+// Top-bar theme toggle (Spec-0026/T2): show the sun in dark mode (click for light mode), and the moon in light mode.
 export function ThemeToggle() {
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
@@ -8,8 +8,8 @@ export function ThemeToggle() {
     <button
       className="theme-toggle"
       onClick={toggle}
-      aria-label={dark ? "切换到浅色主题" : "切换到深色主题"}
-      title={dark ? "浅色" : "深色"}
+      aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+      title={dark ? "Light" : "Dark"}
     >
       {dark ? (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">

@@ -1,9 +1,9 @@
-# Spec-0042/T5：Divergent 从会话行为证据识别产品能力缺口。
-"""Divergent（能力发现）驱动器。
+# Spec-0042/T5: Divergent identifies product capability gaps from session behavior evidence.
+"""Divergent (capability discovery) driver.
 
-体验趋势提供检索索引，会话 timeline/beat/step 提供按需证据。开放 proposal 与 ready item 只作为
-重复方向参照。输出写入 proposal 平面并标记 from-divergent；Architect 负责跨提案吸收，Owner
-负责最终交接。
+Experience trends provide the retrieval index, session timeline/beat/step provide on-demand evidence. Open proposals and ready items serve only as
+duplication-direction reference. Output written to the proposal plane marked from-divergent; Architect is responsible for cross-proposal absorption, Owner
+for final handoff.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from ahe_beta.usage import current_usage_context
 from ahe_beta.user.session_store import SessionStore
 
 _DIVERGENT_TIMEOUT = 3600
-# 单轮候选上限；跨提案的语义吸收由 Architect 执行。
+# Per-round candidate limit; semantic absorption across proposals is Architect's responsibility.
 _MAX_CANDIDATES = 3
 
 StatusFn = Callable[..., None]
@@ -38,7 +38,7 @@ StatusFn = Callable[..., None]
 
 @dataclass
 class DivergentOutcome:
-    """一次 propose_once：新落的候选票号。"""
+    """propose_once once: newly arrived candidate ticket number."""
 
     proposal_numbers: list[int] = field(default_factory=list)
     artifacts: list[dict] = field(default_factory=list)
@@ -49,7 +49,7 @@ class DivergentOutcome:
 
 
 class Divergent:
-    """从会话行为形成能力 proposal，不修改代码或工作流状态。"""
+    """Form a proposal from session behavior capabilities without modifying code or workflow state."""
 
     def __init__(
         self,
@@ -94,7 +94,7 @@ class Divergent:
             trend = [tuple(item) for item in frozen["trend"]]
             reference = [OpenIssue.from_dict(item) for item in frozen["reference"]]
         else:
-            # 全量参照用于理解产品现状；PM 不因相邻价值方向停止生成，跨提案吸收由 Architect 判断。
+            # Full reference used to understand product status; PM does not halt generation due to adjacent value directions; cross-proposal absorption is judged by Architect.
             backlog = self._tracker.list_open_issues()
             reference = [i for i in backlog if plane(i.labels) in (PROPOSAL, READY)]
             trend = self._feeling_trend()
@@ -121,7 +121,7 @@ class Divergent:
                 )
         self._emit(
             running=True,
-            status=f"发散中…（会话={len(trend)} 局 · 参照={len(reference)} 条）",
+            status=f"Discovering opportunities… (sessions={len(trend)} · references={len(reference)})",
         )
 
         if recovery_unit is not None and recovery_unit.get("output_digest"):
@@ -176,7 +176,11 @@ class Divergent:
 
         self._emit(
             running=False,
-            status=(f"落了 {len(numbers)} 条能力候选（待准入）" if numbers else "本轮无产品候选"),
+            status=(
+                f"Created {len(numbers)} capability proposals (awaiting admission)"
+                if numbers
+                else "No product proposals this round"
+            ),
             proposals=numbers,
             detail=(result_text or None),
         )
@@ -208,20 +212,24 @@ class Divergent:
         known_sessions = {sid for _, _, _, sid in trend if sid}
         goal_index = self._goal_index(trend)
         msg = (
-            "你是产品 PM。以下是全部可见的用户体验索引以及开放 proposal、ready item。先理解用户"
-            "试图完成什么、行为反映了什么体验矛盾，再提出产品机会。已有提案是产品现状上下文，"
-            "重叠不构成生成失败；PM 独立到 Owner，Architect 不读取或吸收 PM 提案。"
-            "再以 session 标识调用 get_session_timeline 核实；仅在必要时继续调用 beat 和 step。"
-            "不得直接读取 sessions 文件。\n"
-            f"本轮最多提交 {_MAX_CANDIDATES} 条产品洞察。每条必须能追溯到具体会话证据。\n\n"
-            f"## 体感曲线（索引：时间, 1-4 分, 理由, session 句柄）\n{self._format_trend(trend)}\n\n"
-            "## 目标感知体验摘要（确定性 L1；只保留目标、关键动作和反馈）\n"
+            "You are Product PM. The full visible user-experience index, open proposals, and "
+            "ready items follow. Understand what users were trying to accomplish and the "
+            "experience tensions their behavior reveals before proposing product opportunities. "
+            "Existing proposals provide product-state context; overlap does not invalidate a "
+            "candidate. PM goes independently to Owner; Architect does not read or absorb PM "
+            "proposals. Verify using get_session_timeline with session IDs; continue to beats "
+            "and steps only when needed. Do not read sessions files directly.\n"
+            f"Submit at most {_MAX_CANDIDATES} product insights this round, each traceable to "
+            "specific session evidence.\n\n"
+            f"## Experience trend (index: time, score 1-4, reason, session handle)\n{self._format_trend(trend)}\n\n"
+            "## Goal-aware experience summary (deterministic L1; goals, key actions, and feedback only)\n"
             f"{self._format_goal_index(goal_index)}\n\n"
-            f"## 已有 proposal / ready item（{len(reference)} 条）\n{self._format_issues(reference)}\n\n"
-            "调查完成后调用 `submit_divergent` 一次：`proposals` 为 0..n 条（无则空数组），"
-            "每条分别说明 user_goal、observed_behaviors、experience_tension、product_opportunity、"
-            "desired_outcome、evidence_sessions、solution_level、abstraction_rationale，可选"
-            " related_proposals。字段契约由工具强校验。"
+            f"## Existing proposals / ready items ({len(reference)})\n{self._format_issues(reference)}\n\n"
+            "After investigating, call `submit_divergent` once. `proposals` contains 0..n entries "
+            "(an empty array if none), each separating user_goal, observed_behaviors, "
+            "experience_tension, product_opportunity, desired_outcome, evidence_sessions, "
+            "solution_level, abstraction_rationale, and optional related_proposals. The tool "
+            "enforces the field contract."
         )
         from ahe_beta.usage import current_usage_context  # noqa: PLC0415
 
@@ -280,7 +288,7 @@ class Divergent:
         import json
 
         if not rows:
-            return "（暂无目标证据；旧 session 或缺失 session 明确不补猜）"
+            return "(No goal evidence available; do not guess for older or missing sessions)"
         return json.dumps(rows, ensure_ascii=False, indent=2)
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:
@@ -302,13 +310,13 @@ class Divergent:
     @staticmethod
     def _format_trend(trend: list[tuple[str, int, str, str]]) -> str:
         if not trend:
-            return "（暂无体感数据）"
+            return "(No experience data yet)"
         lines = []
         for ts, score, reason, sid in trend:
             why = f" — {reason}" if reason else ""
             sid_bit = f" [session={sid}]" if sid else ""
             lines.append(
-                f"- {ts}{sid_bit}: {score if score is not None else 'unavailable (未评分)'}{why}"
+                f"- {ts}{sid_bit}: {score if score is not None else 'unavailable (unscored)'}{why}"
             )
         return "\n".join(lines)
 

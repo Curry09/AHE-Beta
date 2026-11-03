@@ -1,7 +1,6 @@
-"""内层 prompt 行为框架（可选核实）与 skill 占位（spec-0008/T3）。
+"""Inner layer prompt behavior framework (optional verification) and skill placeholder (spec-0008/T3).
 
-纯文本断言、不调 LLM。覆盖：D1 工具清单门控、可选/有成本核实措辞、D3/trust 倾向变化、
-skill 占位（senior 才挂、片段为通用方法）、build_inner_system 端到端拼装。
+Plain text assertions, no LLM call. Coverage: D1 tool list gating, optional/costly verification wording, D3/trust inclination changes, skill placeholder (senior only, fragments as generic methods), build_inner_system end-to-end assembly.
 """
 
 from __future__ import annotations
@@ -42,7 +41,7 @@ def _persona(d1: D1Eval, depth: D2Depth = D2Depth.PROFICIENT, d3=None) -> Person
 
 
 # --------------------------------------------------------------------------
-# 能力清单（CAN，机械门控的如实描述）
+# Capability list (CAN, mechanical gating truthful description)
 # --------------------------------------------------------------------------
 def test_capability_clause_varies_by_d1() -> None:
     blind = clause_capability(_persona(D1Eval.BLIND), [])
@@ -50,7 +49,7 @@ def test_capability_clause_varies_by_d1() -> None:
 
     shallow_tools = [t.name for t in tool_stack(_persona(D1Eval.SHALLOW))]
     shallow = clause_capability(_persona(D1Eval.SHALLOW), shallow_tools)
-    assert "run_file" not in shallow  # 不臆造
+    assert "run_file" not in shallow  # Do not fabricate
     assert "do not author your own test suites" in shallow
 
     expert_tools = [t.name for t in tool_stack(_persona(D1Eval.EXPERT))]
@@ -72,34 +71,34 @@ def test_inner_system_renders_tools_by_d1() -> None:
 
 
 # --------------------------------------------------------------------------
-# 可选核实 + WILL 倾向（D3 / trust）
+# Optional verification + WILL inclination (D3 / trust)
 # --------------------------------------------------------------------------
 def test_verification_is_optional_and_costly() -> None:
     pol = clause_verification_policy(_persona(D1Eval.COMPETENT), TrustStance.BALANCED)
     assert "optional" in pol.lower() and "cost" in pol.lower()
-    assert "every turn" in pol.lower()  # 明确「不是每轮都查」
+    assert "every turn" in pol.lower()  # Clarify "not every round checks"
 
 
 def test_verification_lean_varies() -> None:
-    # 严格 D3 或 skeptical -> 倾向核实
+    # Strict D3 or skeptical → tend to verify
     strict = clause_verification_policy(
         _persona(D1Eval.EXPERT, d3=D3Accept.RIGOROUS), TrustStance.SKEPTICAL
     )
     assert "inclined to actually verify" in strict
 
-    # 盲信 / runs 阈值 -> 几乎不查
+    # Blind trust / runs threshold → rarely checks
     lax = clause_verification_policy(_persona(D1Eval.BLIND, d3=D3Accept.RUNS), TrustStance.BLIND)
     assert "almost never" in lax
 
 
 # --------------------------------------------------------------------------
-# skill 占位
+# skill placeholder
 # --------------------------------------------------------------------------
 def test_select_skills_senior_only_and_generic() -> None:
     assert select_skills(_persona(D1Eval.COMPETENT, depth=D2Depth.PROFICIENT)) == []
     senior = select_skills(_persona(D1Eval.EXPERT, depth=D2Depth.SENIOR))
     assert senior and all(isinstance(s, Skill) for s in senior)
-    # 通用方法、不含 bug/benchmark/答案特定词
+    # Generic methods, no bug/benchmark/answer-specific keywords
     blob = " ".join(s.prompt.lower() for s in senior)
     for banned in ("dst", "pytz", "timezone", "answer", "gold", "benchmark"):
         assert banned not in blob
@@ -109,7 +108,7 @@ def test_build_inner_system_includes_skills_when_present() -> None:
     p = _persona(D1Eval.EXPERT, depth=D2Depth.SENIOR)
     sys = build_inner_system(p, tool_stack(p), select_skills(p), State())
     assert "# SKILLS" in sys and "reproduce-first" in sys
-    assert "# INNER TOOL USE" in sys  # 内层协议段在
+    assert "# INNER TOOL USE" in sys  # Inner protocol section at
 
 
 def test_build_inner_system_excludes_global_action_contract() -> None:

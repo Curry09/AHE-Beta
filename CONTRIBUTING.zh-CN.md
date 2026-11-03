@@ -2,7 +2,7 @@
 
 [English](CONTRIBUTING.md) | 简体中文
 
-欢迎提交问题报告、文档改进和代码修改。建议先阅读 [README](README.zh-CN.md) 了解项目流程，再通过[架构说明](docs/ARCHITECTURE.md)了解主要模块。架构与详细设计文档目前主要使用中文。
+欢迎提交问题报告、文档改进和代码修改。建议先阅读 [README](README.zh-CN.md) 了解项目流程，再通过[架构说明](docs/ARCHITECTURE.md)了解主要模块。设计规格以 [docs/specs](docs/specs/README.md) 下的英文版本维护，原始中文版本保存在 [docs/specs-zh-CN](docs/specs-zh-CN/README.md)。
 
 ## 报告问题
 
@@ -11,6 +11,8 @@
 ## 准备修改
 
 每个 PR 尽量围绕一个问题或功能展开。新增功能或调整跨模块行为时，请先创建或更新相关设计文档，再开始实现。[Spec 指南](docs/specs/README.md)说明了文档创建和编号预留方式。
+
+新增的代码注释、docstring 和 Spec 统一使用英文。注释应说明代码本身难以表达的意图、约束和行为。
 
 修改依赖时，请在同一 PR 中提交更新后的锁文件。修改交付接口或证据传输流程时，还需结合对应版本的 OpenAgents 验证，并记录两个仓库的提交版本。OpenAgents 仓库内的修改请参阅其[贡献指南](https://github.com/Curry09/OpenAgents/blob/main/CONTRIBUTING.zh-CN.md)。
 

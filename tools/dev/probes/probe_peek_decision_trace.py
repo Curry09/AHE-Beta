@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""诊断：send_message(/status) 后下一跳的 judge/intent/act 原文。
+"""Diagnostics: original judge/intent/act text on next hop after send_message(/status).
 
-用法（仓根）：
+Usage (repo root):
   PYTHONPATH=backend .venv/bin/python -m tools.dev.probes.probe_peek_decision_trace
 """
 
@@ -71,7 +71,7 @@ class TraceHarness:
         if self._n <= len(self._activities):
             return ("pending", waited)
         self._inflight = False
-        return ("reply", "done.\n\n## 验证证据\n3 passed")
+        return ("reply", "done.\n\n## Verification evidence\n3 passed")
 
     def control(self, name: str) -> str:
         self.controls.append(name)
@@ -86,7 +86,7 @@ class TraceHarness:
 
 
 class TracingClient:
-    """包一层 ApiPersonaClient，只把 waiting 三跳的关键字段打出来。"""
+    """Wrap ApiPersonaClient, print only key fields of the three waiting hops."""
 
     def __init__(self) -> None:
         from ahe_beta.user.sim.persona_client import ApiPersonaClient
@@ -125,7 +125,7 @@ class TracingClient:
             },
         }
         self.after_status_logs.append(row)
-        # 只详打：history 刚 send_message /status
+        # Detailed logging only: history just after send_message /status
         interesting = "send_message" in (hist_tail or "") and "/status" in (hist_tail or "")
         mark = " <<AFTER_STATUS" if interesting else ""
         print(f"\n--- waiting #{self.n} {kind}{mark} ---")

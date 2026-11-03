@@ -1,9 +1,8 @@
-"""GiteaTracker（spec-0002/T2）：spec-0001/T5 IssueTracker 接口的真后端。
+"""GiteaTracker (spec-0002/T2): true backend for the spec-0001/T5 IssueTracker interface.
 
-一个打 Gitea /api/v1 的薄 REST 客户端：把接口调用翻译为 HTTP，状态权威留在 Gitea，
-客户端除 label id 缓存与每线程 HTTP 会话（Spec-0017/T6）外无状态。非 2xx 一律转为带
-状态码与端点的 GiteaError，不静默返回空回执。
-配置（base_url/owner/repo/token）由构造注入，来源是 spec-0002/T1 的 backend/deploy/gitea/.env。
+A thin REST client hitting Gitea /api/v1: translates interface calls into HTTP, keeps state authority in Gitea,
+and maintains no client-side state except label ID caching and per-thread HTTP sessions (Spec-0017/T6). Any non-2xx response is converted to GiteaError with status code and endpoint; no errors are silently swallowed.
+Configuration (base_url/owner/repo/token) is injected at construction, sourced from spec-0002/T1 backend/deploy/gitea/.env.
 """
 
 from __future__ import annotations
@@ -33,27 +32,27 @@ from ahe_beta.tracker.base import (
     operation_marker_digest,
 )
 
-# 新建 label 的默认颜色（标签语义集 {bug,feature} 由 T1 预置；此处仅兜底建缺失项）。
+# Default color for newly created labels (label semantic set {bug, feature} is preset by T1; this is fallback for missing items only).
 _DEFAULT_LABEL_COLOR = "#ededed"
 
-# Spec-0032/T7：PR 正文 closing 关键字（closes/fixes/resolves #N）→ 关联 issue 号（观测展示用；
-# 真正的关票由 Gitea 服务端在合并时按同一语义执行）。
+# Spec-0032/T7: PR body closing keywords (closes/fixes/resolves #N) → associated issue numbers (for observation display;
+# actual issue closure is performed by Gitea server on merge using the same semantics).
 _CLOSING_REF_RE = re.compile(r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+#(\d+)", re.I)
 
 
 def _parse_closing_refs(*, body: str) -> list[int]:
-    """PR 正文 → closing 关键字引用的 issue 号列表（去重保序）。"""
+    """PR body → list of issue numbers referenced by closing keywords (deduplicated, order-preserving)."""
     return list(dict.fromkeys(int(m) for m in _CLOSING_REF_RE.findall(body or "")))
 
 
-# 每次 HTTP 请求的硬超时（秒）：无超时的请求一旦挂死会把整条闭环卡住（主线程 poll() 永等）。
+# Hard timeout (seconds) per HTTP request: a hung request without timeout can block the entire feedback loop (main thread poll() waits forever).
 _REQUEST_TIMEOUT = 30
 _TIMELINE_PAGE_SIZE = 50
 _LABEL_PAGE_SIZE = 50
 
 
 class GiteaError(RuntimeError):
-    """Gitea 返回非 2xx 或响应不可解析时抛出，携带状态码与端点便于在调用点定位。"""
+    """Raised when Gitea returns non-2xx or response is unparseable; carries status code and endpoint for locating the call site."""
 
     def __init__(self, status: int, endpoint: str, detail: str = "") -> None:
         super().__init__(f"Gitea {status} @ {endpoint}{f': {detail}' if detail else ''}")
@@ -85,7 +84,7 @@ class IssueMigrationError(RuntimeError):
 
 
 class GiteaTracker:
-    """IssueTracker 协议的 Gitea 实现。与 FakeTracker 对 run_session 等价、可互换。"""
+    """Gitea implementation of the IssueTracker protocol. Equivalent to and interchangeable with FakeTracker for run_session."""
 
     def __init__(self, base_url: str, owner: str, repo: str, token: str) -> None:
         self._api = f"{base_url.rstrip('/')}/api/v1"
@@ -93,18 +92,18 @@ class GiteaTracker:
         self._repo = repo
         self._token = token
         self._observation_transport: dict | None = None
-        # Spec-0017/T6：requests.Session 非线程安全（cookiejar/内部状态并发变异，Gitea 会回
-        # Set-Cookie），a 段并行后各会话线程收尾并发 create_issue → Session 改每线程一个
-        # （thread-local，惰性新建、各带全 header）。_session_override 是测试注入口（见 setter）。
+        # Spec-0017/T6: requests.Session is not thread-safe (cookiejar/internal state mutate concurrently, Gitea will return
+        # Set-Cookie), so after parallel segment a each session thread winds down and concurrently create_issue → Session changed to per-thread
+        # (thread-local, lazily created, each with full headers). _session_override is a test injection point (see setter).
         self._local = threading.local()
         self._session_override: Any | None = None
-        # label id 缓存不加锁：_create_label 已内置 409/422 竞态回退（他处已建则 refresh 复用），
-        # 且 run.py 开跑前已 ensure_labels 预热，并行段内通常纯读。
+        # Label ID cache has no locks: _create_label already has built-in 409/422 race fallback (if created elsewhere, refresh and reuse),
+        # and run.py has already warmed up via ensure_labels before the parallel segment starts, so the parallel section is usually read-only.
         self._label_ids: dict[str, int] = {}
 
     @property
     def _session(self) -> Any:
-        """当前线程的 HTTP 会话：override 优先（测试注入），否则每线程惰性建独立 Session。"""
+        """HTTP session for the current thread: override takes precedence (test injection), otherwise per-thread lazy-created independent Session."""
         if self._session_override is not None:
             return self._session_override
         session = getattr(self._local, "session", None)
@@ -118,14 +117,14 @@ class GiteaTracker:
 
     @_session.setter
     def _session(self, value: Any) -> None:
-        # 测试注入口：整体替换（所有线程都读到注入对象）；单线程测试语义与旧字段赋值等价。
+        # Test injection point: replace the whole object (all threads read the injected object); single-threaded test semantics equivalent to old field assignment.
         self._session_override = value
 
-    # ---- IssueTracker 协议 ----
+    # ---- IssueTracker protocol ----
 
     def ensure_labels(self, names: list[str]) -> None:
         if not names:
-            return  # 空列表 no-op
+            return  # Empty list is a no-op
         self._refresh_label_cache()
         for name in names:
             if name not in self._label_ids:
@@ -134,7 +133,8 @@ class GiteaTracker:
     def create_issue(self, draft: IssueDraft) -> IssueRef:
         missing = [n for n in draft.labels if n not in self._label_ids]
         if missing:
-            self.ensure_labels(missing)  # 未缓存的 label 先补齐，保证一次带正确 id 提交
+            # Fetch uncached labels first to ensure submission with correct IDs
+            self.ensure_labels(missing)
         label_ids = [self._label_ids[n] for n in draft.labels]
         data = self._request(
             "POST",
@@ -213,17 +213,17 @@ class GiteaTracker:
 
     def set_state(self, number: int, state: str, reason: str) -> None:
         if state not in ISSUE_STATES:
-            raise ValueError(f"非法 state：{state!r}（须属 {ISSUE_STATES}）")
+            raise ValueError(f"Invalid state: {state!r} (must be one of {ISSUE_STATES})")
         self._request(
             "PATCH",
             f"/repos/{self._owner}/{self._repo}/issues/{number}",
             {"state": state},
         )
-        if reason:  # Gitea PATCH 不收 reason 字段，关闭理由以 comment 保留可追溯
+        if reason:  # Gitea PATCH does not accept reason field; closure reason is preserved as a comment for traceability
             self.add_comment(number, reason)
 
     def set_labels(self, number: int, labels: list[str]) -> None:
-        """Spec-0025/T3a：整组替换 issue 标签。ensure 拿 id → PUT /issues/{n}/labels（替换语义）。"""
+        """Spec-0025/T3a: bulk replace issue labels. Ensure IDs → PUT /issues/{n}/labels (replacement semantics)."""
         missing = [n for n in labels if n not in self._label_ids]
         if missing:
             self.ensure_labels(missing)
@@ -235,7 +235,7 @@ class GiteaTracker:
         )
 
     def update_issue(self, number: int, *, title: str, body: str, labels: list[str]) -> None:
-        """安全迁移提案主体；Gitea 1.22 不支持在 EditIssue 中更新 labels。"""
+        """Safe migration proposal body; Gitea 1.22 does not support updating labels in EditIssue."""
         before = self.get_issue(number=number)
         self._request(
             "PATCH",
@@ -272,7 +272,7 @@ class GiteaTracker:
 
     def transition_issue(self, number: int, *, state: str, labels: list[str]) -> None:
         if state not in ISSUE_STATES:
-            raise ValueError(f"非法 state：{state!r}（须属 {ISSUE_STATES}）")
+            raise ValueError(f"Invalid state: {state!r} (must be one of {ISSUE_STATES})")
         before = self.get_issue(number=number)
         self.set_labels(number, labels)
         try:
@@ -323,10 +323,10 @@ class GiteaTracker:
         except Exception:  # noqa: BLE001 - error object remains useful when observation also fails
             return None
 
-    # ---- 观测读路径（非 IssueTracker 协议，仅 GiteaTracker 提供）----
+    # ---- Observation read path (not part of IssueTracker protocol, GiteaTracker only) ----
 
     def list_issues(self, *, state: str = "all", limit: int = 100) -> list[dict[str, Any]]:
-        """列 issue（含已关闭 + 正文 + 时间戳），供观测看板完整展示。纯观测、不改任何状态。"""
+        """List issues (including closed + body + timestamps) for complete dashboard display. Read-only observation; no state changes."""
         data = self._request(
             "GET",
             f"/repos/{self._owner}/{self._repo}/issues?state={state}&type=issues&limit={limit}",
@@ -335,12 +335,12 @@ class GiteaTracker:
         return [self._issue_dto(item) for item in (data or [])]
 
     def get_issue(self, *, number: int) -> dict[str, Any]:
-        """取单条 issue 全量（含正文/labels/状态/时间戳）。不存在时抛 GiteaError(404)。"""
+        """Fetch a single issue in full (including body/labels/state/timestamp). Raises GiteaError(404) if not found."""
         data = self._request("GET", f"/repos/{self._owner}/{self._repo}/issues/{number}", None)
         return self._issue_dto(data or {})
 
     def list_comments(self, *, number: int) -> list[dict[str, Any]]:
-        """取某 issue 的全部评论（作者/内容/时间），供详情面板展示完整讨论过程。"""
+        """Fetch all comments for an issue (author/content/timestamp) to display the complete discussion in detail panels."""
         data = self._request(
             "GET", f"/repos/{self._owner}/{self._repo}/issues/{number}/comments", None
         )
@@ -381,10 +381,10 @@ class GiteaTracker:
             page += 1
 
     def list_timeline(self, *, number: int) -> list[dict[str, Any]]:
-        """分页读取 issue timeline，并归一 label add/remove 方向及调试所需原始字段。
+        """Paginate issue timeline and normalize label add/remove direction plus raw fields for debugging.
 
-        Gitea 1.22 的 label event 用非空 ``body`` 表示 add、空 body 表示 remove。未知事件保留，
-        但 operation 标成 unknown，交给纯观测层 fail-visible 地忽略，绝不猜测方向。
+        In Gitea 1.22, label events use non-empty ``body`` to indicate add and empty body to indicate remove. Unknown events are preserved
+        but marked as unknown operation, left to the read-only layer for fail-visible omission, never guessed.
         """
         events: list[dict[str, Any]] = []
         page = 1
@@ -396,7 +396,7 @@ class GiteaTracker:
                 None,
             )
             if not isinstance(rows, list):
-                raise GiteaError(0, "list_timeline", "响应不是数组")
+                raise GiteaError(0, "list_timeline", "Response is not an array")
             events.extend(self._timeline_event(item) for item in rows if isinstance(item, dict))
             if len(rows) < _TIMELINE_PAGE_SIZE:
                 break
@@ -404,10 +404,10 @@ class GiteaTracker:
         return events
 
     def get_commit_detail(self, *, sha: str) -> dict[str, Any]:
-        """取单个 commit 全量：message 全文 + 作者/时间 + 文件级增删统计 + 原始 diff 文本。
+        """Fetch a single commit in full: complete message + author/timestamp + file-level add/delete stats + raw diff text.
 
-        diff 走 Gitea 的 `.diff` 原文端点（text/plain）；文件统计走 commit API。tag 标注
-        沿用 _tags_by_sha（失败降级为无 tag）。
+        Diff comes from Gitea's `.diff` raw endpoint (text/plain); file stats from commit API. Tag annotations
+        reuse _tags_by_sha (degrades to no tag on failure).
         """
         item = (
             self._request(
@@ -439,7 +439,7 @@ class GiteaTracker:
         }
 
     def _commit_diff(self, *, sha: str) -> str:
-        """commit 原始 diff 文本；取不到降级为空串（不阻断 commit 详情主体）。"""
+        """Raw diff text for a commit; degrades to empty string if unavailable (does not block commit detail body)."""
         endpoint = f"/repos/{self._owner}/{self._repo}/git/commits/{sha}.diff"
         try:
             resp = self._session.request(
@@ -453,7 +453,7 @@ class GiteaTracker:
 
     @staticmethod
     def _issue_dto(item: dict[str, Any]) -> dict[str, Any]:
-        """Gitea issue 响应 → 看板 DTO（观测读路径统一形状）。"""
+        """Gitea issue response → dashboard DTO (unified shape for read-only observation path)."""
         return {
             "number": item.get("number") or 0,
             "title": item.get("title") or "",
@@ -467,7 +467,7 @@ class GiteaTracker:
 
     @staticmethod
     def _timeline_event(item: dict[str, Any]) -> dict[str, Any]:
-        """Gitea timeline item → forge-neutral、JSON 可序列化的只读事件。"""
+        """Gitea timeline item → forge-neutral, JSON-serializable read-only event."""
         event_type = str(item.get("type") or "")
         body = item.get("body")
         operation = "unknown"
@@ -486,11 +486,11 @@ class GiteaTracker:
         }
 
     def list_pulls(self, *, state: str = "open", limit: int = 20) -> list[dict[str, Any]]:
-        """列 PR（Spec-0032/T7 交付面观测读路径）：号/标题/三态 state/head 分支/mergeable/labels。
+        """List PRs (Spec-0032/T7 delivery-layer observation read path): number/title/three-state/head branch/mergeable/labels.
 
-        纯观测、不改任何状态。Gitea 的 PR state 只有 open/closed、merged 是并列布尔——此处归一为
-        open/closed/merged 三态（与交付面语义一致）。closing 关键字关联的 issue 号从正文解析出
-        `closes_issues` 供前端画「票 → PR」链。
+        Read-only observation; no state changes. Gitea PR state has only open/closed, and merged is a parallel boolean—
+        here normalized to three states: open/closed/merged (consistent with delivery-layer semantics). Issue numbers from
+        closing keywords in the body are parsed into `closes_issues` for frontend to draw issue-to-PR links.
         """
         data = self._request(
             "GET",
@@ -518,10 +518,10 @@ class GiteaTracker:
         return out
 
     def list_recent_commits(self, *, limit: int = 15) -> list[dict[str, Any]]:
-        """列 harness 仓 main 最近 commit（带 vK tag 标注），供观测看板「main 分支更新」。
+        """List recent commits on harness repo main branch (annotated with vK tags) for dashboard "main branch updates".
 
-        纯观测、不改任何状态。tag→sha 映射把开发者 agent 打的 vK 观测锚点贴回对应 commit。
-        取标签失败不致命（降级为无 tag），commit 主体照常返回。
+        Read-only observation; no state changes. Tag→sha mapping applies vK observation anchors from developer agents back to
+        corresponding commits. Tag fetch failure is non-fatal (degrades to no tag); commit body returns normally.
         """
         commits = self._request(
             "GET",
@@ -549,7 +549,7 @@ class GiteaTracker:
         return out
 
     def _tags_by_sha(self) -> dict[str, list[str]]:
-        """sha → [tag 名]。取标签失败降级为空映射（不阻断 commit 列表）。"""
+        """sha → [tag names]. Tag fetch failure degrades to empty mapping (does not block commit list)."""
         try:
             tags = self._request("GET", f"/repos/{self._owner}/{self._repo}/tags?limit=50", None)
         except GiteaError:
@@ -562,7 +562,7 @@ class GiteaTracker:
                 mapping.setdefault(sha, []).append(name)
         return mapping
 
-    # ---- 内部 ----
+    # ---- Internal ----
 
     def find_observation_gap(self, *, marker: str) -> int | None:
         # Paginate including closed issues: closing a ticket must not break retry identity.
@@ -776,10 +776,13 @@ class GiteaTracker:
             timeout=_REQUEST_TIMEOUT,
             allow_redirects=False,
         )
-        if resp.status_code in (409, 422):  # 竞态：他处已建 → 回退 GET 取既有 id
+        # Race condition: already created elsewhere → fall back to GET and retrieve existing id
+        if resp.status_code in (409, 422):
             self._refresh_label_cache()
             if name not in self._label_ids:
-                raise GiteaError(resp.status_code, endpoint, f"label {name!r} 建后仍缺")
+                raise GiteaError(
+                    resp.status_code, endpoint, f"Label {name!r} is still missing after creation"
+                )
             return
         data = self._ok(resp, endpoint)
         self._label_ids[name] = data["id"]
@@ -823,4 +826,4 @@ class GiteaTracker:
         try:
             return IssueRef(number=data["number"], url=data["html_url"], state=data["state"])
         except (KeyError, TypeError) as exc:
-            raise GiteaError(0, "create_issue", f"响应缺字段：{exc}") from exc
+            raise GiteaError(0, "create_issue", f"Response is missing a field: {exc}") from exc

@@ -35,7 +35,7 @@
     "candidate_validation": "PR CI selects the reviewed immutable execution_evidence reader candidate and runs both configuration and gzip/ZIP producer-reader contracts; workflow_dispatch can verify another full remote commit SHA.",
     "image_record": "backend/deploy/vigil/observation-runtime.json#hosted_candidate",
     "release_gate": "Merge and publish the reader first, fill reader_release_commit with its verified immutable commit, rebuild the reader image, and rerun the joint contract before enabling the hosted release.",
-    "reader_candidate_commit": "04e9519e69f5c2200e645f6814009f3ac1221932"
+    "reader_candidate_commit": "165af8b042334ac5a8551f0de97d0250bedbc998"
   },
   "release_commits": null,
   "container_digests": null,
@@ -58,7 +58,7 @@
     "schema_version": 1,
     "required_dispatch": true,
     "context_projection": "all-delivery-roles-v1",
-    "reader_candidate_commit": "04e9519e69f5c2200e645f6814009f3ac1221932",
+    "reader_candidate_commit": "165af8b042334ac5a8551f0de97d0250bedbc998",
     "reader_release_commit": null,
     "release_gate": "Review and merge the paired Spec-0093 reader, fill reader_release_commit with the merged immutable SHA, and rerun the publisher/reader contract and provider preflight. Preparation currently uses the published reader_candidate_commit; the Spec-0092 transport pin alone is insufficient."
   }

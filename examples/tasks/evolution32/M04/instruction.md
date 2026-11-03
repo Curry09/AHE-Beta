@@ -1,1 +1,1 @@
-为 Salesforce dbt 模型引入 SQL 质量检查，比较检查位置、覆盖范围、模板和历史债务策略，达成选择后交付最小试点。
+Introduce SQL quality checks for Salesforce dbt models, comparing check locations, coverage, templates, and historical debt strategies; once a decision is reached, deliver a minimal pilot.

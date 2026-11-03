@@ -1,121 +1,140 @@
 # Reference: GitHub Persona Extraction
 
-<!-- Spec-0037/T5: D7 默认 inject；禁从 PR 速度派生 impatient；枚举只引用 hub -->
+<!-- Spec-0037/T5: D7 defaults to injected; never infer impatient from PR speed; enums come only from the hub. -->
 
-GitHub 足迹的取证方法（按维）、trace-floor + 跨层一致性真实性门、态度轴注入、endpoint 速查、
-三个范例、招募 profile。实际抽取时读本文件。
+GitHub evidence collection by dimension, trace-floor and cross-layer consistency authenticity gates,
+attitude-axis injection, endpoint reference, three examples, and recruitment profiles.
+Read this file when performing an extraction.
 
-维度**枚举、`D5.area` 受控词表、注入分布、卡形状、真实性裁决词表**一律在唯一公共契约
-[`../card-schema.md`](../card-schema.md)。本文件只写 GitHub 这类**观测型**来源**不同**的部分。
+All dimension **enums, the controlled `D5.area` vocabulary, injection distributions, card shape,
+and authenticity verdicts** are defined in the sole shared contract,
+[`../card-schema.md`](../card-schema.md). This file covers only what differs for GitHub as an **observational** source.
 
-## 1. 按维从 GitHub 足迹 ground
+## 1. Ground dimensions from GitHub activity
 
-GitHub 是 `observed` 源：能 ground 的维带 `basis: "observed"`。**它只可靠观测得到 D1/D5**；
-态度轴（D2/D4/D6/D7 + 多数 D3）默认 `injected`（见 §3）。
+GitHub is an `observed` source: dimensions grounded from it carry `basis: "observed"`.
+**Only D1/D5 can be observed reliably.** Attitude axes (D2/D4/D6/D7 and most of D3) default to `injected` (see §3).
 
-### D1 evaluation_capability — *强（可验证）*
-`blind | surface | competent | expert`（枚举见 card-schema.md）
-- **从（GitHub）ground：** issue body 的技术深度（精确 repro、根因推理）+ PR 的真实实质
-  （真逻辑修复 vs docs/版本 bump）。读 diff 意图，不读计数。
-- blind = 无代码痕迹；surface = 出 app 但从不审深度；competent = 真 bug 修复；
-  expert = 维护库 / 深跨模块修复。**标 `grounded` / `basis: "observed"`。**
+### D1 evaluation_capability — *strong, verifiable*
+`blind | surface | competent | expert` (see card-schema.md for the enum)
+- **Ground from GitHub:** technical depth in issue bodies (precise reproductions, root-cause reasoning)
+  and the substance of PRs (real logic fixes versus documentation/version bumps). Read the intent of the diff, not activity counts.
+- blind = no code evidence; surface = builds apps but never reviews deeply; competent = real bug fixes;
+  expert = library maintenance / substantial fixes spanning modules. **Mark `grounded` / `basis: "observed"`.**
 
-### D5 domain — *强（area+depth+stack）*
-`{area, depth, stack, weak}`；`area` 取 card-schema.md 受控词表（单 token）。
-- **从（GitHub）ground：** repos/PR 的实际技术 → `area` + `stack`（具体技术数组，如 `["typescript","node"]`）；
-  `depth ∈ {shallow|working|deep}` 从实质。`weak` = 有效能力降一档的子域，从证据 ground（明显回避/做错的域），
-  否则 inject 0–2 或 `[]`。**标 `grounded` / `basis: "observed"`。**
-- `area` 判定：看**这个库*是*什么**，不看它*恰好被谁用*（消歧见 recruitment/domains.md）。
+### D5 domain — *strong: area+depth+stack*
+`{area, depth, stack, weak}`; `area` must be a single token from card-schema.md's controlled vocabulary.
+- **Ground from GitHub:** the actual technology in repos/PRs determines `area` and `stack`
+  (a concrete technology array such as `["typescript","node"]`). Derive `depth ∈ {shallow|working|deep}`
+  from substance. `weak` lists subdomains where effective capability drops one tier: ground it from evidence
+  of clear avoidance or mistakes; otherwise inject 0–2 entries or `[]`. **Mark `grounded` / `basis: "observed"`.**
+- Determine `area` from **what the library is**, not *who happens to use it* (see recruitment/domains.md for disambiguation).
 
-### D2 acceptance_bar — *弱 → 默认 injected*
-`primary ∈ {ship-fast|functional|modern-correct|type-safety-purist}`，`flags ⊆ {tests,types,scope,security,style,a11y,perf}`
-- **默认 `injected`。** repo 里 CI/tests/strict-tsconfig 存在与否是**行为**，不等于本人陈述的验收线——
-  不要据此标 grounded（那是从产出反推态度）。
-- **例外（可 grounded）：** 仅当 issue/PR 里有**本人一手的验收陈述**（明说其标准，如
-  "我不会合并没测试的改动"、"任何 `any` 都不可接受"）→ `grounded` / `basis: "stated"`，且**每个 flag
-  各需一条对应 quote**（无 quote 的 flag 丢弃，勿凑）。纯自述封顶 `confidence: medium`（见 card-schema.md
-  「`stated` → confidence 规则」）。
+### D2 acceptance_bar — *weak; default to injected*
+`primary ∈ {ship-fast|functional|modern-correct|type-safety-purist}`, `flags ⊆ {tests,types,scope,security,style,a11y,perf}`
+- **Default to `injected`.** CI/tests/strict-tsconfig in a repo are **behavior**, not the person's stated
+  acceptance criteria. Do not mark acceptance grounded by inferring an attitude from their output.
+- **Exception permitting grounded:** only a **first-hand statement of acceptance criteria** in an issue/PR,
+  such as "I will not merge changes without tests" or "Any `any` is unacceptable", supports `grounded` /
+  `basis: "stated"`. **Each flag needs its own supporting quote**; omit unsupported flags rather than filling them in.
+  Pure self-report is capped at `confidence: medium` (see card-schema.md's `stated` → confidence rules).
 
-### D3 interaction_style — *弱 → 多为 injected*
-`delegation ∈ {vibe-dump|loose|spec-driven}`，`supervision ∈ {hands-off|reviews|micromanage}`，`on_offtrack ∈ {abandon|retry|correct|fix-self|file-issue}`
-（语义：supervision=过程卷入；on_offtrack=质量失败策略，**不驱动等待耐心**——见 card-schema.md。）
-- **delegation：** 可从 issue 写法**弱观测**（极简一句 → `vibe-dump`；模板化带 repro → 偏 `spec-driven`）；
-  有清晰痕迹→ `grounded` / `observed`（confidence 保守），否则 inject。
-- **on_offtrack：** `fix-self` 唯当**本人真的提交了修复 PR**（真实行为，`observed`）；`file-issue` 唯当
-  真写了结构化 bug 报告。否则 inject。**不要**把「提交很快」读成 impatient——那是 D7。
-- **supervision：** GitHub 观测不到「他对 **agent 进行中**要不要可见感」→ 默认 `injected` / `low`。
+### D3 interaction_style — *weak; mostly injected*
+`delegation ∈ {vibe-dump|loose|spec-driven}`, `supervision ∈ {hands-off|reviews|micromanage}`, `on_offtrack ∈ {abandon|retry|correct|fix-self|file-issue}`
+(Semantics: supervision means process involvement; on_offtrack means the response to quality failure and **does not drive waiting patience**. See card-schema.md.)
+- **delegation:** issue-writing style is a **weak observation**: a minimal sentence suggests `vibe-dump`;
+  a structured issue with reproduction steps leans toward `spec-driven`. Clear evidence supports `grounded` /
+  `observed` with conservative confidence; otherwise inject.
+- **on_offtrack:** use `fix-self` only when **the person actually submitted a fix PR** (real behavior, `observed`);
+  use `file-issue` only for an actual structured bug report. Otherwise inject. **Do not** interpret fast commits
+  as impatient: that belongs to D7.
+- **supervision:** GitHub does not show whether someone needs visibility while an **agent is working**.
+  Default to `injected` / `low`.
 
-### D7 time_temperament — *无 → 默认 injected*
+### D7 time_temperament — *unobservable; default to injected*
 `patient | steady | impatient`
-- **默认 `injected` / `low`。** 足迹几乎看不到「干等多久受得了」。
-- **禁止**从 PR/commit 频率、issue 关闭速度、贡献量反推 `impatient` 或 `patient`。
-- **禁止**与 on_offtrack 锁死（fix-self ≠ patient；abandon ≠ impatient）。走契约注入分布，独立采样。
-- **例外：** 仅当有本人一手等待陈述（极罕，如 issue 里明说「我等半小时就放弃」）才 `grounded` / `stated`。
-  等待气质真人锚由 `extract-selfreport-persona` 提供。
+- **Default to `injected` / `low`.** Activity traces almost never reveal tolerance for waiting without activity.
+- **Never** infer `impatient` or `patient` from PR/commit frequency, issue-closing speed, or contribution volume.
+- **Never** couple it to on_offtrack (fix-self ≠ patient; abandon ≠ impatient). Sample independently from the contract's injection distribution.
+- **Exception:** only a first-hand statement about waiting, which is extremely rare, supports `grounded` /
+  `stated` (for example, "I give up after waiting half an hour" in an issue).
+  `extract-selfreport-persona` supplies real-person anchors for waiting temperament.
 
-### D4 trust_model — *无 → 默认 injected*
+### D4 trust_model — *unobservable; default to injected*
 `over-trust | balanced | skeptical`
-- **默认 `injected` / `confidence: low`。** GitHub 观测不到「他有多信 **agent**」。
-- **不要** 从 CVE 卫生 / auto-merge / 审查习惯反推 grounded——那是脆弱外推（原则 4）。
-- **例外：** 仅当有本人一手信任陈述（罕见）才 `grounded` / `stated`。信任轴的真人锚由
-  `extract-selfreport-persona` 提供。
+- **Default to `injected` / `confidence: low`.** GitHub does not show how much someone trusts an **agent**.
+- **Do not** infer grounded trust from CVE hygiene, auto-merge, or review habits: that is fragile extrapolation (principle 4).
+- **Exception:** a first-hand trust statement, which is rare, supports `grounded` / `stated`.
+  `extract-selfreport-persona` supplies real-person anchors for trust.
 
-### D6 autonomy_expectation — *无 → 默认 injected*
+### D6 autonomy_expectation — *unobservable; default to injected*
 `advisory | collaborative | agentic`
-- GitHub 观测不到「他期望 agent 扮什么」→ 默认 `injected` / `low`。有 automation 强依赖（CI/CD/bots/
-  "automate …"）可作**弱先验**偏置采样，但仍标 injected。
+- GitHub does not show the role someone expects an agent to play: default to `injected` / `low`.
+  Heavy reliance on automation (CI/CD/bots/"automate …") may bias sampling as a **weak prior**, but the result remains injected.
 
-## 2. 真实性门（trace-floor + 跨层一致性）
+## 2. Authenticity gates: trace floor and cross-layer consistency
 
-观测型源的门是 **trace-floor + 一致性**（与自述型的 performative/promotional 门相反；裁决词表见 card-schema.md）。
-先跑 Step 1（floor）再跑 Step 2（consistency），都在 map 维之前。
+Observational sources use **trace-floor and consistency** gates, rather than self-report's
+performative/promotional gate (verdict vocabulary is in card-schema.md).
+Run Step 1 (floor), then Step 2 (consistency), before mapping dimensions.
 
-| 裁决 | 触发 | 动作 |
-|------|------|------|
-| `insufficient_evidence` | 低于取证下限：自有 repos + 真实 PR + 已诊断 issue 合计 < ~3，尤其 0 repo 且 0 PR | **不入库**；路由到非 GitHub 源（此类型——blind newcomer、vibe user——活在 GitHub 之外） |
-| `authentic` | 浅层信号（profile/repos）⇄ 深层信号（issue/PR 实质）跨 **≥2 个非空层**一致 | 入库（D1/D5 标 `observed`） |
-| `contaminated` | 学习者浅层 ⊥ 专家深层 PR；不可信的跨栈速度；AI 格式痕迹（`id=` 围栏、过度模板化） | **隔离，永不入** |
-| `suspect` | 部分/含糊 | 隔离待人工 |
+| Verdict | Trigger | Action |
+|---------|---------|--------|
+| `insufficient_evidence` | Below the evidence floor: own repos + real PRs + diagnosed issues total < ~3, especially 0 repos and 0 PRs | **Do not admit**; route to a non-GitHub source. These blind newcomers / vibe users exist outside GitHub. |
+| `authentic` | Shallow signals (profile/repos) agree with deep signals (issue/PR substance) across **≥2 nonempty layers** | Admit; mark D1/D5 `observed`. |
+| `contaminated` | Learner-level profile contradicts expert-level PRs; implausible cross-stack speed; AI formatting (`id=` fences, excessive templating) | **Isolate; never admit.** |
+| `suspect` | Partial or ambiguous evidence | Isolate for human review. |
 
-`authentic` 需 **≥2 个非空层**——返回 0 结果的层永不计入 grounding。永不把 `contaminated`→`authentic`，
-也永不靠注入补齐把 `insufficient_evidence`→`authentic`。
-**volume 检查**：大计数（1000+ PR）是污染提示；唯当深实质**单域一致**才过；跨不相干栈的高量 → `contaminated`。
+`authentic` requires **≥2 nonempty layers**. A layer returning 0 results never counts as grounding.
+Never upgrade `contaminated` to `authentic`, or use injected values to upgrade `insufficient_evidence` to `authentic`.
+**Volume check:** large counts (1000+ PRs) suggest contamination. Admit only if the deep substance is
+**consistent within one domain**; high volume across unrelated stacks means `contaminated`.
 
-## 3. 态度轴注入（本源默认——D2/D4/D6/D7 + 多数 D3）
+## 3. Inject attitude axes: default for D2/D4/D6/D7 and most of D3
 
-GitHub 观测不到态度轴与等待气质。当某轴确实沉默时，从 **card-schema.md「受控注入分布」逐卡独立采样**
-（与已 grounded 的 D1/D5 正交），置 `source: "injected"` / `confidence: "low"`（注入维**不带 basis**）。
+GitHub does not reveal attitude axes or waiting temperament. When an axis is genuinely unsupported,
+**sample independently per card from card-schema.md's controlled injection distributions**, orthogonally
+to grounded D1/D5. Set `source: "injected"` / `confidence: "low"`; injected dimensions **have no basis**.
 
-- 具体比例（delegation / supervision / on_offtrack / trust_model / autonomy / **time_temperament** / D5.weak）
-  见 card-schema.md，不在此重列（轮辐式：契约是唯一真源）。
-- **正交强制**：`on_offtrack` ⊥ `time_temperament`——禁止「fix-self 必配 patient」或「abandon 必配 impatient」。
-- 有弱先验时偏置采样（自称 vibecoder → over-trust + vibe-dump；库维护者 → 偏 spec-driven）——但**仍标 injected**；
-  **弱先验不得用于 D7**（无可靠足迹信号）。
-- **采样，不按档锁死（强制）**：逐卡真实抽一次，不是从 D1 确定性映射。若每张 `surface` 卡都成
-  `ship-fast+over-trust+hands-off`，就是锁死了——重抽。批后目测分布是否塌缩。
+- See card-schema.md for the delegation / supervision / on_offtrack / trust_model / autonomy /
+  **time_temperament** / D5.weak proportions. Do not duplicate them here: in the hub-and-spoke design,
+  the contract is the single source of truth.
+- **Mandatory orthogonality:** `on_offtrack` ⊥ `time_temperament`. Never require fix-self to pair with patient,
+  or abandon with impatient.
+- Weak priors may bias sampling (self-described vibecoders toward over-trust + vibe-dump;
+  library maintainers toward spec-driven), but **still mark the values injected**.
+  **Do not use weak priors for D7:** activity provides no reliable signal.
+- **Sample; never lock combinations by tier (mandatory).** Make a real independent draw for each card,
+  rather than deterministically mapping from D1. If every `surface` card becomes
+  `ship-fast+over-trust+hands-off`, the dimensions are coupled: resample. Inspect the batch for distribution collapse.
 
-## 4. GitHub endpoint 速查
+## 4. GitHub endpoint reference
 
 ```
 GET /users/{u}                                              # L0 profile (created_at→era, bio)
 GET /users/{u}/repos?sort=pushed&per_page=100               # L1 langs, own/fork ratio, themes
-GET /repos/{owner}/{repo}/contents                          # L2 tsconfig/CI/tests/CHANGELOG/release（行为，非验收陈述）
-GET /repos/{owner}/{repo}/contents/{path}                   #    钻具体文件
-GET /search/issues?q=author:{u}+type:issue&sort=created     # L3 issue bodies → D1 深度；一手验收陈述才 ground D2
-GET /search/issues?q=author:{u}+type:pr&sort=created        # L4 PR 实质 → D1, D5；本人提交修复 → on_offtrack=fix-self
+GET /repos/{owner}/{repo}/contents                          # L2 tsconfig/CI/tests/CHANGELOG/release (behavior, not an acceptance statement)
+GET /repos/{owner}/{repo}/contents/{path}                   #    Inspect specific files
+GET /search/issues?q=author:{u}+type:issue&sort=created     # L3 issue bodies → D1 depth; only first-hand acceptance statements ground D2
+GET /search/issues?q=author:{u}+type:pr&sort=created        # L4 PR substance → D1, D5; a personally submitted fix → on_offtrack=fix-self
 ```
-注：`/search/issues` 返回 `body`/`title`/`repository_url`——读 body，不只看标题。Search API 未认证限流低，
-规模化需认证。**剥每个 PII 字段**（`name`、`company`、`location`、`email`、`blog`、`twitter_username`）。
 
-## 5. 范例（观测型：D1/D5 grounded observed，态度轴 injected）
+`/search/issues` returns `body`/`title`/`repository_url`: read the body, not just the title.
+Unauthenticated Search API quotas are low; use authentication at scale.
+**Strip every PII field:** `name`, `company`, `location`, `email`, `blog`, `twitter_username`.
 
-### A — authentic（入库）
-句柄经 L0–L4 深挖；浅层（14 年老兵、TS bio）⇄ 深层（维护 134★ 类型安全 DI 库，Turborepo +
-release-please；105 issue 带精确 TS repro；246 PR 含手动 CVE backport）。**一致 → authentic。**
-D1/D5 由足迹 grounded(`observed`)；D2 有一条**一手验收陈述** quote → grounded(`stated`, medium)；
-on_offtrack=fix-self 由**真实提交的 PR** grounded(`observed`)；delegation 由 issue 写法弱观测；
-**D4 信任 / D6 自主 / supervision / D7 等待气质 无一手证据 → injected(`low`)**（旧版从 CVE 卫生推 skeptical 的写法已删）。
-D7 与 fix-self **独立**——勿因本人修 PR 就标 patient。
+## 5. Examples: D1/D5 grounded observed, attitude axes injected
+
+### A — authentic: admit
+
+Investigate the handle through L0–L4. Shallow evidence (14-year veteran, TS bio) agrees with deep evidence:
+maintains a 134★ type-safe DI library with Turborepo + release-please; 105 issues with precise TS reproductions;
+246 PRs including manual CVE backports. **Consistency → authentic.**
+D1/D5 are grounded (`observed`). A **first-hand acceptance statement** grounds D2 (`stated`, medium).
+An **actual submitted PR** grounds on_offtrack=fix-self (`observed`); issue style weakly grounds delegation.
+**No first-hand evidence for D4 trust / D6 autonomy / supervision / D7 waiting temperament → injected (`low`).**
+The old inference of skeptical from CVE hygiene has been removed.
+D7 is **independent** of fix-self: submitting a fix does not imply patient.
 
 ```json
 {
@@ -143,14 +162,15 @@ D7 与 fix-self **独立**——勿因本人修 PR 就标 patient。
       {"quote": "I'm willing to submit a PR", "source": "github.com/.../issues/MMMMM"}
     ]
   },
-  "behavioral_prediction": "Gives precise constrained tasks, submits his own fix when the agent stalls; 低体感 on any/implicit-magic (his one STATED standard). 其信任/自主/等待气质为注入先验，非观测所得——真人信任与 D7 锚须由 selfreport 提供。"
+  "behavioral_prediction": "Gives precise constrained tasks, submits his own fix when the agent stalls; Low experience ratings for any/implicit-magic (his one STATED standard). Trust/autonomy/waiting temperament are injected priors, not observations; real-person trust and D7 anchors must come from selfreport."
 }
 ```
 
-### B — contaminated（拒）
-浅层：2024 账号、leetcode/hackathon repos、bio "continuously learning"。深层：80 PR 深修 redis
-sentinel、oxc（Rust）语义绑定、strapi 竞态；一条 issue 带 `id=` 围栏。**学习者浅层 ⊥ 跨栈专家速度 +
-AI 格式 → contaminated。**
+### B — contaminated: reject
+
+Shallow evidence: a 2024 account, leetcode/hackathon repos, bio "continuously learning".
+Deep evidence: 80 PRs with substantial redis sentinel fixes, oxc (Rust) semantic binding, and strapi races;
+one issue has `id=` fences. **Learner-level profile ⊥ cross-stack expert speed + AI formatting → contaminated.**
 
 ```json
 {
@@ -161,10 +181,11 @@ AI 格式 → contaminated。**
 }
 ```
 
-### C — insufficient_evidence（拒）
-0 public repos、0 PR、账号 2024-08、仅一条 issue（"BUILD: issue loading the python library" — 一段
-ipython traceback，无诊断）。低于 trace-floor → 一致性检查无从跑；D2/D3/D4 会 ~100% 注入。
-**拒为 `insufficient_evidence`，不入库。**
+### C — insufficient_evidence: reject
+
+0 public repos, 0 PRs, account created 2024-08, and only one issue ("BUILD: issue loading the python library":
+an ipython traceback with no diagnosis). Below the trace floor, consistency cannot be checked;
+D2/D3/D4 would be ~100% injected. **Reject as `insufficient_evidence`; do not admit.**
 
 ```json
 {
@@ -175,48 +196,57 @@ ipython traceback，无诊断）。低于 trace-floor → 一致性检查无从�
 }
 ```
 
-反模式（本门要拦的）：把近空账号标 `authentic`、维多为注入、`provenance.layers` 列空层（`L1`,`L4`）。
-该 *类型*（blind traceback-paster newcomer）对多样性有价值，但**不能从空 GitHub 账号诚实抽出**——
-交 `extract-stackoverflow-persona` / 初学者论坛。
+The gate must reject this anti-pattern: mark a nearly empty account `authentic`, inject most dimensions,
+and list empty layers (`L1`,`L4`) in `provenance.layers`. The blind traceback-pasting newcomer *type*
+matters for diversity, but **cannot honestly be extracted from an empty GitHub account**.
+Use `extract-stackoverflow-persona` or beginner forums instead.
 
-## 6. 源-产物分工（三方）
+## 6. Source-to-output responsibilities
 
-| 来源 | spoke | observed vs stated | 可靠 grounds | 最适合 |
-|------|-------|--------------------|--------------|--------|
-| **GitHub footprint** | **extract-github（本 skill）** | **observed** | **D1, D5** | builder personas，expert/competent 端；D1×D5 覆盖网格 |
-| Stack Overflow | extract-stackoverflow-persona | observed | D1, D5（+ delegation 弱观测） | blind/surface 求助者 |
-| blogs / interviews / talks | extract-selfreport-persona | stated | D2, D3, D4, D6, D7 | 态度/交互/等待气质锚；**唯一能可靠 ground D4 与 D7** |
-| dev surveys (SO/JetBrains) | (weights) | aggregate | distribution | 采样权重 |
+| Source | Spoke | observed vs stated | Reliably grounds | Best use |
+|--------|-------|--------------------|------------------|----------|
+| **GitHub footprint** | **extract-github (this skill)** | **observed** | **D1, D5** | Builder personas at expert/competent tiers; D1×D5 coverage grid |
+| Stack Overflow | extract-stackoverflow-persona | observed | D1, D5 (+ weak delegation evidence) | blind/surface help-seekers |
+| blogs / interviews / talks | extract-selfreport-persona | stated | D2, D3, D4, D6, D7 | Attitude/interaction/waiting anchors; **the only reliable source for grounding D4 and D7** |
+| dev surveys (SO/JetBrains) | (weights) | aggregate | distribution | Sampling weights |
 
-三类抽取 spoke 互补：没有单一源 ground 全轴，但**每轴都被至少一个源观测或自述 ground**。
-关键分工：**观测型源（GitHub/SO）ground 能力/领域，自述型源 ground 态度与等待气质**——别指望观测型给出真 D7。
+The three extraction spokes complement one another: no source grounds every axis, but **every axis
+can be grounded from observations or self-reports by at least one source**.
+**Observational sources (GitHub/SO) ground capability/domain; self-reports ground attitudes and waiting temperament.**
+Do not expect genuine D7 evidence from observational sources.
 
-## 7. 招募 profile（可插拔——L0 前挑）
+## 7. Pluggable recruitment profiles: choose before L0
 
-域覆盖是**库级**目标，与逐卡抽取**解耦**：绝不为凑目标弯折某卡的 D5。recruitment profile 只指引
-*下一个去抽谁*。profile 是 [`recruitment/`](recruitment/) 下的插件文件，换/加一个不碰核心 skill。
+Domain coverage is a **library-level** goal, **decoupled** from individual extraction.
+Never distort a card's D5 to meet a quota. A recruitment profile only guides *whom to extract next*.
+Profiles are plugin files under [`recruitment/`](recruitment/); replacing or adding one does not change the core skill.
 
-一个 profile 声明：
-- `priority_domains` — 该目标须覆盖的 D5 受控词表子集
-- `pools` — **多源**：`github`（repos / skill-profiles）供本 skill，`stackoverflow`（tags）供
-  `extract-stackoverflow-persona`。一份 profile、同批域、D1 两端：GitHub 填 expert/competent，SO 填 blind/surface。
-- 跨贡献者阶梯招募（core maintainer → drive-by reporter）的规则，避免填一个域时把 D1 塌到 expert。
+A profile declares:
+- `priority_domains`: the subset of the controlled D5 vocabulary to cover.
+- `pools`: **multiple sources**. `github` (repos / skill-profiles) serves this skill;
+  `stackoverflow` (tags) serves `extract-stackoverflow-persona`. One profile, the same domains, both ends of D1:
+  GitHub fills expert/competent, SO fills blind/surface.
+- Recruitment across the contributor ladder (core maintainer → drive-by reporter), preventing a domain's D1 distribution from collapsing to expert.
 
-可用 profile：
-- [`recruitment/swe-bench.md`](recruitment/swe-bench.md) — 库 / 源码编辑类域（Python）
-- [`recruitment/terminal-bench.md`](recruitment/terminal-bench.md) — ops / systems / CLI 类域
-- [`recruitment/domains.md`](recruitment/domains.md) — 域登记（每个受控词表 token 的锚 repos + 消歧）
+Available profiles:
+- [`recruitment/swe-bench.md`](recruitment/swe-bench.md): library/source-editing domains (Python).
+- [`recruitment/terminal-bench.md`](recruitment/terminal-bench.md): ops / systems / CLI domains.
+- [`recruitment/domains.md`](recruitment/domains.md): domain registry, with anchor repos and disambiguation for each controlled token.
 
-消费方式：挑下一个欠填的 `priority_domain` → 去其 pool → 取一个 issue-reporter/贡献者 → 照常跑
-**L0–L5 + 门**。卡按自身实质入库；profile 只决定 *看谁*。若卡 `D5.area` 落在 `priority_domains` 外，
-标 **off-target**（可凭实质入库，但不计入该目标覆盖）；也别堆已满的域。
+Choose the next underfilled `priority_domain`, use its pool, select an issue reporter/contributor,
+and run **L0–L5 plus the gates** as usual. Admit the card on its own merits; the profile decides only *whom to inspect*.
+If `D5.area` falls outside `priority_domains`, mark it **off-target**: it may still be admitted on substance,
+but does not count toward that target's coverage. Do not keep filling already saturated domains.
 
-## 8. 库分布纪律（库才是真正的对象）
+## 8. Library distribution discipline: the library is the real object
 
-单卡只是样本；驱动正确、可泛化的 harness 改进的是**卡的分布**逼近真实使用人群。故判库、不只判卡：
-- **格覆盖**：要紧的格是 `D1 tier × D5 domain`（在目标 `priority_domains` 内）。每个在意的格需 **≥ ~3–5 卡**
-  才让其体感均值是信号。GitHub 占 `competent`/`expert` 行；SO 占 `blind`/`surface` 行。
-- **边际平衡**：任一轴无单值主导（若 80% 卡是 `infra-devops` 或 `surface`，覆盖已聚簇 → 补薄格）。
-- **克隆检查**：批后查注入轴（D2/D3/D4/D6/D7）。若某档塌到一种组合（每张 `surface` = 同一组合，或
-  `abandon` 总配 `impatient`），即锁死 → 重抽（§3）。
-- **可用 ≠ 计数**：可用是联合门——计数达标 **且** 边际平衡 **且** 过克隆检查。
+A card is only a sample. A **distribution of cards** approximating real users drives correct,
+generalizable harness improvements. Evaluate the library, not just its cards:
+- **Cell coverage:** the important cells are `D1 tier × D5 domain` within `priority_domains`.
+  Each relevant cell needs **≥ ~3–5 cards** for its mean user experience to become a signal.
+  GitHub fills `competent`/`expert` rows; SO fills `blind`/`surface` rows.
+- **Marginal balance:** no single value should dominate an axis. If 80% of cards are `infra-devops` or `surface`,
+  coverage is clustered: fill sparse cells.
+- **Clone check:** inspect injected D2/D3/D4/D6/D7 after each batch. A tier collapsing to one combination,
+  or `abandon` always pairing with `impatient`, means coupled sampling: resample (§3).
+- **Usable ≠ counted:** usability requires the count threshold **and** marginal balance **and** passing the clone check.

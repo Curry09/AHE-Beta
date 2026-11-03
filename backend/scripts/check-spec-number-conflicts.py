@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""检查 spec 组编号是否在本地或其它 open PR 之间冲突。
+"""Check whether spec group numbers conflict locally or across other open PRs.
 
-Spec-0014/T5: 编号校验脚本（check-rfc 的 spec 版）
+Spec-0014/T5: number validation script (the spec version of check-rfc)
 
-仓库约定：spec 源数据为单 markdown 文件 docs/specs/NNNN-slug.md（frontmatter + rust-RFC 正文）。
-同一个编号 NNNN 不能被不同的 slug 复用（本地）；新建的组编号不能与其它 open PR 撞号。
-匹配 docs/specs/(NNNN)-slug.md 单文件形态，本地 + open PR 并集取下一号（决策 D11）。
+Repo convention: spec source data is a single markdown file docs/specs/NNNN-slug.md (frontmatter + rust-RFC body).
+The same number NNNN must not be reused by a different slug (locally); new group numbers must not collide with other open PRs.
+Matches the docs/specs/(NNNN)-slug.md single-file form; the next number is taken from the union of local + open PRs (decision D11).
 """
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# 匹配 docs/specs/NNNN-slug.md 单文件形态，抽组编号与 slug。
-# slug 以字母起，排除 dated 设计文档（YYYY-MM-DD-*.md）与 OVERVIEW/ARCHITECTURE/README。
+# Match the docs/specs/NNNN-slug.md single-file form and extract the group number and slug.
+# Slugs start with a letter; exclude dated design docs (YYYY-MM-DD-*.md) and OVERVIEW/ARCHITECTURE/README.
 SPEC_PATH_RE = re.compile(r"^docs/specs/(?P<number>\d{4})-(?P<slug>[A-Za-z][^/]*)\.md$")
 NEW_SPEC_CHANGE_TYPES = {"ADDED", "RENAMED"}
 
@@ -45,13 +45,13 @@ def _extract_spec_identity(path: str) -> tuple[str, str] | None:
 
 
 def _iter_repo_spec_groups(repo_root: Path) -> list[tuple[str, str]]:
-    """本地 docs/specs/ 下的 (number, slug) 组文件列表。"""
+    """List of (number, slug) group files under the local docs/specs/."""
     specs_dir = repo_root / "docs" / "specs"
     if not specs_dir.is_dir():
         return []
     groups: list[tuple[str, str]] = []
     for child in sorted(specs_dir.glob("*.md")):
-        # 仅 NNNN-slug.md 单文件形态视为 spec 组。
+        # Only the NNNN-slug.md single-file form counts as a spec group.
         identity = _extract_spec_identity(f"docs/specs/{child.name}")
         if identity:
             groups.append(identity)
@@ -67,12 +67,12 @@ def _find_local_conflicts(repo_root: Path) -> list[str]:
     for number, slugs in sorted(by_number.items()):
         if len(slugs) > 1:
             joined = ", ".join(sorted(slugs))
-            conflicts.append(f"spec-{number} 被多个 slug 复用：{joined}")
+            conflicts.append(f"spec-{number} is reused by multiple slugs: {joined}")
     return conflicts
 
 
 def _pr_new_spec_numbers(pr: dict[str, Any]) -> dict[str, list[str]]:
-    """PR 中新增（ADDED/RENAMED）的 spec 文件 → number -> [paths]。"""
+    """Spec files newly added in the PR (ADDED/RENAMED) → number -> [paths]."""
     files = pr.get("files", [])
     if not isinstance(files, list):
         return {}
@@ -95,7 +95,7 @@ def _pr_new_spec_numbers(pr: dict[str, Any]) -> dict[str, list[str]]:
 def _find_open_pr_conflicts(current_pr: int) -> list[str]:
     current = _pr_new_spec_numbers(_run_gh(["pr", "view", str(current_pr), "--json", "files"]))
     if not current:
-        print("本 PR 无新增 spec 文件；跳过 open PR 冲突扫描。")
+        print("This PR adds no spec files; skipping the open-PR conflict scan.")
         return []
 
     open_prs = _run_gh(
@@ -112,7 +112,7 @@ def _find_open_pr_conflicts(current_pr: int) -> list[str]:
             if number in current:
                 current_paths = ", ".join(sorted(current[number]))
                 conflicts.append(
-                    f"spec-{number}（本 PR：{current_paths}）已被 open PR #{pr_number} 占用"
+                    f"spec-{number} (this PR: {current_paths}) is already used by open PR #{pr_number}"
                 )
     return conflicts
 
@@ -123,22 +123,22 @@ def main() -> int:
         "--repo-root",
         type=Path,
         default=Path.cwd(),
-        help="仓库根目录，默认当前工作目录。",
+        help="Repository root; defaults to the current working directory.",
     )
     parser.add_argument(
         "--open-prs",
         action="store_true",
-        help="同时用 gh 比对其它 open PR 的 spec 编号。",
+        help="Also use gh to compare spec numbers with other open PRs.",
     )
     parser.add_argument(
         "--current-pr",
         type=int,
-        help="当前 PR 编号；与 --open-prs 一起使用。",
+        help="Current PR number; use with --open-prs.",
     )
     parser.add_argument(
         "--require-open-pr-scan",
         action="store_true",
-        help="open PR 扫描失败时直接判失败。",
+        help="Fail if the open-PR scan cannot be completed.",
     )
     args = parser.parse_args()
 
@@ -157,7 +157,7 @@ def main() -> int:
             RuntimeError,
             subprocess.TimeoutExpired,
         ) as exc:
-            message = f"Open PR spec 冲突扫描失败：{exc}"
+            message = f"Open-PR spec conflict scan failed: {exc}"
             if args.require_open_pr_scan:
                 print(f"::error::{message}")
                 return 1
@@ -168,7 +168,7 @@ def main() -> int:
             print(f"::error::{conflict}")
         return 1
 
-    print("✓ spec 编号冲突检查通过")
+    print("✓ Spec number conflict check passed")
     return 0
 
 

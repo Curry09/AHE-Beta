@@ -1,4 +1,4 @@
-# Spec-0047/T4：生命周期与 CLI。
+# Spec-0047/T4: Lifecycle and CLI.
 from __future__ import annotations
 
 import json
@@ -85,9 +85,9 @@ def test_duplicate_create_fails(tmp_path: Path, monkeypatch) -> None:
     runtime.create(config_path=cfg, root=tmp_path)
     try:
         runtime.create(config_path=cfg, root=tmp_path)
-        raise AssertionError("应拒绝重复 create")
+        raise AssertionError("should reject duplicates create")
     except ManifestError as exc:
-        assert "已存在" in str(exc)
+        assert "already exists" in str(exc)
 
 
 def test_preflight_and_resume(tmp_path: Path, monkeypatch) -> None:

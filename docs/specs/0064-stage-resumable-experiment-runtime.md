@@ -1,12 +1,12 @@
 ---
 number: "0064"
-title: 阶段级可恢复实验运行
+title: "Stage-level resumable experiment execution"
 issue: 0
 slug: stage-resumable-experiment-runtime
-summary: 把真实闭环改造成带持久化阶段游标、工作项幂等键和外部状态对账的可重入状态机，使实验失败后从最近完成的用户、Triage、Architect、Owner 或交付节点继续。
+summary: "Transform the real closed loop into a reentrant state machine with persistent stage cursors, work-item idempotency keys, and external-state reconciliation, so that after an experiment failure it can continue from the most recently completed User, Triage, Architect, Owner, or delivery node."
 tasks:
   - id: T1
-    title: 持久化恢复状态与对账原语
+    title: "Persisted recovery state and reconciliation primitives"
     status: done
     priority: P0
     tags: []
@@ -26,10 +26,10 @@ tasks:
       - backend/tests/loop/test_checkpoint.py
       - backend/tests/tracker/test_fake.py
       - backend/tests/tracker/test_gitea.py
-    scope: 定义版本化快照、追加事件、稳定 operation key、输出回执、原子 revision 与权威后置条件对账；轮次 tar 仅作灾备。
-    acceptance: 崩溃发生在输出保存和副作用提交前后时均能判定重放或补记完成；状态撕裂、身份漂移、摘要冲突和旧 revision 写入被拒绝，快照不含密钥。
+    scope: "Define versioned snapshots, append-only events, stable operation keys, output receipts, atomic revisions, and authoritative postcondition reconciliation; round tar files serve only as disaster recovery."
+    acceptance: "Whether a crash occurs before or after output persistence and side-effect submission, determine whether to replay or record completion; reject state tearing, identity drift, summary conflicts, and writes using stale revisions, and ensure snapshots contain no secrets."
   - id: T2
-    title: 阶段化 Orchestrator 与交付恢复
+    title: "Staged Orchestrator and delivery recovery"
     status: done
     priority: P0
     tags: []
@@ -44,10 +44,10 @@ tasks:
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_runner.py
       - backend/tests/loop/test_round_gate.py
-    scope: 把整轮控制流拆成可重入阶段 DAG，持久化冻结计划、阶段依赖、admitted 集与 sealed SHA，并统一 HarborRunner。
-    acceptance: 从每个阶段边界及 delivery inflight/blocked 恢复只执行合法后继；末轮跳过需求交付；完成轮幂等跳过；阶段依赖、远端 main 冲突和失败终态 fail-closed。
+    scope: "Split the full-round control flow into a reentrant staged DAG, persist the frozen plan, stage dependencies, admitted set, and sealed SHA, and standardize on HarborRunner."
+    acceptance: "When recovering from each stage boundary or from delivery inflight/blocked, execute only valid successors; skip requirement delivery in the final round; idempotently skip completed rounds; fail closed on stage dependencies, remote main conflicts, and terminal failure states."
   - id: T3
-    title: 用户会话工作项级恢复
+    title: "User-session work-item-level recovery"
     status: done
     priority: P0
     tags: []
@@ -61,10 +61,10 @@ tasks:
       - backend/ahe_beta/user/session_store.py
       - backend/tests/loop/test_sim_user.py
       - backend/tests/user/test_session_store.py
-    scope: 为冻结计划中的每个 session 建稳定身份，使会话文件、索引和中途 issue 副作用可对账、upsert 与局部补跑。
-    acceptance: 并行用户任意部分完成后恢复只补跑缺失 session；同一 session/index/issue 不重复；进行中 workspace 可重建，已完成会话的体感、issue 引用与审计内容保持字节级稳定。
+    scope: "Assign a stable identity to every session in the frozen plan, so that session files, indexes, and in-progress issue side effects can be reconciled, upserted, and partially rerun."
+    acceptance: "After any subset of parallel users has completed, recovery reruns only missing sessions; the same session/index/issue is not duplicated; in-progress workspaces can be rebuilt, while the user experience, issue references, and audit content of completed sessions remain byte-for-byte stable."
   - id: T4
-    title: Triage 与 Divergent 第一拍恢复
+    title: "Triage and Divergent first-beat recovery"
     status: done
     priority: P0
     tags: []
@@ -78,10 +78,10 @@ tasks:
       - backend/ahe_beta/demand/divergent.py
       - backend/tests/demand/test_triage.py
       - backend/tests/demand/test_divergent_gate.py
-    scope: 冻结 report 快照和分片，按 report/worker 保存模型输出，使用 operation key 幂等应用规范化与 PM proposal 副作用。
-    acceptance: 恢复不重新切片、不吸收快照后新增 report；已处理票和已创建 PM proposal 不重复；部分应用可补齐，输入漂移或矛盾远端状态明确 blocked。
+    scope: "Freeze report snapshots and shards, save model outputs by report/worker, and use operation keys to idempotently apply normalization and PM proposal side effects."
+    acceptance: "Recovery does not re-shard or absorb reports added after the snapshot; processed issues and created PM proposals are not duplicated; partial applications can be completed, while input drift or contradictory remote state is explicitly blocked."
   - id: T5
-    title: Architect 与 Owner 输出先存后应用
+    title: "Persist Architect and Owner outputs before applying them"
     status: done
     priority: P0
     tags: []
@@ -100,10 +100,10 @@ tasks:
       - backend/tests/demand/test_grouped_architect.py
       - backend/tests/demand/test_owner.py
       - backend/tests/demand/test_delivery_evidence.py
-    scope: 让 grouping、Architect batch 和 Owner 决策拥有确定身份与不可变回执，逐项对账 proposal、来源迁移、评论、证据发布和准入。
-    acceptance: 分类和角色输出完整落盘后不再调用模型；崩溃恢复不重复建票、合并来源、评论或准入；Owner 完成后 admitted 集固定，后续开放队列变化不扩大本轮交付。
+    scope: "Give grouping, Architect batches, and Owner decisions deterministic identities and immutable receipts, and reconcile proposals, source migrations, comments, evidence publication, and admission item by item."
+    acceptance: "Once classification and role outputs have been fully persisted, do not call the model again; crash recovery does not duplicate issue creation, source merging, commenting, or admission; after Owner completion, the admitted set is fixed, and subsequent changes to the open queue do not expand delivery for the round."
   - id: T6
-    title: Fresh/resume 入口与故障矩阵验收
+    title: "Fresh/resume entry points and fault-matrix acceptance"
     status: done
     priority: P0
     tags: []
@@ -126,94 +126,67 @@ tasks:
       - backend/tests/loop/test_live.py
       - backend/tests/test_run_swebench_closed_loop.py
       - backend/tests/test_stage_resume_e2e.py
-    scope: 统一包内 ordinary/SWE controller 和当前 v2 生命周期的 fresh/resume 语义，保留 live/history 与阶段级恢复故障矩阵；旧 auditable/v1 入口及其测试已退出。
-    acceptance: fresh 才能复位，resume 复用稳定 run id 和冻结 manifest；当前阶段恢复、controller 与 v2 生命周期故障矩阵通过；历史记录不重写。
+    scope: "Unify fresh/resume semantics for the ordinary/SWE controller within the package and the current v2 lifecycle, while retaining live/history and stage-level recovery fault matrices; the legacy auditable/v1 entry points and their tests have been retired."
+    acceptance: "Only fresh may reset state; resume reuses the stable run id and frozen manifest; the current-stage recovery, controller, and v2 lifecycle fault matrices pass; historical records are not rewritten."
 ---
 
-# 0064 · 阶段级可恢复实验运行
+# 0064 · Stage-Level Resumable Experiment Runtime
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: the frontmatter is structured source data (including the tasks DAG), and the body is the group-level nine-section rust-RFC overview. -->
 
 ## Summary
 
-真实实验闭环改为持久化、可重入的阶段状态机。每轮在冻结用户计划与 harness SHA 后，按
-用户会话、Triage 与 Divergent、Architect、Owner、交付等待、轮次封口推进；每个并行
-工作项有稳定幂等键、输入摘要、输出回执和可验证后置条件。进程或基础设施失败后，统一的
-`resume` 入口先对账 SessionStore、Gitea 与 git，再从最小未完成工作项继续，不重复已经完成
-的用户交互或模型调用，也不重新初始化实验。
+The real experiment loop is changed to a persistent, re-entrant stage state machine. After freezing the user plan and harness SHA for each round, it advances through user sessions, Triage and Divergent, Architect, Owner, delivery waiting, and round sealing; every parallel work item has a stable idempotency key, input digest, output receipt, and verifiable postconditions. After process or infrastructure failure, the unified `resume` entry point first reconciles SessionStore, Gitea, and git, then continues from the smallest incomplete work item without repeating completed user interactions or model calls, and without reinitializing the experiment.
 
-本组恢复执行进度，不改变训练信号、角色职责、准入标准、交付终态或 benchmark held-out
-边界。它也不序列化 Python 进程、线程、容器或进行中的模型流；崩溃中的单个工作项从持久化
-输入或模型输出回执重放，已完成工作项直接跳过。
+This group restores execution progress without changing training signals, role responsibilities, admission criteria, delivery terminal states, or benchmark held-out boundaries. It also does not serialize Python processes, threads, containers, or in-progress model streams; an individual crashed work item is replayed from persisted input or a model-output receipt, while completed work items are skipped directly.
 
 ## Motivation
 
-仓库已有 `RunState`、checkpoint tar 和 `HarborRunner`，但它们只在完整轮次结束后记录
-`round` 与 main 游标；当前真实入口直接调用一次覆盖整轮的 Orchestrator。实际审计实验的
-`resume` 只重新启动基础设施，需求面启动路径仍会重新创建本地 harness 仓、强制复位远端
-main、关闭遗留 issue，并清空 live 投影。因此，用户会话已经全部完成后若 Triage、Architect、
-Owner 或交付等待失败，恢复只能依赖人工阅读日志、修改入口或重跑昂贵的上游阶段。
+The repository already has `RunState`, checkpoint tar, and `HarborRunner`, but they record `round` and the main cursor only after a complete round ends; the current real entry point directly invokes one Orchestrator covering the whole round. In an actual audited experiment, `resume` only restarts infrastructure; the requirement-facing startup path still recreates the local harness repository, forcibly resets remote main, closes legacy issues, and clears the live projection. Therefore, if Triage, Architect, Owner, or delivery waiting fails after all user sessions are complete, recovery can only rely on manually reading logs, modifying the entry point, or rerunning expensive upstream stages.
 
-真实副作用分散在两个权威面：SessionStore 保存会话，Gitea 保存 issue、评论、标签、PR 与
-harness main。现有角色调用 JSON 是 fail-open 审计制品，不能证明副作用完成；单一 `phase`
-字段也不能表达十个用户中完成九个、四个 Triage worker 中完成三个的状态。直接在更多位置
-写“阶段完成”还会留下经典崩溃窗口：远端 issue 已创建，但本地完成标记尚未写入，重启后
-再次执行便产生重复票或重复评论。
+Real side effects are distributed across two authoritative surfaces: SessionStore stores sessions, while Gitea stores issues, comments, labels, PRs, and harness main. Existing role invocation JSON is a fail-open audit artifact and cannot prove that side effects completed; a single `phase` field cannot express that nine of ten users completed or three of four Triage workers completed. Writing “stage complete” in more locations also leaves the classic crash window: the remote issue has been created, but the local completion marker has not yet been written, so restart creates duplicate issues or comments.
 
-实验成本集中在模型调用、用户会话与交付。恢复机制必须在保留审计真实性的同时减少重做，
-并保证恢复后的最终 SessionStore、Gitea 状态与一次无故障运行等价。失败不能被恢复流程
-改写成成功；`automation-failed`、配置漂移和无法解释的远端状态仍应明确阻断。
+Experiment cost is concentrated in model calls, user sessions, and delivery. Recovery must reduce rework while preserving audit authenticity and ensuring that the final SessionStore and Gitea state after recovery is equivalent to one fault-free run. Failure must not be rewritten as success by recovery; `automation-failed`, configuration drift, and unexplainable remote state must still explicitly block execution.
 
 ## Guide-level explanation
 
-### 操作者入口
+### Operator entry point
 
-新实验使用显式 fresh 语义创建。只有 fresh 路径可以种初始 harness、复位专属 Gitea 仓和
-清空本次运行投影。实验开始前写入不可变身份：experiment id、run id、配置哈希、controller
-代码 SHA、模型与镜像 pin、完整交互计划摘要。
+New experiments are created with explicit fresh semantics. Only the fresh path may seed the initial harness, reset the dedicated Gitea repository, and clear the projection for this run. Before the experiment starts, immutable identity is written: experiment id, run id, configuration hash, controller code SHA, model and image pins, and a complete interaction-plan digest.
 
-实验异常退出后，操作者执行同一个 `experiment resume <id>` 入口。它取得实验级独占锁，
-加载 checkpoint，验证不可变身份，并读取真实 SessionStore、Gitea issue/PR 和 `origin/main`。
-对账完成后，状态机会从最近安全位置继续。例如：
+After abnormal experiment exit, the operator executes the same `experiment resume <id>` entry point. It acquires the experiment-level exclusive lock, loads the checkpoint, verifies immutable identity, and reads the real SessionStore, Gitea issues/PRs, and `origin/main`. After reconciliation, the state machine continues from the latest safe position. For example:
 
-- 八个用户中六个完成时，只补跑两个未完成 session；已完成 session 不重新收费或重复开票。
-- 用户阶段完成而 Triage 尚未开始时，直接从冻结的 report 快照开始 Triage。
-- 一部分 report 已规范化时，只处理仍属于该 Triage 快照且未完成的工作项。
-- Architect 分组完成后失败时，复用已保存的分组和模型输出，从未应用的 batch 继续。
-- Owner 完成后失败时，复用固定的 admitted issue 集合，只恢复 Vigil 和交付等待。
-- 所有准入票已成功终结时，对账远端 main 并封存 sealed SHA，然后进入下一轮。
+- When six of eight users are complete, rerun only the two incomplete sessions; completed sessions are not charged or ticketed again.
+- When the user stage is complete but Triage has not started, begin Triage directly from the frozen report snapshot.
+- When part of the report has been normalized, process only work items that still belong to that Triage snapshot and are incomplete.
+- When Architect grouping completes and then fails, reuse the saved grouping and model output and continue from unapplied batches.
+- When Owner completes and then fails, reuse the fixed admitted issue set and restore only Vigil and delivery waiting.
+- When all admission issues have successfully terminated, reconcile remote main, seal the sealed SHA, and enter the next round.
 
-`resume` 不自动忽略业务失败。某张票带 `automation-failed` 时，轮次保持 blocked；修复或重新
-发起该票的交付后再次 resume，只重新检查交付集合。配置、源码或冻结计划漂移时 fail-closed，
-需要另建实验或执行显式、可审计的迁移，不能静默用新代码续旧实验。
+`resume` does not automatically ignore business failures. When an issue carries `automation-failed`, the round remains blocked; after fixing or relaunching delivery for that issue, resume again and recheck only the delivery set. If configuration, source code, or frozen-plan drift is detected, fail closed; create another experiment or perform an explicit, auditable migration instead of silently continuing the old experiment with new code.
 
-### 恢复粒度
+### Recovery granularity
 
-| 阶段 | 最小恢复单元 | 完成证据 |
+| Stage | Smallest recovery unit | Completion evidence |
 |---|---|---|
-| round start | 一轮计划 | 固定 pair 列表、user SHA 与输入摘要 |
-| users | 一个 persona × seed session | 唯一 session 文件、索引项及关联 issue 后置条件 |
-| triage | 一张冻结 report | 保存的结构化决策及该票目标状态/标签/正文 |
-| divergent | 一个 worker 调用及其每项 proposal | 输出回执及带来源幂等标识的 Gitea issue |
-| architect | 一次 grouping 与一个 batch | grouping 摘要、设计输出、来源状态和新 proposal 回执 |
-| owner | 一张 proposal 决策 | 决策回执、标签/评论后置条件及固定 admitted 集合 |
-| delivery | 一张 admitted issue | Gitea issue/PR 终态与合并提交 |
-| seal | 一轮 | 全部交付成功及唯一 sealed main SHA |
+| round start | One round plan | Fixed pair list, user SHA, and input digest |
+| users | One persona × seed session | Unique session file, index entry, and associated issue postconditions |
+| triage | One frozen report | Saved structured decision and the issue’s target state/labels/body |
+| divergent | One worker call and each of its proposals | Output receipt and Gitea issue with a source-bearing idempotency identifier |
+| architect | One grouping and one batch | Grouping digest, design output, source state, and new proposal receipt |
+| owner | One proposal decision | Decision receipt, label/comment postconditions, and fixed admitted set |
+| delivery | One admitted issue | Gitea issue/PR terminal state and merge commit |
+| seal | One round | All delivery successful and unique sealed main SHA |
 
-进行中的模型请求无法恢复到 token 中间位置。恢复时优先使用已经原子保存的结构化模型输出；
-只有输出从未完整落盘的最小工作项才重新调用模型。进行中的用户会话使用同一计划项重新开始，
-其临时 workspace 可以重建，但已经发生的中途开票必须通过幂等键识别，不能重复创建。
+In-progress model requests cannot resume at an intermediate token position. During recovery, use atomically saved structured model output first; call the model again only for the smallest work item whose output was never completely persisted. An in-progress user session restarts with the same plan item; its temporary workspace may be rebuilt, but any ticket created midway must be identified by its idempotency key and must not be created again.
 
 ## Reference-level explanation
 
-### 1. 权威状态与文件布局
+### 1. Authoritative state and file layout
 
-实验根的 `checkpoints/` 新增版本化快照 `recovery.json` 和追加式事件日志
-`recovery.jsonl`。快照用临时文件、fsync 和原子 replace 发布；事件日志记录状态迁移、尝试号、
-错误和对账结论。轮次边界的可移植 tar checkpoint 继续存在，但阶段续跑不在每个节点复制整套
-Gitea 数据库。
+The experiment root adds a versioned snapshot `recovery.json` and append-only event log `recovery.jsonl` under `checkpoints/`. Snapshots are published with a temporary file, fsync, and atomic replace; the event log records state transitions, attempt numbers, errors, and reconciliation conclusions. The portable tar checkpoint at round boundaries remains, but stage continuation does not copy the entire Gitea database at every node.
 
-恢复快照至少包含：
+The recovery snapshot contains at least:
 
 ```text
 schema_version, revision
@@ -228,17 +201,13 @@ stages[stage].units[operation_key] = {
 admitted_issue_ids
 ```
 
-状态文件是编排游标和意图记录。Session 全量文件仍是用户结果权威，Gitea 仍是 issue、PR 与 main
-权威，冻结 manifest 仍是实验配置权威。角色 invocation 文件保留审计用途；只有 recovery store
-成功保存并能校验摘要的输出才可用于免模型重放。archive 必须包含 recovery 快照、事件日志和其
-引用的角色输出。
+The state file is the orchestration cursor and intent record. The full Session files remain authoritative for user results; Gitea remains authoritative for issues, PRs, and main; and the frozen manifest remains authoritative for experiment configuration. Role invocation files are retained for audit; only output successfully saved by the recovery store with a verifiable digest may be used to avoid model replay. The archive must include the recovery snapshot, event log, and referenced role outputs.
 
-单 controller 通过现有实验锁获得写权；快照 revision 单调递增，旧进程不得覆盖新 revision。
-敏感凭证不进入快照、日志、幂等标识或异常文本。
+A single controller obtains write access through the existing experiment lock; snapshot revisions increase monotonically, and an old process must not overwrite a newer revision. Sensitive credentials must not enter snapshots, logs, idempotency identifiers, or exception text.
 
-### 2. 状态机与提交协议
+### 2. State machine and commit protocol
 
-轮次 DAG 为：
+The round DAG is:
 
 ```mermaid
 flowchart LR
@@ -252,71 +221,50 @@ flowchart LR
     W --> S[round_sealed]
 ```
 
-Triage 与 Divergent 属于同一拍但分别记录，Architect 只在全部 Triage 单元完成后启动；Owner
-等待 Architect 与 Divergent 都完成。末轮在 users 完成后直接 seal，不生成或交付提案。
+Triage and Divergent belong to the same beat but are recorded separately. Architect starts only after all Triage units complete; Owner waits for both Architect and Divergent to complete. The final round seals directly after users complete and generates or delivers no proposals.
 
-每个工作项执行统一协议：
+Every work item follows one protocol:
 
-1. 从冻结计划或上一阶段完成输出计算稳定 `operation_key` 与输入摘要。
-2. 原子记录 `running`、attempt 和预期后置条件。
-3. 调用模型；先把完整结构化输出与摘要保存为不可变回执。
-4. 用该输出执行本地/Gitea 副作用，每一步携带同一个 operation key。
-5. 读取权威面验证后置条件，再原子标记 `completed`。
+1. Compute a stable `operation_key` and input digest from the frozen plan or the previous stage’s completed output.
+2. Atomically record `running`, the attempt, and expected postconditions.
+3. Call the model; first save the complete structured output and digest as an immutable receipt.
+4. Apply local/Gitea side effects using that output, carrying the same operation key at every step.
+5. Read the authoritative surfaces to verify postconditions, then atomically mark `completed`.
 
-进程在第 4、5 步之间崩溃时，恢复器先对账。后置条件已满足则补记 completed；尚未满足则用已保存
-输出继续 apply；出现输入对象被外部修改、部分效果互相矛盾或同一键指向不同内容时标记
-`blocked/inconsistent`，禁止重新调用模型掩盖冲突。
+If the process crashes between steps 4 and 5, the recovery system reconciles first. If postconditions are satisfied, it records completed; if not, it continues applying the saved output. If an input object was externally modified, partial effects contradict one another, or the same key points to different content, it marks `blocked/inconsistent` and forbids another model call from concealing the conflict.
 
-operation key 使用 `experiment/round/stage/unit` 的稳定逻辑身份，另存输入 digest 防止相同键
-复用到不同内容。SessionStore 对同一 session id 改为 upsert 索引；新 issue 与评论写入可解析的
-签名标识；标签、正文和状态通过读后校验确认。恢复器不能仅凭本地 `completed` 跳过远端检查。
+The operation key uses the stable logical identity of `experiment/round/stage/unit`; an input digest is stored separately to prevent the same key from being reused for different content. SessionStore changes the same session id to an upsert index; new issues and comments include parseable signed identifiers; labels, body, and state are confirmed through read-after-write verification. Recovery must not skip remote checks solely because local `completed` exists.
 
-### 3. 各阶段特殊规则
+### 3. Stage-specific rules
 
-round start 在任何用户工作前物化整轮 persona/seed pair，callable session plan 只调用一次并
-持久化；恢复不得重新抽样。user SHA 在轮次内冻结。每个 session 使用稳定 plan item id；失败的
-临时 workspace 清理后可以重建，已完成 session 的输出和 issue 引用必须复用。
+At round start, materialize the entire persona/seed pair list before any user work, call the session plan exactly once, and persist it; recovery must not resample. User SHA is frozen within the round. Each session uses a stable plan item id; a failed temporary workspace may be rebuilt after cleanup, but completed-session outputs and issue references must be reused.
 
-Triage 在 users 完成后只拍一次 report 快照，并持久化 worker 分片。恢复不重新切片，也不吸收
-后来人工新增的 report。已离开 report 平面的票必须与保存回执对账；仍在 report 且无完整输出的票
-才重新调用 Triage。
+After users complete, Triage takes exactly one report snapshot and persists worker shards. Recovery neither reslices nor absorbs reports added manually later. Issues that have left the report surface must be reconciled with saved receipts; only issues still in the report without complete output may call Triage again.
 
-Divergent、Architect 创建 proposal 时写入 operation key 签名。Architect grouping 的目录和 group
-id 由轮次与输入摘要派生，替换随机 UUID 作为恢复身份；分类输出一旦保存便复用。模型输出先落盘，
-再创建结构 proposal、合并来源；部分合并通过每个来源的后置条件逐项补齐。
+When Divergent or Architect creates a proposal, it writes an operation-key signature. Architect grouping’s directory and group id are derived from the round and input digest, replacing random UUIDs as recovery identities; once classification output is saved, it is reused. Model output is persisted first, then structural proposals are created and sources merged; partial merges are completed source by source through postconditions.
 
-Owner 先持久化整批决策，再按 proposal 逐项应用。admit、hold、精确 merge、评论和证据发布各自
-校验；评论签名避免恢复时重复追加。Owner 阶段完成时固化 admitted issue ids，之后不因开放队列
-变化重新扩大本轮交付集合。
+Owner first persists the full batch of decisions, then applies them proposal by proposal. Admit, hold, exact merge, comments, and evidence publication are each verified; comment signatures prevent duplicate appends during recovery. When Owner completes, admitted issue ids are fixed; subsequent changes to the open queue must not expand this round’s delivery set.
 
-delivery resume 重新连接已有 Vigil/Gitea 资源并按固化集合分类状态，不重跑 Owner。成功关闭必须
-仍无失败标签；失败或 needs-human 保持 blocked；inflight 继续等待。全体成功后 fetch 并解析远端
-main，写 sealed SHA，再幂等更新轮次 manifest。若 main 与已记录 sealed SHA 冲突则停止。
+delivery resume reconnects to existing Vigil/Gitea resources and classifies state according to the fixed set; it does not rerun Owner. Successful closure must still have no failure label; failure or needs-human remains blocked; inflight continues waiting. After all succeed, fetch and parse remote main, write the sealed SHA, and idempotently update the round manifest. Stop if main conflicts with the recorded sealed SHA.
 
-### 4. Fresh、resume 与兼容
+### 4. Fresh, resume, and compatibility
 
-真实入口接收显式运行模式。`fresh` 要求不存在有效 recovery state，负责初始化专属资源；
-`resume` 要求存在 state，禁止调用 harness/Gitea/live 的破坏性复位。旧实验没有 recovery state 时
-不得猜测细粒度游标；可以继续使用现有人工恢复流程，或经单独 migration 命令从 Gitea、session 与
-manifest 生成一份待人工确认的初始快照。
+The real entry point accepts an explicit run mode. `fresh` requires that no valid recovery state exist and initializes dedicated resources; `resume` requires that state exist and forbids destructive resets of harness/Gitea/live. For old experiments without recovery state, do not guess a fine-grained cursor; continue using the existing manual recovery process, or use a separate migration command to generate an initial snapshot from Gitea, sessions, and the manifest for manual confirmation.
 
-实验 runtime、审计 controller 和 SWE-bench 闭环入口共享同一个 resume 实现。基础设施恢复与需求
-状态恢复是一次操作的两个步骤，CLI 不再把“容器已启动”报告成“实验已续跑”。run id 在 resume
-中保持稳定，attempt 递增；journal 记录 fresh、reconcile、resume、blocked、completed。
+The experiment runtime, audit controller, and SWE-bench loop entry point share the same resume implementation. Infrastructure recovery and requirement-state recovery are two steps of one operation; the CLI no longer reports “the container has started” as “the experiment has resumed.” Run id remains stable during resume, attempt increments, and the journal records fresh, reconcile, resume, blocked, and completed.
 
-live 文件仍是投影。resume 保留 history，修正遗留 running 槽并展示 recovering/当前阶段；live
-损坏不能决定工作是否重跑。旧的 HarborRunner 改为调用同一阶段状态机，避免保留第二套轮次恢复语义。
+The live file remains a projection. Resume preserves history, fixes stale running slots, and displays recovering/current stage; live corruption cannot determine whether work is rerun. The old HarborRunner is changed to call the same stage state machine, avoiding a second round-recovery semantics.
 
-### 5. 任务 DAG、文件分配与验证
+### 5. Task DAG, file allocation, and verification
 
-| Task | 内容 | 依赖 |
+| Task | Content | Dependencies |
 |---|---|---|
-| T1 | 持久化状态、回执和对账原语 | — |
-| T2 | Orchestrator 阶段状态机与交付恢复 | T1 |
-| T3 | 用户 session 工作项级恢复 | T1, T2 |
-| T4 | Triage/Divergent 第一拍恢复 | T1, T2 |
-| T5 | Architect/Owner 输出先存后应用 | T1, T2, T4 |
-| T6 | Fresh/resume 真实入口和故障注入验收 | T1–T5 |
+| T1 | Persistent state, receipts, and reconciliation primitives | — |
+| T2 | Orchestrator stage state machine and delivery recovery | T1 |
+| T3 | Work-item-level recovery for user sessions | T1, T2 |
+| T4 | First-beat recovery for Triage/Divergent | T1, T2 |
+| T5 | Save Architect/Owner output before applying it | T1, T2, T4 |
+| T6 | Fresh/resume real entry point and fault-injection acceptance | T1–T5 |
 
 ```mermaid
 flowchart TD
@@ -335,52 +283,32 @@ flowchart TD
     T5 --> T6
 ```
 
-端到端脚本为 `backend/scripts/e2e-stage-resume.sh`。它在每个模型输出保存点和每个外部副作用
-前后注入一次强制退出，随后执行 resume；每个 case 与无故障基线比较 session id/index、issue
-数量与内容、评论/标签、admitted 集、PR 终态、轮次 manifest 和 sealed SHA。测试必须覆盖并行
-用户部分完成、Triage 部分完成、Architect 创建后来源未完全迁移、Owner 部分应用、delivery
-inflight/failed/success，以及配置和远端状态漂移的拒绝路径。测试使用 FakeTracker/Gitea fixture
-验证故障矩阵，不调用 benchmark 作为开发门禁。
+The end-to-end script is `backend/scripts/e2e-stage-resume.sh`. It injects a forced exit before and after every model-output save point and every external side effect, then executes resume; each case compares session id/index, issue count and content, comments/labels, admitted set, PR terminal state, round manifest, and sealed SHA with a fault-free baseline. Tests must cover partially completed parallel users, partially completed Triage, Architect-created proposals whose sources have not fully migrated, partially applied Owner work, delivery inflight/failed/success, and rejection paths for configuration and remote-state drift. Tests use FakeTracker/Gitea fixtures to validate the fault matrix and do not invoke the benchmark as a development gate.
 
 ## Drawbacks
 
-持久化状态机、幂等签名和对账逻辑会增加代码量，并把原来单函数内直观的控制流拆成多个可重入步骤。
-每个工作项完成后写盘和读取 Gitea 会增加少量延迟；并行阶段还需处理完成顺序与 revision 竞争。
+The persistent state machine, idempotency signatures, and reconciliation logic increase code volume and split the control flow that was previously direct within one function into multiple re-entrant steps. Writing to disk and reading Gitea after each work item adds slight latency; parallel stages also need to handle completion ordering and revision races.
 
-细粒度恢复只能避免重复已完成工作，不能恢复进行中的模型流或容器内瞬时进程。一个未保存完整输出的
-工作项仍会重新收费。外部对象被人工修改后，保守对账可能要求人工判断，而不是自动猜测正确状态。
+Fine-grained recovery can only avoid repeating completed work; it cannot restore an in-progress model stream or transient process inside a container. A work item whose complete output was not saved still incurs another charge. After external objects are manually modified, conservative reconciliation may require human judgment rather than guessing the correct state.
 
 ## Rationale and alternatives
 
-采用“轻量状态快照 + 权威面对账 + 幂等 apply”，因为 Gitea 和 SessionStore 已经持久化了大部分
-业务事实。每个阶段复制整套 Gitea volume 虽然直观，但成本高、恢复慢，并且无法解决副作用发生在
-快照与完成标记之间的重复执行问题；完整 volume 备份更适合作为轮次级灾备。
+Adopt “lightweight state snapshot + authoritative-surface reconciliation + idempotent apply” because Gitea and SessionStore already persist most business facts. Copying the entire Gitea volume at every stage is intuitive but expensive and slow to recover, and it does not solve duplicate execution when a side effect occurs between the snapshot and completion marker; complete volume backups are better suited to round-level disaster recovery.
 
-只在用户、Triage、Architect 后写单一 phase 文件实现较快，但无法处理并行阶段部分完成，也无法区分
-“副作用已发生、标记未写”和“从未执行”。本组因此保留阶段游标，同时记录工作项回执与后置条件。
+Writing a single phase file only after users, Triage, and Architect would be faster, but could not handle partially completed parallel stages or distinguish “side effect occurred, marker not written” from “never executed.” This group therefore retains the stage cursor while recording work-item receipts and postconditions.
 
-把每个角色变成消息队列消费者可以天然获得 ack/retry，但会引入常驻 broker、消息 schema 和新的
-运维面。当前单 controller、文件存储和 Gitea 已足够表达恢复语义，先不增加服务。
+Turning each role into a message-queue consumer would naturally provide ack/retry, but would introduce a resident broker, message schemas, and a new operational surface. The current single controller, file storage, and Gitea are sufficient to express recovery semantics, so no service is added for now.
 
-直接重放所有上游阶段实现简单，却会改变随机用户计划、重复模型成本和 Gitea 副作用，也破坏失败前后
-实验归因，因此不作为正式恢复策略。
+Replaying every upstream stage is simple, but changes the random user plan, repeats model cost and Gitea side effects, and damages experiment attribution before and after failure; it is therefore not the formal recovery strategy.
 
 ## Prior art
 
-数据库 write-ahead log 的“先记意图、再应用、最后提交”、工作流引擎的 durable execution、以及
-Kubernetes controller 的期望状态/实际状态 reconciliation 都使用相同思路。现有 HarborRunner 的
-轮次 checkpoint、实验 journal、SessionStore 原子文件和 Gitea 后置条件检查提供了可复用起点，
-但本组统一其语义并接入真实实验入口。
+The database write-ahead log’s “record intent first, apply next, commit last,” workflow engines’ durable execution, and Kubernetes controllers’ desired-state/actual-state reconciliation all use the same idea. Existing HarborRunner round checkpoints, experiment journal, atomic SessionStore files, and Gitea postcondition checks provide a reusable starting point, but this group unifies their semantics and connects them to the real experiment entry point.
 
 ## Unresolved questions
 
-首版没有阻塞设计的问题。旧实验的自动迁移不纳入首版；迁移工具只生成候选快照并要求人工确认。
-跨机器恢复是否需要自动打包 Docker volume 留到灾备需求明确后决定，不影响同一实验根和保留 volume
-条件下的阶段续跑。
+The first version has no design-blocking questions. Automatic migration of old experiments is out of scope for the first version; the migration tool only generates a candidate snapshot and requires manual confirmation. Whether cross-machine recovery needs automatic Docker-volume packaging will be decided after disaster-recovery requirements are clarified; it does not affect stage continuation under the same experiment root and retained-volume conditions.
 
 ## Future possibilities
 
-后续可让 controller 在可重试基础设施错误后自动退避并自行 resume，减少操作者执行命令；也可在看板
-展示每个阶段、工作项、attempt、恢复原因和预计剩余成本。稳定 operation key 与事件日志还能支持从
-指定历史阶段 fork 新实验、比较恢复前后模型输出，以及将本地 controller 替换为外部 durable workflow
-引擎而不改变角色协议。
+Later, the controller could automatically back off and resume after retryable infrastructure errors, reducing operator commands. A dashboard could also show each stage, work item, attempt, recovery reason, and estimated remaining cost. Stable operation keys and the event log could support forking a new experiment from a specified historical stage, comparing model outputs before and after recovery, and replacing the local controller with an external durable workflow engine without changing role protocols.

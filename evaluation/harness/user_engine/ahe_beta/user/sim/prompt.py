@@ -1,12 +1,12 @@
 """
 prompt.py
-拼装薄 base system（角色/感知边界 + BLOCK-P）与每轮分阶段 user 消息。
+Compose thin base system (role/perception boundary + BLOCK-P) and per-round staged user messages.
 
-KV cache 友好的排序(从不变到善变):
-  system = BASE_USER_SYSTEM + BLOCK_P <- 跨/内 session 稳定前缀, cache 命中区
+KV cache–friendly ordering (stable to fluid):
+  system = BASE_USER_SYSTEM + BLOCK_P <- cross/intra-session stable prefix, cache-hit zone
   user   = <task><history><harness_output><mood>
-           act 阶段才额外带 <action_space>，避免 judge/intent 先看菜单倒推意图。
-状态数值不进 system; mood 只给离散标签, 放在 user 尾部。
+           stage act adds <action_space> only, avoiding judge/intent seeing menu before inferring intent.
+State numerics not in system; mood only discrete labels, placed at user tail.
 """
 
 from __future__ import annotations
@@ -64,8 +64,8 @@ def build_system(persona: Persona) -> str:
 
 
 # --------------------------------------------------------------------------
-# 内层 tool-using system 装配（spec-0008/T3 + spec-0031）
-# 内层只拼薄 base + private tool 协议 + 工具清单 + 个性倾向 + skill；阶段输出契约仍来自 user prompt。
+# Inner tool-using system assembly (spec-0008/T3 + spec-0031)
+# Inner only composes thin base + private tool protocol + tool list + persona bias + skill; phase output contract still comes from user prompt.
 # --------------------------------------------------------------------------
 INNER_PROTOCOL = """# INNER TOOL USE (private)
 Before you answer, you MAY take a few PRIVATE investigation steps. On each step you
@@ -96,7 +96,7 @@ def build_inner_system(
     skills: list[Skill],
     state: State,
 ) -> str:
-    """装配内层 system：薄 base + 内层工具协议 + 可选核实框架 + 工具清单 + 个性倾向 + skill。"""
+    """Assemble inner layer system: thin base + inner layer tool protocol + optional verification framework + tool inventory + persona traits + skills."""
     parts = [
         BASE_USER_SYSTEM,
         INNER_PROTOCOL,
@@ -122,8 +122,8 @@ def _mood_tag(state: State) -> str:
     return f"patience={p}, trust={state.trust.value}"
 
 
-# 开局一轮附加：让 persona 自己给这任务估个“分量”，框架据此在耐心基线上叠加一次性小浮动。
-# 只在 OPENING 追加（其余轮忽略该字段）——同一个人接不同任务的起始耐心本就不同（见 state.apply_task_load）。
+# Opening round bonus: let persona estimate the "load" of this task themselves; framework applies a one-time small float on patience baseline accordingly.
+# Only appended in OPENING (other rounds ignore this field)—same person naturally has different initial patience for different tasks (see state.apply_task_load).
 _TASK_APPRAISAL = (
     "# SIZE UP THIS TASK (first turn only)\n"
     "This is the FIRST thing you're asking this tool for. Before you act, judge — as THIS "
@@ -140,7 +140,7 @@ _TASK_APPRAISAL = (
 
 
 def _private_evidence_block(state: State) -> str:
-    """用户自己的 private tool 证据短记忆；空则不注入。"""
+    """User's own private tool evidence short-term memory; empty if not injected."""
     items = list(state.private_evidence or [])
     if not items:
         return ""
@@ -182,10 +182,9 @@ def _main_context_parts(
     goal_frame: dict | None = None,
     include_action_space: bool,
 ) -> list[str]:
-    """主 decide 共用上下文（不含分步输出契约）。
+    """Main decide shared context (excluding step-by-step output contracts).
 
-    <action_space> 只属于 act 收敛阶段；judge / intent 不看当前菜单，避免先按按钮倒推
-    判断和意愿。等待时长只靠 <history> 的 [+Ns]。
+    <action_space> belongs only to act convergence phase; judge / intent do not view current menu to avoid inferring judgment and intent backwards from button presses. Wait duration depends solely on <history> [+Ns].
     """
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     ho = harness_output.strip() if harness_output else "(empty)"
@@ -229,7 +228,7 @@ def build_main_judge_turn(
     goal_frame: dict | None = None,
     appraise_task: bool = False,
 ) -> str:
-    """主 loop · Judge：只评现状（perceive + verdict）；意愿留给 intent。"""
+    """Main loop · Judge: evaluate current state only (perceive + verdict); intent is left to the intent phase."""
     parts = ["<main_judge>"]
     parts.extend(
         _main_context_parts(
@@ -310,7 +309,7 @@ def build_main_intent_turn(
     goal_reading: list[dict] | None = None,
     final_check_available: bool = False,
 ) -> str:
-    """主 loop · Intent：开放意愿（可超菜单）。"""
+    """Main loop · Intent: open-ended intent (may exceed menu)."""
     parts = ["<main_intent>"]
     parts.extend(
         _main_context_parts(
@@ -389,7 +388,7 @@ def build_main_final_check_turn(
     intent: str,
     check_goal: str,
 ) -> str:
-    """Spec-0048/T3, Spec-0084/T2: ACTIVE 内一次按 persona 能力进行的有界私查。"""
+    """Spec-0048/T3, Spec-0084/T2: within ACTIVE, one bounded private query per persona capability."""
     parts = ["<main_final_check>"]
     parts.extend(
         _main_context_parts(
@@ -439,7 +438,7 @@ def build_main_rejudge_turn(
     check_status: str,
     check_evidence: str,
 ) -> str:
-    """final check 后强制重判；本阶段由 client 机械禁用工具。"""
+    """After final check, force re-judgment; during this phase the client mechanically disables tools."""
     parts = ["<main_rejudge>"]
     parts.extend(
         _main_context_parts(
@@ -491,7 +490,7 @@ def build_main_reintent_turn(
     perceive: str,
     goal_reading: list[dict] | None = None,
 ) -> str:
-    """重判后重新形成意愿；final check 已用完，不能回跳。"""
+    """Re-form intent after re-judgment; final check is exhausted and cannot loop back."""
     parts = ["<main_reintent>"]
     parts.extend(
         _main_context_parts(
@@ -554,7 +553,7 @@ def build_main_act_turn(
     target_goal_ids: list[str] | None = None,
     expected_progress: str = "",
 ) -> str:
-    """主 loop · Act：把开放 intent 收敛到 action_space；兑不了就兜底并 gap=true。"""
+    """Main loop · Act: converge open intent to action_space; if unredeemable, fall back and set gap=true."""
     parts = ["<main_act>"]
     parts.extend(
         _main_context_parts(
@@ -651,7 +650,7 @@ def build_main_act_turn(
 
 
 def _activity_bullets(items: list | None, *, limit: int = 12) -> str:
-    """把 progress / 上轮活动收成短标题列表；空则空串。"""
+    """Summarize progress / previous round activity into a short title list; empty if none."""
     bullets: list[str] = []
     for item in list(items or [])[-limit:]:
         if not isinstance(item, dict):
@@ -662,8 +661,8 @@ def _activity_bullets(items: list | None, *, limit: int = 12) -> str:
     return "\n".join(bullets)
 
 
-# 心跳等待：过程判断 → 开放意愿(intent) → 菜单动作(act) 收敛；act 自报 gap 时记 WAIT_GAP。
-# judgment 只评「在干什么」；intent 自由文本；菜单四按钮才是能力边界。
+# Heartbeat wait: process judgment → open intent → menu action convergence; act self-reports gap, record WAIT_GAP.
+# judgment only assesses "what is being done"; intent is free text; the four menu buttons are the true capability boundary.
 WAITING_JUDGMENTS = ("on_track", "off_track", "unclear")
 
 
@@ -678,7 +677,7 @@ def _waiting_context_parts(
     prior_activity: list | None,
     goal_frame: dict | None = None,
 ) -> list[str]:
-    """等待轮共用上下文：帮助文本 / 任务 / 历史 / 活动条 / 墙钟 / mood。不含输出契约。"""
+    """Wait-turn shared context: help text / task / history / activity bar / wall clock / mood. Does not include output contracts."""
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     parts: list[str] = []
     if help_text.strip():
@@ -762,7 +761,7 @@ def build_waiting_judge_turn(
     prior_activity: list | None = None,
     goal_frame: dict | None = None,
 ) -> str:
-    """3 跳模式·第 1 跳：只评过程内容（不对路 / 合预期 / 看不清），不选 intent/动作。"""
+    """3-hop mode · Hop 1: evaluate process content only (off-track / meets expectation / unclear); do not select intent/action."""
     parts = ["<waiting_judge>"]
     parts.extend(
         _waiting_context_parts(
@@ -815,7 +814,7 @@ def build_waiting_intent_turn(
     perceive: str = "",
     goal_reading: list[dict] | None = None,
 ) -> str:
-    """3 跳模式·第 2 跳：已有 judgment，只表达真实意愿 intent（开放文本）。"""
+    """3-hop mode · Hop 2: judgment already made; express genuine intent only (open-ended text)."""
     parts = ["<waiting_intent>"]
     parts.extend(
         _waiting_context_parts(
@@ -875,7 +874,7 @@ def build_waiting_act_turn(
     target_goal_ids: list[str] | None = None,
     expected_progress: str = "",
 ) -> str:
-    """末跳：把开放 intent 收敛到菜单；兑不了就兜底并 gap=true（框架记 WAIT_GAP）。"""
+    """Final hop: converge open intent to menu; if unredeemable, fall back and set gap=true (framework records WAIT_GAP)."""
     parts = ["<waiting_act>"]
     parts.extend(
         _waiting_context_parts(
@@ -946,15 +945,14 @@ def build_waiting_act_turn(
 def build_issue_turn(
     task: str, history_lines: list[str], state: State, *, mode: str = "filed"
 ) -> str:
-    """开单的专门一轮：让 persona 跳出对话，以本人口吻写一条*自包含*的 issue（提交给不在场、
-    看不到聊天记录的开发团队），而非对 harness 撂下的那句临场话。
+    """Dedicated issue-filing round: let persona step out of conversation and write one *self-contained* issue in their own voice (to submit to off-duty dev team who cannot see chat history), not just a temporary remark dropped to the harness.
 
-    mode 三种口吻（把"提 issue"从特定动作解耦：无论怎么收场，不满都留信号）：
-    - "filed"（file_issue）：你没能在会话里搞定，正式开单——报告哪里一直不对、为什么卡住。
-    - "left"（give_up）：你**决定弃坑走人**，临走留一条"问卷式"退出反馈——什么把你逼走了。
-    - "accepted"（accept_with_reservations）：你**接受/交付了**产出但不达预期——留一条体感落差反馈。
+    Three voice modes (decouple "file issue" from specific actions: dissatisfaction leaves a signal regardless of how the session ends):
+    - "filed" (file_issue): you could not resolve it in the conversation, formally file an issue—report what went wrong and why you got stuck.
+    - "left" (give_up): you **decide to abandon and leave**, leaving a "survey-style" exit feedback on your way out—what drove you away.
+    - "accepted" (accept_with_reservations): you **accept/deliver** the output but it falls short of expectations—leave a feedback capturing the gap in experience.
 
-    本阶段只要 {"issue"}，不发 message / 不选 action。
+    This phase requires only {"issue"}, no message / action selection.
     """
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     framing = {
@@ -985,9 +983,9 @@ def build_issue_turn(
             "to a colleague — NOT a formal spec, ticket, or status report."
         ),
     }.get(mode, "")
-    # 诉求型开单也合法：若真正困扰你的不是"坏了"而是"这工具缺了你干活需要的东西"，就把这条 issue
-    # 写成对你所需的请求（用你自己的话，只能出自你本次会话的真实体验），而不是硬套成 bug。不点名任何
-    # 具体功能——要什么由你自己想，绝不照搬这段说明里的措辞。
+    # Request-type filing is also valid: if what really troubles you is not "broken" but "this tool lacks something I need to work," write the issue
+    # as a request for what you need (in your own words, drawn only from your genuine experience this session), not forced as a bug. Do not name any
+    # specific features—what you want is up to you, never copy wording from this explanation.
     feature_ok = (
         "Issues aren't only for bugs. If what actually bothered you was not that something broke "
         "but that the tool — even working as described — lacked something you needed to get this "
@@ -1051,9 +1049,9 @@ def build_direct_review_turn(task: str, reply: str, patch: str) -> str:
 
 
 def build_rating_turn(task: str, history_lines: list[str], state: State) -> str:
-    """会话末自评请求: 让 persona 跳出对话, 按本人体感给 1–4 分 (类 CC 满意度评分)。
+    """Self-assessment request at end of conversation: let persona step out and give a 1–4 score (similar to CC satisfaction rating) based on their own experience.
 
-    本阶段只要 {"score", "reason"}，不发 message / 不选 action。
+    This phase requires only {"score", "reason"}, no message / action selection.
     """
     hist = "\n".join(history_lines) if history_lines else "(empty)"
     return "\n\n".join(

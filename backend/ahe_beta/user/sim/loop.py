@@ -1,22 +1,22 @@
 """
 loop.py
-控制信封主循环 —— 把所有部件按"三层认知主干 + 状态层"编排起来。
+Simulated-user control loop: coordinate the three cognitive stages and shared state.
 
-每轮(turn)流水线:
-  ① 物理接收     harness_output (文本)                  (harness_adapter / scenarios)
-  ② 派生动作空间  phase ∩ cap ∩ authz (∪ 终止/accept)   (action_space, 纯代码)
-  ③ 主观三层      persona LLM -> {perceive,verdict,action,message}  (persona_client)
-  ④ resolve      自由产出归类 + 越权投影 + channel 校验  (action_space.resolve)
-  ⑤ 状态写回      只吃主观 verdict                        (state.apply_verdict)
-  ⑥ 终止判定      Effect.TERMINATE -> 记 end_reason 并 break
-  ⑦ 路由          EMIT -> 驱动 harness 出下一轮；终止动作 -> 收场
+Each turn pipeline:
+  ① Receive harness output    harness_output (text)                  (harness_adapter / scenarios)
+  ② Derive action space   phase ∩ cap ∩ authz (∪ terminate/accept)  (action_space, pure code)
+  ③ Three subjective stages   persona LLM -> {perceive, verdict, action, message}  (persona_client)
+  ④ resolve               free-form output classification + privilege projection + channel validation  (action_space.resolve)
+  ⑤ state write-back      consume only subjective verdict                        (state.apply_verdict)
+  ⑥ termination check     Effect.TERMINATE -> record end_reason and break
+  ⑦ routing               EMIT -> drive harness for next turn; terminate action -> wrap up
 
-本轮纯主观(不实现客观真值线):
-- harness 只回文本, 无 gold / exit_code; bug 体现在文本里, 由 persona 凭能力识别。
-- 状态与体感全程只依赖主观 verdict / trust, 不读任何客观真值。
-- 用户自己的读文件/跑命令/看 diff 等核实发生在 AgenticPersonaClient 的私有内层工具循环，
-  作为 judge 阶段形成 perceive/verdict 的证据；不是外层 action。
-- 感知不在框架侧过滤: harness 文本原样喂入 persona LLM, 由 prompt(G1)+persona 档位约束"只在能力内感知"。
+This round is purely subjective (no objective ground truth track):
+- harness returns only text, no gold / exit_code; bugs surface in the text, identified by persona's capability.
+- state and experience signals throughout depend only on subjective verdict / trust, not any objective ground truth.
+- user's own file reads / command runs / diff inspection occur in the private tool loop of AgenticPersonaClient,
+  forming evidence for perceive/verdict in the judge phase; not an outer action.
+- perception is not filtered at framework level: harness text feeds raw into persona LLM, constrained by prompt(G1) + persona tier to "perceive only within capability".
 """
 
 from __future__ import annotations
@@ -80,17 +80,17 @@ class TurnLog:
     patience: int
     trust: str
     harness_output: str = ""
-    # 与 harness_output 配对：该轮 persona 所看回复的 harness 内层过程流（{kind,text} 序列）。
-    # 观测层展开时才用；persona 只感知 harness_output（最终答案），不吃 steps。
+    # Paired with harness_output: the harness's inner process stream for the reply the persona saw in that round (a sequence of {kind,text}).
+    # Only used when the observation layer is expanded; the persona only perceives harness_output (the final answer) and does not consume the steps.
     harness_steps: list = field(default_factory=list)
-    # 自上次用户决策以来的 harness stdout 可见事件（reply/progress/status/ack/error）；
-    # 按观察顺序保留，不做 request/reply 配对推断。
+    # Visible events on the harness stdout since the last user decision (reply/progress/status/ack/error);
+    # Preserved in observation order, with no request/reply pairing inference.
     harness_events: list = field(default_factory=list)
-    # 用户 agent 本决策触发的原始 LLM 调用（system/user/raw/steps）；先全量，后续再筛。
+    # Raw LLM calls (system/user/raw/steps) triggered by the user agent for this decision; keep everything for now, filter later.
     persona_trace: list = field(default_factory=list)
-    # Spec-0024/T6：请求–回复配对（观测用；不改 harness 线协议）。
-    # utterance_id：本拍外发的用户指令句柄；delivery=open|queued；queued 时 queued_behind=当前 open。
-    # answers_*：本拍 harness_output 所应答的那条 utterance（及正文预览）。
+    # Spec-0024/T6: request–reply pairing (for observability; does not change the harness wire protocol).
+    # utterance_id: handle of the user instruction sent out this tick; delivery=open|queued; when queued, queued_behind=the current open one.
+    # answers_*: the utterance (and body-text preview) that this tick's harness_output answers.
     utterance_id: str = ""
     delivery: str = ""
     queued_behind: str = ""
@@ -118,9 +118,9 @@ class TurnLog:
 
 @dataclass
 class _UtteranceLedger:
-    """局内用户→harness 指令账本：给每条外发编号，reply 挂回它所关闭的 open 指令。
+    """In-session user → harness instruction ledger: assign a number to each outbound directive, with reply linked back to the open instruction it closes.
 
-    Spec-0024/T6：persona 仍可能「看见内容才知真相」；落盘/结构综合时间线必须显式配对。
+    Spec-0024/T6: persona may still "learn the truth only upon seeing content"; explicit request/reply pairing is required when persisting / integrating structures.
     """
 
     _seq: int = 0
@@ -138,11 +138,11 @@ class _UtteranceLedger:
         self.open_id = uid
 
     def clear_open(self) -> None:
-        """放弃当前 open（如 give_up），不产生 answers。"""
+        """Abandon current open (e.g., give_up), do not produce answers."""
         self.open_id = None
 
     def close_open_as_answered(self) -> str | None:
-        """当前 open 收到 reply/interrupt 回执：记入 pending，供下一拍 TurnLog 写入 answers。"""
+        """Current open receives reply/interrupt receipt: record in pending, available for next TurnLog write to answers."""
         answered = self.open_id
         self.pending_answers_id = answered
         self.open_id = None
@@ -162,26 +162,31 @@ class SessionResult:
     persona_id: str
     end_reason: str
     turns: list[TurnLog] = field(default_factory=list)
-    signals: list[str] = field(default_factory=list)  # 给开发者的行为反馈信号(纯主观派生)
+    # Behavioral feedback signal for developers (purely subjective derivation)
+    signals: list[str] = field(default_factory=list)
     issue_artifact: str | None = None
-    # 中途 report_issue tool 记下的正文（不终止会话）；收尾与 issue_artifact 一并交 tracker。
+    # Body text recorded via the mid-session report_issue tool (does not terminate the session); at wrap-up it is handed to the tracker together with issue_artifact.
     issue_notes: list[str] = field(default_factory=list)
-    feeling: FeelingScore | None = None  # 训练信号: persona LLM 会话末自评 (1–4)
-    feeling_derived: FeelingScore | None = None  # 独立诊断，不填补自评缺测
+    # Training signal: persona LLM's end-of-session self-rating (1–4)
+    feeling: FeelingScore | None = None
+    # Independent diagnostic; does not fill in missing self-rating values
+    feeling_derived: FeelingScore | None = None
     experience: dict = field(default_factory=dict)
     terminal_issue_mode: str | None = None
-    # 已收到但尚未进入 TurnLog 的 harness 回复(harness 回复要等下一轮 TurnLog 才随
-    # harness_output 落日志, 这里先行暴露给观测层实时展示; 下一条 TurnLog 追加时清空)
+    # Harness replies received but not yet entered into the TurnLog (a harness reply has to wait for the next round's TurnLog before being logged along with the
+    # harness_output; here it is surfaced early to the observability layer for real-time display; cleared when the next TurnLog entry is appended)
     pending_harness_output: str | None = None
-    pending_harness_steps: list | None = None  # 与 pending_harness_output 配对的内层过程流
-    pending_harness_events: list | None = None  # 与 pending_harness_output 同窗口的 stdout 可见事件
-    # 局末不挂某一 Turn 的用户 agent 调用（file_issue 正文 / 体感评分）。
+    # Inner process stream paired with pending_harness_output
+    pending_harness_steps: list | None = None
+    # stdout-visible events within the same window as pending_harness_output
+    pending_harness_events: list | None = None
+    # End-of-episode user agent calls not attached to any particular Turn (file_issue body text / subjective experience rating).
     persona_tail: list = field(default_factory=list)
-    # Spec-0048：评估器协议异常与 harness 任务失败分轨；invalid 结果不得计入正常通过率。
+    # Spec-0048: evaluator protocol anomalies and harness task failures are tracked on separate rails; invalid results must not count toward the normal pass rate.
     evaluation_status: str = "valid"
     evaluation_error: dict | None = None
-    # 轻量协议分轨：保留 evaluation_status 的旧兼容语义，同时让消费者知道是否只是
-    # persona 输出契约失败，而不是把它误读成用户 give_up 或客观代码失败。
+    # Lightweight protocol split: keeps the legacy-compatible semantics of evaluation_status while letting consumers know whether it is merely a
+    # persona output-contract failure, rather than misreading it as a user give_up or an objective code failure.
     interaction_status: str = "completed"
     # Every failed contract attempt is retained separately from persona_tail so an
     # auditor can distinguish malformed output, recovery, and the eventual outcome.
@@ -196,45 +201,45 @@ class SessionResult:
 
 MAX_TURNS = 24
 
-# 阻塞 send 路径：墙钟超过此值额外耗一点耐心（防无限干等）。心跳路径用 history [+Ns] + 有条件耗心。
+# Blocking send path: wall-clock time beyond this value additionally drains a bit of patience (to prevent waiting indefinitely). The heartbeat path uses history [+Ns] + conditional patience drain.
 _EXTREME_WAIT_SEC = 480.0
 
-# 框架自有的 harness 失败哨兵前缀：route 在 harness.send() 崩溃/超时时回填此串（见下），原样喂给
-# 用户 agent 感知。它不再触发任何框架侧动作门控——面对崩溃是否验收/开单/走人，由有判断力的模型自判
-# （prompt G6 + 终止时机条主导）；框架只负责把失败如实surfacing，不炸整局、也不替模型下结论。
+# The framework's own harness-failure sentinel prefix: when harness.send() crashes or times out, route backfills this string (see below) and feeds it verbatim to
+# the user agent's perception. It no longer triggers any framework-side action gating—whether to accept the work, file a ticket, or walk away in the face of a crash is left to the model's own judgment
+# (governed primarily by prompt G6 + the termination-timing clause); the framework only surfaces the failure faithfully—neither blowing up the whole episode nor drawing conclusions on the model's behalf.
 HARNESS_ERROR_PREFIX = "[harness error] "
 _HARNESS_TERMINAL_STATUSES = frozenset({"timed_out", "crashed"})
 
-# 事件等待（用户等待中的主动权）：
-#   AwaitEvent = poll 直到 harness reply（唤醒主 loop）或到心跳阈值（一次性等待决策）。
-#   心跳是一次性动作（含 keep_waiting）——做完即结束，回到 AwaitEvent；不为「认领上一笔 send」
-#   在心跳里继续 poll。
-#   persona 侧仍可能「看见 reply 内容才知发生了什么」；观测侧用 _UtteranceLedger 显式配对
+# Event waiting (user-side initiative while waiting):
+#   AwaitEvent = poll until a harness reply (which wakes the main loop) or until the heartbeat threshold is reached (a one-shot waiting decision).
+#   A heartbeat is a one-shot action (including keep_waiting)—once done, it ends and returns to AwaitEvent; it does not
+#   keep polling within the heartbeat in order to 'claim the previous send'.
+#   The persona side may still only know what happened after seeing the reply's content; the observability side uses _UtteranceLedger for explicit pairing
 #   （Spec-0024/T6：heard.answers → utterance）。
 _HEARTBEAT_SEC = 90.0
-# 心跳唤醒次数硬上限（兜底防病态：模型一直 keep_waiting 而 harness 永不回）。到顶即强制放弃。
+# Hard cap on heartbeat wakeups (a backstop against the pathological case where the model keeps keep_waiting and the harness never replies). Hitting the cap forces a give-up.
 _MAX_HEARTBEATS = 12
 # A malformed persona reply is not a user give-up. Allow one warning heartbeat
 # to keep listening; repeated failures then stop safely with an auditable status.
 _MAX_PROTOCOL_STALL_HEARTBEATS = 2
-# 等待菜单：内 = send_message；外 = interrupt（Ctrl+C）+ give_up；keep_waiting = 决定继续等。
+# Waiting menu: inside = send_message; outside = interrupt (Ctrl+C) + give_up; keep_waiting = decide to keep waiting.
 WAITING_ACTIONS = ["keep_waiting", "send_message", "interrupt", "give_up"]
 
 
 def _supports_heartbeat(harness) -> bool:
-    """真实子进程句柄：统一写 + poll + 外 interrupt/shutdown；Fake/Scripted 无需心跳。"""
+    """Real subprocess handle: unified write + poll + external interrupt/shutdown; Fake/Scripted requires no heartbeat."""
     has_write = hasattr(harness, "write_message") or hasattr(harness, "begin")
     return has_write and all(hasattr(harness, m) for m in ("poll", "interrupt", "shutdown"))
 
 
 def _harness_terminal_status(harness) -> str:
-    """读取 launcher 给出的机器可判终态；绝不从面向人的回复文本猜。"""
+    """Read terminal state from launcher output; never infer from human-facing reply text."""
     status = str(getattr(harness, "last_request_status", "") or "")
     return status if status in _HARNESS_TERMINAL_STATUSES else ""
 
 
 def _write_harness_message(harness, message: str) -> None:
-    """统一 stdin 写（Spec-0036）：优先 write_message，兼容旧 begin/emit_message 别名。"""
+    """Unified stdin write (Spec-0036): prefer write_message, compatible with legacy begin/emit_message aliases."""
     for name in ("write_message", "begin", "emit_message"):
         fn = getattr(harness, name, None)
         if callable(fn):
@@ -244,7 +249,7 @@ def _write_harness_message(harness, message: str) -> None:
 
 
 def _take_persona_calls(client: PersonaClient, role: str) -> list[dict]:
-    """drain client 上刚结束的原始调用，打上 role 标签（供 TurnLog / persona_tail）。"""
+    """Drain raw call just completed on client, tag with role (for TurnLog / persona_tail)."""
     out: list[dict] = []
     for call in drain_call_traces(client):
         tagged = dict(call)
@@ -319,7 +324,7 @@ def _tool_result_summary(text: str) -> str:
 
 
 def _record_private_evidence(*, state: State, calls: list[dict], phase: str) -> None:
-    """把本轮 private tool-use 压成用户自己的跨轮短记忆。"""
+    """Compress this round's private tool-use into user's own cross-turn short memory."""
     for call in calls:
         steps = [
             s
@@ -358,7 +363,7 @@ def _record_private_evidence(*, state: State, calls: list[dict], phase: str) -> 
 
 
 def _resolve_gap(ret: dict) -> bool:
-    """act 自报 gap；非法缺省 → False。"""
+    """act self-reports gap; illegal/default → False."""
     gap_raw = ret.get("gap")
     return gap_raw is True or (
         isinstance(gap_raw, str) and gap_raw.strip().lower() in ("true", "1", "yes")
@@ -366,11 +371,11 @@ def _resolve_gap(ret: dict) -> bool:
 
 
 def _resolve_waiting(ret: dict) -> tuple[str, str, bool]:
-    """把心跳唤醒的自由产出归到 WAITING_ACTIONS + message + gap。
+    """Route heartbeat-awakened free output to WAITING_ACTIONS + message + gap.
 
-    非法/缺省一律安全落到 keep_waiting（绝不擅自替用户放弃或打断）。
-    send_message 缺正文 → 退回 keep_waiting（不 fabricate、不外发空串）。
-    gap：由 act 步自报——intent 开放，收敛后若只能兜底、未真正兑现意愿则 True。
+    Illegal/default always safely fall back to keep_waiting (never unilaterally abandon or interrupt for user).
+    send_message missing body → return to keep_waiting (do not fabricate, do not send empty string).
+    gap: self-reported by act step—intent is open; after convergence, if only fallback is possible and user intent is not truly fulfilled, then True.
     """
     action = str(ret.get("action", "")).strip()
     if action not in WAITING_ACTIONS:
@@ -384,7 +389,7 @@ def _resolve_waiting(ret: dict) -> tuple[str, str, bool]:
 
 
 def _resolve_judgment(ret: dict) -> str:
-    """心跳判断轮：归到 WAITING_JUDGMENTS；非法/缺省 → unclear（安全偏向续等侧，由动作轮再决）。"""
+    """Heartbeat judgment round: route to WAITING_JUDGMENTS; illegal/default → unclear (safe bias toward continued waiting, action round decides next)."""
     raw = str(ret.get("judgment", "")).strip().lower().replace("-", "_")
     if raw in WAITING_JUDGMENTS:
         return raw
@@ -392,7 +397,7 @@ def _resolve_judgment(ret: dict) -> str:
 
 
 def _resolve_intent(ret: dict) -> str:
-    """开放意愿：自由文本；空缺省 → keep waiting。可选 intent_detail 并入一句。"""
+    """Open intent: free text; empty/default → keep waiting. Optional intent_detail may be merged into one sentence."""
     raw = str(ret.get("intent", "")).strip()
     detail = str(ret.get("intent_detail", "")).strip()
     if not raw:
@@ -449,10 +454,10 @@ def _main_decide(
     goal_frame: dict | None = None,
     goal_ledger: GoalLedger | None = None,
 ) -> tuple[dict, list[dict], str, bool]:
-    """主 loop 决策：judge → intent → [一次 final-check → rejudge → reintent] → act。
+    """Main loop decision: judge → intent → [once final-check → rejudge → reintent] → act.
 
-    返回 (act_ret 含 action/message, persona_calls, intent, gap)。
-    judge 的 perceive/verdict/task_load 已合并进 act_ret，供后续 apply_verdict / 开局 task_load。
+    Return (act_ret contains action/message, persona_calls, intent, gap).
+    judge's perceive/verdict/task_load already merged into act_ret, available for downstream apply_verdict / session startup task_load.
     """
     calls: list[dict] = []
     goal_updates: list = []
@@ -475,7 +480,7 @@ def _main_decide(
             decision_task,
             history,
             harness_output,
-            [],  # judge 不看当前动作菜单；只在 act 收敛阶段暴露真实 action_space
+            [],  # judge does not see the current action menu; the real action_space is exposed only during the act convergence stage
             state,
             help_text=help_text,
             harness_events=harness_events,
@@ -499,7 +504,7 @@ def _main_decide(
             decision_task,
             history,
             harness_output,
-            [],  # intent 仍是开放意愿，不看当前动作菜单
+            [],  # intent remains an open wish and does not look at the current action menu
             state,
             help_text=help_text,
             harness_events=harness_events,
@@ -518,8 +523,8 @@ def _main_decide(
     expected_progress = str(iret.get("expected_progress") or "").strip()
     apply_goal_updates(iret.get("goal_update"))
 
-    # Spec-0048：仅 ACTIVE 的本决策周期允许一次最终私有核查；无论核查成功、不可用或
-    # 协议失败，之后都必须经过无工具 rejudge/reintent，并且不能在同一周期再次回跳。
+    # Spec-0048: only one final private check is allowed per decision cycle while ACTIVE; regardless of whether the check succeeds, is unavailable, or
+    # fails at the protocol level, everything afterwards must go through tool-less rejudge/reintent, and it may not jump back again within the same cycle.
     if phase == Phase.ACTIVE.value and iret.get("needs_final_check") is True:
         check_goal = str(iret.get("check_goal") or "").strip()
         check_status = "failed"
@@ -547,8 +552,8 @@ def _main_decide(
             check_status = str(cret.get("check_status") or "failed")
             check_evidence = str(cret.get("perceive") or "").strip() or check_evidence
         except PersonaProtocolError as exc:
-            # final-check 本身是可选证据通道：失败时把失败作为证据交给强制复判，不把它
-            # 误作 harness 失败，也不允许重新进入工具阶段。
+            # final-check itself is an optional evidence channel: on failure, the failure is handed over as evidence to the forced re-judgment; it is not
+            # mistaken for a harness failure, and re-entering the tool phase is not allowed.
             new_calls = _take_persona_calls(client, "main_final_check")
             calls.extend(new_calls)
             _record_private_evidence(state=state, calls=new_calls, phase=phase)
@@ -673,11 +678,11 @@ def _main_decide(
 
 
 def route(action_id: str, message: str, state: State, harness, observable: str) -> str | None:
-    """按 executor×channel 分派, 返回下一轮的 harness 文本(无则 None)。"""
+    """Dispatch by executor×channel, return next round's harness text (None if absent)."""
     spec = CATALOG[action_id]
 
     if action_id == "keep_waiting":
-        # 主 loop「再等」：poll 等下一条 reply（软唤醒，不绑写旗标；Spec-0036）。
+        # Main loop 'wait again': poll for the next reply (soft wakeup, without binding a write flag; Spec-0036).
         if not hasattr(harness, "poll"):
             return None
         try:
@@ -697,17 +702,18 @@ def route(action_id: str, message: str, state: State, harness, observable: str) 
 
     if spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE:
         if not message.strip():
-            # 模型选了要发话的动作却没给出这句话（client 重问后仍空，极少见）：不 fabricate、不外发。
-            # 本轮空转（harness 不推进），MAX_TURNS 兜底；绝不把框架编的话发给 harness。
+            # The model chose an action requiring it to speak but did not supply that message (still empty after the client re-asks—very rare): do not fabricate, do not send anything out.
+            # This round is a no-op (the harness does not advance); MAX_TURNS is the backstop; never send framework-invented text to the harness.
             return None
         try:
-            return harness.send(message)  # 发 B 线 -> 驱动 harness 出下一轮文本
+            # Send line B -> drive the harness to produce the next round of text
+            return harness.send(message)
         except Exception as exc:  # noqa: BLE001
-            # harness 是黑盒：崩溃/超时/协议违例都不该炸掉整局，而应作为可观测的失败信号回给用户 agent
-            # （读作 [harness error] → 判 stuck/failed_blame_harness → 掉耐心 → 最终终止并留 issue）。
+            # The harness is a black box: crashes/timeouts/protocol violations must not blow up the whole game; they should be fed back to the user agent as observable failure signals
+            # (Reads as: [harness error] → judged stuck/failed_blame_harness → patience drops → eventually terminate and leave an issue).
             return f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}"
 
-    return None  # 终止动作: 不再驱动 harness
+    return None  # Terminal action: stop driving the harness
 
 
 def _append_issue_note(result: SessionResult, body: str) -> bool:
@@ -745,7 +751,7 @@ def _record_act_report(
 
 
 def _drain_issue_notes(client: PersonaClient, result: SessionResult) -> None:
-    """把 agentic 中途 report_issue 笔记并入 SessionResult（允许闲置；无则空操作）。"""
+    """Merge agentic mid-session report_issue notes into SessionResult (idempotent if idle; no-op if absent)."""
     drain = getattr(client, "drain_issue_notes", None)
     if not callable(drain):
         return
@@ -757,11 +763,13 @@ def _drain_issue_notes(client: PersonaClient, result: SessionResult) -> None:
 
 
 def emit_issue_artifact(persona: Persona, log: list[TurnLog], issue_text: str) -> str:
-    """从本局真实(主观)数据派生 issue(不写死场景, 不读客观真值)。
+    """Derive issue from this session's subjective data (do not hard-code scenarios, do not read objective ground truth).
 
-    正文 = issue_text：persona 经专门的 build_issue_turn 以本人口吻写的*自包含* issue(提交给不在场的
-    开发团队),不套第三人称标题或模板外壳; 末尾仅附一行斜体的机器自动采集元信息(能力档/纠错风格/复现轮数/
-    最近 harness 末行)供开发者分流, 与用户原话明确分隔。issue_text 为空时回落到 file_issue 当轮的 message。
+    Body = issue_text: persona composes via specialized build_issue_turn in first person a *self-contained* issue
+    (submitted to absent developers), not wrapped in third-person title or template shell; only append one line of italic
+    auto-collected metadata (capability tier / error correction style / reproduction round / recent harness last line) for
+    developer triage, clearly delimited from user's original words. When issue_text is empty, fall back to file_issue's
+    message for that round.
     """
     fails = [t for t in log if t.verdict == "failed_blame_harness"]
     last_out = next((t.harness_output for t in reversed(log) if t.harness_output.strip()), "")
@@ -798,16 +806,16 @@ def _log_waiting(
     goal_effect: dict | None = None,
     goal_field_audit: dict | None = None,
 ) -> None:
-    """把一次心跳唤醒的等待决策记为 phase='waiting' 的 TurnLog（观测用，不占 harness_output）。
+    """Record one heartbeat-awakened waiting decision as phase='waiting' TurnLog (for observation; does not occupy harness_output).
 
-    perceive 形如 [judgment|intent→action] notes；act 自报 gap 时追加 WAIT_GAP 信号。
-    send_message 的正文写入 TurnLog.message（内通道）；其余动作为空。
-    Spec-0024/T6：send_message 分配 utterance，delivery=queued（排在当前 open 之后）。
+    perceive resembles [judgment|intent→action] notes; act self-reports gap, then append WAIT_GAP signal.
+    send_message body written to TurnLog.message (internal channel); other actions are empty.
+    Spec-0024/T6: send_message allocates utterance, delivery=queued (queued after current open).
     """
     note = perceive.strip()
     head = f"[{judgment}|{intent}→{action}]"
     perceive_logged = f"{head} {note}" if note else head
-    # 信道标注：send_message 是内（EMIT）；interrupt/give_up/keep_waiting 是外/本地（SILENT）。
+    # Channel annotations: send_message is inner (EMIT); interrupt/give_up/keep_waiting are outer/local (SILENT).
     if action == "send_message":
         executor, channel = Executor.HARNESS.value, Channel.EMIT.value
     else:
@@ -855,9 +863,9 @@ def _log_waiting(
 
 
 class _SessionClock:
-    """会话相对时间轴：history 一律 `[+Ns] …`，避免多种增量时间写法混用。
+    """Session relative timeline: all history entries as `[+Ns] …`, avoid mixing multiple delta-time notations.
 
-    墙钟与 harness 上报的 waited_sec 取 max，便于单测用 fake poll 的 waited 推进时间轴。
+    Wall clock and harness-reported waited_sec take max, enabling unit tests with fake poll's waited to advance timeline.
     """
 
     def __init__(self) -> None:
@@ -890,7 +898,7 @@ def _note_waiting_memory(
     perceive: str,
     gap: bool,
 ) -> None:
-    """心跳思考+动作写入 history（时间由 clock 统一打 [+Ns] 前缀）。"""
+    """Heartbeat thought + action written to history (timestamps unified by clock, prefixed with [+Ns])."""
     intent_one = intent.strip().replace("\n", " ")[:120] or "(no intent)"
     note = perceive.strip().replace("\n", " ")[:160]
     gap_bit = " (felt a gap — action did not fully match intent)" if gap else ""
@@ -954,7 +962,7 @@ def _narrate_terminal(*, result, persona, client, system, task, history, state) 
 
 
 def _activity_from_harness(harness) -> list[dict]:
-    """本轮已见活动：优先 last_progress；否则从 last_steps 抽 tool/tool_error（短标题）。"""
+    """Activity seen this round: prefer last_progress; else extract tool/tool_error short titles from last_steps."""
     progress = list(getattr(harness, "last_progress", None) or [])
     if progress:
         return progress
@@ -989,11 +997,11 @@ def _heartbeat_once(
     goal_frame: dict | None = None,
     goal_ledger: GoalLedger | None = None,
 ) -> tuple[str, str, bool, int]:
-    """一次性等待决策（timer 触发）。任意动作（含 keep_waiting）做完即结束本次心跳。
+    """One-shot waiting decision (timer triggered). Any action (including keep_waiting) completes this heartbeat.
 
-    Spec-0023：仅 judge → intent → act（three）。
-    返回 (action, message, gap, new_progress_seen)。
-    强制 give_up：心跳次数触顶，或 keep_waiting 且无新进度把耐心耗尽。
+    Spec-0023: only judge → intent → act (three).
+    Return (action, message, gap, new_progress_seen).
+    Forced give_up: heartbeat count maxed, or keep_waiting with no new progress exhausts patience.
     """
     new_progress = len(progress) > progress_seen
     goal_before = goal_ledger.snapshot() if goal_ledger is not None else {}
@@ -1122,7 +1130,7 @@ def _heartbeat_once(
 
 
 def _try_ready_reply(harness) -> str | None:
-    """心跳动作执行前：非阻塞看 reply 是否已到（LLM 思考期间可能已进缓冲）。"""
+    """Before heartbeat action execution: non-blocking check if reply already arrived (may be buffered while LLM is thinking)."""
     fn = getattr(harness, "try_reply", None)
     if not callable(fn):
         return None
@@ -1149,17 +1157,17 @@ def _await_harness(
     goal_frame: dict | None = None,
     goal_ledger: GoalLedger | None = None,
 ) -> tuple[str, float, str | None, str | None]:
-    """写消息后进入 AwaitEvent：reply → 交主 loop；timer → 一次性心跳后回到 AwaitEvent。
+    """After message write, enter AwaitEvent: reply → pass to main loop; timer → one-shot heartbeat then return to AwaitEvent.
 
-    Spec-0024/T6：本轮写对应 open_utterance_id；收到的 reply/interrupt 关闭该 open。
-    Spec-0036：写走统一 write_message（兼容 begin/emit 别名）。
-    心跳动作（含 keep_waiting / send_message）做完即结束本次心跳，不在心跳内 continue poll。
+    Spec-0024/T6: this round's write associates with open_utterance_id; received reply/interrupt closes that open.
+    Spec-0036: unified write_message (compatible with begin/emit aliases).
+    Heartbeat actions (including keep_waiting / send_message) complete this heartbeat; do not continue poll within heartbeat.
 
-    返回 (harness_output, elapsed_sec, terminal_action, user_control)：
-      - reply：terminal=None，user_control=None（主 loop 下一轮 decide）；
-      - interrupt：控制回复入 harness_output，user_control="interrupt"；
-      - give_up：harness_output=""，terminal="give_up"；
-      - 崩溃：harness_output 为 [harness error] 串。
+    Return (harness_output, elapsed_sec, terminal_action, user_control):
+      - reply: terminal=None, user_control=None (main loop next round decides);
+      - interrupt: control response enters harness_output, user_control="interrupt";
+      - give_up: harness_output="", terminal="give_up";
+      - crash: harness_output is [harness error] string.
     """
     t0 = time.monotonic()
     begin_at = clock.now()
@@ -1267,7 +1275,7 @@ def _await_harness(
                     pass
                 return "", time.monotonic() - t0, "protocol_stalled", None
             continue
-        # 决策期间 reply 可能已进缓冲：动作执行前先确认；有则作废等待动作，交回主 loop。
+        # A reply may have entered the buffer during decision-making: verify before executing the action; if one is present, void the waiting action and hand control back to the main loop.
         ready = _try_ready_reply(harness)
         if ready is not None:
             clock.stamp(
@@ -1280,7 +1288,7 @@ def _await_harness(
             clock.observe(begin_at + (time.monotonic() - t0))
             ledger.close_open_as_answered()
             return ready, time.monotonic() - t0, None, None
-        # 任意动作都结束本次心跳；下面只执行 I/O 副作用，然后要么 return 给主环，要么回 AwaitEvent。
+        # Any action ends the current heartbeat; below we only perform the I/O side effects, then either return to the main loop or go back to AwaitEvent.
         if action == "send_message":
             try:
                 _write_harness_message(harness, wait_message)
@@ -1292,7 +1300,7 @@ def _await_harness(
                     None,
                     None,
                 )
-            continue  # 回 AwaitEvent：下一笔 reply 唤醒主 loop，不再嵌套心跳决策
+            continue  # Return to AwaitEvent: the next reply wakes the main loop; no more nested heartbeat decisions
         if action == "interrupt":
             try:
                 ctrl_out = harness.interrupt()
@@ -1312,11 +1320,11 @@ def _await_harness(
         if action == "give_up":
             try:
                 harness.shutdown()
-            except Exception:  # noqa: BLE001  give_up 是终止意图，关闭失败不应阻塞会话收场
+            except Exception:  # noqa: BLE001  give_up is a terminal intent; a close failure must not block the session wrap-up
                 pass
             ledger.clear_open()
             return "", time.monotonic() - t0, "give_up", None
-        # keep_waiting：动作已记录并可能耗心；回 AwaitEvent，等下一笔 reply 或下一跳 timer。
+        # keep_waiting: the action has been recorded and may drain patience; return to AwaitEvent and wait for the next reply or the next timer hop.
         continue
 
 
@@ -1332,8 +1340,8 @@ def run_session(
     before_terminal_review: Callable[[], None] | None = None,
     on_actor_complete: Callable[[dict], None] | None = None,
 ) -> SessionResult:
-    # on_progress: 每轮写完 TurnLog 后回调一次进行中的 result(含终止轮)，供观测层(看板)逐轮展示。
-    # Spec-0023：主决定与心跳均为 judge → intent → act（three），无 mode 旋钮。
+    # on_progress: after each round's TurnLog is written, invoke the callback once with the in-progress result (including the terminal round) so the observation layer (dashboard) can display round by round.
+    # Spec-0023: both the main decision and the heartbeat are judge → intent → act (three); no mode knob.
     coef = make_coef(persona)
     state = init_state(persona)
     system = build_system(persona)
@@ -1344,10 +1352,11 @@ def run_session(
     history: list[str] = []
     clock = _SessionClock()
     harness_output = ""
-    harness_steps: list = []  # 与 harness_output 配对的内层过程流
-    harness_events: list = []  # 上一轮 stdout 可见事件流，供下一次主决策感知
-    prior_activity: list[dict] = []  # 上一轮已完成请求的活动条（过程记忆，供对照）
-    ledger = _UtteranceLedger()  # Spec-0024/T6：请求–回复配对
+    harness_steps: list = []  # Inner process stream paired with harness_output
+    harness_events: list = []  # The previous round's visible stdout event stream, for the next main decision to perceive
+    # Activity bars of requests completed in the previous round (process memory, for comparison)
+    prior_activity: list[dict] = []
+    ledger = _UtteranceLedger()  # Spec-0024/T6: request–reply pairing
     started_at = time.monotonic()
 
     while state.turn < MAX_TURNS:
@@ -1358,10 +1367,10 @@ def run_session(
         phase = Phase.OPENING if state.turn == 0 and not history else Phase.ACTIVE
         goal_before = goal_ledger.snapshot()
 
-        # ② 派生动作空间
+        # ② Derived action space
         space = derive_action_space(phase, persona, state)
 
-        # ③ 同构主决定：judge → intent → act。
+        # ③ Main decision follows the same stages: judge → intent → act.
         try:
             ret, decide_calls, intent, gap = _main_decide(
                 client=client,
@@ -1414,18 +1423,18 @@ def run_session(
         goal_after = goal_ledger.snapshot()
         result.goal_ledger = goal_after
         result.goal_audit = goal_ledger.audit()
-        # 开局：据 persona 主观任务量读数，在耐心基线上叠加一次性小浮动（同一个人接不同任务耐心不同）。
+        # At session start: based on the persona's subjective reading of the task size, overlay a one-time small fluctuation on the patience baseline (the same persona shows different patience for different tasks).
         if phase is Phase.OPENING:
             apply_task_load(state, str(ret.get("task_load", "normal")))
 
-        # ③.5 方案 B：action=='free' 交给模型自评归类到合法 id（替代关键词硬猜）。
-        # 仅 client 支持 classify_action 时启用；否则落 resolve 的安全兜底。
+        # ③.5 Option B: when action=='free', let the model self-assess and classify it into a legal id (replacing hard-coded keyword guessing).
+        # Enabled only when the client supports classify_action; otherwise fall through to resolve's safe fallback.
         try:
             if ret.get("action") == "free" and hasattr(client, "classify_action"):
                 ret = {**ret, "action": client.classify_action(system, ret, space)}
                 decide_calls.extend(_take_persona_calls(client, "classify_action"))
 
-            # ④ resolve: 只接收真实合法 action；缺失、越界或信道冲突一律 fail closed。
+            # ④ resolve: accepts only genuinely legal actions; missing, out-of-range, or channel-conflicting ones all fail closed.
             action_id, message = resolve_action(ret, space, persona)
         except (PersonaProtocolError, ActionResolutionError) as exc:
             result.persona_tail.extend(decide_calls)
@@ -1453,7 +1462,7 @@ def run_session(
             break
         spec = CATALOG[action_id]
 
-        # ⑤ 状态写回 (只吃主观 verdict)
+        # ⑤ State write-back (consumes only the subjective verdict)
         verdict = ret.get("verdict", "unsure")
         if verdict not in VERDICTS:
             verdict = "unsure"
@@ -1463,7 +1472,7 @@ def run_session(
         head = f"[{verdict}|{intent}→{action_id}]"
         perceive_logged = f"{head} {note}" if note else head
 
-        # Spec-0024/T6：本拍若带着上一笔 reply，挂上 answers；若本拍外发，分配 utterance。
+        # Spec-0024/T6: if this beat carries the previous reply, attach answers; if this beat sends outward, allocate an utterance.
         answers_id, answers_said = ("", "")
         if harness_output.strip():
             answers_id, answers_said = ledger.consume_pending_answers()
@@ -1473,7 +1482,8 @@ def run_session(
             utterance_id = ledger.alloc(message)
             delivery = "open"
 
-        result.pending_harness_output = None  # 该回复即将随本条 TurnLog 落日志, 不再悬挂
+        # This reply is about to be logged with this TurnLog and is no longer left hanging
+        result.pending_harness_output = None
         result.pending_harness_steps = None
         result.pending_harness_events = None
         result.turns.append(
@@ -1511,13 +1521,14 @@ def run_session(
         if gap:
             result.signals.append(f"WAIT_GAP: intent={intent} action={action_id}")
         if on_progress is not None:
-            on_progress(result)  # 逐轮观测钩子(含终止轮): 喂给看板等观测层, 不影响主循环
+            # Round-by-round observation hook (including the terminal round): feeds observation layers such as the dashboard; does not affect the main loop
+            on_progress(result)
 
-        # 记历史(只记 B 线真正发出的话；空 message 不 fabricate、不入史)；统一 [+Ns] 前缀。
+        # Record history (only utterances actually sent on line B; empty messages are not fabricated and not recorded); uniform [+Ns] prefix.
         if spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE and message.strip():
             clock.stamp(history, f"you -> harness: {message}")
 
-        # ⑥ 终止判定（三种终止都以本人口吻留一条自包含 issue，见 _finalize_terminal）
+        # ⑥ Termination determination (all three termination types leave one self-contained issue in the persona's own voice; see _finalize_terminal)
         if spec.effect is Effect.TERMINATE:
             # Spec-0056/T4: persist the user's terminal claim without overriding it.
             terminal_audit = goal_ledger.commit_terminal_effect(
@@ -1574,8 +1585,8 @@ def run_session(
             )
             break
 
-        # ⑦ 路由。EMIT：真实子进程走 AwaitEvent（reply→主 decide；timer→一次性心跳）；
-        # Fake/Scripted 退回阻塞 route。
+        # ⑦ Routing. EMIT: a real subprocess goes through AwaitEvent (reply → main decide; timer → one-shot heartbeat);
+        # Fake/Scripted fall back to the blocking route.
         _t0 = time.monotonic()
         _emits = spec.channel is Channel.EMIT and spec.effect is not Effect.TERMINATE
         terminal_from_wait: str | None = None
@@ -1601,7 +1612,8 @@ def run_session(
                 goal_frame=goal_ledger.prompt_snapshot(),
                 goal_ledger=goal_ledger,
             )
-            if terminal_from_wait == "give_up":  # 等待决策放弃：走终止路径并结束
+            # Waiting decision gives up: take the termination path and finish
+            if terminal_from_wait == "give_up":
                 _finalize_terminal(
                     "give_up",
                     result=result,
@@ -1620,25 +1632,25 @@ def run_session(
             elapsed = time.monotonic() - _t0
             if nxt is not None:
                 clock.observe(clock.now() + elapsed)
-                # 阻塞 route：reply 即关闭本拍刚分配的 open utterance
+                # Blocking route: a reply immediately closes the open utterance just allocated this beat
                 if utterance_id:
                     ledger.mark_open(utterance_id)
                     ledger.close_open_as_answered()
             elif action_id == "keep_waiting":
-                # 再等无新 reply：仍把等待期吞到的旁路事件交给下一轮感知（避免空转丢 status）。
+                # Waiting again with no new reply: still hand the side-channel events swallowed during the wait to the next round's perception (to avoid idle spinning that drops status).
                 drain_only = getattr(harness, "drain_visible_events", None)
                 if callable(drain_only):
                     ev_only = list(drain_only())
                     if ev_only:
                         harness_events = ev_only
         if nxt is not None:
-            # 时间感知·轻耗心：仅极端超时才自动扣一点耐心。
-            # 仅对阻塞 route：AwaitEvent 路径的等待挫败已由 keep_waiting 一次性心跳建模，不双记。
+            # Time awareness · light patience drain: only extreme timeouts automatically deduct a bit of patience.
+            # Only for the blocking route: waiting frustration on the AwaitEvent path is already modeled by keep_waiting's one-shot heartbeat; no double counting.
             if not supervised and elapsed >= _EXTREME_WAIT_SEC:
                 state.patience = max(0, state.patience - 1)
             harness_output = nxt
-            # 与回复配对的内层过程流：send 后 launcher 把它挂在 harness.last_steps（观测旁路）。
-            # Fake/Scripted harness 无此属性 → []。route 只在 EMIT 轮真调 send，此处取值即本轮回复的。
+            # Inner process stream paired with the reply: after send, the launcher attaches it to harness.last_steps (observation side channel).
+            # Fake/Scripted harnesses lack this attribute → []. route only actually calls send on EMIT rounds, so the value fetched here is this round's reply's.
             steps = getattr(harness, "last_steps", None)
             harness_steps = list(steps) if isinstance(steps, list) else []
             drain_events = getattr(harness, "drain_visible_events", None)
@@ -1646,7 +1658,7 @@ def run_session(
                 harness_events = list(drain_events())
             else:
                 harness_events = []
-            # 活动条写入过程记忆：下次等待时可对照（不宣称「这是哪一轮的活动」归属）。
+            # Activity bars are written into process memory: available for comparison at the next wait (without asserting attribution of 'which round this activity belongs to').
             prior_activity = _activity_from_harness(harness)
             if prior_activity:
                 titles = [
@@ -1659,7 +1671,7 @@ def run_session(
                         history,
                         "harness activity: " + "; ".join(titles)[:240],
                     )
-            # Spec-0024/T6：answers 写在下一拍 TurnLog；history 仍给人读的短预览。
+            # Spec-0024/T6: answers are written to the next beat's TurnLog; history still carries a short human-readable preview.
             if user_control:
                 clock.stamp(
                     history,
@@ -1668,20 +1680,20 @@ def run_session(
                 )
             else:
                 clock.stamp(history, f"harness -> you: {nxt.splitlines()[0][:80]}...")
-            # harness 回复到手即推观测层(不等 persona 下一轮), 否则长任务期间看板对话缺半边
+            # Push the harness reply to the observation layer as soon as it arrives (without waiting for the persona's next round); otherwise the dashboard conversation is missing half of the dialogue during long tasks
             result.pending_harness_output = nxt
             result.pending_harness_steps = harness_steps
             result.pending_harness_events = list(harness_events or [])
             if on_progress is not None:
                 on_progress(result)
-            # timeout/crash 是 workspace 已失效的会话终态。回复文本仍作为 pending
-            # evidence 保留，但不能再进入下一轮 persona 决策，更不能再向已死容器写消息。
+            # timeout/crash is the terminal state of an invalidated workspace session. Reply text remains as pending
+            # evidence is retained, but cannot enter the next round of persona decision-making, and certainly cannot write messages to the dead container.
             terminal_status = _harness_terminal_status(harness)
             if terminal_status:
                 result.end_reason = f"harness_{terminal_status}"
                 result.signals.append(f"HARNESS_TERMINAL: {terminal_status}")
                 break
-        # 本轮若未产生下一条 harness 输出（例如模型空转），保持上一条可见输出供下一轮继续判断。
+        # If this round produces no next harness output (e.g., model idle), retain the previous visible output for the next round to continue evaluation.
 
     result.goal_ledger = goal_ledger.snapshot()
     final_goal_audit = goal_ledger.audit()
@@ -1762,13 +1774,13 @@ def _finish_terminal_review(*, persona, client, result, history, state, task) ->
         result.experience = experience_feedback(None, source="simulated_user", error=reason)
         return result
 
-    # 收尾: 汇总纯主观的行为信号
+    # Conclusion: aggregate purely subjective behavioral signals
     _collect_signals(result, persona)
 
-    # 会话末两路并出体感分 (训练信号), 均只吃主观信号, 不读客观真值:
-    # ② 框架派生仅作独立诊断，不补测量缺失。
+    # Session end: two-stream convergence of subjective experience scores (training signals), both consuming only subjective signals, not objective ground truth:
+    # ② Framework derivation serves only as independent diagnosis, not to supplement missing measurements.
     result.feeling_derived = derive_feeling(result.end_reason, result.turns)
-    # ① LLM 自评: persona 在角色内给"这次体验"打 1–4 + 理由 (spec-0001/T3 产出方式)
+    # ① LLM self-evaluation: persona rates "this experience" 1–4 in-character + rationale (spec-0001/T3 output method)
     set_usage_context(interaction_id=None, turn_no=None, operation="rate")
     try:
         rating = client.respond(system, build_rating_turn(task, history, state))
@@ -1799,7 +1811,7 @@ def _finish_terminal_review(*, persona, client, result, history, state, task) ->
 
 
 def _collect_signals(result: SessionResult, persona: Persona) -> None:
-    """行为信号一律从本局主观数据派生(end_reason / verdict / persona), 不读客观真值。"""
+    """All behavior signals derived from this session's subjective data (end_reason / verdict / persona), never read objective ground truth."""
     fails = sum(1 for t in result.turns if t.verdict == "failed_blame_harness")
     if persona.d1.value in ("blind", "shallow") and result.end_reason == "abandoned":
         result.signals.append(

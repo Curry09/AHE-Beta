@@ -1,7 +1,7 @@
-# Spec-0029/T5：divergent = discovery 轨生成器单测（stub agent，不跑真 LLM）。
-"""验证 divergent：吃会话证据（体感索引）+ 勿重复参照（紧凑索引），产 proposal+from-divergent
-（不可领）；每轮硬顶 3 条；字段不全跳过；drift-guard（submit_divergent yaml == rfc_input_schema）。
-旧 gate 三路测试已随 gate_once 退役删除——准入裁决测试见 test_owner.py（Spec-0029/T6）。"""
+# Spec-0029/T5: divergent = unit tests of the discovery-track generator (stub agent, no real LLM).
+"""Verify divergent: consumes session evidence (user experience index) + no-repeat reference (compact index), produces proposal+from-divergent
+(not claimable); hard cap of 3 per round; skips entries with incomplete fields; drift-guard (submit_divergent yaml == pm_input_schema).
+The old gate three-path tests were deleted along with the retirement of gate_once — see test_owner.py for admission adjudication tests (Spec-0029/T6)."""
 
 from __future__ import annotations
 
@@ -43,14 +43,14 @@ def _seed_session(store: SessionStore, *, score: int = 3) -> None:
 
 def _pm_artifact() -> dict:
     return {
-        "user_goal": "持续掌握长任务进展",
-        "observed_behaviors": ["超时后反复追问状态"],
-        "experience_tension": "系统在工作但用户无法判断是否仍值得等待",
-        "product_opportunity": "提供连续、可理解的进展反馈",
-        "desired_outcome": "用户无需用追问恢复确定感",
+        "user_goal": "Maintain continuous awareness of long running task progress",
+        "observed_behaviors": ["Repeatedly ask for status after timeout"],
+        "experience_tension": "The system is working but the user cannot tell whether it is still worth waiting",
+        "product_opportunity": "Provide continuous、Understandable progress feedback",
+        "desired_outcome": "The user does not need follow up questions to regain certainty",
         "evidence_sessions": ["SESSION_ID"],
         "solution_level": "product_capability",
-        "abstraction_rationale": "只描述用户可感知能力与结果",
+        "abstraction_rationale": "Describe only user perceptible capabilities and results",
     }
 
 
@@ -113,7 +113,7 @@ def _recovery(tmp_path: Path) -> RecoveryStore:
 
 
 def test_submit_divergent_yaml_matches_contract() -> None:
-    """drift-guard：submit_divergent.tool.yaml 的 input_schema = rfc_input_schema()（同 RFC shape）。"""
+    """drift-guard: input_schema of submit_divergent.tool.yaml = pm_input_schema() (same PM artifact shape)."""
     import yaml
 
     from ahe_beta.demand.agent_contract import pm_input_schema
@@ -130,7 +130,7 @@ def test_submit_divergent_yaml_matches_contract() -> None:
 
 def test_divergent_creates_unclaimable_proposal(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    canned = _submit([{"title": "状态交接产品化", **_pm_artifact()}])
+    canned = _submit([{"title": "Productize status handoff", **_pm_artifact()}])
     d = _divergent(tmp_path, tracker, canned, round_provider=lambda: 2)
     out = d.propose_once()
     assert isinstance(out, DivergentOutcome) and out.count == 1
@@ -140,48 +140,52 @@ def test_divergent_creates_unclaimable_proposal(tmp_path: Path) -> None:
     assert sc.PROPOSAL in labels and sc.FROM_DIVERGENT in labels
     assert "round-2" in labels
     assert sc.plane(labels) == sc.PROPOSAL
-    assert not sc.is_ready(labels=labels, state="open")  # 不可领，待 Owner 准入
+    assert not sc.is_ready(labels=labels, state="open")  # Not claimable; awaiting Owner admission
 
 
 def test_divergent_inputs_are_session_first(tmp_path: Path) -> None:
-    """输入 = 体感索引 + 勿重复参照（open 提案/ready），不吃 triaged backlog/runtime_agg。"""
+    """Input = user experience index + no-repeat reference (open proposals/ready); does not consume triaged backlog/runtime_agg."""
     tracker = FakeTracker()
     ref1 = tracker.create_issue(
-        IssueDraft(title="已有提案", body="x", labels=[sc.PROPOSAL, sc.FROM_TRIAGE])
+        IssueDraft(title="Existing proposals", body="x", labels=[sc.PROPOSAL, sc.FROM_TRIAGE])
     ).number
-    ref2 = tracker.create_issue(IssueDraft(title="ready 项", body="x", labels=[sc.READY])).number
-    tracker.create_issue(IssueDraft(title="raw report", body="x", labels=[sc.REPORT]))  # 不作参照
+    ref2 = tracker.create_issue(IssueDraft(title="ready Items", body="x", labels=[sc.READY])).number
+    # Not used as a reference
+    tracker.create_issue(IssueDraft(title="raw report", body="x", labels=[sc.REPORT]))
     d = _divergent(tmp_path, tracker, _submit([]))
     d.propose_once()
-    assert len(d.seen_trend) == 1  # 体感索引喂进
-    assert {i.number for i in d.seen_reference} == {ref1, ref2}  # 参照只含提案/ready
+    assert len(d.seen_trend) == 1  # The user experience index is fed in
+    # references contain only proposal/ready
+    assert {i.number for i in d.seen_reference} == {ref1, ref2}
 
 
 def test_divergent_dedupe_reference_is_compact() -> None:
     tracker = FakeTracker()
     tracker.create_issue(
         IssueDraft(
-            title="精确指令下探索范围失控",
-            body="### 根因区域\n\nagents/main.md 未约束精确任务的探索范围",
+            title="Exploration scope runs out of control under precise instructions",
+            body="### Root cause\n\nagents/main.md Exploration scope is not constrained for precise tasks",
             labels=[sc.PROPOSAL, sc.FROM_TRIAGE],
         )
     )
     rendered = Divergent._format_issues(tracker.list_open_issues())
-    assert "精确指令下探索范围失控" in rendered
-    assert "agents/main.md 未约束精确任务的探索范围" not in rendered
+    assert "Exploration scope runs out of control under precise instructions" in rendered
+    assert "agents/main.md Exploration scope is not constrained for precise tasks" not in rendered
 
 
 def test_divergent_caps_at_three(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    many = [{"title": f"候选{i}", **_pm_artifact()} for i in range(5)]
+    many = [{"title": f"Candidate{i}", **_pm_artifact()} for i in range(5)]
     out = _divergent(tmp_path, tracker, _submit(many)).propose_once()
-    assert out.count == 3  # 每轮硬顶
+    assert out.count == 3  # hard cap per round
 
 
 def test_divergent_incomplete_fields_skipped(tmp_path: Path) -> None:
     tracker = FakeTracker()
     out = _divergent(
-        tmp_path, tracker, _submit([{"title": "半成品", "user_goal": "只填了这个"}])
+        tmp_path,
+        tracker,
+        _submit([{"title": "Half finished product", "user_goal": "Only filled this in"}]),
     ).propose_once()
     assert out.count == 0
     assert tracker.list_open_issues() == []
@@ -189,7 +193,7 @@ def test_divergent_incomplete_fields_skipped(tmp_path: Path) -> None:
 
 def test_divergent_no_submit_is_noop(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    out = _divergent(tmp_path, tracker, "散文，没调 submit").propose_once()
+    out = _divergent(tmp_path, tracker, "Prose，Did not tune it submit").propose_once()
     assert out.count == 0
 
 
@@ -209,7 +213,7 @@ def test_recovery_reuses_output_and_reconciles_created_proposal(tmp_path: Path) 
     divergent = _divergent(
         tmp_path,
         tracker,
-        _submit([{"title": "状态交接产品化", **_pm_artifact()}]),
+        _submit([{"title": "Productize status handoff", **_pm_artifact()}]),
         recovery=recovery,
     )
     with bind_usage_context(round_no=1, operation="divergent-worker-0"):

@@ -24,10 +24,10 @@ def main() -> int:
     repo = Path("/opt/auto-designer/harness_repo")
     source = tracker.create_issue(
         IssueDraft(
-            title="用户希望助手在长任务中提供可操作的进度信号",
+            title="The user wants actionable progress signals during long tasks",
             body=(
-                "用户报告：助手执行较长任务时只显示静默等待，用户无法判断是在工作还是卡住。"
-                "需要保留真实进度、等待和中断语义，并给出可验收的交互行为。"
+                "User report：The assistant only shows a silent wait during long tasks，The user cannot tell whether it is working or stuck。"
+                "Actual progress must be preserved、Waiting and interruption semantics，And provide interaction behavior with verifiable acceptance criteria。"
             ),
             labels=[PROPOSAL, FROM_TRIAGE, "P2"],
         )

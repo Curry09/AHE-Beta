@@ -111,7 +111,7 @@ def test_actual_runners_persist_complete_patch_before_save_and_close(
     store = _CheckingStore(tmp_path / "data" / "sessions")
     review = _ReviewClient()
     run, persona = _runner(mode, store, review)
-    content = "用户修改\n" * 5000 + "complete-tail\n" if long_patch else "baseline\n"
+    content = "User change\n" * 5000 + "complete-tail\n" if long_patch else "baseline\n"
     prediction_path = store.root.parent / "predictions" / f"{sid}.patch"
     workspace = _ObservedWorkspace(str(repo), prediction_path)
     with bind_usage_context(session_id=sid, round_no=1):
@@ -339,7 +339,7 @@ def test_retry_after_session_save_crash_reuses_original_prediction(
 
     store = CrashOnceStore(tmp_path / "data" / "sessions")
     run, persona = _runner(mode, store, _ReviewClient())
-    content = "完整补丁\n" * 5000
+    content = "Complete patch\n" * 5000
     with bind_usage_context(session_id=sid):
         with pytest.raises(RuntimeError, match="crash before"):
             run(

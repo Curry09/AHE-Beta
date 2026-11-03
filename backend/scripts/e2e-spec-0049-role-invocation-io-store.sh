@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Spec-0049/T5：角色调用落盘与冻结重放 e2e——无密钥、不启真 Gitea/vigil。
+# Spec-0049/T5: e2e for role-invocation persistence and frozen replay — no keys, no real Gitea/vigil started.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

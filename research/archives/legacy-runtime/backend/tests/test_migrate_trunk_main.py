@@ -1,10 +1,10 @@
-# Spec-0007/T3：migrate_trunk_main 一次性迁移单测（真临时 git 仓，不触远端）。
-"""验证 main←release 收敛：
+# Spec-0007/T3: one-off migration unit tests for migrate_trunk_main (using a real temporary Git repository; does not touch the remote).
+"""Verify main←release convergence:
 
-- main 指向旧 release tip（内容与历史全保留、git log 见 release 历史），release/孤儿/已合并分支全删，
-  本地仅剩 main；
-- 重复运行幂等无副作用、不报错；
-- release 不存在 / main 非 release 祖先 → 安全跳过、打印原因、不执行 -f/删除、仓状态不变。
+- main points to the old release tip (all content and history are preserved; `git log` shows the release history), and all release/orphan/merged branches are deleted,
+  leaving only main locally;
+- repeated runs are idempotent, with no side effects or errors;
+- if release does not exist / main is not an ancestor of release → safely skip, print the reason, do not execute -f or delete anything, and leave the repository state unchanged.
 """
 
 from __future__ import annotations
@@ -30,23 +30,23 @@ def _branches(repo: Path) -> list[str]:
 
 
 def _seed_main_plus_release(tmp_path: Path) -> Path:
-    """种 main(空种子) + release(领先若干提交) + 孤儿 fix/issue-* + 一条已合并分支。"""
+    """Seed main (with an empty seed commit) + release (several commits ahead) + an orphan fix/issue-* branch + one merged branch."""
     repo = tmp_path / "harness"
     repo.mkdir()
     subprocess.run(["git", "init", "-b", "main", str(repo)], check=True, capture_output=True)
     (repo / "main.md").write_text("v0 seed\n", encoding="utf-8")
     _git(repo, "add", ".")
-    _git(repo, "commit", "-m", "seed: harness v0")  # main 空种子
-    # release 从 main 起、领先多个演化提交
+    _git(repo, "commit", "-m", "seed: harness v0")  # Empty main seed
+    # release branched from main, ahead by multiple evolution commits
     _git(repo, "branch", "release")
     _git(repo, "checkout", "release")
     for i in (1, 2, 3):
         (repo / "main.md").write_text(f"v0 seed\n# evo {i}\n", encoding="utf-8")
         _git(repo, "commit", "-am", f"release: evo {i}")
-    # 孤儿 fix/issue-* 分支（从 release 切，残留）
+    # Orphan fix/issue-* branches (branched from release, left behind)
     for n in (7, 8):
         _git(repo, "branch", f"fix/issue-{n}")
-    # 一条已合并进 release 的分支
+    # A branch already merged into release
     _git(repo, "branch", "merged-feat")
     _git(repo, "checkout", "main")
     return repo
@@ -59,12 +59,12 @@ def test_migrates_main_to_release_tip_and_prunes(tmp_path) -> None:
 
     rc = migrate_trunk_main(repo=repo, push_remote=False, set_default_branch=None)
     assert rc == 0
-    # main 指向旧 release tip，内容与全部 release 历史保留
+    # main points to the old release tip; all content and release history are preserved
     assert _git(repo, "rev-parse", "main") == release_tip
     assert (repo / "main.md").read_text(encoding="utf-8") == "v0 seed\n# evo 3\n"
     assert _git(repo, "log", "main", "--oneline") == release_log
     assert "release: evo 3" in release_log
-    # 本地仅剩 main 一条线（release/孤儿/已合并全删）
+    # Only main remains locally (release/orphan/merged branches all deleted)
     assert _branches(repo) == ["main"]
 
 
@@ -72,14 +72,14 @@ def test_idempotent_second_run_noop(tmp_path) -> None:
     repo = _seed_main_plus_release(tmp_path)
     assert migrate_trunk_main(repo=repo, push_remote=False, set_default_branch=None) == 0
     head_after_first = _git(repo, "rev-parse", "main")
-    # 二次运行：无 release → no-op，不报错、不改动
+    # Second run: no release → no-op; no error and no changes
     assert migrate_trunk_main(repo=repo, push_remote=False, set_default_branch=None) == 0
     assert _git(repo, "rev-parse", "main") == head_after_first
     assert _branches(repo) == ["main"]
 
 
 def test_no_release_safe_skip(tmp_path) -> None:
-    """本就无 release（纯 trunk）→ 视为已迁移，no-op 返回 0、分支不变。"""
+    """No release branch exists to begin with (pure trunk) → treat as already migrated; return 0 as a no-op, leaving branches unchanged."""
     repo = tmp_path / "h"
     repo.mkdir()
     subprocess.run(["git", "init", "-b", "main", str(repo)], check=True, capture_output=True)
@@ -91,9 +91,9 @@ def test_no_release_safe_skip(tmp_path) -> None:
 
 
 def test_main_not_ancestor_of_release_safe_exit(tmp_path) -> None:
-    """main 已分叉（非 release 祖先）→ 安全退出 rc=1，不执行 -f/删除，分支与 HEAD 不变。"""
+    """main has diverged (is not an ancestor of release) → exit safely with rc=1, without executing -f or deletion; leave branches and HEAD unchanged."""
     repo = _seed_main_plus_release(tmp_path)
-    # 让 main 领先一个 release 没有的提交 → main 不再是 release 祖先
+    # Give main a commit that is absent from release → main is no longer an ancestor of release
     (repo / "main.md").write_text("v0 seed\n# main-only divergence\n", encoding="utf-8")
     _git(repo, "commit", "-am", "main: diverge")
     main_before = _git(repo, "rev-parse", "main")
@@ -101,5 +101,5 @@ def test_main_not_ancestor_of_release_safe_exit(tmp_path) -> None:
 
     rc = migrate_trunk_main(repo=repo, push_remote=False, set_default_branch=None)
     assert rc == 1
-    assert _git(repo, "rev-parse", "main") == main_before  # 未改动
-    assert _branches(repo) == branches_before  # release/孤儿仍在，未删
+    assert _git(repo, "rev-parse", "main") == main_before  # Unchanged
+    assert _branches(repo) == branches_before  # release/orphans still exist; not deleted

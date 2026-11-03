@@ -1,13 +1,12 @@
 ---
 number: '0083'
-title: 可扩展的会话产物与独立客观验收
+title: "Extensible session artifacts and independent objective acceptance verification"
 issue: 0
 slug: extensible-session-grading
-summary: 统一 direct 与模拟交互的验收产物，保留现有 SWE 评分并增加 benchmark
-  与自定义评分适配；评分读取冻结归档、独立留存，缺失证据不补造。
+summary: "Unify acceptance artifacts for direct and simulated interactions, retain existing SWE grading, and add benchmark and custom grading adapters; grading reads frozen archives and is stored independently, without fabricating missing evidence."
 tasks:
 - id: T1
-  title: 统一评分合同、注册与结果语义
+  title: "Unified grading contracts, registration, and result semantics"
   status: done
   priority: P1
   tags: []
@@ -20,11 +19,10 @@ tasks:
   - backend/ahe_beta/evaluation/results.py
   - backend/ahe_beta/evaluation/acceptance.py
   - backend/tests/evaluation/test_grading_contracts.py
-  scope: 定义只读评分请求、固定适配器注册、执行合同与公共结果；抽出接受关系，区分连续分数及基础设施故障。
-  acceptance: 未知适配器或版本明确拒绝；completed 才可计技术成败；非 fresh 合同可严格核验；未验收或连续分数不自动成为
-    valid_accept。
+  scope: "Define read-only grading requests, fixed adapter registration, execution contracts, and public results; extract acceptance relations and distinguish continuous scores from infrastructure failures."
+  acceptance: "Explicitly reject unknown adapters or versions; only completed results may count as technical success or failure; non-fresh contracts must support strict verification; unverified results or continuous scores do not automatically become valid_accept."
 - id: T2
-  title: 任务来源、公开产物声明与兼容身份
+  title: "Task sources, public artifact declarations, and compatible identity"
   status: done
   priority: P1
   tags: []
@@ -40,12 +38,10 @@ tasks:
   - backend/ahe_beta/models.py
   - backend/tests/test_experiment_grading_task_config.py
   - backend/tests/test_experiment_grading_task_materials.py
-  scope: 增加 task package v2 的通用 benchmark 来源与 artifact v1 声明；冻结内容、校验路径与后端能力，保留
-    schema1 原身份。
-  acceptance: 旧配置、catalog 与任务 digest 不漂移；自定义来源不冒充 benchmark；管理 handle
-    不接受用户路径伪造；不支持的必需采集在资源或模型操作前拒绝。
+  scope: "Add generic benchmark sources in task package v2 and artifact v1 declarations; freeze content, validate paths and backend capabilities, and preserve original schema1 identities."
+  acceptance: "Old configurations, catalogs, and task digests must not drift; custom sources must not pose as benchmarks; managed handles must not accept forged user paths; reject unsupported required collection before resource or model operations."
 - id: T3
-  title: 共用会话采集、归档与续跑边界
+  title: "Shared session collection, archiving, and resume boundaries"
   status: pending
   priority: P1
   tags: []
@@ -71,12 +67,10 @@ tasks:
   - backend/ahe_beta/loop/orchestrator.py
   - backend/tests/test_experiment_engine.py
   - backend/tests/user/test_prediction_artifacts.py
-  scope: 两种 runner 共用清理前采集，复用完整 prediction；保存 session/attempt
-    receipt，接入受管环境收集且隔离私有材料、恢复与父轮证据。
-  acceptance: direct/simulated 相同合同；实际 user_sha
-    绑定；文件与测量来源可核验；缺失/超限/篡改不升级；父轮记录不充当子轮结果；旧 Session 不回写；受管测量前置未完成则不得标 done。
+  scope: "Both runners share collection before cleanup and reuse the complete prediction; save session/attempt receipts, integrate managed-environment collection, and isolate private materials, recovery evidence, and parent-round evidence."
+  acceptance: "Use the same contract for direct/simulated; bind the actual user_sha; ensure file and measurement sources are verifiable; do not upgrade missing, over-limit, or tampered evidence; parent-round records must not serve as child-round results; do not write back to old Sessions; do not mark done until managed-measurement prerequisites are complete."
 - id: T4
-  title: 官方与自定义评分适配器
+  title: "Official and custom grading adapters"
   status: pending
   priority: P1
   tags: []
@@ -96,13 +90,10 @@ tasks:
   - backend/ahe_beta/evaluation/adapters/container.py
   - backend/ahe_beta/evaluation/adapters/profiles.py
   - backend/ahe_beta/evaluation/__init__.py
-  scope: 包装现有 SWE evaluator；按锁定官方合同验收 Terminal/TUA/NL2Repo 产物，custom
-    在独立容器执行固定脚本，移除旧在线评分入口与接受函数兼容导出。
-  acceptance: 官方 grader 不重写；锁定任务、执行器、镜像及外部评分材料；SWE 官方报告保留；Terminal/TUA 读取正式
-    reward；NL2Repo 保留官方通过率且不虚构二值规则；生产计划重放 SQL；KV 只消费可信原测量；无法还原的环境不可评分；custom
-    与操作者阈值不冒充官方。
+  scope: "Wrap the existing SWE evaluator; verify Terminal/TUA/NL2Repo artifacts against pinned official contracts, execute fixed custom scripts in independent containers, and remove the old online grading entry point and compatibility exports for acceptance functions."
+  acceptance: "Do not rewrite official graders; pin tasks, executors, images, and external grading materials; retain official SWE reports; read official rewards for Terminal/TUA; retain official NL2Repo pass rates without inventing binary rules; replay SQL using the production plan; KV consumes only trusted original measurements; environments that cannot be reconstructed cannot be graded; custom grading and operator thresholds must not pose as official."
 - id: T5
-  title: 统一事后 grade 命令与原会话绑定
+  title: "Unified post-hoc grade command and binding to the original session"
   status: done
   priority: P1
   tags: []
@@ -121,13 +112,10 @@ tasks:
   - backend/tests/test_experiment_grading_e2e.py
   - backend/tests/test_experiment_grading_plan.py
   - backend/tests/test_experiment_cli_v2.py
-  scope: 复用归档/轮次/基线/Session/generation 校验后分发 adapter；grade 只接收必填私有 --plan，删除旧
-    dataset 参数及兼容转换，保留离线模式并独立保存评分与接受关系。
-  acceptance: 所有 adapter 共用 --plan；缺 plan 或使用旧 dataset 参数在评分执行前明确报错并指向新用法；direct
-    SWE plan 可评分；隐藏材料不上传；评分不调用模型/provider/Issue；原实验字节与身份不变；中断及重评分独立
-    attempt；新接口不得绕过旧绑定。
+  scope: "Reuse archive/round/baseline/Session/generation validation before dispatching to the adapter; grade accepts only the required private --plan, removes old dataset arguments and compatibility conversions, retains offline mode, and stores grading results and acceptance relations independently."
+  acceptance: "All adapters share --plan; a missing plan or use of old dataset arguments must produce an explicit error before grading execution and point to the new usage; direct SWE plans can be graded; hidden materials are not uploaded; grading does not invoke models/providers/Issue; original experiment bytes and identities remain unchanged; interruptions and regrading use independent attempts; the new interface must not bypass existing bindings."
 - id: T6
-  title: 真实验收、迁移说明与双语教程
+  title: "Real acceptance verification, migration instructions, and bilingual tutorials"
   status: pending
   priority: P1
   tags: []
@@ -158,44 +146,43 @@ tasks:
   - backend/scripts/e2e-spec-0051-session-container.sh
   - backend/scripts/e2e-spec-0056-0057-user-semantics.sh
   - backend/scripts/e2e-spec-0075-post-run-grading.sh
-  scope: 给出两后端统一事后验收材料、命令和扩展方法；核验官方正负控制与管理测量，更新旧规格边界并完成回归。
-  acceptance: SWE/生产计划/Excel/TinyDB/custom 真实评分逐项报告；KV 以真实原运行受管测量验证；替身不冒充官方结果；旧
-    run 不修改；前置或材料未完成时保留 pending，文档不称完整 N8 支持。
+  scope: "Provide unified post-hoc acceptance materials, commands, and extension methods for both backends; verify official positive and negative controls and managed measurements, update the boundaries of old specifications, and complete regression verification."
+  acceptance: "Report real grading results item by item for SWE/production planning/Excel/TinyDB/custom; verify KV using managed measurements from the actual original run; substitutes must not masquerade as official results; do not modify old runs; retain pending when prerequisites or materials are incomplete, and do not describe complete N8 support in the documentation."
 ---
 
-# 0083 · 可扩展的会话产物与独立客观验收
+# 0083 · Extensible Session Artifacts and Independent Objective Verification
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: the frontmatter is the structured source data (including the tasks DAG), and the body is a group-level rust-RFC nine-section overview. -->
 
 ## Summary
 
-为统一实验入口增加可扩展的**已有会话客观验收**：direct 与 simulated-user 共用产物收集合同，评分只读取停止并完整收集的 run，根据独立评分计划调用 SWE、Terminal-Bench、TUA、NL2Repo 或自定义适配器。任务来源、交互模式、运行环境和验收方式分别建模；新增 benchmark 不增加会话 runner 分支。
+Add extensible **objective verification of existing sessions** to the unified experiment entry point: direct and simulated-user share an artifact collection contract, and grading reads only stopped, fully collected runs and invokes SWE, Terminal-Bench, TUA, NL2Repo, or custom adapters according to an independent grading plan. Task source, interaction mode, runtime environment, and verification method are modeled separately; adding a benchmark does not add session runner branches.
 
-保留 SWE 官方 evaluator，但退役公开 grade 的旧 `--dataset`／`--dataset-sha256` 参数，所有任务只使用必填 `--plan`，不提供别名、自动转换或并行兼容路径。不改用户主观结论、原 Session、反馈、交付门禁或历史归档。每次评分生成独立报告，区分真实通过、真实不通过、未配置、不支持、材料缺失和验收环境故障。独立 Harness benchmark 评测仍负责将指定 Harness 在新任务上重新运行，不由本组替换。
+Retain the official SWE evaluator, but retire the old `--dataset`/`--dataset-sha256` parameters from the public grade interface. All tasks use only the required `--plan`, with no aliases, automatic conversion, or parallel compatibility paths. Do not change subjective user conclusions, original Sessions, feedback, delivery gates, or historical archives. Each grading attempt generates an independent report distinguishing actual passes, actual failures, not configured, unsupported, missing materials, and verification environment failures. Independent Harness benchmark evaluation remains responsible for rerunning a specified Harness on new tasks and is not replaced by this group.
 
-本组已获审阅批准并实施第一版：公共合同、任务包 v2、共用普通文件采集、首批 adapter 与统一 plan 命令已经接入。T3 的受管环境支路、T4 的完整官方核验和 T6 的完整验收仍 pending。已完成部分真实 Docker 控制；历史逐项记录可从 Git 历史查看，当前可复现检查见 docs/VERIFICATION.zh-CN.md。离线回归不代表真实评分成功。不在本组重跑 N8 或修改旧实验结果。
+This group has received review approval and implemented the first version: the public contracts, task package v2, shared regular-file collection, initial adapters, and unified plan command are integrated. T3's managed-environment branch, T4's complete official verification, and T6's complete acceptance verification remain pending. Some real Docker controls have been completed; historical itemized records are available in Git history, and currently reproducible checks are listed in docs/VERIFICATION.zh-CN.md. Offline regression does not indicate successful real grading. Do not rerun N8 or modify old experiment results within this group.
 
 ## Motivation
 
-旧 SWE 模拟会话在结束后导出补丁，调用 `SWEbenchEvaluator`，并保存 `objective_evaluation` 和 `accept_validity`。该路径由 0051 的会话隔离与双结论设计引入，已存在实际官方 CLI 调用；只有配置数据集和执行环境时才会运行。后来加入的 direct 路径未调用该 evaluator，其 `accept_validity` 直接为 `not_applicable`。
+The old SWE simulated sessions exported patches after completion, invoked `SWEbenchEvaluator`, and saved `objective_evaluation` and `accept_validity`. This path was introduced by 0051's session isolation and dual-conclusion design and already included actual official CLI calls; it runs only when the dataset and execution environment are configured. The direct path added later did not invoke this evaluator, and its `accept_validity` was directly set to `not_applicable`.
 
-当前公开入口主动关闭演化期间的官方评分。0075 实现的事后 `grade` 校验冻结归档、完整补丁与原会话身份，并在本机 Docker 调用官方 SWE evaluator；它已经可以对 direct 的 SWE 会话评分，但按 `kind == swebench` 分流，所有评分都必须提供 SWE dataset，其他任务没有适配器。接受关系的通用判定仍放在 SWE 模块中，而且用 `fresh=true` 表达所有验收隔离，不能直接覆盖在原任务环境中验收的 TUA 或依赖独立测量的 KV。
+The current public entry point explicitly disables official grading during evolution. The post hoc `grade` implemented in 0075 validates the frozen archive, complete patch, and original session identity, then invokes the official SWE evaluator in local Docker; it can already grade direct SWE sessions, but routes by `kind == swebench`, requires an SWE dataset for all grading, and has no adapters for other tasks. Generic determination of the acceptance relationship still resides in the SWE module, and `fresh=true` represents all verification isolation, which cannot directly cover TUA verification in the original task environment or KV verification that depends on independent measurements.
 
-旧混合任务执行器准备了 agent/grader 包，文档要求执行官方 grader，但准备包、用户自主检查、角色交付和官方验收是不同事实。Terminal、Excel、TinyDB 以及服务任务需要不同产物，不能只持有一个 Git diff。R6 归档中保存过工作簿和数据库，却缺少正式 KV 测量记录；新增评分器不能恢复当时未保存的事实。
+The old mixed-task executor prepared agent/grader packages, and the documentation required running the official grader, but package preparation, users' own checks, role-based delivery, and official verification are distinct facts. Terminal, Excel, TinyDB, and service tasks require different artifacts; a Git diff alone is insufficient. R6 archives saved workbooks and databases but lacked formal KV measurement records; adding a grader cannot recover facts that were not saved at the time.
 
-0081 的完整 E2B 任务环境仍 pending：它计划提供管理侧服务、companion、就绪与 finalize、收集和隔离。本组定义它应交付的验收产物接口，不实现另一套 E2B 环境 broker，也不把旧共享快照包装成已具备可信测量隔离的当前公开环境。
+0081's complete E2B task environment remains pending: it plans to provide management-side services, companions, readiness and finalize, collection, and isolation. This group defines the verification artifact interface it must deliver, does not implement another E2B environment broker, and does not repackage old shared snapshots as a current public environment with trustworthy measurement isolation already in place.
 
 ## Guide-level explanation
 
-### 操作者流程
+### Operator workflow
 
-1. 配置实验任务和交互模式。现有 schema 1 的 SWE/ordinary 任务包仍可使用；需要新 benchmark 来源或额外产物的任务使用 task package schema 2。
-2. 任务包仅声明公开任务来源和需要保存的产物，不包含隐藏测试、标准答案、评分输出或私有评分路径。prepare 校验当前后端是否能保存这些材料；无法提供所需能力时在分配资源或调用模型前拒绝。
-3. 正常运行实验。两种交互模式在会话结束、任务 finalize 后和工作区清理前，调用同一收集函数。捕获失败记录原因并继续必要清理，不把实验成功等同于材料完整。
-4. 停止并 collect。操作者提供独立 grading plan 和所需官方材料；评分计划在验收执行前复制、校验并冻结到独立 attempt，不上传到演化运行环境。
-5. 调用同一个 `experiment.py grade`，查看每个会话的技术结果、原始用户结论和二者的派生关系。该命令不启动 Harness、不调用模型、不恢复 E2B、不创建 Gitea Issue。
+1. Configure experiment tasks and interaction mode. Existing schema 1 SWE/ordinary task packages remain usable; tasks requiring new benchmark sources or additional artifacts use task package schema 2.
+2. Task packages declare only public task sources and artifacts to preserve; they contain no hidden tests, reference answers, grading outputs, or private grading paths. prepare validates whether the current backend can preserve these materials; if it cannot provide the required capabilities, reject before allocating resources or invoking models.
+3. Run the experiment normally. Both interaction modes invoke the same collection function after the session ends and task finalize completes, but before workspace cleanup. Record capture failure reasons and continue necessary cleanup; do not equate experiment success with material completeness.
+4. Stop and collect. The operator supplies an independent grading plan and the required official materials; the grading plan is copied, validated, and frozen into an independent attempt before verification executes, and is not uploaded to the evolution runtime environment.
+5. Invoke the same `experiment.py grade` to view each session's technical result, original user conclusion, and the derived relationship between them. This command does not start a Harness, invoke models, restore E2B, or create a Gitea Issue.
 
-新功能统一使用以下调用。SWE、其他 benchmark 和自定义任务都使用 `--plan`，SWE 不需要走另一个入口：
+The new functionality uniformly uses the following invocation. SWE, other benchmarks, and custom tasks all use `--plan`; SWE does not require a separate entry point:
 
 ```bash
 uv run --locked --extra experiments --extra evaluation \
@@ -203,9 +190,9 @@ uv run --locked --extra experiments --extra evaluation \
   --plan /path/grading-plan.json --round 6
 ```
 
-这里的 plan 是评分配置，不是新的 benchmark 数据集：它说明哪些原任务使用哪个 adapter，以及 adapter 所需的官方材料在哪里。SWE 的官方 dataset 是 plan 引用的一项材料；Terminal/TUA 的测试包、NL2Repo 的任务镜像及 custom 脚本分别作为对应 adapter 的输入，不强行共用 SWE 数据集结构。
+The plan here is grading configuration, not a new benchmark dataset: it specifies which adapters apply to which original tasks and where the official materials required by each adapter are located. The official SWE dataset is one material referenced by the plan; Terminal/TUA test packages, NL2Repo task images, and custom scripts serve as inputs to their respective adapters, without forcing them to share the SWE dataset structure.
 
-SWE plan 的配置示意如下。占位 hash 须替换为真实值，此格式已由当前 plan loader 校验：
+An illustrative SWE plan configuration follows. Placeholder hashes must be replaced with actual values; this format is already validated by the current plan loader:
 
 ```json
 {
@@ -213,7 +200,7 @@ SWE plan 的配置示意如下。占位 hash 须替换为真实值，此格式�
   "materials": {
     "swe_dataset": {
       "path": "/path/official.json",
-      "sha256": "<官方数据集文件的64位SHA256>"
+      "sha256": "<64-character SHA256 of the official dataset file>"
     }
   },
   "graders": [
@@ -228,182 +215,182 @@ SWE plan 的配置示意如下。占位 hash 须替换为真实值，此格式�
 }
 ```
 
-上述配置表示：从 `RUN_ID` 的第 6 轮选取指定任务的原会话，读取已保存的完整补丁，用该官方数据集执行 SWE 验收。操作者不重新填写补丁路径、persona、Harness SHA 或原源码基线；这些事实由归档解析并校验。官方 SWE evaluator 版本保持锁定的 4.1.0，通过规则由官方 adapter 决定。
+This configuration means: select the original sessions for the specified tasks from round 6 of `RUN_ID`, read the saved complete patches, and perform SWE verification using this official dataset. The operator does not reenter patch paths, persona, Harness SHA, or the original source baseline; these facts are resolved from the archive and validated. The official SWE evaluator version remains pinned to 4.1.0, and the official adapter determines the passing rules.
 
-同一份 plan 可以在 `graders` 中增加 Terminal、TUA、NL2Repo 或 custom 条目，分别引用材料。多个 SWE 任务可以共享 `swe_dataset`，不需要复制 dataset 文件；通用评分入口对混合会话逐项分发，未选中项标记 not_configured。每个任务至多匹配一项，重复匹配在执行前拒绝。
+The same plan can add Terminal, TUA, NL2Repo, or custom entries in `graders`, each referencing its own materials. Multiple SWE tasks can share `swe_dataset` without copying the dataset file; the generic grading entry point dispatches mixed sessions item by item and marks unselected items not_configured. Each task may match at most one entry; duplicate matches are rejected before execution.
 
-旧 `--dataset`／`--dataset-sha256` 参数直接删除，不保留兼容简写或自动 plan 转换。使用旧参数或缺少 `--plan` 时，在运行验收器和写评分 attempt 前报参数错误，并指向 `grade RUN_ID --plan PATH`。迁移旧 SWE 用法时，将原 dataset 路径和 SHA 放入上述 plan 的 materials，再明确选择原 run 的 SWE task_ids；不需要更改数据集文件或重新运行实验。
+The old `--dataset`/`--dataset-sha256` parameters are removed outright, with no compatibility shorthand or automatic plan conversion. Using old parameters or omitting `--plan` produces an argument error before running a verifier or writing a grading attempt, and points to `grade RUN_ID --plan PATH`. To migrate old SWE usage, place the original dataset path and SHA in the plan's materials, then explicitly select the SWE task_ids from the original run; there is no need to change dataset files or rerun the experiment.
 
-`--plan` 路径支持 `--offline`：只验证可得的输入身份、合同和材料，不分配容器、不运行评分脚本、不写评分 attempt，也不把未知环境标为已就绪。缺少的材料在离线报告中明确列出。新示例与正式教程只展示 plan 调用；旧参数仅在退役说明中列出，不作为可执行示例。
+The `--plan` path supports `--offline`: it validates only available input identities, contracts, and materials, without allocating containers, running grading scripts, writing grading attempts, or marking unknown environments as ready. Missing materials are explicitly listed in the offline report. New examples and official tutorials show only plan invocations; old parameters appear only in retirement notes, not as executable examples.
 
-### 任务来源与评分选择
+### Task sources and grading selection
 
-task package schema 2 保留现有 `ordinary` 和 `swebench`，新增通用 `benchmark`，其中 `benchmark={suite,instance_id,revision}` 标识真实来源。ordinary 仍是明确的非 benchmark 场景，可以配置自定义验收。评分适配器由独立 plan 选择，不能通过将标准任务改成 ordinary 绕过来源校验，也不为每个新 suite 增加一种 kind。
+task package schema 2 retains the existing `ordinary` and `swebench` and adds the generic `benchmark`, in which `benchmark={suite,instance_id,revision}` identifies the actual source. ordinary remains an explicitly non-benchmark scenario and can configure custom verification. Grading adapters are selected by an independent plan; source validation cannot be bypassed by changing a standard task to ordinary, and a new kind is not added for every new suite.
 
-同一评分适配器处理两种交互模式；例如同一 TinyDB 任务的 direct 和 simulated-user 交付均在同一官方环境中验收。来源标识不自动开启评分，交互模式不决定评分器，评分器也不改变任务运行环境。
+The same grading adapter handles both interaction modes; for example, direct and simulated-user deliveries for the same TinyDB task are verified in the same official environment. A source identifier does not automatically enable grading, interaction mode does not determine the grader, and the grader does not change the task runtime environment.
 
-### 兼容范围
+### Compatibility scope
 
-| 输入 | 实施后行为 |
+| Input | Behavior after implementation |
 | --- | --- |
-| 现有 schema 1 SWE 任务 | 原身份与官方验收规则保持，使用新的 --plan 评分 |
-| 原 grade 的 dataset 参数 | 直接退役；改为 plan，不提供别名或自动转换 |
-| 现有 ordinary 任务，未声明验收 | 可以继续运行；报告明确 not_configured，不默认通过 |
-| 当前 schema 2 实验的旧完整归档 | 原生绑定校验通过且材料足够时可独立评分，不添加旧 receipt |
-| schema 1 私有旧实验、缺基线或仅有截断轨迹 | 仍明确不支持或材料不足，不自动转换为当前 run |
-| 新 benchmark，无注册适配器 | 可在任务环境能力允许时运行；显式评分记录 unsupported |
-| 缺原运行测量的 KV 会话 | missing_artifact 或 ungradable；不能新跑负载伪装为原会话验收 |
+| Existing schema 1 SWE tasks | Original identities and official verification rules remain unchanged; grade using the new --plan |
+| Dataset parameters of the original grade interface | Retired outright; replaced with plan, with no aliases or automatic conversion |
+| Existing ordinary tasks with no verification declared | May continue running; reports explicitly state not_configured, with no default pass |
+| Old complete archives of current schema 2 experiments | May be graded independently when native binding validation passes and materials are sufficient; no old receipt is added |
+| Private old schema 1 experiments, missing baselines, or truncated traces only | Remain explicitly unsupported or insufficient in materials; not automatically converted into current runs |
+| New benchmarks without registered adapters | May run when task environment capabilities permit; explicit grading records unsupported |
+| KV sessions missing original-run measurements | missing_artifact or ungradable; a newly run workload must not masquerade as verification of the original session |
 
-新增评分不回填原 `accept_validity`；评分报告用 `acceptance_assessment` 展示派生关系，保留原字段和用户体感作为独立事实。
+New grading does not backfill the original `accept_validity`; grading reports use `acceptance_assessment` to show the derived relationship while preserving the original fields and user experience as independent facts.
 
 ## Reference-level explanation
 
-### 1. 分层与最小接口
+### 1. Layers and minimal interfaces
 
-执行依赖固定为：
+Execution dependencies are fixed as:
 
 ```text
-任务包的公开产物声明 → 会话公共收集 → 不可变归档
-                                          ↓
-原 run/round/session 绑定校验 → 评分适配器 → 独立结果与接受关系
-                                 ↑
-                      操作者私有 grading plan/测试材料
+Public task-package artifact declarations → Shared session collection → Immutable archive
+                                                                                ↓
+Original run/round/session binding checks →                              Grading adapter → Independent results and acceptance relations
+                                                                                ↑
+                                                          Operator-private grading plan/test materials
 ```
 
-在 `ahe_beta.evaluation` 内建立小型合同、注册表和结果模块。新增 adapter 只增加模块和显式注册项，不修改 direct、simulated-user、triage、OpenAgents 或 provider 的调度流程。注册表使用固定标识及合同版本；不允许配置文件任意 import Python 类，也不引入本组无需求的第三方 plugin 发现系统。
+Create small contract, registry, and result modules within `ahe_beta.evaluation`. Adding an adapter adds only a module and an explicit registry entry, without modifying the orchestration flows of direct, simulated-user, triage, OpenAgents, or providers. The registry uses fixed identifiers and contract versions; configuration files may not arbitrarily import Python classes, and no third-party plugin discovery system unneeded by this group is introduced.
 
-适配器只提供 `validate_inputs(request)` 和 `evaluate(request, attempt_dir)`。输入包含已经验证的 task/session 身份、只读产物集合、冻结评分配置与评分资源位置。适配器不得从在线工作区重新猜测产物，也不负责实验恢复、Session 保存、Issue 操作或主观评阅。公共层拥有原 run 绑定、评分锁、attempt 生命周期、统一报告；适配器拥有官方材料校验、环境准备、验收命令和结果解析。
+Adapters provide only `validate_inputs(request)` and `evaluate(request, attempt_dir)`. Inputs include validated task/session identities, a read-only artifact collection, frozen grading configuration, and grading resource locations. Adapters must not infer artifacts anew from live workspaces and are not responsible for experiment restoration, Session persistence, Issue operations, or subjective review. The common layer owns original-run binding, grading locks, attempt lifecycles, and unified reports; adapters own official-material validation, environment preparation, verification commands, and result parsing.
 
-官方 SWE CLI 的执行细节收至 `evaluation/adapters/swebench.py` 内的私有 `_SWEbenchRunner` 类，与公共 `SWEbenchAdapter` 共处单文件；不存在单独的 runner 模块或兼容别名。删除旧 `evaluation/swebench.py`、包级 evaluator 导出、`from_env()`、runner 的 evaluator 注入以及 `derive_accept_validity` 兼容接口；不会从宿主配置在用户会话内启动评分。历史 Session 的 objective/acceptance 字段保留用于读取既有记录，新会话仅留存交互和产物，接受关系在独立 grade 报告中判定。新报告的判定显式接收各 adapter 已验证的执行合同，不用全局 `fresh` 布尔值代替所有 benchmark 的隔离要求。
+Official SWE CLI execution details are consolidated into the private `_SWEbenchRunner` class within `evaluation/adapters/swebench.py`, sharing a single file with the public `SWEbenchAdapter`; there is no separate runner module or compatibility alias. Remove the old `evaluation/swebench.py`, package-level evaluator exports, `from_env()`, runner evaluator injection, and the `derive_accept_validity` compatibility interface; grading will not be started within user sessions through host configuration. Historical Sessions' objective/acceptance fields remain available for reading existing records; new sessions retain only interactions and artifacts, with acceptance relationships determined in independent grade reports. Determination in new reports explicitly receives the execution contracts validated by each adapter, rather than using a global `fresh` boolean to substitute for every benchmark's isolation requirements.
 
-### 2. 版本化公开任务与私有评分计划
+### 2. Versioned public tasks and private grading plans
 
-新增 `task-package-v2.json`；schema 1 的解析、字段默认值、序列化及 digest 不变，禁止为了复用解析器而改写旧冻结 package。新 package 才可添加真实 benchmark 来源与 `artifacts` 声明；它们原样进入 task catalog 和内容身份。新增 provenance kind 在模型与 catalog 校验中显式支持。
+Add `task-package-v2.json`; schema 1 parsing, field defaults, serialization, and digests remain unchanged, and old frozen packages must not be rewritten to reuse a parser. Only new packages may add actual benchmark sources and `artifacts` declarations; these enter the task catalog and content identity unchanged. New provenance kinds are explicitly supported in model and catalog validation.
 
-`artifacts` 使用独立版本 1 和显式导出列表。每项至少包含稳定 id、来源 `workspace`/`managed_service`、任务根内的路径或管理侧 handle、内容类型、必需性和字节上限；限制路径逃逸、重复目标、无限 glob 和非普通文件。受管服务只能引用控制器已创建、属于当前 session/attempt 的 handle，任务不能自行指定宿主绝对路径或将自己写出的文件冒充独立测量。
+`artifacts` uses an independent version 1 and an explicit export list. Each entry includes at least a stable id, source `workspace`/`managed_service`, a path within the task root or a management-side handle, content type, requiredness, and byte limit; restrict path traversal, duplicate targets, unbounded globs, and non-regular files. Managed services may reference only handles already created by the controller and belonging to the current session/attempt; tasks cannot specify host absolute paths themselves or pass off files they write as independent measurements.
 
-已有环境声明负责输入与服务部署，本组的 artifact 声明只描述验收输出。二者以 artifact id 对接，不能出现两套 source of truth。实施 0081 时应沿用 task package v2 及本组的公共收集入口；不再向旧 schema 1 隐式注入环境或评分默认字段。
+Existing environment declarations are responsible for inputs and service deployment; this group's artifact declarations describe only verification outputs. The two connect through artifact ids and must not create two sources of truth. Implementation of 0081 should reuse task package v2 and this group's public collection entry point; environment or grading default fields must no longer be implicitly injected into old schema 1.
 
-私有 grading plan 版本 1 使用 `materials` 定义材料路径与 hash，使用 `graders` 定义 adapter/合同版本、task_ids、材料引用、时限和 adapter 专属配置。`task_ids` 只选择原 run 中的任务，task digest、session 和 Harness 身份从已验证归档解析并冻结到 attempt，不让操作者手抄或覆盖。每个选中任务至多一个适配器，禁止重复匹配、缺失材料引用、未知任务或与真实来源不符的映射。官方/custom 身份由 adapter 和冻结任务来源共同校验，不信任任意字符串标记。
+Private grading plan version 1 uses `materials` to define material paths and hashes, and `graders` to define adapters/contract versions, task_ids, material references, time limits, and adapter-specific configuration. `task_ids` selects only tasks in the original run; task digests, sessions, and Harness identities are resolved from the validated archive and frozen into the attempt, rather than allowing operators to transcribe or override them. Each selected task has at most one adapter; duplicate matches, missing material references, unknown tasks, and mappings inconsistent with actual sources are prohibited. Official/custom identity is jointly validated by the adapter and frozen task source, without trusting arbitrary string labels.
 
-官方材料锁定 revision 与文件 hash；必要环境由 adapter 专属配置或锁定 adapter 的固定规则确定，解析后的容器 image digest 在验收执行前冻结，禁止验收期间重新解析可变标签。custom 脚本和依赖固定 hash。数据集、测试文件和命令均由适配器专属 schema 校验，不将 SWE dataset 强制为所有 adapter 的参数。
+Official materials pin revisions and file hashes; required environments are determined by adapter-specific configuration or fixed rules of the pinned adapter. Resolved container image digests are frozen before verification executes, and mutable tags must not be resolved again during verification. Custom scripts and dependencies have fixed hashes. Datasets, test files, and commands are validated by adapter-specific schemas; the SWE dataset is not forced to be a parameter for all adapters.
 
-官方二值任务保留原通过规则；连续分数任务报告原 score 及其定义。自定义阈值必须在启动评分前声明并冻结，没有二值规则时 `passed=null`，只能报告 score。阈值或测试版本改变必须形成新 attempt，报告不得将不同 plan digest 合并成相同实验条件。若评分计划是实验结束后才指定，记录该事实，不声称它是实验前预注册的标准。
+Official binary tasks retain their original passing rules; continuous-score tasks report the original score and its definition. Custom thresholds must be declared and frozen before grading starts; when there is no binary rule, `passed=null`, and only the score may be reported. A threshold or test-version change must create a new attempt, and reports must not merge different plan digests as identical experimental conditions. If a grading plan is specified only after an experiment ends, record that fact and do not claim it was a standard preregistered before the experiment.
 
-评分私有文件只写入本机独立 evaluation attempt。后续 collect 明确排除 run 根下的 evaluation 目录，避免私有测试、标准答案和评分计划进入新的演化归档。只把任务运行所需的公开产物声明传给控制器，grader 文件、评分结论和受管测量的私有内容不进入用户、需求面或交付面的观测授权。评分只读本地材料和容器镜像；私有镜像登录由操作者的既有容器工具处理，不把凭证写入 plan、Session 或评分摘要。
+Private grading files are written only to independent local evaluation attempts. Subsequent collect explicitly excludes the evaluation directory under the run root to prevent private tests, reference answers, and grading plans from entering new evolution archives. Only public artifact declarations needed for task execution are passed to the controller; grader files, grading conclusions, and private managed-measurement content are not included in observation authorizations for users, the requirements surface, or the delivery surface. Grading reads only local materials and container images; private image login is handled by the operator's existing container tools, and credentials are not written to plans, Sessions, or grading summaries.
 
-### 3. 共用收集与生命周期
+### 3. Shared collection and lifecycle
 
-在 `evaluation/artifacts.py` 实现单一收集函数，由两种 runner 在同一生命周期边界调用。沿用现有完整 prediction 导出，不建立第二套补丁实现。新增产物 receipt 放在 `workspace_evidence.evaluation_artifacts`，数据按 session/attempt 独立落盘；receipt 记录合同版本、task digest、run/round/session/slot、试用 Harness SHA、文件 hash/bytes、采集时刻、来源与完成状态。评分绑定的是用户实际试用的 `user_sha`，不是当轮交付后的 `sealed_sha`。
+Implement a single collection function in `evaluation/artifacts.py`, invoked by both runners at the same lifecycle boundary. Reuse the existing complete prediction export rather than creating a second patch implementation. New artifact receipts are placed in `workspace_evidence.evaluation_artifacts`, with data persisted separately by session/attempt; receipts record the contract version, task digest, run/round/session/slot, trial Harness SHA, file hashes/bytes, collection time, source, and completion status. Grading binds to the `user_sha` actually tried by the user, not the `sealed_sha` after delivery in that round.
 
-必须按顺序执行：结束 Harness 和用户评阅 → 完成任务规定的 finalize → 停止或封存 companion 的测量 → 收集 → 保存 receipt → 回收资源。失败仍执行必要清理；缺文件、截断、超限、失去服务归属等分别记录，必需产物失败不得产生 complete receipt。用户自写输出与控制器采集的受管测量分开标记；KV 的可信来源要求不仅是 hash 正确，还包括管理侧身份、隔离和封存证据。
+The following sequence is mandatory: end the Harness and user review → complete the task-prescribed finalize → stop or seal companion measurements → collect → save the receipt → reclaim resources. Necessary cleanup still runs on failure; missing files, truncation, limit overruns, loss of service ownership, and other failures are recorded separately, and failure of a required artifact must not produce a complete receipt. User-written outputs and controller-collected managed measurements are marked separately; trustworthy KV provenance requires not only correct hashes but also management-side identity, isolation, and sealing evidence.
 
-工作区文件通过现有 runtime 的读写/导出能力收集；受管服务通过 0081 的环境管理接口收集，不通过用户 shell 读取管理目录。现有后端不支持 managed_service 时 prepare 明确拒绝该声明。共用收集模块可以先实现和验证普通文件、SWE prediction；完整 KV 路径必须等待 0081 的受管环境能力，不能把一个本地 fixture 或共享可写 E2B 目录称为完整支持。
+Workspace files are collected through the existing runtime's read/write/export capabilities; managed services are collected through the environment management interface in 0081, without reading management directories through the user shell. If the existing backend does not support managed_service, prepare explicitly rejects that declaration. The shared collection module can first implement and verify ordinary files and SWE predictions; the complete KV path must wait for the managed environment capabilities in 0081. A local fixture or shared writable E2B directory must not be described as full support.
 
-collect 校验 receipt 与实际字节，并为评分材料提供明确的收集路径。隐藏或管理侧材料保持操作者访问边界，不能因归档或 continuation 导入而自动获得需求面 observation grant。新子 run 只继承任务的公开采集声明，重新生成本轮 receipt；父轮验收记录只能引用，不能替代子轮执行。已完成恢复单元不得因缺验收材料重跑用户会话。
+collect validates receipts against actual bytes and provides explicit collection paths for grading materials. Hidden or management-side materials retain operator access boundaries and must not automatically acquire demand-side observation grants through archiving or continuation imports. New child runs inherit only the task's public collection declarations and regenerate receipts for the current round; parent-round acceptance records may only be referenced and cannot substitute for child-round execution. Completed recovery units must not rerun user sessions because acceptance materials are missing.
 
-### 4. 首批适配器与扩展合同
+### 4. Initial Adapters and Extension Contracts
 
-| adapter | 输入及执行方式 | 真实评分所需边界 |
+| adapter | Inputs and execution method | Boundaries required for actual grading |
 | --- | --- | --- |
-| swebench | 基线、完整 prediction、锁定 dataset；调用现有官方 4.1.0 CLI | 官方 fresh instance 容器；读取 resolved 及官方报告分类，不以 shell 退出码判整题成功 |
-| terminal-bench | 锁定 Harbor 任务包、task.toml、环境构建材料和 tests；执行官方 tests/test.sh | 遵守 verifier.environment_mode、产物来源/目标、用户及预算；读取正式 reward 与诊断，不统一猜测为 fresh |
-| tua-bench | 锁定官方 task.toml/tests、环境及标准答案材料，保存任务输出 | Agent 退出后按锁定执行器语义验收；读取官方 reward/metric，不用 pytest 或进程退出码替代；不能满足环境合同则 ungradable |
-| nl2repo | 锁定 test_commands/test_files/count、官方 task image 和生成仓库；遵守官方 post_process_task 的覆盖及解析语义 | 从生成副本移除官方声明的测试及包配置后覆盖官方环境，保留原测试和通过率；不把 Agent 自测或任意阈值称为官方二值成功 |
-| custom | 操作者固定版本的独立脚本、输入和通过规则 | 在受限验收容器执行 argv；容器隔离是本系统合同，结果标记 custom，不存在统一的“官方 custom”评分器 |
+| swebench | Baseline, complete prediction, pinned dataset; invokes the existing official 4.1.0 CLI | Official fresh instance container; reads resolved and official report classifications, without using the shell exit code to determine success for the entire task |
+| terminal-bench | Pinned Harbor task package, task.toml, environment build materials, and tests; executes the official tests/test.sh | Respects verifier.environment_mode, artifact sources/destinations, user, and budget; reads formal reward and diagnostics, without universally assuming fresh |
+| tua-bench | Pinned official task.toml/tests, environment, and reference-answer materials; saves task outputs | Performs acceptance after the Agent exits according to the pinned executor semantics; reads official reward/metric, without substituting pytest or process exit codes; ungradable if the environment contract cannot be met |
+| nl2repo | Pinned test_commands/test_files/count, official task image, and generated repository; follows the overwrite and parsing semantics of the official post_process_task | Removes officially declared tests and package configuration from the generated copy before overlaying it onto the official environment, preserving the original tests and pass rate; does not describe Agent self-tests or arbitrary thresholds as official binary success |
+| custom | Independent scripts, inputs, and pass rules with versions fixed by the operator | Executes argv in a restricted acceptance container; container isolation is a contract of this system, results are labeled custom, and there is no unified “official custom” grader |
 
-上述表格是实施和验收必须满足的对齐要求，不能作为已完成真实评分验证或整个 benchmark 已支持的声明。首批非 SWE 对齐样本限定为下列固定任务来源；adapter 标识不是“所有历史/最新版本都兼容”的承诺。实现时锁定实际验收执行器及其依赖版本，不能只固定任务仓库而任意选择当前 Harbor。新增任务只有其元数据、环境与评分语义通过验证后才列入支持清单；未知版本或未覆盖的执行模式明确 unsupported。
+The table above specifies alignment requirements that implementation and acceptance must satisfy; it must not be used to claim that actual grading verification is complete or that an entire benchmark is supported. The initial non-SWE alignment samples are restricted to the fixed task sources below; adapter identifiers do not promise compatibility with “all historical/latest versions.” During implementation, pin the actual acceptance executor and its dependency versions; pinning only the task repository while arbitrarily choosing the current Harbor is not permitted. New tasks are added to the support list only after their metadata, environment, and grading semantics have been verified; unknown versions or uncovered execution modes are explicitly unsupported.
 
-| 来源 | 固定 revision / 版本 | 首批验证范围 |
+| Source | Fixed revision / version | Initial verification scope |
 | --- | --- | --- |
-| SWE-bench 官方 evaluator | 4.1.0 | 当前已支持的 SWE 官方实例及其数据集身份 |
-| harbor-framework/terminal-bench-1 | 452bf305c6daa62fc59061d22133a7cbc7c1572e | production-planning、kv-live-surgery 的 Harbor 格式任务 |
+| SWE-bench official evaluator | 4.1.0 | Currently supported official SWE instances and their dataset identities |
+| harbor-framework/terminal-bench-1 | 452bf305c6daa62fc59061d22133a7cbc7c1572e | Harbor-format tasks production-planning and kv-live-surgery |
 | facebookresearch/TUA-Bench | 3497fd320abcafaf4797424192c891a593fd7964 | 010-pivot-product-revenue |
 | multimodal-art-projection/NL2RepoBench | 781a1da1ee41fb8edb0bed22f586d69111610edf | tinydb |
 
-Terminal 的生产计划任务显式使用 separate verifier，并声明三个 SQL 产物；官方 test.sh 恢复干净数据库、重放 SQL 后执行测试及写 reward。KV 也使用 separate verifier，但产物来自 loadgen 服务：results.json、measure.log 和诊断 loadgen.log，应按官方路径重新放入验收环境；有效测量下的六项 gate 和 5 倍门槛不改写。缺记录、无效 baseline 等官方前置失败保留原 reward/日志，同时在本系统单列证据或环境问题，不能只看 reward=0 就说代码失败。[生产计划合同](https://github.com/harbor-framework/terminal-bench-1/blob/452bf305c6daa62fc59061d22133a7cbc7c1572e/tasks/production-planning/task.toml)、[官方重放与 reward](https://github.com/harbor-framework/terminal-bench-1/blob/452bf305c6daa62fc59061d22133a7cbc7c1572e/tasks/production-planning/tests/test.sh)、[KV 产物合同](https://github.com/harbor-framework/terminal-bench-1/blob/452bf305c6daa62fc59061d22133a7cbc7c1572e/tasks/kv-live-surgery/task.toml)、[KV 官方 gate](https://github.com/harbor-framework/terminal-bench-1/blob/452bf305c6daa62fc59061d22133a7cbc7c1572e/tasks/kv-live-surgery/tests/test_score.py)。
+The Terminal production-planning task explicitly uses a separate verifier and declares three SQL artifacts; the official test.sh restores a clean database, replays the SQL, then executes tests and writes reward. KV also uses a separate verifier, but its artifacts come from the loadgen service: results.json, measure.log, and the diagnostic loadgen.log, which must be placed back into the acceptance environment at the official paths; the six gates and 5-fold threshold under valid measurements remain unchanged. For official prerequisite failures such as missing records or an invalid baseline, preserve the original reward/logs while separately classifying evidence or environment issues in this system; reward=0 alone must not be taken to mean code failure. [Production-planning contract](https://github.com/harbor-framework/terminal-bench-1/blob/452bf305c6daa62fc59061d22133a7cbc7c1572e/tasks/production-planning/task.toml), [official replay and reward](https://github.com/harbor-framework/terminal-bench-1/blob/452bf305c6daa62fc59061d22133a7cbc7c1572e/tasks/production-planning/tests/test.sh), [KV artifact contract](https://github.com/harbor-framework/terminal-bench-1/blob/452bf305c6daa62fc59061d22133a7cbc7c1572e/tasks/kv-live-surgery/task.toml), [KV official gates](https://github.com/harbor-framework/terminal-bench-1/blob/452bf305c6daa62fc59061d22133a7cbc7c1572e/tasks/kv-live-surgery/tests/test_score.py).
 
-TUA 首批 Excel 的官方脚本运行 test_outputs.py 并将数值写入 reward.txt；该任务的 compare_table 给出 0/1，但不能推导其他 TUA 任务均是二值任务。验收保留官方 metric 的组合规则和原 score，不运行 --sanity/oracle 来修复提交。标准答案、sidecar 及测试内下载的外部文件也须记录内容 hash 并冻结；仅固定 tests revision 不足以锁定远程 URL 内容。[官方验收脚本](https://github.com/facebookresearch/TUA-Bench/blob/3497fd320abcafaf4797424192c891a593fd7964/tasks/010-pivot-product-revenue/tests/test.sh)、[官方 metric 和材料引用](https://github.com/facebookresearch/TUA-Bench/blob/3497fd320abcafaf4797424192c891a593fd7964/tasks/010-pivot-product-revenue/tests/test_outputs.py)。
+The official script for the initial TUA Excel task runs test_outputs.py and writes the numeric value to reward.txt; this task's compare_table produces 0/1, but that does not imply that all other TUA tasks are binary tasks. Acceptance preserves the combination rules of the official metrics and the original score, without running --sanity/oracle to repair submissions. Content hashes must also be recorded and frozen for reference answers, sidecars, and external files downloaded within tests; pinning only the tests revision is insufficient to pin the contents of remote URLs. [Official acceptance script](https://github.com/facebookresearch/TUA-Bench/blob/3497fd320abcafaf4797424192c891a593fd7964/tasks/010-pivot-product-revenue/tests/test.sh), [official metrics and material references](https://github.com/facebookresearch/TUA-Bench/blob/3497fd320abcafaf4797424192c891a593fd7964/tasks/010-pivot-product-revenue/tests/test_outputs.py).
 
-NL2Repo 首批沿用官方 post_processor 的包配置清理、测试路径清理、镜像覆盖、命令执行和输出解析；只修改评分用生成副本，不改原归档。官方解析使用固定测试数作分母，success_rate=min(passed/total,1)，不是一条现成的整题通过规则；不得另写更方便的 pytest 统计公式冒充官方。未提供正式二值规则时 passed=null；操作者可在 plan 声明派生阈值，但须以 operator policy 单列，不能标为官方成功。[官方 post_processor](https://github.com/multimodal-art-projection/NL2RepoBench/blob/781a1da1ee41fb8edb0bed22f586d69111610edf/openhands/post_processor.py)。
+The initial NL2Repo implementation follows the official post_processor's package configuration cleanup, test path cleanup, image overlay, command execution, and output parsing; it modifies only the generated copy used for grading, not the original archive. Official parsing uses a fixed test count as the denominator, success_rate=min(passed/total,1), which is not a ready-made rule for passing the entire task; a more convenient pytest statistics formula must not be written and passed off as official. When no formal binary rule is provided, passed=null; operators may declare a derived threshold in the plan, but it must be listed separately as operator policy and cannot be labeled official success. [Official post_processor](https://github.com/multimodal-art-projection/NL2RepoBench/blob/781a1da1ee41fb8edb0bed22f586d69111610edf/openhands/post_processor.py).
 
-Terminal adapter 根据任务声明选择 verifier mode；缺少所需环境或原测量时报告不可评分，不自行降级。生产计划按官方合同在干净数据库重放提交 SQL；数据库快照不自动替代 SQL。KV verifier 消费原运行独立负载生成器的记录，不启动新的负载以补造原测量。TUA 若只能在原任务环境验收，则其 verifier-only 材料应在用户进程退出后通过环境受管操作进入、结果作为独立验收 receipt 封存；不把这种必须在线捕获的行为塞入通用 persona runner。未提供此能力的当前 run 只能事后评分可完整重建环境的任务。
+The Terminal adapter selects the verifier mode according to the task declaration; if the required environment or original measurements are missing, it reports the task as ungradable without silently falling back. Production planning replays submitted SQL in a clean database according to the official contract; database snapshots do not automatically substitute for SQL. The KV verifier consumes records from the original run's independent load generator and does not start a new load to fabricate replacement measurements. If TUA acceptance can only occur in the original task environment, its verifier-only materials must enter through managed environment operations after the user process exits, and the results must be sealed as a separate acceptance receipt; this behavior, which must be captured online, must not be put into the generic persona runner. Current runs that do not provide this capability can only grade tasks after the fact whose environments can be fully reconstructed.
 
-NL2Repo 的 grader 包通常只包含文件列表、命令和测试数；官方测试本体来自固定 task image，不能认为仅有这三个文本文件就已具备完整测试。通过率与二值成功均使用固定评分规则，不把任意 pytest 子集通过解释为官方全通过。
+NL2Repo's grader package usually contains only file lists, commands, and test counts; the actual official tests come from the pinned task image. The presence of these three text files alone must not be treated as a complete test suite. Both the pass rate and binary success use fixed grading rules; passing an arbitrary pytest subset must not be interpreted as passing all official tests.
 
-不复制 `evaluation/harness_bench` 的计划、交互或调度器。已有 budget/官方元数据解析可以通过窄函数复用；能复用的评分规则只有一份，独立 Harness 评测以后可调用相同 adapter，但这次不要求把两套入口或 manifest 合并。
+Do not copy the planning, interaction, or scheduler from `evaluation/harness_bench`. Existing budget/official metadata parsing can be reused through narrow functions; reusable grading rules have a single implementation, and independent Harness evaluation may call the same adapters later, but this change does not require merging the two sets of entry points or manifests.
 
-### 5. 统一结果与接受关系
+### 5. Unified Results and Acceptance Relationships
 
-每个结果包含 adapter/版本、plan digest、输入与输出 hash、执行环境身份、原始报告路径、时限、状态、score/定义、passed、错误原因及执行合同证据。attempt 同时保留当前评分代码各模块的内容 hash，与原实验 controller_sha 分开，避免把实验代码版本当成事后评分器版本。执行合同至少区分 `fresh_official_instance`、`agent_stopped_task_environment`、`trusted_recorded_measurement` 和 `isolated_custom_verifier`，由 adapter 校验，不接受调用方随意填写一个 true 值。
+Each result includes the adapter/version, plan digest, input and output hashes, execution environment identity, raw report path, time limit, status, score/definition, passed, error reason, and execution contract evidence. Each attempt also preserves content hashes for the modules of the current grading code, separately from the original experiment's controller_sha, to avoid treating the experiment code version as the post hoc grader version. Execution contracts must distinguish at least `fresh_official_instance`, `agent_stopped_task_environment`, `trusted_recorded_measurement`, and `isolated_custom_verifier`, and must be validated by the adapter; callers cannot arbitrarily supply a true value.
 
-| 状态 | 含义 | passed |
+| Status | Meaning | passed |
 | --- | --- | --- |
-| completed | 正式验收成功运行并给出有效结论 | true/false；仅连续评分且无二值规则时 null |
-| not_configured / unsupported | 未指定规则／无相应 adapter | null |
-| missing_artifact / ungradable | 缺产物／身份、来源或环境不能满足合同 | null |
-| unavailable / crashed / timed_out | 验收基础设施、解析或运行失败 | null |
-| not_evaluated | 官方 evaluator 明确跳过，例如 SWE 空预测 | null |
+| completed | Formal acceptance ran successfully and produced a valid conclusion | true/false; null for continuous scoring only with no binary rule |
+| not_configured / unsupported | No rules specified / no corresponding adapter | null |
+| missing_artifact / ungradable | Missing artifacts / identity, provenance, or environment cannot satisfy the contract | null |
+| unavailable / crashed / timed_out | Acceptance infrastructure, parsing, or execution failed | null |
+| not_evaluated | Official evaluator explicitly skipped evaluation, such as an empty SWE prediction | null |
 
-只在 completed、合同验证通过且原始报告有效时把 passed=false 计为正常任务失败；其他状态单列，不能混入成功或失败分母。原有 SWE JSON 输出保留原含义与字段；旧 evaluator 内部以 passed=false 表示故障时，只在新公共结果中根据 status 归一化为 null，保留原始输出，不改旧调用行为。
+Count passed=false as a normal task failure only when the status is completed, contract validation passes, and the raw report is valid; list other statuses separately, without including them in success or failure denominators. Existing SWE JSON outputs retain their original meanings and fields; when the old evaluator internally uses passed=false to indicate a fault, normalize it to null according to status only in the new public result, preserving the raw output and leaving the behavior of old calls unchanged.
 
-上述分母仅指本系统“已有效验收会话”的诊断统计，不替代 benchmark 官方汇总。官方报告的任务总数、空预测、未完成、错误及分母定义原样保留；不得删除这些项后将一个更高的条件通过率称为官方 resolved rate。报告将 official metrics 与本系统 coverage/status/acceptance 诊断分开展示。评分脚本自身规定的异常转零仍保留为原始官方输出；只有可核验的外围环境或材料故障才附加本系统分类，不改写官方脚本的结果规则。[SWE 4.1.0 官方汇总](https://github.com/SWE-bench/SWE-bench/blob/v4.1.0/swebench/harness/reporting.py)。
+The denominator above refers only to this system's diagnostic statistics for “sessions with valid acceptance” and does not replace official benchmark aggregation. Preserve the official report's task totals, empty predictions, incomplete tasks, errors, and denominator definitions unchanged; do not remove these items and call a higher conditional pass rate the official resolved rate. Reports display official metrics separately from this system's coverage/status/acceptance diagnostics. Exceptions that the grading script itself specifies should become zero are still preserved as raw official output; add this system's classifications only for verifiable external environment or material failures, without rewriting the official script's result rules. [SWE 4.1.0 official aggregation](https://github.com/SWE-bench/SWE-bench/blob/v4.1.0/swebench/harness/reporting.py).
 
-`acceptance_assessment` 只写在新评分报告。模拟交互读取原 accepted 结论；direct 读取原 review_verdict=accept，要求 review_status 已完成；不依据 feeling、Harness 自述或代码 diff 推测用户接受。只有有效交互、用户接受、正式 passed=true 和执行合同验证通过时派生 valid_accept；客观失败或请求超时/崩溃为 false_accept；未完成技术验收或没有二值结论为 unverified_accept；未接受为 not_applicable。该关系不覆盖原 Session.accept_validity。
+`acceptance_assessment` is written only in new grading reports. Simulated interaction reads the original accepted conclusion; direct reads the original review_verdict=accept and requires review_status to be completed; user acceptance must not be inferred from feeling, Harness self-reports, or code diffs. Derive valid_accept only when the interaction is valid, the user accepts, formal passed=true, and execution contract validation passes; objective failure or request timeout/crash yields false_accept; incomplete technical acceptance or no binary conclusion yields unverified_accept; no acceptance yields not_applicable. This relationship does not override the original Session.accept_validity.
 
-### 6. 公开命令与归档绑定
+### 6. Public Commands and Archive Binding
 
-`experiment/grading.py` 保留 0075 的归档完整性、RecoveryIdentity、轮次 seal、session provenance、基线与预测 hash、当前 generation 和锁校验；提取通用输入校验后才进行 adapter 分发，不允许新模式绕过其中任一检查。`--plan` 是所有 adapter 的唯一配置方式，CLI 已删除旧 dataset 参数，不设置转换逻辑；公共 grade 函数也改为接收评分 plan，dataset 只作为 SWE adapter 的材料。固定归档、任务选择、官方 dataset 与 evaluator 相同时，SWE 技术结论仍遵守原官方规则；这是评分行为回归，不是旧 CLI 兼容。
+`experiment/grading.py` preserves 0075's archive integrity, RecoveryIdentity, round seals, session provenance, baseline and prediction hashes, current generation, and lock validation; adapter dispatch occurs only after extracting common input validation, and new modes must not bypass any of these checks. `--plan` is the sole configuration method for all adapters; the CLI has removed the old dataset parameters and provides no conversion logic. The public grade function also changes to accept a grading plan, with dataset serving only as material for the SWE adapter. Given the same fixed archive, task selection, official dataset, and evaluator, SWE technical conclusions still follow the original official rules; this is a regression check of grading behavior, not old CLI compatibility.
 
-每次评分使用独立 `run_dir/evaluation/<attempt>/`，记录 plan snapshot/材料 manifest、逐 session 官方日志和归一化结果、summary。实验与评分的完成状态分开；评分中断不导致实验失败，不覆盖已有评分，下一次调用创建新 attempt。batch 的子 run 仍分别调用相同单 run 命令。新 task schema 和评分记录不能改变现有 continuation/恢复身份；冻结控制器不会因宿主升级而被自动替换。
+Each grading invocation uses a separate `run_dir/evaluation/<attempt>/`, recording the plan snapshot/material manifest, per-session official logs and normalized results, and summary. Experiment and grading completion statuses are separate; an interrupted grading attempt does not cause the experiment to fail or overwrite existing grading, and the next invocation creates a new attempt. Batch child runs still invoke the same single-run command individually. The new task schema and grading records must not change existing continuation/recovery identities; frozen controllers are not automatically replaced because the host is upgraded.
 
-### 7. 任务分解与验收
+### 7. Task Breakdown and Acceptance
 
-| Task | 实现范围 | 主要验证 |
+| Task | Implementation scope | Primary verification |
 | --- | --- | --- |
-| T1 | 评分合同、注册与公共结果 | 未知版本拒绝，故障不计失败，不以 fresh 一刀切 |
-| T2 | schema 2 task 来源与公开采集声明 | schema 1 身份不变，来源真实，后端能力在运行前检查 |
-| T3 | 两种会话共用收集、归档及续跑边界 | 相同 receipt 合同，清理前持久化，来源/slot/attempt 不串，缺证据不升级 |
-| T4 | 五类评分 adapter 与 SWE 官方实现复用 | 官方规则固定，custom 不冒充官方，KV/TUA 缺运行材料时明确不可评分 |
-| T5 | 原 run 绑定、唯一 plan CLI 与独立报告 | 旧参数拒绝，SWE 新 plan 正常评分，原字节不变，无模型/provider/Issue 调用 |
-| T6 | 双语文档、真实验收与完整回归 | 真实官方正负案例、环境失败与证据缺失分类，当前支持范围逐项报告 |
+| T1 | Grading contracts, registration, and public results | Reject unknown versions, do not count faults as failures, and do not universally impose fresh |
+| T2 | schema 2 task provenance and public collection declarations | schema 1 identities remain unchanged, provenance is authentic, and backend capabilities are checked before execution |
+| T3 | Shared collection, archiving, and continuation boundaries for both session types | Same receipt contract, persistence before cleanup, no mixing of provenance/slot/attempt, and no escalation when evidence is missing |
+| T4 | Five types of grading adapters and reuse of the official SWE implementation | Official rules are fixed, custom does not pose as official, and KV/TUA are explicitly ungradable when runtime materials are missing |
+| T5 | Original run binding, sole plan CLI, and independent reports | Old parameters are rejected, SWE grading works with the new plan, original bytes remain unchanged, and no model/provider/Issue calls occur |
+| T6 | Bilingual documentation, actual acceptance, and full regression | Actual official positive and negative cases, classification of environment failures and missing evidence, and itemized reporting of current support scope |
 
-组内 DAG 为 T1 → T2 → T3，T1 → T4，T2/T3/T4 → T5 → T6。T3 的 managed_service 支路依赖 0081/T3；T6 的完整 E2B/受管测量实测依赖 0081/T4。这些前置尚未完成时，可以实现已具备的文件收集和事后 adapter，但不得将整个 T3/T6 标 done 或宣传完整 N8 公开路径。各 Task 的唯一文件归属以 frontmatter 为准；适配器、运行时和评分绑定各有单一维护位置。
+The DAG within the group is T1 → T2 → T3, T1 → T4, T2/T3/T4 → T5 → T6. The managed_service branch of T3 depends on 0081/T3; complete E2B/managed measurement testing in T6 depends on 0081/T4. While these prerequisites remain incomplete, available file collection and post hoc adapters may be implemented, but T3/T6 as a whole must not be marked done, nor may the complete N8 public path be advertised. The sole file ownership for each Task is determined by the frontmatter; adapters, runtime, and grading binding each have a single maintenance location.
 
-生产验收脚本为 `backend/scripts/e2e-spec-0083-session-grading.sh`。离线回归覆盖 direct/simulated 的等价采集、超限/篡改/重复/清理竞态、恢复幂等、不同 generation、私有材料访问边界、评分结果分类、SWE plan 的官方行为，以及旧 dataset 参数和缺 plan 的拒绝。验收环境实现对单个材料/产物及 tar 展开总字节设 256 MiB 边界、tar 文件数 10000 和 verifier 日志 16 MiB 边界；这些是当前容器执行器的资源限制，不是 benchmark 官方限制，也不替代任务包显式 max_bytes。超限明确拒绝或失败，不截断后判成功。真实测试调用固定官方 grader，至少覆盖 SWE、生产计划、Excel、TinyDB 的可核验正负控制，以及一个自定义文件任务；测试控制材料只在验收边界使用，不宣称来自 Harness 的真实任务成功。KV 只有完成受管负载原运行记录采集后才做端到端实测，普通 JSON fixture 测试不替代它。模型驱动任务执行、评分器真实执行、离线替身验证分别报告。
+The production acceptance script is `backend/scripts/e2e-spec-0083-session-grading.sh`. Offline regression covers equivalent collection in direct/simulated modes; limit overruns, tampering, duplication, and cleanup races; recovery idempotency; different generations; private material access boundaries; grading result classification; official SWE plan behavior; and rejection of the old dataset parameter and missing plans. The acceptance environment enforces a 256 MiB limit for each material or artifact and for the total bytes extracted from a tar archive, a limit of 10000 tar files, and a 16 MiB limit for verifier logs; these are resource limits of the current container executor, not official benchmark limits, and do not replace an explicit max_bytes in a task package. Limit overruns are explicitly rejected or failed, not truncated and then marked successful. Real tests invoke the fixed official grader and cover, at minimum, verifiable positive and negative controls for SWE, production planning, Excel, and TinyDB, plus one custom file task. Test control materials are used only within the acceptance boundary and are not claimed to demonstrate success on real Harness tasks. KV is tested end to end only after collection of the managed workload's original run records is complete; ordinary JSON fixture tests do not replace it. Model-driven task execution, actual grader execution, and offline substitute verification are reported separately.
 
-实现阶段运行相关 pytest、ruff、spec validate/render/graph 和现有 0075/continuation/两后端回归。真实所需材料或环境缺失时保留 pending/阻塞说明，不伪造官方通过、不重写 grader，也不擅自重启历史实验来补证据。
+During implementation, run the relevant pytest, ruff, spec validate/render/graph, and existing 0075/continuation/two-backend regressions. When required real materials or environments are unavailable, retain a pending/blocking explanation; do not fabricate an official pass, rewrite the grader, or restart historical experiments on your own to obtain evidence.
 
 ## Drawbacks
 
-非补丁产物会增加存储，工作簿、数据库和服务测量的保留预算需明确；必需材料超限会使会话不可验收。测试镜像与环境锁会增加可选依赖和下载成本，不应让普通无验收任务被迫安装所有 benchmark 环境。
+Non-patch artifacts increase storage requirements, and retention budgets for workbooks, databases, and service measurements must be explicit; required materials exceeding limits will make a session ineligible for acceptance. Test images and environment locks add optional dependencies and download costs, and ordinary tasks without acceptance requirements should not be forced to install every benchmark environment.
 
-私有 grader 与公开产物之间增加一个接口，managed_service 和原环境验收需要真实运行时支持。0081 尚未实现，因此本组不能单独交付完整 N8 场景运行及可信 KV 原测量采集。退役旧 CLI 会要求已有脚本和调用者改用 plan；更新仓内文档、示例和验收脚本是本组必要工作，历史冻结记录保持原样。
+An interface is added between private graders and public artifacts, and managed_service and acceptance in the original environment require actual runtime support. 0081 has not yet been implemented, so this group cannot independently deliver a complete N8 scenario run or trustworthy collection of original KV measurements. Retiring the old CLI will require existing scripts and callers to switch to plan; updating in-repository documentation, examples, and acceptance scripts is required work for this group, while historical frozen records remain unchanged.
 
 ## Rationale and alternatives
 
-选择“统一产物合同 + 独立评分计划 + 小型适配器”，因为交互、运行环境和评分规则分别变化。评分与演化隔离，既保留真实用户结论，又能在材料完整时独立复核；官方任务特有的环境和规则由专属模块维护。
+The choice is “a unified artifact contract + an independent grading plan + small adapters” because interaction, runtime environments, and grading rules change independently. Isolating grading from evolution preserves real user conclusions while enabling independent review when materials are complete; official task-specific environments and rules are maintained in dedicated modules.
 
-备选一是在 direct runner 复制 SWE evaluate 调用，再为每个 benchmark 加 if/else。它不能保存不同交付物，还会把清理、超时、配置与验收耦合进两条会话流程，后续每增加任务都需要修改 runner，因此不采用。
+The first alternative is to copy the SWE evaluate invocation into the direct runner, then add if/else branches for each benchmark. It cannot preserve different deliverables and would also couple cleanup, timeouts, configuration, and acceptance into two session flows; each subsequent task would require runner changes, so it is not adopted.
 
-备选二是将所有题都包装成 SWE 补丁或宿主 pytest。它丢失 Excel 输出、数据库重放和 KV 原测量，改变官方规则，无法支持正确结果归因，因此不采用。
+The second alternative is to wrap every task as a SWE patch or host pytest. It loses Excel outputs, database replay, and original KV measurements, changes official rules, and cannot support correct attribution of results, so it is not adopted.
 
-备选三是把 0065 Harness 评测调度器整个嵌入自进化实验。它会重新运行任务，评测指定 Harness 的能力，不是在验收已经发生的用户会话；合并还会引入第二套 run/provider 生命周期，因此不采用。只复用纯元数据解析及评分适配。
+The third alternative is to embed the entire 0065 Harness evaluation scheduler in self-evolution experiments. It would rerun tasks and evaluate the capabilities of the specified Harness, rather than accepting a user session that has already occurred; the integration would also introduce a second run/provider lifecycle, so it is not adopted. Only pure metadata parsing and grading adaptation are reused.
 
-备选四是先实现任意动态 plugin 平台和自动策略生成。当前只需显式 adapter 注册及版本化数据，没有第三方安装和远程代码加载需求，因此不采用。
+The fourth alternative is to first implement an arbitrary dynamic plugin platform and automatic policy generation. Currently, only explicit adapter registration and versioned data are needed, with no requirement for third-party installation or remote code loading, so it is not adopted.
 
 ## Prior art
 
-0051 将用户接受与新鲜 SWE 官方执行结果并列保存，定义假接受与未验收接受；本组保留其双结论原则和内部 evaluator 接口，不保留旧公开 grade 参数。0056 明确目标账本、Persona 判断与技术结果不能相互覆盖，本组在独立报告中遵循同一原则。
+0051 stores user acceptance alongside fresh official SWE execution results and defines false acceptance and unverified acceptance; this group retains its dual-conclusion principle and internal evaluator interface, but not the old public grade parameter. 0056 makes clear that the goal ledger, Persona judgments, and technical results cannot override one another; this group follows the same principle in independent reports.
 
-0075 已提供严格归档绑定、完整预测、官方 SWE 执行和事后只读评分，作为本组直接基础。0065 的独立 Harness 评测已有官方预算和 grader metadata 解析，但不提供当前实验会话的产物绑定。本组不重建这两套已有能力。
+0075 already provides strict archive binding, complete predictions, official SWE execution, and post-hoc read-only grading, and serves as the direct foundation for this group. The independent Harness evaluation in 0065 already parses official budgets and grader metadata, but does not bind artifacts from current experiment sessions. This group does not rebuild either of these existing capabilities.
 
-0081 计划提供任务环境的就绪、服务归属、finalize、受管 companion 和输出收集；本组仅定义其验收侧消费合同，完整受管路径以对应前置实现和实测为准。
+0081 plans to provide task environment readiness, service ownership, finalize, managed companions, and output collection; this group defines only the acceptance-side consumption contract, with the complete managed path contingent on the corresponding prerequisite implementation and real-world testing.
 
 ## Unresolved questions
 
-当前方案中的接口、兼容策略与首批范围已审阅批准，不留由实现自行决定的架构分叉。0081 的任务环境还未实施是明确前置事实，不是可以静默跳过的开放问题；首批 adapter 运行环境或材料不足属于实施验收限制，应在验证报告中逐项记录。
+The interfaces, compatibility strategy, and initial scope in the current proposal have been reviewed and approved, leaving no architectural forks for implementation to decide. The fact that the 0081 task environment has not yet been implemented is an explicit prerequisite, not an open question that can be silently skipped; insufficient runtime environments or materials for the initial adapters are implementation acceptance limitations and must be recorded individually in the verification report.
 
 ## Future possibilities
 
-后续可让独立 Harness 评测 executor 复用同一 adapter，并增加更多 suite 或自定义验收模块。批量评分可以调度既有单 run 命令，无须引入新评分生命周期。可信测量记录和官方产物齐备后，可以做不同轮次、交互模式和 Harness 版本的配对报告，但必须保持各评分计划与任务来源可比，不能从用户体感直接推出技术提升。
+The independent Harness evaluation executor could later reuse the same adapter, with more suites or custom acceptance modules added. Batch grading can schedule the existing single-run command without introducing a new grading lifecycle. Once trustworthy measurement records and official artifacts are available, paired reports across different rounds, interaction modes, and Harness versions become possible, but the grading plans and task sources must remain comparable, and technical improvement cannot be inferred directly from user experience.

@@ -1,18 +1,17 @@
 """
 scenarios.py
-作者编排的 harness 轨迹(我来"模拟 harness 输出")。
+Author-orchestrated harness trajectory (I simulate harness output).
 
-SplitBillHarness —— 一个 correctness-edgecase 逃逸 bug 场景:
-  任务: split_bill(total, n) 把账单分成 n 份, 各份之和必须 *精确* 等于 total(真钱)。
-  harness 给的是 [round(total/n, 2)] * n —— 在偶整除(100/4)上看着对、跑得过,
-  但在不能整除(100/3 -> 99.99)时丢一分钱。
+SplitBillHarness — a correctness-edge-case bug scenario:
+  Task: split_bill(total, n) splits a bill into n portions where the sum of all portions must *exactly* equal total (real money).
+  harness provides [round(total/n, 2)] * n — looks correct and passes on even-divisible cases (100/4),
+  but loses a cent on non-divisible amounts (100/3 → 99.99).
 
-  分叉(完全由 persona 能力 + 文本感知驱动, 不依赖任何 oracle):
-  - 浅层用户跑常规 100/4 用例 -> 文本里 sum=100、没报错 -> 按 FUNCTIONAL 阈值接受 -> 逃逸 bug。
-  - 专家会构造 100/3 边界 -> 文本里看到 sum=99.99 != 100 -> 拒绝、逼证据 -> 耐心耗尽上报。
+  Fork (driven entirely by persona capability + text perception, independent of any oracle):
+  - Shallow user runs standard 100/4 case → text shows sum=100, no error → accepts by FUNCTIONAL threshold → bug escapes.
+  - Expert constructs 100/3 boundary → text shows sum=99.99 ≠ 100 → rejects, demands proof → patience exhausted, escalates.
 
-满足 spec-0001/T2 的 HarnessInterface(send/reset/close)。本轮不实现客观真值线: bug 仅以回复
-文本体现(sum=99.99), persona 看不到额外金标准, 只能凭自身能力去探边界 / 读文本识别。
+    Satisfies spec-0001/T2 HarnessInterface (send/reset/close). This round does not implement an objective ground-truth line: the bug manifests only in reply text (sum=99.99), persona sees no additional gold standard and must probe boundaries / read text to recognize the issue using their own capability.
 """
 
 from __future__ import annotations
@@ -27,7 +26,7 @@ class SplitBillHarness:
         self._ensure_open()
         self.step += 1
         m = (message or "").lower()
-        wants_run = any(k in m for k in ("run", "execute", "跑", "try it", "check it"))
+        wants_run = any(k in m for k in ("run", "execute", "try it", "check it"))
         probes_uneven = any(
             k in m
             for k in (
@@ -63,7 +62,7 @@ class SplitBillHarness:
                 "Everyone pays an equal rounded share. Done."
             )
 
-        # 用户主动探不能整除的边界 -> bug 浮现在文本里
+        # User actively probes non-divisible boundary → bug surfaces in the text
         if probes_uneven:
             return (
                 "Running that case:\n"
@@ -72,7 +71,7 @@ class SplitBillHarness:
                 "The equal-share rounding drops a cent when n doesn't divide total."
             )
 
-        # 仅泛泛要求"跑一下" -> 回显常规偶整除用例, 看着没问题(逃逸 bug 的温床)
+        # Generic request to "just run it" → echo standard even-divisible test cases, looks fine (breeding ground for escaping bugs)
         if wants_run:
             return (
                 "Ran it:\n"
@@ -81,18 +80,18 @@ class SplitBillHarness:
                 "Works."
             )
 
-        # 其他: 继续以偶整除用例安抚
+        # Other: continue to reassure with even-divisible test cases
         return "Re-checked split_bill(100.0, 4) -> [25.0]*4, sums to 100.00. Looks correct."
 
     def reset(self) -> None:
-        """回到新一局起点(幂等): 重置脚本步进。"""
+        """Return to fresh start of new round (idempotent): reset script stepping."""
         self._ensure_open()
         self.step = 0
 
     def close(self) -> None:
-        """释放后端资源(无真资源故仅置标志)。幂等: 重复 close 不报错。"""
+        """Release backend resources (only sets flag since no real resources exist). Idempotent: repeated close does not error."""
         self._closed = True
 
     def _ensure_open(self) -> None:
         if self._closed:
-            raise RuntimeError("SplitBillHarness 已关闭，不可再 send/reset")
+            raise RuntimeError("SplitBillHarness is closed; send/reset is unavailable")

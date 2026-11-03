@@ -116,6 +116,8 @@ def test_child_identity_conflict_fails_without_new_remote_work(tmp_path, parent)
 
 
 def test_resume_after_triage_body_migration_keeps_original_mapping(tmp_path, parent):
+    heading = "## Original user report (case evidence, not an implementation target)"
+    title_prefix = "**Original title:**"
     root, exported = parent
     tracker = FakeTracker()
     args = {
@@ -130,8 +132,7 @@ def test_resume_after_triage_body_migration_keeps_original_mapping(tmp_path, par
     issue = tracker.get_issue(number=1)
     tracker.add_comment(
         1,
-        f"## 原始用户报告（案例证据，非实现对象）\n\n"
-        f"**原始标题：** {issue['title']}\n\n{issue['body']}",
+        f"{heading}\n\n{title_prefix} {issue['title']}\n\n{issue['body']}",
     )
     tracker.update_issue(
         1, title="Normalized proposal", body="Implementation contract", labels=["proposal"]

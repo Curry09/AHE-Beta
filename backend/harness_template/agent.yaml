@@ -7,7 +7,7 @@ name: harness
 max_context_tokens: 256000
 system_prompt: ./agents/main.md
 system_prompt_type: file
-# structured：使用模型原生结构化工具调用，工具参数由 NexAU 按 schema 校验。
+# structured: use native structured model tool calls; NexAU validates tool arguments against the schema.
 tool_call_mode: structured
 max_iterations: 100
 
@@ -20,12 +20,12 @@ llm_config:
   timeout: 300
   api_type: openai_chat_completion
 
-# 本地 sandbox：run_shell_command 在 work_dir 执行；work_dir 取环境变量 SANDBOX_WORK_DIR
-# （entry.py 运行时指向一个干净的每会话工作区，作为「用户项目」根目录）。
+# Local sandbox: run_shell_command executes in work_dir; work_dir comes from the SANDBOX_WORK_DIR environment variable
+# (entry.py points it at a clean per-session workspace at runtime, serving as the user project root).
 sandbox_config:
   type: local
 
-# 只挂 bash（run_shell_command）+ complete_task：bash 即可读写文件、跑校验，最小够用。
+# Expose only bash (run_shell_command) and complete_task: bash can read/write files and run checks, providing the necessary minimum.
 tools:
   - name: run_shell_command
     yaml_path: ./tools/run_shell_command.tool.yaml

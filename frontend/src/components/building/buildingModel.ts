@@ -23,12 +23,12 @@ export interface FloorModel {
 }
 
 export const ROLE_COPY: Record<AgentRole, { icon: string; subtitle: string }> = {
-  user: { icon: "🧑‍💻", subtitle: "用户实验室 · 真实体感采样" },
-  triager: { icon: "🧭", subtitle: "分诊台 · 归类定位与去重" },
-  architect: { icon: "📐", subtitle: "架构设计工区 · RFC" },
-  divergent: { icon: "💡", subtitle: "发散 PM · 产品候选孵化" },
-  owner: { icon: "🚪", subtitle: "准入门 · proposal → ready 裁决" },
-  developer: { icon: "OA", subtitle: "交付边界 · Owner 准入与 OpenAgents vigil 接管" },
+  user: { icon: "🧑‍💻", subtitle: "User lab · Usage feedback" },
+  triager: { icon: "🧭", subtitle: "Triage desk · Classification and diagnosis" },
+  architect: { icon: "📐", subtitle: "Architecture workspace · RFC" },
+  divergent: { icon: "💡", subtitle: "Divergent PM · Product ideas" },
+  owner: { icon: "🚪", subtitle: "Admission gate · proposal → ready" },
+  developer: { icon: "OA", subtitle: "Delivery boundary · Owner handoff to OpenAgents vigil" },
 };
 
 function latestRound(history: HistoryEntry[]): number | null {
@@ -63,12 +63,12 @@ export function resolveBuildingMode(
 }
 
 export function historyLabel(item: HistoryItem): string {
-  if (item.kind === "user_session") return item.score != null ? `体感 ${item.score}` : "用户会话";
-  if (item.kind === "triager_run") return "分诊完成";
-  if (item.kind === "divergent_run") return `${(item.proposals ?? []).length} 候选`;
+  if (item.kind === "user_session") return item.score != null ? `Experience ${item.score}` : "User session";
+  if (item.kind === "triager_run") return "Triage complete";
+  if (item.kind === "divergent_run") return `${(item.proposals ?? []).length} candidates`;
   if (item.kind === "architect_run") return `${(item.proposals ?? []).length} RFC`;
-  if (item.kind === "dev_run") return item.tag ? `${item.tag}` : item.committed ? "已推进" : "未推进";
-  return "已完成";
+  if (item.kind === "dev_run") return item.tag ? `${item.tag}` : item.committed ? "Main updated" : "Main unchanged";
+  return "Completed";
 }
 
 export function shortStatus(text: string): string {
@@ -142,9 +142,9 @@ export function buildFloorModels(params: {
 
 export function titleCopy(mode: BuildingMode, round: RoundFilter, fallbackRound: number | null): string {
   if (fallbackRound != null) {
-    return `当前没有 live agent，自动展示最近归档的第 ${fallbackRound} 轮复盘。`;
+    return `No agents are running. Showing the most recently archived round: ${fallbackRound}.`;
   }
-  if (mode === "live") return "Live 模式：每层显示当前 agent 的办公状态。";
-  if (mode === "replay" && round !== "all") return `第 ${round} 轮复盘：大厦展示该轮各楼层归档。`;
-  return "全部轮次汇总：大厦展示各楼层累计产出。";
+  if (mode === "live") return "Live view: current agent activity on each floor.";
+  if (mode === "replay" && round !== "all") return `Round ${round} replay: archived activity on each floor.`;
+  return "All rounds: cumulative activity on each floor.";
 }

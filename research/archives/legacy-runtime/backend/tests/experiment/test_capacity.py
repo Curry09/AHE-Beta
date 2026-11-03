@@ -1,4 +1,4 @@
-# Spec-0047/T5：容量租约与过期回收。
+# Spec-0047/T5: Capacity leases and expiration cleanup.
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,7 +29,7 @@ def test_parallel_acquire_respects_capacity(tmp_path: Path) -> None:
         pid=2,
         now=100.0,
     )
-    with pytest.raises(CapacityError, match="容量不足"):
+    with pytest.raises(CapacityError, match="Insufficient capacity"):
         acquire(
             experiment_id="e3",
             endpoint="glm",

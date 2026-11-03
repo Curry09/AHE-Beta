@@ -1,12 +1,12 @@
-# Spec-0007/T3：一次性迁移脚本——把 harness 仓从 main+release 收敛到纯 trunk（单 main）。
-"""把演化成果从 release 收敛到 main 且不丢东西：
+# Spec-0007/T3: One-time migration script—converge the harness repository from main+release to trunk-only (single main).
+"""Converge the evolution results from release to main without losing anything:
 
-`git checkout main && git reset --hard release`（main 移到 release tip，保留全部 release 历史与内容）→
-删除除 main 外所有本地分支（release + 孤儿 fix/issue-* + 已合并）→ 可选：push main、删远端 release、
-确认 Gitea 默认分支为 main。
+`git checkout main && git reset --hard release` (move main to the release tip, preserving all release history and contents) →
+delete all local branches except main (release + orphaned fix/issue-* + merged branches) → optional: push main, delete remote release,
+confirm that the Gitea default branch is main.
 
-幂等：已迁移（无 release 分支）→ no-op、不报错。对意外仓状态（无 release、main 非 release 祖先）安全退出
-并提示，绝不执行破坏性的 `-f`/删除。
+Idempotent: already migrated (no release branch) → no-op, no error. Safely exit and provide a notice for unexpected repository states (no release, main is not an ancestor of release);
+never perform destructive `-f` operations or deletions.
 """
 
 from __future__ import annotations
@@ -16,12 +16,12 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-# 可选回调：确认/切换远端（Gitea）默认分支为给定分支名；None 则跳过（纯本地迁移）。
+# Optional callback: confirm/switch the remote (Gitea) default branch to the specified branch name; None skips this step (purely local migration).
 SetDefaultBranch = Callable[[str], None]
 
 
 def _git(repo: Path, *args: str) -> str:
-    """在 repo 内跑 git（check=True，失败抛 CalledProcessError），返回 stdout。"""
+    """Run git inside the repo (check=True; raises CalledProcessError on failure) and return stdout."""
     out = subprocess.run(
         ["git", "-C", str(repo), *args], check=True, capture_output=True, text=True
     )
@@ -29,13 +29,13 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def _branches(repo: Path) -> list[str]:
-    """列出本地分支名。"""
+    """List local branch names."""
     out = _git(repo, "branch", "--format=%(refname:short)")
     return [b for b in out.split("\n") if b]
 
 
 def _is_ancestor(repo: Path, ancestor: str, descendant: str) -> bool:
-    """ancestor 是否为 descendant 的祖先（相等视为真）。"""
+    """Whether ancestor is an ancestor of descendant (equality counts as true)."""
     return (
         subprocess.run(
             ["git", "-C", str(repo), "merge-base", "--is-ancestor", ancestor, descendant],
@@ -51,57 +51,57 @@ def migrate_trunk_main(
     push_remote: bool,
     set_default_branch: SetDefaultBranch | None,
 ) -> int:
-    """执行迁移，返回退出码：0=迁移成功 / 已迁移(no-op)；1=意外仓状态，安全跳过、未改动。"""
+    """Execute the migration and return the exit code: 0 = migration succeeded / already migrated (no-op); 1 = unexpected repository state, safely skipped without changes."""
     repo = Path(repo)
     branches = _branches(repo)
 
-    # 幂等：无 release（已迁移或本就 trunk）→ no-op，不报错、不触碰任何分支。
+    # Idempotent: no release branch (already migrated or originally trunk) → no-op; do not report an error or touch any branch.
     if "release" not in branches:
-        print("[migrate-trunk] 无 release 分支 → 视为已迁移，跳过")
+        print("[migrate-trunk] None release branch → Treat as migrated，Skip")
         return 0
 
-    # 安全闸：main 必须是 release 的祖先（release ⊃ main）才允许把 main 快进到 release tip。
-    # 否则（main 领先/已分叉）属意外状态，绝不强行 -f/删除，交人工处置。
+    # Safety gate: main must be an ancestor of release (release ⊃ main) before main may be fast-forwarded to the release tip.
+    # Otherwise (main is ahead or has diverged), this is an unexpected state; never force -f or delete anything—hand it over for manual handling.
     if "main" not in branches or not _is_ancestor(repo, "main", "release"):
         print(
-            "[migrate-trunk] main 非 release 祖先（或缺 main）→ 安全退出，不执行 -f/删除",
+            "[migrate-trunk] main Non release ancestor（Or missing main）→ Exit safely，Do not execute -f/deletion",
             file=sys.stderr,
         )
         return 1
 
-    # 迁移：main 移到 release tip（reset --hard 到 release，release ⊃ main 故保留全部历史与内容）。
+    # Migration: move main to the release tip (reset --hard to release; because release ⊃ main, all history and content are preserved).
     _git(repo, "checkout", "main")
     _git(repo, "reset", "--hard", "release")
 
-    # 删除除 main 外所有本地分支（release + 孤儿 fix/issue-* + 已合并），本地仅剩 main 一条线。
+    # Delete all local branches except main (release + orphaned fix/issue-* + merged branches), leaving only the main line locally.
     for branch in _branches(repo):
         if branch != "main":
             _git(repo, "branch", "-D", branch)
 
     if push_remote:
         _git(repo, "push", "origin", "main")
-        # 删远端 release（已不存在则忽略，保持幂等）。
+        # Delete the remote release branch (ignore it if it no longer exists, preserving idempotence).
         subprocess.run(
             ["git", "-C", str(repo), "push", "origin", "--delete", "release"],
             capture_output=True,
         )
 
-    # 确认远端默认分支为 main（默认展示真正在进化的版本）。
+    # Confirm that the remote default branch is main (so the default view shows the version that is actually evolving).
     if set_default_branch is not None:
         set_default_branch("main")
 
-    print("[migrate-trunk] 完成：本地仅 main（release/孤儿/已合并分支已删除）")
+    print("[migrate-trunk] Completed：Locally only main（release/orphan/Merged branches deleted）")
     return 0
 
 
 def _gitea_default_branch_setter(*, session, api: str, owner: str, repo: str) -> SetDefaultBranch:
-    """构造把 Gitea 仓默认分支切到给定分支的回调（PATCH /repos/{owner}/{repo}）。"""
+    """Construct a callback that sets the Gitea repository's default branch to the given branch (PATCH /repos/{owner}/{repo})."""
 
     def _set(branch: str) -> None:
         resp = session.patch(f"{api}/repos/{owner}/{repo}", json={"default_branch": branch})
         if resp.status_code not in (200, 201):
             print(
-                f"[migrate-trunk] 切默认分支为 {branch} 失败：HTTP {resp.status_code}",
+                f"[migrate-trunk] Set the default branch to {branch} Failed：HTTP {resp.status_code}",
                 file=sys.stderr,
             )
 
@@ -111,12 +111,12 @@ def _gitea_default_branch_setter(*, session, api: str, owner: str, repo: str) ->
 def main() -> int:
     import requests
 
-    from bootstrap_harness import HARNESS_REPO, _read_env  # 复用 .env 解析与仓名
+    from bootstrap_harness import HARNESS_REPO, _read_env  # Reuse .env parsing and repository name
 
     repo_root = Path(__file__).resolve().parents[1]  # backend/
     harness_repo = repo_root / "data" / "harness_repo"
     if not (harness_repo / ".git").is_dir():
-        print(f"[migrate-trunk] 前置缺失：{harness_repo} 不是 git 仓", file=sys.stderr)
+        print(f"[migrate-trunk] Missing prerequisite：{harness_repo} Is not git Repository", file=sys.stderr)
         return 2
 
     env = _read_env(repo_root / "deploy" / "gitea" / ".env")

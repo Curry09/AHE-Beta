@@ -1,10 +1,10 @@
-# 公开静态快照
+# Public Static Snapshots
 
-静态快照用于分享实验的概要进度。导出器只保留预先定义的状态和计数字段，原始会话、任务代码与诊断日志继续保存在私有实验记录中。
+Static snapshots are used to share a summary of an experiment’s progress. The exporter retains only predefined status and count fields; raw sessions, task code, and diagnostic logs remain in the private experiment record.
 
-## 导出
+## Export
 
-从仓库根目录运行，输入目录应包含 `telemetry/monitor-latest.json`，也可包含历史记录 `telemetry/monitor.jsonl`：
+Run from the repository root. The input directory should contain `telemetry/monitor-latest.json` and may also contain historical records `telemetry/monitor.jsonl`:
 
 ```bash
 uv run --locked python backend/scripts/export_experiment_snapshot.py \
@@ -12,20 +12,20 @@ uv run --locked python backend/scripts/export_experiment_snapshot.py \
   --public-id demo --title "Experiment snapshot"
 ```
 
-将 `EXPERIMENT_ROOT` 设为已有监控记录的实验目录，`NEW_PUBLIC_DIRECTORY` 设为本次导出的新目录。脚本会生成实验索引、最新状态、时间线和前端使用的静态 API 数据。
+Set `EXPERIMENT_ROOT` to the experiment directory containing the existing monitoring records, and `NEW_PUBLIC_DIRECTORY` to a new directory for this export. The script generates an experiment index, the latest status, a timeline, and static API data for the frontend.
 
-## 公开内容
+## Public Content
 
-导出范围包括已知状态、规范化时间、非负整数计数、布尔值、已知角色和告警数量。Agent 标识会替换为序号；未指定 `--public-id` 时，实验目录名会转换为散列标识。
+The export includes known statuses, normalized timestamps, non-negative integer counts, Boolean values, known roles, and alert counts. Agent identifiers are replaced with sequence numbers; unless `--public-id` is specified, experiment directory names are converted to hash identifiers.
 
-提示词、Issue／PR 正文、原始告警、日志、未知字段和自由文本状态均不导出。`--title` 与 `--public-id` 则是操作者提供的公开信息，发布前应确认其中不含私密内容。散列标识不会直接暴露源目录名，但不构成匿名性保证。
+Prompts, issue/PR bodies, raw alerts, logs, unknown fields, and free-text statuses are not exported. `--title` and `--public-id`, however, are public information provided by the operator; confirm that they contain no private content before publication. Hash identifiers do not directly expose source directory names, but they do not guarantee anonymity.
 
-导出器会更新目标索引，但不会删除已有文件或重新处理目标目录中的其他实验。重新制作整套公开资产时，请在新目录导出、检查内容后替换旧资产。仅发布生成的静态数据，不将原始 telemetry、会话或完整实验归档放入公开站点。
+The exporter updates the target index but does not delete existing files or reprocess other experiments in the target directory. To recreate the complete set of public assets, export to a new directory, inspect the contents, and then replace the old assets. Publish only the generated static data; do not put raw telemetry, sessions, or complete experiment archives on a public site.
 
-## 快照时间与实时观测
+## Snapshot Times and Live Observations
 
-静态页面展示采集时的状态和时间。例如 `RUNNING` 表示记录产生时仍在运行。索引中的 `updated_at` 来自监控数据的 `time`，按 UTC 展示；重新构建站点或再次导出同一份数据不会刷新记录时间。
+Static pages show the status and time as recorded at collection. For example, `RUNNING` indicates that the run was still in progress when the record was created. `updated_at` in the index comes from `time` in the monitoring data and is displayed in UTC; rebuilding the site or exporting the same data again does not refresh the record time.
 
-需要查看运行中的实验时，使用 `backend/scripts/experiment.py status`、`logs` 或绑定该 run 的 `dashboard`。默认开发 API 不会自动选择实验；E2B 看板读取最近一次收集的快照，需要再次 `collect` 更新数据。
+To view experiments while they are running, use `backend/scripts/experiment.py status`, `logs`, or `dashboard` bound to that run. The default development API does not automatically select an experiment; the E2B dashboard reads the most recently collected snapshot, so `collect` must be used again to update the data.
 
-公开快照导出与实验产物收集是两项操作。保存完整实验记录使用 `backend/scripts/experiment.py collect RUN_ID`，详见[快速开始](QUICKSTART.zh-CN.md)。
+Exporting public snapshots and collecting experiment artifacts are separate operations. To save the complete experiment record, use `backend/scripts/experiment.py collect RUN_ID`; see [Quick Start](QUICKSTART.md).

@@ -1,12 +1,12 @@
 ---
 number: "0043"
-title: 需求面角色认知契约：专属产物语言与行为质量门
+title: "Demand-side role cognitive contracts: role-specific artifact language and behavioral quality gates"
 issue: 0
 slug: role-cognitive-contracts
-summary: 在共享证据之上为 Triage、产品 PM、Architect 与 Owner 建立不同的认知任务、角色专属产物契约和可执行质量门，防止多角色退化为同一种技术分析 Agent。
+summary: "Establish distinct cognitive tasks, role-specific artifact contracts, and executable quality gates for Triage, product PM, Architect, and Owner on top of shared evidence, preventing multiple roles from degenerating into the same kind of technical analysis Agent."
 tasks:
   - id: T1
-    title: 角色产物模型与共享质量门契约
+    title: "Role artifact models and shared quality gate contracts"
     status: done
     priority: P0
     tags: []
@@ -19,10 +19,10 @@ tasks:
       - backend/ahe_beta/demand/submit_tools.py
       - backend/tests/demand/test_role_contract.py
       - backend/tests/demand/test_agent_contract.py
-    scope: 定义四角色专属 artifact schema、来源引用、确定性不变量与结构化 revise/hold violation；保留 canonical proposal 落库投影，但不再让四角色共享同一认知表单。
-    acceptance: 四角色 schema 在字段和语义目的上明确不同；Triage 单 report 来源、PM 用户/产品视角、Architect 多 proposal 关系、Owner 投资裁决均有可机检不变量；非法来源、越权票号和缺失关系被拒绝并返回结构化 violation；契约与 submit binding 单测通过。
+    scope: "Define role-specific artifact schemas for the four roles, source references, deterministic invariants, and structured revise/hold violations; retain the canonical proposal storage projection, but no longer have all four roles share the same cognitive form."
+    acceptance: "The four role schemas are explicitly distinct in their fields and semantic purposes; machine-checkable invariants cover Triage's single-report source, PM's user/product perspective, Architect's multi-proposal relationships, and Owner's investment adjudication; invalid sources, unauthorized issue numbers, and missing relationships are rejected with structured violations; contract and submit binding unit tests pass."
   - id: T2
-    title: Triage 单报告认知隔离与事实型提案
+    title: "Triage single-report cognitive isolation and factual proposals"
     status: done
     priority: P0
     tags: []
@@ -35,10 +35,10 @@ tasks:
       - backend/agent_defs/triage_agent/systemprompt.md
       - backend/agent_defs/triage_agent/tools/submit_triage.tool.yaml
       - backend/tests/demand/test_triage.py
-    scope: 将 Triage 调度改为每个 report 独立上下文，可并行但不在同一模型调用暴露其他 report/proposal；产物只界定报告事实、用户影响、边界、证据与不确定项，再投影为 canonical proposal。
-    acceptance: 处理 report A 的模型输入和工具作用域不含 B；Triage 不能提交跨票判重、产品机会或实现方案字段；批量运行仍可并发且 outcome 精确归属每票；正反行为测试与现有状态迁移测试通过。
+    scope: "Change Triage scheduling to give each report an independent context; processing may run in parallel, but other reports/proposals must not be exposed in the same model call; artifacts define only reported facts, user impact, boundaries, evidence, and uncertainties, then project them into canonical proposals."
+    acceptance: "The model input and tool scope for processing report A exclude B; Triage cannot submit fields for cross-issue duplicate detection, product opportunities, or implementation plans; batch execution remains concurrent, with outcomes precisely attributed to each issue; positive and negative behavioral tests and existing state transition tests pass."
   - id: T3
-    title: 产品 PM 全景洞察契约
+    title: "Product PM holistic insight contract"
     status: done
     priority: P0
     tags: []
@@ -51,10 +51,10 @@ tasks:
       - backend/agent_defs/divergent_pm/systemprompt.md
       - backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml
       - backend/tests/demand/test_divergent_gate.py
-    scope: 保留 PM 对全部体验、已有 report/proposal 和按需会话证据的观察权，将任务改为解释用户目标、行为、体验矛盾、产品机会与期望结果；不把 PM 定义为未报告项扫描器或去重器。
-    acceptance: PM 可引用有或无 report 的 session，也可重构已有问题视角；输出必须包含用户目标、观察行为、体验矛盾、产品机会、期望结果和证据引用；不得携带代码位置、协议、阈值或实施步骤；是否重复不在 PM driver 拒绝，而由 Owner 裁决；行为测试覆盖上述正反例。
+    scope: "Retain PM's visibility into all experiences, existing reports/proposals, and on-demand session evidence, while changing its task to explaining user goals, behavior, experience contradictions, product opportunities, and desired outcomes; do not define PM as a scanner for unreported items or a deduplicator."
+    acceptance: "PM may reference sessions with or without reports and may reframe existing problems; output must include user goals, observed behavior, experience contradictions, product opportunities, desired outcomes, and evidence references; it must not contain code locations, protocols, thresholds, or implementation steps; duplication is not grounds for rejection by the PM driver and is instead adjudicated by Owner; behavioral tests cover these positive and negative examples."
   - id: T4
-    title: Architect 提案关系综合契约
+    title: "Architect proposal relationship synthesis contract"
     status: done
     priority: P0
     tags: []
@@ -70,10 +70,10 @@ tasks:
       - backend/agent_defs/architect/systemprompt.md
       - backend/agent_defs/architect/tools/submit_rfcs.tool.yaml
       - backend/tests/loop/test_architect.py
-    scope: 将 Architect 的认知对象锁定为 ProposalView 关系：声明来源提案、关系类型、共同矛盾、结构方向与预期杠杆；证据下钻只能验证已引用提案关系，不能脱离 proposal 自行发掘新需求。
-    acceptance: 每条结构产物引用至少两条本轮可见 proposal 并解释关系；不存在或越权来源被拒绝；单条改写、无来源 session 派生和具体实现处方不能落为 from-architect；covers 仍只是 Owner 的非约束建议；行为及落库测试通过。
+    scope: "Constrain Architect's cognitive focus to ProposalView relationships: declare source proposals, relationship types, shared contradictions, structural direction, and expected leverage; evidence drill-down may only validate relationships among already referenced proposals and must not independently discover new requirements outside proposals."
+    acceptance: "Each structural artifact references at least two proposals visible in the current round and explains their relationship; nonexistent or unauthorized sources are rejected; single-proposal rewrites, derivations from sessions without source proposals, and concrete implementation prescriptions cannot be stored as from-architect; covers remains only a nonbinding recommendation to Owner; behavioral and persistence tests pass."
   - id: T5
-    title: Owner 投资判断与组合质量门
+    title: "Owner investment judgment and portfolio quality gates"
     status: done
     priority: P0
     tags: []
@@ -88,10 +88,10 @@ tasks:
       - backend/agent_defs/owner/systemprompt.md
       - backend/agent_defs/owner/tools/submit_admission.tool.yaml
       - backend/tests/demand/test_owner.py
-    scope: Owner 只基于角色产物、ready queue、体验摘要和证据引用判断用户价值、证据强度、范围内聚、重叠关系、投入风险与优先级；移除自由源码调查和重新诊断路径，保留 admit/merge/decline/hold。
-    acceptance: Owner 只能裁决本批输入并为每项给出价值、证据、范围、重叠/风险依据；证据不足、范围不内聚或过早实施化时可观测 hold/revise，不能无理由全量放行；Owner 不调用源码搜索或自由 timeline 重新诊断；决策图和状态迁移回归通过。
+    scope: "Owner judges user value, evidence strength, scope cohesion, overlap relationships, investment risk, and priority based only on role artifacts, the ready queue, experience summaries, and evidence references; remove unrestricted source code investigation and rediagnosis paths, while retaining admit/merge/decline/hold."
+    acceptance: "Owner may adjudicate only inputs in the current batch and must provide a rationale for each item's value, evidence, scope, and overlap/risk; insufficient evidence, incohesive scope, or premature implementation detail must support observable hold/revise outcomes, and blanket approval without justification is prohibited; Owner does not invoke source code search or unrestricted timeline access for rediagnosis; decision graph and state transition regression tests pass."
   - id: T6
-    title: 跨角色行为评测与真实回放验收
+    title: "Cross-role behavioral evaluation and real replay acceptance"
     status: done
     priority: P1
     tags: []
@@ -106,143 +106,146 @@ tasks:
       - backend/tests/demand/test_role_contract_flow.py
       - tools/dev/replay/replay_roles_from_sessions.py
       - tools/dev/audit/evaluate_role_traces.py
-    scope: 建立角色正例、反例与越界样例，验证同一证据经过四种认知任务产生不同 artifact；真实回放冻结完整输入、角色产物、裁决和逐角色合规评分，不以 JSON 合法或状态迁移成功代替行为验收。
-    acceptance: 测试证明 Triage 不串票、PM 保持产品视角且不受 novelty 限制、Architect 解释多提案关系、Owner 做投资组合裁决并拦截越界产物；trace evaluator 输出逐角色 contract violations 和证据位置；真实回放无 OpenAgents 且完整产物可独立审计；ruff、相关 pytest、spec validate/render/graph 通过。
+    scope: "Establish positive, negative, and boundary-violation examples for each role to verify that the same evidence produces different artifacts through four cognitive tasks; real replays freeze complete inputs, role artifacts, adjudications, and per-role compliance scores, without substituting valid JSON or successful state transitions for behavioral acceptance."
+    acceptance: "Tests demonstrate that Triage does not mix issues, PM maintains a product perspective without novelty restrictions, Architect explains multi-proposal relationships, and Owner adjudicates the investment portfolio and blocks artifacts that exceed role boundaries; the trace evaluator outputs per-role contract violations and evidence locations; real replays run without OpenAgents and complete artifacts can be independently audited; ruff, relevant pytest tests, and spec validate/render/graph pass."
 ---
 
-# 0043 · 需求面角色认知契约：专属产物语言与行为质量门
+# 0043 · Demand-side Role Cognitive Contracts: Dedicated Artifact Languages and Behavioral Quality Gates
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level overview in 9 rust-RFC sections. -->
 
 ## Summary
 
-需求面角色目前共享相近的证据、工具和 `问题/根因/方向/验收` 表单，真实回放中因而反复退化为
-“读取大量会话、重新技术诊断、提出实现方案”的同一种 Agent。本组把角色差异从 Prompt 描述提升为三层
-可验证契约：每个角色回答不同的认知问题，提交不同的结构化 artifact，并经过与职责相匹配的质量门。
+Before role-specific artifacts, demand-side roles shared similar evidence, tools, and `problem`/`root_cause`/`direction`/`acceptance` fields, so in real replays they repeatedly collapsed into
+the same kind of Agent that “reads large volumes of sessions, repeats technical diagnosis, and proposes implementation plans.” This group elevates role distinctions from Prompt descriptions into three layers of
+verifiable contracts: each role answers a different cognitive question, submits a different structured artifact, and passes a quality gate matched to its responsibilities.
 
-正式分工为：Triage 准确界定单条报告；产品 PM 全面观察用户行为并解释产品问题与机会；Architect
-解释既有提案之间的结构关系与共同机制；Owner 判断哪些方向值得投入以及应 admit、merge、decline 或
-hold。PM 不被降格为“未报告项扫描器”，重复也不在生成侧强行消除；Owner 保留全局组合裁决权。
+The formal division of responsibilities is: Triage accurately defines a single report; the product PM comprehensively observes user behavior and explains product problems and opportunities; Architect
+explains structural relationships and common mechanisms among existing proposals; Owner decides which directions merit investment and whether to admit, merge, decline, or
+hold. PM is not reduced to an “unreported-item scanner,” nor are duplicates forcibly eliminated during generation; Owner retains authority over global portfolio decisions.
 
 ## Motivation
 
-Spec 0042 已统一 report/proposal/ready 状态、ProposalView、迁移可靠性和角色名称，但回放显示“数据流
-正确”不等于“角色行为正确”。早期回放中，产品 PM 提出的直接操作层、原始输出可信度和变更对账接近产品
-能力表达；后续回放却逐渐输出命令指纹、固定超时、关键词触发等技术处方。Triage 从保留用户任务原文摇摆到
-替产品设计解决方案；Architect 有时能形成“探索/执行分层”这样的结构判断，有时又脱离 proposal 重新从
-session 发掘需求；Owner 从有选择的 admit/hold/decline 退化为全部 admit、全部 covers merge。
+Spec 0042 unified report/proposal/ready states, ProposalView, migration reliability, and role names, but replays show that “correct data flow”
+does not mean “correct role behavior.” In early replays, the product PM's proposals for a direct operation layer, raw output trustworthiness, and change reconciliation were close to expressions of product
+capabilities; later replays gradually shifted toward technical prescriptions such as command fingerprints, fixed timeouts, and keyword triggers. Triage oscillated between preserving the original user task text and
+designing solutions on behalf of the product; Architect sometimes produced structural judgments such as “exploration/execution separation,” but at other times bypassed proposals to
+rediscover requirements from sessions; Owner degraded from selective admit/hold/decline decisions to admitting everything and merging everything with covers.
 
-偏差来自同质化契约：多个角色看近似证据、使用近似调查工具、提交相同字段，测试又主要断言 JSON、标签和
-状态迁移。Prompt 虽写明“不负责什么”，运行时没有专属 artifact、来源关系或越界结果，因而模型只需换一个
-提交按钮就能继续采用相同的技术分析范式。本组目标不是减少 PM 的观察范围，而是让全面证据经过不同认知
-任务后产生真正不同、可审查的中间产物。
+These deviations stem from homogeneous contracts: multiple roles see similar evidence, use similar investigation tools, and submit the same fields, while tests primarily assert JSON, labels, and
+state transitions. Although Prompts state “what the role is not responsible for,” the runtime has no dedicated artifacts, provenance relationships, or consequences for crossing boundaries, so the model only needs to switch
+submission buttons to continue using the same technical analysis paradigm. This group's goal is not to narrow PM's observation scope, but to ensure that comprehensive evidence produces genuinely different, reviewable intermediate artifacts
+through different cognitive tasks.
 
 ## Guide-level explanation
 
-每个角色契约固定三个部分：它必须回答的认知问题、允许使用的产物语言、产物失败的条件。
+Each role contract fixes three components: the cognitive question it must answer, the artifact language it may use, and the conditions under which its artifact fails.
 
-| 角色 | 认知问题 | 专属产物语言 | 质量门 |
+| Role | Cognitive question | Dedicated artifact language | Quality gate |
 |---|---|---|---|
-| Triage | 这条报告准确描述了什么问题？ | 报告事实、用户影响、边界、证据、不确定项 | 忠于单条 report；不跨票判重，不提前给产品/实现方案 |
-| 产品 PM | 用户行为意味着什么产品问题和机会？ | 用户目标、观察行为、体验矛盾、产品机会、期望结果 | 以用户价值和产品能力表达；技术实现不是 PM 产物 |
-| Architect | 已有提案之间有什么结构关系和共同机制？ | 来源提案、关系类型、共同矛盾、结构方向、预期杠杆 | 必须解释多提案关系；不能改写单票或脱离 proposal 发掘新需求 |
-| Owner | 哪些方向值得投入，如何组成队列？ | 用户价值、证据强度、范围内聚、重叠、风险、优先级、裁决 | 只能裁决输入；证据不足、边界混乱或过早方案化时 hold/revise |
+| Triage | What problem does this report accurately describe? | Report facts, user impact, boundaries, evidence, uncertainties | Remain faithful to a single report; do not deduplicate across issues or prematurely provide product/implementation solutions |
+| Product PM | What product problems and opportunities does user behavior imply? | User goals, observed behavior, experience tensions, product opportunities, desired outcomes | Express user value and product capabilities; technical implementation is not a PM artifact |
+| Architect | What structural relationships and common mechanisms exist among existing proposals? | Source proposals, relationship types, common tensions, structural directions, expected leverage | Must explain relationships among multiple proposals; must not rewrite a single issue or discover new requirements independently of proposals |
+| Owner | Which directions merit investment, and how should they form a queue? | User value, evidence strength, scope cohesion, overlap, risk, priority, decisions | May decide only on inputs; hold/revise when evidence is insufficient, boundaries are confused, or solutions are proposed prematurely |
 
-PM 继续获得全部体验索引、已有 report/proposal 参照和按需会话证据。它可以重新解释已有报告，也可以从未
-报告行为发现机会；系统不要求每条 PM 洞察证明“前所未有”。PM 与其他生成器的重叠是合法输入，是否合并由
-Owner 判断。其边界是产品视角而非 novelty：输出回答用户目标、体验矛盾和期望结果，而不是指定代码位置、
-协议、阈值或实现步骤。
+PM continues to receive the full experience index, existing report/proposal references, and session evidence on demand. It may reinterpret existing reports or discover opportunities in
+unreported behavior; the system does not require every PM insight to prove it is “unprecedented.” Overlap between PM and other generators is valid input, and
+Owner decides whether to merge it. The boundary is product perspective rather than novelty: outputs answer questions about user goals, experience tensions, and desired outcomes, rather than specifying code locations,
+protocols, thresholds, or implementation steps.
 
-质量门分为两类。机器可证明的不变量在落库前硬拒绝，例如来源票不存在、Triage 同时引用多份 report、
-Architect 少于两条来源或 Owner 裁决越权。产品视角、抽象层级和范围内聚等语义质量不能用关键词黑名单
-可靠判断，采用角色正反例、结构化 revise 原因和回放评分验证；首次不合格允许同轮修订，仍不合格则产生
-可观测 hold/revise，不伪装成合格 proposal。
+Quality gates fall into two categories. Machine-provable invariants trigger hard rejection before persistence, such as nonexistent source issues, Triage referencing multiple reports at once,
+Architect having fewer than two sources, or Owner making decisions beyond its authority. Semantic qualities such as product perspective, abstraction level, and scope cohesion cannot be reliably judged with keyword blacklists;
+they are verified using positive and negative role examples, structured revise reasons, and replay scores. An initial failure permits revision within the same round; continued failure produces
+an observable hold/revise rather than masquerading as a qualified proposal.
 
 ## Reference-level explanation
 
-### Artifact 与 canonical proposal
+### Artifacts and canonical proposals
 
-新增角色 artifact 契约层。artifact 保存角色原始认知产物及来源，再由确定性投影生成现有 canonical
-proposal，保持 tracker、前端和 OpenAgents 的 report/proposal/ready 流程兼容。四个 submit tool 不再共享
-同一个 RFC item schema：
+Add a role artifact contract layer. An artifact preserves the role's original cognitive output and its sources, then a deterministic projection generates the existing canonical
+proposal, maintaining compatibility with the report/proposal/ready workflows in tracker, the frontend, and OpenAgents. The four submit tools no longer share
+the same RFC item schema:
 
-- Triage artifact：`source_report`、`reported_problem`、`user_impact`、`scope_boundary`、
-  `evidence`、`uncertainties`。
-- PM artifact：`user_goal`、`observed_behaviors`、`experience_tension`、`product_opportunity`、
-  `desired_outcome`、`evidence_sessions`，可选 `related_proposals` 只作参照，不表达 merge。
-- Architect artifact：`source_proposals`、`relationship`、`common_tension`、
-  `structural_direction`、`expected_leverage`，可选 `covers` 仍只是 Owner 建议。
-- Owner decision：既有 `decision/into/priority/reason` 外，增加 `user_value`、`evidence_strength`、
-  `scope_cohesion`、`overlap` 与 `delivery_risk`，使投资判断可观察。
+- Triage artifact: `source_report`, `reported_problem`, `user_impact`, `scope_boundary`,
+  `evidence`, `uncertainties`.
+- PM artifact: `user_goal`, `observed_behaviors`, `experience_tension`, `product_opportunity`,
+  `desired_outcome`, `evidence_sessions`; optional `related_proposals` serves only as a reference and does not express a merge.
+- Architect artifact: `source_proposals`, `relationship`, `common_tension`,
+  `structural_direction`, `expected_leverage`; optional `covers` remains only a recommendation to Owner.
+- Owner decision: in addition to the existing `decision/into/priority/reason`, add `user_value`, `evidence_strength`,
+  `scope_cohesion`, `overlap`, and `delivery_risk` to make investment judgments observable.
 
-`role_contract.py` 负责 schema 之外的集合和来源不变量，并返回稳定 violation code，例如
-`foreign-source`、`not-cross-proposal`、`decision-out-of-batch`。不得用事故词汇黑名单推断角色质量。
+All submit properties use canonical English identifiers. Normalized issue/RFC projections read `Field.key` directly; the English `Field.label` controls display headings only and is never a parser alias.
+Unknown or nonstring normalized fields are rejected by per-kind validation. The PM and Architect artifact keys listed above remain unchanged.
 
-### 角色执行边界
+`role_contract.py` handles collection and provenance invariants beyond the schema and returns stable violation codes, such as
+`foreign-source`, `not-cross-proposal`, and `decision-out-of-batch`. Incident vocabulary blacklists must not be used to infer role quality.
 
-Triage 可并行处理多个 report，但每个模型 invocation 只包含当前 report、其关联 session 证据和只读 harness
-背景；结果按票号独立归属。产品 PM 保持全景输入，不做生成侧去重。Architect 首先读取全量 ProposalView；
-timeline/beat 下钻必须由当前可见 proposal 的证据引用发起，仅用于验证关系，不允许成为无来源新 proposal
-的依据。Owner 接收角色 artifact、ProposalView、ready queue、体验摘要和证据摘要，不提供自由源码搜索；
-它评估投入价值而非重新生成根因和方案。
+### Role execution boundaries
 
-### 质量门与行为评测
+Triage may process multiple reports concurrently, but each model invocation includes only the current report, its associated session evidence, and read-only harness
+context; results are attributed independently by issue number. The product PM retains panoramic input without generation-side deduplication. Architect first reads the full ProposalView;
+timeline/beat drill-down must originate from evidence references in currently visible proposals and may only verify relationships; it must not become the basis for new proposals
+without provenance. Owner receives role artifacts, ProposalView, the ready queue, experience summaries, and evidence summaries, without unrestricted source code search;
+it evaluates investment value rather than regenerating root causes and solutions.
 
-运行时先执行 schema 校验，再执行来源/集合硬不变量，最后记录语义自审结果。语义门使用稳定维度而非禁词：
-`evidence_fidelity`、`product_orientation`、`cross_proposal_reasoning`、`investment_judgment`、
-`abstraction_level`。它可以由同一角色结构化自审或独立评测器实现，但评测输入、结果和证据位置必须落 trace；
-任何自动模型评测都不得直接改 tracker 状态，状态仍由 driver 的确定性规则和 Owner 裁决控制。
+### Quality gates and behavioral evaluation
 
-正反例测试使用任务无关的合成证据：同一组会话分别经过四角色，断言 Triage 产事实边界、PM 产产品机会、
-Architect 产关系解释、Owner 产投资裁决。测试拒绝“字段存在即合格”的断言，必须覆盖典型串岗产物。
+At runtime, execute schema validation first, then hard provenance/collection invariants, and finally record semantic self-review results. The semantic gate uses stable dimensions rather than banned words:
+`evidence_fidelity`, `product_orientation`, `cross_proposal_reasoning`, `investment_judgment`,
+`abstraction_level`. It may be implemented through structured self-review by the same role or an independent evaluator, but evaluation inputs, results, and evidence locations must be recorded in the trace;
+no automated model evaluation may directly change tracker state. State remains controlled by the driver's deterministic rules and Owner decisions.
 
-### DAG 与文件分配
+Positive and negative example tests use task-independent synthetic evidence: the same set of sessions passes through all four roles, asserting that Triage produces factual boundaries, PM produces product opportunities,
+Architect produces relationship explanations, and Owner produces investment decisions. Tests reject assertions that “field presence means qualification” and must cover typical artifacts produced by roles straying into other roles' responsibilities.
 
-| Task | 内容 | 依赖 |
+### DAG and file allocation
+
+| Task | Content | Dependencies |
 |---|---|---|
-| T1 | artifact schema、共享不变量与 violation | — |
-| T2 | Triage 单报告隔离 | T1 |
-| T3 | 产品 PM 全景洞察 | T1 |
-| T4 | Architect 关系综合 | T1、T2、T3 |
-| T5 | Owner 投资质量门 | T1、T4 |
-| T6 | 跨角色行为评测与真实回放 | T2、T3、T4、T5 |
+| T1 | Artifact schemas, shared invariants, and violations | — |
+| T2 | Triage single-report isolation | T1 |
+| T3 | Product PM panoramic insights | T1 |
+| T4 | Architect relationship synthesis | T1, T2, T3 |
+| T5 | Owner investment quality gate | T1, T4 |
+| T6 | Cross-role behavioral evaluation and real replays | T2, T3, T4, T5 |
 
-文件由 frontmatter 的 Task `files` 独占。端到端入口为
-`tools/dev/audit/evaluate_role_traces.py` 配合 `replay_roles_from_sessions.py`：回放运行到 Owner 停止，
-输出完整 artifact、来源关系、violation、裁决和逐角色评分，不启动 OpenAgents。
+Files are exclusively owned through Task `files` in the frontmatter. The end-to-end entry point is
+`tools/dev/audit/evaluate_role_traces.py` together with `replay_roles_from_sessions.py`: replay runs until Owner stops,
+outputs complete artifacts, provenance relationships, violations, decisions, and per-role scores, and does not launch OpenAgents.
 
 ## Drawbacks
 
-角色专属 schema 增加迁移成本，历史 proposal 只能通过兼容投影参与新 Owner 评审。Triage 从一批一次调用改为
-逐票隔离会增加请求次数，但可通过并发保持墙钟时间。Architect 的来源约束可能漏掉仅有一条 proposal 却很
-重要的结构信号；这种信号应由 PM 先形成产品 proposal，再进入下一轮综合。语义质量不能完全由确定性代码
-判断，引入评测器会增加成本和不确定性，因此语义评分默认用于 revise/hold 与观测，不直接拥有状态写权限。
+Role-specific schemas increase migration costs; historical proposals can participate in new Owner reviews only through compatibility projections. Changing Triage from one invocation per batch to
+per-issue isolation increases request counts, but concurrency can maintain wall-clock time. Architect's provenance constraints may miss important
+structural signals represented by only one proposal; PM should first turn such signals into product proposals before they enter the next round of synthesis. Semantic quality cannot be fully judged by deterministic code,
+and introducing evaluators adds cost and uncertainty, so semantic scores are used by default for revise/hold and observation, without direct state write permissions.
 
 ## Rationale and alternatives
 
-未采用“给四份 Prompt 增加更多禁止事项”：既有回放已经证明，角色共享输入和表单时，Prompt 身份容易被通用
-调查范式覆盖。未采用“严格隔离 PM，只允许查看无 report session”：产品 PM 需要全面理解体验，也应能重构
-已有报告的产品意义；限制其提交内容的视角比限制其观察范围更符合职责。未采用生成侧强制 novelty/去重：
-相似提案可能表达不同产品机会，过早去重会损失信息，Owner 才拥有组合视角和合并权。
+We did not adopt “add more prohibitions to the four Prompts”: existing replays have already demonstrated that when roles share inputs and forms, Prompt identities are easily overridden by a generic
+investigation paradigm. We did not adopt “strictly isolate PM and allow it to view only sessions without reports”: the product PM needs a comprehensive understanding of the user experience and should also be able to reconstruct
+the product significance of existing reports; constraining the perspective of its submissions fits its responsibilities better than constraining its observation scope. We did not adopt mandatory generation-side novelty/deduplication:
+similar proposals may express different product opportunities, and premature deduplication loses information; Owner holds the portfolio perspective and merge authority.
 
-选择“专属 artifact + 可证明不变量 + 语义行为评测”，因为三层分别解决表达同质化、来源越权和抽象层漂移；
-同时保留 canonical proposal 作为下游兼容层，避免重写 tracker 与交付面协议。
+We chose “dedicated artifacts + provable invariants + semantic behavioral evaluation” because the three layers address homogeneous expression, provenance boundary violations, and abstraction-level drift, respectively;
+canonical proposals are retained as the downstream compatibility layer to avoid rewriting tracker and delivery-side protocols.
 
 ## Prior art
 
-现有 ProposalView 已证明统一只读数据模型能消除格式漂移，本组在其上增加角色专属投影和 artifact。现有 Owner
-decision graph 已证明先验证整批再迁移状态的模式可行，本组把相同思路扩展到来源集合和投资裁决字段。编译器
-的 typed intermediate representation 提供了相近原则：各阶段可以共享底层事实，但必须通过不同、可校验的
-中间表示交接，不能只靠阶段名称约束行为。
+The existing ProposalView has demonstrated that a unified read-only data model can eliminate format drift; this group adds role-specific projections and artifacts on top of it. The existing Owner
+decision graph has demonstrated the feasibility of validating an entire batch before transitioning states; this group extends the same approach to source collections and investment decision fields. Compiler
+typed intermediate representations provide a similar principle: stages may share underlying facts, but must hand off through distinct, verifiable
+intermediate representations rather than relying solely on stage names to constrain behavior.
 
 ## Unresolved questions
 
-语义质量门首版采用角色自审、独立低成本模型评测，还是只在离线回放中评分，需在实现 T1 前根据调用成本与
-误拒绝率选定；无论选择哪种，自动评测都不拥有 tracker 写权限。历史 canonical proposal 缺少角色 artifact
-时，Owner 是直接按兼容低置信输入评审，还是先进入一次迁移/重述队列，也留待实现前确定。
+Whether the first semantic quality gate uses role self-review, independent low-cost model evaluation, or scoring only in offline replays must be decided before implementing T1 based on invocation cost and
+false rejection rates; regardless of the choice, automated evaluation has no tracker write permissions. When historical canonical proposals lack role artifacts,
+whether Owner reviews them directly as compatible low-confidence inputs or first routes them through a migration/restatement queue also remains to be decided before implementation.
 
 ## Future possibilities
 
-积累足够 trace 后，可建立按角色分层的长期指标：Triage 事实保真率、PM 产品视角得分、Architect 跨提案
-杠杆率、Owner hold/merge 校准度。角色 artifact 也可支持多模型分工、人工抽样校准和从 Owner 反馈反向改进
-上游契约，但不得把 Owner 的单次偏好固化为事故词汇规则。
+After enough traces accumulate, long-term metrics stratified by role can be established: Triage factual fidelity, PM product perspective scores, Architect cross-proposal
+leverage rates, and Owner hold/merge calibration. Role artifacts can also support division of work across models, manual sample calibration, and improvements to
+upstream contracts based on Owner feedback, but must not turn a single Owner preference into an incident vocabulary rule.

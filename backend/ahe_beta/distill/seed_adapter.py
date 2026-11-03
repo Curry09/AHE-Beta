@@ -1,17 +1,10 @@
-"""seed_adapter.py（spec-0010/T2）：把种子卡注入 0009 的 SeedSource 供给。
+"""seed_adapter.py (spec-0010/T2): injects seed cards into the 0009 SeedSource supply.
 
-card_to_seed 是「采集（种子卡，0010/T1）」与「0009 SeedSource 引擎」之间的**唯一桥接层**：按字段
-把一张卡翻成 spec-0001 models.SeedScenario——`task.prompt` → description，`source.repo`+`env.repo_at`
-→ git 工作区（0009/T4 kind="git" + params{repo, commit}），`env.setup` → venv 前缀化的 setup
-（0009/T3）。无 repo 的纯文本卡退化为 workspace=None。与 0006/T2 card_to_persona 对称镜像。
+card_to_seed is the **sole bridge layer** between "card collection (seed card, 0010/T1)" and "0009 SeedSource engine": maps one card to spec-0001 models.SeedScenario by field — `task.prompt` → description, `source.repo` + `env.repo_at` → git workspace (0009/T4 kind="git" + params{repo, commit}), `env.setup` → venv-prefixed setup (0009/T3). Pure-text cards without repo degrade to workspace=None. Mirrors spec-0006/T2 card_to_persona symmetrically.
 
-**held-out 红线**：客观判分制品 oracle / env.test_cmd / gates 是 benchmark 侧证据，经 extract_sidecar
-剥到旁路、**绝不进** SeedScenario（及其 to_dict / {version, seeds} 信封 JSON）、不进训练环。依据
-CLAUDE.md「benchmark 全程 held-out：不参与训练，不参与发版门禁」——训练信号只取体感，oracle 归
-harbor 侧平行评测，二者物理隔离于注入边界。卡形状契约见 tools/seed-distill/seed-card-schema.md。
+**Held-out boundary**: objective evaluation artifacts oracle / env.test_cmd / gates are benchmark-side evidence, extracted via extract_sidecar to a sidecar, **never enter** SeedScenario (or its to_dict / {version, seeds} envelope JSON) or training. Per CLAUDE.md "benchmark held-out throughout: no training participation, no release gating" — training signal draws only from subjective ratings, oracle belongs to harbor-side parallel evaluation, both physically isolated at the injection boundary. Card shape contract in tools/seed-distill/seed-card-schema.md.
 
-缺字段 / 非法值（git 型缺 repo_at、repo_at 仍是未解析占位、domain 越表）显式报错（不静默兜底），
-把采集质量问题暴露在注入边界；与 0006/T2 报错而非安全缺省同策。
+Missing fields / invalid values (git type missing repo_at, repo_at still an unresolved placeholder, domain out of range) raise explicit errors (no silent defaults), exposing collection quality issues at the injection boundary; mirrors spec-0006/T2 error-on-invalid strategy.
 """
 
 from __future__ import annotations
@@ -24,13 +17,13 @@ from ahe_beta.models import SeedScenario, WorkspaceSpec
 if TYPE_CHECKING:
     from ahe_beta.distill.seed_library import SeedLibrary
 
-# {version, seeds} 信封版本：card_to_seeds 的可持久化产物形状（信封 JSON schema 版本号）。
+# {version, seeds} envelope version: persistent artifact shape of card_to_seeds (envelope JSON schema version number).
 SEED_ENVELOPE_VERSION = 1
 
-# held-out 客观判分制品：注入时剥离到 sidecar，绝不进 SeedScenario。
+# Held-out objective evaluation artifacts: stripped to sidecar at injection, never enter SeedScenario.
 _SIDECAR_KEYS = ("oracle", "gates", "provenance")
 
-# 裸解释器命令 → per-workspace venv 内命令（对齐 0009/T3 约定）。
+# Bare interpreter command → command within per-workspace venv (aligned with spec-0009/T3 convention).
 _VENV_BIN = {
     "pip": ".venv/bin/pip",
     "pip3": ".venv/bin/pip3",
@@ -40,10 +33,10 @@ _VENV_BIN = {
 
 
 def extract_sidecar(record: dict) -> dict:
-    """剥离出一张卡的 held-out 判分制品（oracle / test_cmd / gates + provenance）。
+    """Extract a card's held-out evaluation artifacts (oracle / test_cmd / gates + provenance).
 
-    Spec-0010/T2: 供 harbor 侧平行评测消费；**绝不**进 SeedScenario / 训练环。只收录卡中实际存在
-    的键（前向兼容）。test_cmd 藏在 env 里，单独提到顶层便于 sidecar 消费。
+    Spec-0010/T2: consumed by harbor-side parallel evaluation; **never** enters SeedScenario / training. Records only keys
+    actually present in the card (forward compatible). test_cmd is nested in env, surfaced to top level here for sidecar consumption.
     """
     sidecar: dict = {key: record[key] for key in _SIDECAR_KEYS if key in record}
     env = record.get("env")
@@ -53,22 +46,24 @@ def extract_sidecar(record: dict) -> dict:
 
 
 def card_to_seed(record: dict) -> SeedScenario:
-    """把一张种子卡映射为 models.SeedScenario；held-out 字段（oracle/test_cmd/gates）被剥离。
+    """Map one seed card to models.SeedScenario; held-out fields (oracle/test_cmd/gates) are extracted.
 
-    Spec-0010/T2: task.prompt → description（原文直传，禁带 oracle/test_cmd）；有 source.repo 的卡
-    → WorkspaceSpec(kind="git", params={repo(URL), commit(已解析 SHA)}, setup=venv 前缀化)；无 repo 的
-    纯文本卡 → workspace=None。缺 repo_at / 占位未解析 / domain 越表显式报错。
+    Spec-0010/T2: task.prompt → description (original text passed through verbatim, no oracle/test_cmd); cards with source.repo
+    → WorkspaceSpec(kind="git", params={repo (URL), commit (resolved SHA)}, setup=venv-prefixed); pure-text cards without repo
+    → workspace=None. Missing repo_at / unresolved placeholder / domain out of range raises explicit error.
     """
-    # 1. 契约级校验前移到注入边界（domain/capability 受控、非 benchmark、白名单）。
+    # 1. Contract-level validation moved forward to injection boundary (domain/capability controlled, non-benchmark, whitelist).
     validate_card(record)
 
-    # 2. task.prompt → description（held-out 红线：只带真实诉求原文）。
+    # 2. task.prompt → description (held-out boundary: carry only the genuine request original text).
     task = record.get("task")
     if not isinstance(task, dict) or not task.get("prompt"):
-        raise ValueError("卡缺 task.prompt（注入 SeedScenario.description 的原文）")
+        raise ValueError(
+            "Card is missing task.prompt (the original text injected into SeedScenario.description)"
+        )
     description = str(task["prompt"])
 
-    # 3. 有真实 repo → git 工作区；否则纯文本（workspace=None）。
+    # 3. If a real repo exists → git working directory; otherwise plain text (workspace=None).
     source = record.get("source") or {}
     repo = source.get("repo")
     if not repo or repo == "n/a":
@@ -77,7 +72,9 @@ def card_to_seed(record: dict) -> SeedScenario:
     env = record.get("env") or {}
     repo_at = env.get("repo_at")
     if not repo_at:
-        raise ValueError("git 型卡缺 env.repo_at（要恢复的父 commit 真实 SHA）")
+        raise ValueError(
+            "Git card is missing env.repo_at (the resolved parent commit SHA to restore)"
+        )
     commit = _resolved_sha(repo_at=str(repo_at))
     workspace = WorkspaceSpec(
         kind="git",
@@ -88,11 +85,12 @@ def card_to_seed(record: dict) -> SeedScenario:
 
 
 def card_to_seeds(library: SeedLibrary) -> dict:
-    """把库内每条卡注入为 {version, seeds:[SeedScenario.to_dict()...]} 信封。
+    """Inject each card in the library as a {version, seeds:[SeedScenario.to_dict()...]} envelope.
 
-    Spec-0010/T2: 可持久化的 {version, seeds} 信封（供旁路落盘 / 离线检视）。held-out 字段已在
-    card_to_seed 剥离，故信封 JSON 不含 oracle/test_cmd/gates。run.py 走 card_to_seed 直接注入
-    SeedScenario、不经此信封。
+    Spec-0010/T2: Persistable {version, seeds} envelope (for side-path serialization / offline inspection).
+    The held-out field has been stripped in card_to_seed, so the envelope JSON does not contain
+    oracle/test_cmd/gates. run.py uses card_to_seed to inject SeedScenario directly, bypassing
+    this envelope.
     """
     return {
         "version": SEED_ENVELOPE_VERSION,
@@ -101,33 +99,37 @@ def card_to_seeds(library: SeedLibrary) -> dict:
 
 
 def _repo_url(repo: str) -> str:
-    """owner/repo → https clone URL；已是 URL / git@ 形式则原样透传。"""
+    """owner/repo → https clone URL; if already a URL or git@ form, pass through as-is."""
     if "://" in repo or repo.startswith("git@"):
         return repo
     return f"https://github.com/{repo}.git"
 
 
 def _resolved_sha(repo_at: str) -> str:
-    """校验 repo_at 已解析为真实 SHA；未解析占位（如 `<parent-...>`）显式拒收。
+    """Validate that repo_at has been resolved to a real SHA; reject placeholders (e.g., `<parent-...>`)
+    explicitly.
 
-    Spec-0010/T2: 0009/T4 git 源按 commit checkout，占位会在物化时才炸——在注入边界前移校验。
+    Spec-0010/T2: Git sources in 0009/T4 checkout by commit; placeholders would fail during
+    materialization—move validation earlier to the injection boundary.
     """
     val = repo_at.strip()
     if not val:
-        raise ValueError("env.repo_at 为空（须为已解析的真实 commit SHA）")
+        raise ValueError("env.repo_at is empty (must be a resolved commit SHA)")
     if "<" in val or ">" in val or any(ch.isspace() for ch in val):
         raise ValueError(
-            f"env.repo_at={repo_at!r} 仍是未解析占位（须为已解析的真实 commit SHA，"
-            "harvest 时用 git 求父 commit）"
+            f"env.repo_at={repo_at!r} is still an unresolved placeholder (must be a resolved commit SHA; "
+            "resolve the parent commit with git during harvest)"
         )
     return val
 
 
 def _prefix_venv(setup: list[str]) -> list[str]:
-    """venv 前缀化 env.setup（对齐 0009/T3）：首插 `python -m venv .venv`，裸 pip/python 改写为 .venv/bin/…。
+    """Prefix env.setup with venv (align with 0009/T3): prepend `python -m venv .venv`, rewrite
+    bare pip/python to .venv/bin/….
 
-    Spec-0010/T2: 使 0009/T3 ensure_deps 建 per-workspace venv、Sandbox 探测 `.venv` 生效。
-    空 setup（无依赖）不建 venv（返回 []，与既有无依赖场景零改动）。
+    Spec-0010/T2: Enable 0009/T3 ensure_deps to build per-workspace venv; Sandbox detects `.venv`
+    successfully. Empty setup (no dependencies) does not create venv (returns [], no change from
+    existing zero-dependency scenarios).
     """
     if not setup:
         return []
@@ -137,7 +139,8 @@ def _prefix_venv(setup: list[str]) -> list[str]:
 
 
 def _venv_bin(command: str) -> str:
-    """把一条 setup 命令的裸解释器前缀（pip/python）改写为 .venv/bin/…；其余原样。"""
+    """Rewrite the bare interpreter prefix (pip/python) of a setup command to .venv/bin/…; leave
+    the rest unchanged."""
     parts = command.split()
     if parts and parts[0] in _VENV_BIN:
         parts[0] = _VENV_BIN[parts[0]]

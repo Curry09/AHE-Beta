@@ -142,7 +142,9 @@ def test_legacy_session_is_explicitly_unavailable() -> None:
     envelope = build_evidence_envelope(session)
     assert envelope.user_evidence["goal_summary"]["status"] == "unavailable"
     assert envelope.objective_evidence["status"] == "unavailable"
-    assert "legacy session" in envelope.user_evidence["goal_summary"]["initial"]["reason"]
+    assert (
+        "session has no goal ledger" in envelope.user_evidence["goal_summary"]["initial"]["reason"]
+    )
 
 
 def test_role_access_fails_closed_for_forbidden_levels() -> None:
@@ -182,7 +184,7 @@ def test_session_store_persists_and_triage_consumes_handoff(tmp_path, monkeypatc
     monkeypatch.setattr("ahe_beta.demand.triage.run_agent_def", fake_run)
     triager = Triager(tracker, store, str(tmp_path / "harness"), str(tmp_path / "agent"))
     triager.triage_once()
-    assert captured and "目标感知用户证据" in captured[0]
+    assert captured and "Goal-aware user evidence" in captured[0]
     assert "RAW_SYSTEM_SENTINEL" not in captured[0]
     assert "RAW_STDOUT_SENTINEL" not in captured[0]
 

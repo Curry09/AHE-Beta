@@ -39,7 +39,7 @@ function MindTrace({ trace }: { trace: SimTrace | null | undefined }) {
   if (turns.length === 0) return null;
   return (
     <div className="block">
-      <div className="block-title">用户心智轨迹</div>
+      <div className="block-title">User mental trajectory</div>
       <div className="mind-trace">
         {turns.map((turn) => {
           const prefix = turn.phase === "waiting" ? "waiting" : "main";
@@ -67,10 +67,10 @@ function MindTrace({ trace }: { trace: SimTrace | null | undefined }) {
                 <MindCell title={`① Judge · ${judgeLabel} ${verdict}`} defaultOpen>
                   {judgeText}
                 </MindCell>
-                <MindCell title="② Intent · 原始愿望">
+                <MindCell title="② Intent · Original intent">
                   {intentText}
                 </MindCell>
-                <MindCell title="③ Act · 动作收敛">
+                <MindCell title="③ Act · Chosen action">
                   {`action: ${action}\nmessage: ${message}\ngap: ${gap}`}
                 </MindCell>
               </div>
@@ -78,11 +78,11 @@ function MindTrace({ trace }: { trace: SimTrace | null | undefined }) {
                 <span>{turn.executor}/{turn.channel}</span>
                 <span>patience {turn.patience}</span>
                 <span>trust {turn.trust}</span>
-                {steps.length > 0 && <span>私有核实 {steps.length} 步</span>}
+                {steps.length > 0 && <span>Private verification {steps.length} steps</span>}
               </div>
               {steps.length > 0 && (
                 <details className="mind-private">
-                  <summary>展开私有核实过程（{steps.length} 步）</summary>
+                  <summary>Show private verification ({steps.length} steps)</summary>
                   <ProcessStream log={steps} />
                 </details>
               )}
@@ -91,14 +91,14 @@ function MindTrace({ trace }: { trace: SimTrace | null | undefined }) {
         })}
       </div>
       {trace?.signals?.length ? (
-        <div className="mind-signals">信号：{trace.signals.join(" · ")}</div>
+        <div className="mind-signals">Signal: {trace.signals.join(" · ")}</div>
       ) : null}
     </div>
   );
 }
 
-// 已完成用户会话：优先拉权威全量 session（persona/scenario/体感/transcript/issue 引用），
-// 拉不到时回退归档快照的 turns。issue 引用可点跳 issue 详情。
+// Completed user session: prefer the authoritative full session (persona/scenario/user experience/transcript/issue references),
+// falling back to archived snapshot turns if unavailable. Issue references link to issue details.
 export function SessionDetailView(props: {
   item: HistoryItem;
   onSelect: (sel: Selection) => void;
@@ -119,44 +119,44 @@ export function SessionDetailView(props: {
     <div className="detail">
       <div className="detail-head">
         <button className="back" onClick={onBack}>
-          ‹ 返回
+          ‹ Back
         </button>
         <span className="role-dot user" />
         <span className="detail-title">{item.label}</span>
-        {score != null && <span className={`score s${score}`}>体感 {score}</span>}
+        {score != null && <span className={`score s${score}`}>Experience {score}</span>}
       </div>
       <div className="detail-body">
         <dl className="kv">
-          <dt>轮次</dt>
-          <dd>第 {origin?.round_no ?? item.round} 轮</dd>
-          {sessionId && <><dt>会话</dt><dd>{sessionId}</dd></>}
+          <dt>Round</dt>
+          <dd>Round {origin?.round_no ?? item.round}</dd>
+          {sessionId && <><dt>session</dt><dd>{sessionId}</dd></>}
           {origin && (
             <>
-              <dt>任务</dt><dd>{origin.task_id} · {origin.task_kind}</dd>
+              <dt>Task</dt><dd>{origin.task_id} · {origin.task_kind}</dd>
               <dt>Persona ID</dt><dd>{origin.persona_id}</dd>
-              <dt>交互方式</dt><dd>{origin.interaction}</dd>
-              <dt>槽位</dt><dd>{origin.slot}</dd>
+              <dt>Interaction method</dt><dd>{origin.interaction}</dd>
+              <dt>Slot</dt><dd>{origin.slot}</dd>
               <dt>Harness SHA</dt><dd>{origin.harness_sha}</dd>
-              <dt>任务摘要</dt><dd>{origin.task_digest}</dd>
+              <dt>Task digest</dt><dd>{origin.task_digest}</dd>
             </>
           )}
-          <dt>状态</dt>
+          <dt>Status</dt>
           <dd>{item.status}</dd>
           {item.end_reason && (
             <>
-              <dt>结束原因</dt>
+              <dt>End reason</dt>
               <dd>{item.end_reason}</dd>
             </>
           )}
           {session && (
             <>
-              <dt>时间</dt>
+              <dt>Time</dt>
               <dd>{fmtDate(session.created_at)}</dd>
             </>
           )}
           {session && session.issue_refs.length > 0 && (
             <>
-              <dt>提的 issue</dt>
+              <dt>Reported issues</dt>
               <dd>
                 {session.issue_refs.map((ref) => (
                   <button
@@ -175,28 +175,28 @@ export function SessionDetailView(props: {
           <div className="block">
             <div className="block-title">Persona</div>
             <dl className="kv">
-              <dt>身份</dt>
+              <dt>Identity</dt>
               <dd>{session.persona.identity}</dd>
-              <dt>水平 · 领域</dt>
+              <dt>Proficiency · Domain</dt>
               <dd>
                 {session.persona.level} · {session.persona.domain}
               </dd>
-              <dt>目标</dt>
+              <dt>Goal</dt>
               <dd>{session.persona.goal}</dd>
-              <dt>说话风格</dt>
+              <dt>Speaking style</dt>
               <dd>{session.persona.speaking_style}</dd>
             </dl>
           </div>
         )}
         {session && (
           <div className="block">
-            <div className="block-title">场景</div>
+            <div className="block-title">Scenario</div>
             <div className="prose dim">{session.scenario.description}</div>
           </div>
         )}
         {session && (
           <div className="block">
-            <div className="block-title">体感评价</div>
+            <div className="block-title">Experience assessment</div>
             <div className="prose">
               {session.feeling ? (
                 <>
@@ -206,14 +206,14 @@ export function SessionDetailView(props: {
                   {session.feeling.reason}
                 </>
               ) : (
-                <span>体感缺测（{experience?.status ?? "missing"}）：{experience?.reason || "未记录有效自评"}</span>
+                <span>Experience data missing ({experience?.status ?? "missing"}): {experience?.reason || "No valid self-assessment recorded"}</span>
               )}
-              {experience?.source && <div className="dim">来源：{experience.source}</div>}
+              {experience?.source && <div className="dim">Source: {experience.source}</div>}
             </div>
           </div>
         )}
         <div className="block">
-          <div className="block-title">完整对话</div>
+          <div className="block-title">Full conversation</div>
           <Turns turns={turns} />
         </div>
         <MindTrace trace={session?.sim_trace} />

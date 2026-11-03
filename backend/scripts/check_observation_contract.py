@@ -268,6 +268,8 @@ def check_execution_publication(*, checkout: Path) -> dict:
         Path(__file__).resolve().parents[1] / "tests/fixtures/execution_evidence_contract.json"
     )
     counterpart = checkout / "tests/fixtures/execution_evidence_contract.json"
+    # Update both copies and regenerate derived hashes together; the reader pin
+    # must identify the matching fixture version.
     assert fixture_path.read_bytes() == counterpart.read_bytes(), "shared execution fixture drift"
     fixture = json.loads(fixture_path.read_text())["package"]
     wire = fixture["execution_evidence"]
@@ -304,7 +306,7 @@ def check_execution_publication(*, checkout: Path) -> dict:
                 "harness_sha": "synthetic-user-sha",
             }
             scenario = SeedScenario(
-                description="修复公开示例的计算结果，交付 result.txt。",
+                description="Fix the calculation result in the public example and deliver result.txt.",
                 workspace=WorkspaceSpec(
                     params={
                         key: provenance[key]

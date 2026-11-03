@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""质量失败策略（d43）对照：真 LLM 用户 × ScriptedHarness（会反复交错/半吊子实现）。
+"""Quality fail strategy (d43) reference: real LLM user × ScriptedHarness (will interleave repeatedly / half-baked implementations).
 
-Spec-0037/T6: d43 路径可观测；与 tempo 正交（本探针固定/同 tempo）。
+Spec-0037/T6: d43 path observable; orthogonal to tempo (fixed in this probe, same as tempo).
 
-同题同 tempo，只改 d43，看收场是 feedback 循环 / give_up / file_issue / handover / resend。
+Same instance, same tempo, vary only d43, observe how it concludes: feedback loop / give_up / file_issue / handover / resend.
 
-用法（仓根）：
+Usage (repo root):
   PYTHONPATH=backend PYTHONUNBUFFERED=1 .venv/bin/python -u \\
     -m tools.dev.probes.probe_d43_quality_fail [--d43 feedback] ...
-  不传 --d43 则五档全跑（可并行多进程，本脚本串行；外层并行用多次调用）。
+  Without --d43, all five strategies run (can parallelize with multiple processes, this script serial; parallelize externally via multiple invocations).
 """
 
 from __future__ import annotations
@@ -46,13 +46,13 @@ def _persona(d43_value: str):
     return finalize_persona(
         Persona(
             persona_id=f"d43-{d43_value}",
-            d1=D1Eval.EXPERT,  # 能识破 DST 错实现
+            d1=D1Eval.EXPERT,  # Can detect flawed DST implementations
             d2=D2Domain(stack=("python",), depth=D2Depth.SENIOR, weak=()),
             d41=D41Grain.SPEC_LEVEL,
             d42=D42Supervise.PHASE_CHECK,
             d43=D43Correct(d43_value),
             d5=D5Autonomy.COLLABORATIVE,
-            tempo=TimeTemperament.STEADY,  # 失败策略对照，气质固定
+            tempo=TimeTemperament.STEADY,  # Fail strategy reference, temperament fixed
         )
     )
 
@@ -74,7 +74,7 @@ def _run_one(d43_value: str) -> int:
 
     api = ApiPersonaClient()
     client = AgenticPersonaClient(api.complete)
-    # 无真实工作区：内层工具会受限，但仍可走 judge/intent/act + d43 文案
+    # No real workspace: inner tools limited, but still traverse judge/intent/act + d43 wording
     harness = ScriptedHarness()
 
     turns_seen = 0
@@ -119,7 +119,7 @@ def main() -> None:
         action="append",
         dest="d43s",
         choices=["feedback", "handover", "resend", "give_up", "file_issue"],
-        help="不传则五档全跑",
+        help="Run all five levels if omitted",
     )
     add_inputs(parser)
     args = parser.parse_args()

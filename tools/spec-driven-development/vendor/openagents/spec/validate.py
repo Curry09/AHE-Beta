@@ -1,16 +1,16 @@
-"""spec 校验：JSON Schema + 语义规则（files 重叠 / DAG 无环 / 血缘引用）。
+"""spec validation: JSON Schema + semantic rules (files overlap / DAG acyclic / lineage references).
 
-Spec-0014/T2: spec validate（schema + 语义校验）
+Spec-0014/T2: spec validate (schema + semantic validation)
 
-依序跑六条校验链（决策 D7：同组 files 重叠是 error，跨组 files 重叠仅 warning）：
-  1. JSON Schema 校验所有 task / metadata / history（结构 + 枚举）   -> error
-  2. status 与 history 自洽（快照不含 abandoned、历史版本单调递增）  -> error
-  3. 同组 files 不重叠（协同模式无冲突前提）                        -> error
-  4. 全局 depends-on DAG（含跨组）无环                              -> error
-  5. 血缘 / 跨组引用（depends-on/relates-to/supersedes/...）指向存在 Task -> error
-  6. 跨组 files 重叠（协作信号，进 OVERVIEW 文件冲突报告）          -> warning
+run six validation chains in order (decision D7: same-group files overlap is error, cross-group files overlap is warning only):
+  1. JSON Schema validation for all task / metadata / history (structure + enum)   -> error
+  2. status and history consistency (snapshot contains no abandoned, history version monotonic increasing)  -> error
+  3. same-group files do not overlap (collaboration mode no-conflict prerequisite)                        -> error
+  4. global depends-on DAG (cross-group included) acyclic                              -> error
+  5. lineage / cross-group references (depends-on/relates-to/supersedes/...) point to existing Task -> error
+  6. cross-group files overlap (collaboration signal, enter OVERVIEW file conflict report)          -> warning
 
-无 error 即 ok=True（warning 不影响 ok）。纯函数，不感知 git / GitHub（理念 10 解耦）。
+no error means ok=True (warning does not affect ok). pure function, unaware of git / GitHub (principle 10 decoupling).
 """
 
 from __future__ import annotations
@@ -28,32 +28,32 @@ from openagents.spec.schema import GROUP_FRONTMATTER_SCHEMA
 _ERROR = "error"
 _WARNING = "warning"
 
-# issue #69：单 spec 自包含 + 总览先行的质量门槛。
-# 必填总览段（attr, 人读标题）——这四段撑起「读完即懂、无需翻别的 spec」。
+# issue #69: single spec self-contained + overview-first quality gate.
+# required overview sections (attr, human-readable title)—these four sections support "read once and understand, no need to read other specs".
 _REQUIRED_SECTIONS: tuple[tuple[str, str], ...] = (
     ("summary", "Summary"),
     ("motivation", "Motivation"),
     ("reference_level", "Reference-level explanation"),
     ("rationale_alternatives", "Rationale and alternatives"),
 )
-# 疑似跨 spec 裸引用：`Spec-0012`、`Spec-0012 决策 8`、`Spec-0012/T2`。命中即提示就地复述。
-_BARE_REF_RE = re.compile(r"Spec-\d{4}(?:\s*决策\s*\d+|/T\w+)?")
+# Suspected bare cross-spec reference: `Spec-0012`, `Spec-0012 decision 8`, `Spec-0012/T2`; prompt to restate needed context.
+_BARE_REF_RE = re.compile(r"Spec-\d{4}(?:\s+[Dd]ecision\s+\d+|/T\w+)?")
 
 
 @dataclass(frozen=True)
 class ValidationIssue:
-    """Spec-0014/T2：单条校验问题。"""
+    """Spec-0014/T2: single validation issue."""
 
     # Spec-0014/T2：error | warning
     level: str
-    # Spec-0014/T2：定位串，"0009/T3" 或文件路径
+    # Spec-0014/T2: locator string, "0009/T3" or file path
     where: str
     message: str
 
 
 @dataclass(frozen=True)
 class ValidationReport:
-    """Spec-0014/T2：一次校验的汇总。无 error 即 ok（warning 不影响 ok）。"""
+    """Spec-0014/T2: summary of one validation run. no error means ok (warning does not affect ok)."""
 
     ok: bool
     issues: list[ValidationIssue]
@@ -62,29 +62,29 @@ class ValidationReport:
 def validate(*, specs_root: Path) -> ValidationReport:
     """Run the full schema + semantic validation chain over a specs tree.
 
-    Spec-0014/T2: 依序跑六条链，汇总 issues；无 error 即 ok=True。
+    Spec-0014/T2: run six chains in order, summarize issues; no error means ok=True.
     """
     issues: list[ValidationIssue] = []
 
-    # 1. JSON Schema：对原始 YAML 文件校验结构与枚举（在 model 宽松归一化之前）。
+    # 1. JSON Schema: validate structure and enum for raw YAML files (before model loose normalization).
     issues.extend(_schema_checks(specs_root=specs_root))
 
-    # 后续语义校验基于 model 加载的结构化对象。
+    # subsequent semantic validation based on model-loaded structured objects.
     groups = model.load_all(specs_root=specs_root)
 
-    # 2. status 与 history 自洽。
+    # 2. status and history consistency.
     issues.extend(_status_checks(groups=groups))
-    # 3. 同组 files 不重叠（error）；6. 跨组 files 重叠（warning）。
+    # 3. same-group files do not overlap (error); 6. cross-group files overlap (warning).
     issues.extend(_file_overlap_checks(groups=groups))
-    # 4. 全局 depends-on DAG 无环。
+    # 4. global depends-on DAG acyclic.
     issues.extend(_dag_acyclic_checks(groups=groups))
-    # 5. 血缘 / 跨组引用指向存在的 Task。
+    # 5. lineage / cross-group references point to existing Task.
     issues.extend(_reference_checks(groups=groups))
-    # 7. metadata.summary 非空（Spec-0015/T3：每个 feature 必须有人话 TL;DR）。
+    # 7. metadata.summary non-empty (Spec-0015/T3: each feature must have human-readable TL;DR).
     issues.extend(_summary_checks(groups=groups))
-    # 8. 必填总览段非空（issue #69：总览先行）。                          -> error
+    # 8. required overview sections non-empty (issue #69: overview first).                          -> error
     issues.extend(_overview_required_checks(groups=groups))
-    # 9. 总览里疑似跨 spec 裸引用（issue #69：单 spec 自包含）。         -> warning
+    # 9. suspected bare cross-spec references in overview (issue #69: single spec self-contained).         -> warning
     issues.extend(_self_contained_checks(groups=groups))
 
     ok = not any(issue.level == _ERROR for issue in issues)
@@ -92,7 +92,7 @@ def validate(*, specs_root: Path) -> ValidationReport:
 
 
 def _overview_required_checks(*, groups: list[Group]) -> list[ValidationIssue]:
-    """issue #69：每个组的必填总览段去空白后非空，否则 error（总览先行、读完即懂）。"""
+    """issue #69: each group's required overview sections non-empty after whitespace removal, else error (overview first, read and understand)."""
     issues: list[ValidationIssue] = []
     for group in groups:
         for attr, label in _REQUIRED_SECTIONS:
@@ -101,14 +101,14 @@ def _overview_required_checks(*, groups: list[Group]) -> list[ValidationIssue]:
                     ValidationIssue(
                         level=_ERROR,
                         where=f"{group.number}/overview",
-                        message=f"必填总览段「{label}」为空（单 spec 自包含、总览先行）",
+                        message=f"Required overview section '{label}' is empty (self-contained spec, overview first)",
                     )
                 )
     return issues
 
 
 def _self_contained_checks(*, groups: list[Group]) -> list[ValidationIssue]:
-    """issue #69：扫总览 9 段，命中「见 Spec-NNNN」式裸引用 → warning（提示就地复述）。"""
+    """issue #69: scan overview 9 sections, hit "see Spec-NNNN" style bare reference → warning (prompt to restate in place)."""
     issues: list[ValidationIssue] = []
     for group in groups:
         for _, attr in model._OVERVIEW_SECTIONS:
@@ -119,8 +119,8 @@ def _self_contained_checks(*, groups: list[Group]) -> list[ValidationIssue]:
                         level=_WARNING,
                         where=f"{group.number}/overview/{attr}",
                         message=(
-                            f"疑似跨 spec 裸引用 {match.group(0)!r}："
-                            "确认理解本 spec 的必要信息已就地复述（issue #69）"
+                            f"Possible bare cross-spec reference {match.group(0)!r}: "
+                            "ensure the context needed to understand this spec is restated here (issue #69)"
                         ),
                     )
                 )
@@ -128,7 +128,7 @@ def _self_contained_checks(*, groups: list[Group]) -> list[ValidationIssue]:
 
 
 def _summary_checks(*, groups: list[Group]) -> list[ValidationIssue]:
-    """Spec-0015/T3：每个组的 metadata.summary 去空白后非空，否则 error。"""
+    """Spec-0015/T3: each group's metadata.summary non-empty after whitespace removal, else error."""
     issues: list[ValidationIssue] = []
     for group in groups:
         if not group.metadata.summary.strip():
@@ -136,14 +136,14 @@ def _summary_checks(*, groups: list[Group]) -> list[ValidationIssue]:
                 ValidationIssue(
                     level=_ERROR,
                     where=f"{group.number}/frontmatter",
-                    message="metadata.summary 为空（每个 feature 必须有人话 TL;DR）",
+                    message="metadata.summary is empty (each feature needs a plain-language TL;DR)",
                 )
             )
     return issues
 
 
 def _schema_checks(*, specs_root: Path) -> list[ValidationIssue]:
-    """JSON Schema 校验每个组 markdown 文件的 frontmatter；每个错误一条 error。"""
+    """Validate the frontmatter of each group's markdown file using JSON Schema; one error per violation."""
     issues: list[ValidationIssue] = []
     if not specs_root.is_dir():
         return issues
@@ -164,45 +164,47 @@ def _schema_checks(*, specs_root: Path) -> list[ValidationIssue]:
 
 
 def _status_checks(*, groups: list[Group]) -> list[ValidationIssue]:
-    """快照不得含 abandoned；有历史则版本号严格递增且当前版高于历史末版。"""
+    """Snapshots must not contain abandoned; if history exists, version numbers must be strictly increasing and the current version must exceed the last historical version."""
     issues: list[ValidationIssue] = []
     for group in groups:
         for task in group.tasks:
             where = model.qualified_id(group=group.number, task_id=task.id)
-            # abandoned 只能在历史里，不能留在快照（决策 D2）。
+            # abandoned can only appear in history, not in snapshots (Decision D2).
             if task.status == "abandoned":
                 issues.append(
                     ValidationIssue(
                         level=_ERROR,
                         where=where,
-                        message="status=abandoned 的 Task 应进 history 而非快照",
+                        message="A Task with status=abandoned must leave the snapshot; history is retained in git",
                     )
                 )
             history = group.history.get(task.id, [])
             if not history:
                 continue
             versions = [item.version for item in history]
-            # 历史版本严格递增。
+            # Historical versions must be strictly increasing.
             if any(b <= a for a, b in zip(versions, versions[1:], strict=False)):
                 issues.append(
                     ValidationIssue(
-                        level=_ERROR, where=where, message=f"history 版本号非严格递增：{versions}"
+                        level=_ERROR,
+                        where=where,
+                        message=f"History version numbers are not strictly increasing: {versions}",
                     )
                 )
-            # 当前版必须高于历史末版。
+            # Current version must be greater than the last historical version.
             if task.version <= max(versions):
                 issues.append(
                     ValidationIssue(
                         level=_ERROR,
                         where=where,
-                        message=f"当前版 v{task.version} 未高于历史末版 v{max(versions)}",
+                        message=f"Current version v{task.version} does not exceed the latest historical version v{max(versions)}",
                     )
                 )
     return issues
 
 
 def _file_overlap_checks(*, groups: list[Group]) -> list[ValidationIssue]:
-    """同组 files 重叠 → error；跨组 files 重叠 → warning（决策 D7）。"""
+    """Overlapping files within the same group → error; overlapping files across groups → warning (Decision D7)."""
     issues: list[ValidationIssue] = []
     # file -> {group_number -> [task_id, ...]}
     owners: dict[str, dict[str, list[str]]] = {}
@@ -212,7 +214,7 @@ def _file_overlap_checks(*, groups: list[Group]) -> list[ValidationIssue]:
                 owners.setdefault(path, {}).setdefault(group.number, []).append(task.id)
 
     for path, by_group in sorted(owners.items()):
-        # 同组内多个 Task 占用同一文件 → error。
+        # Multiple Tasks in the same group using the same file → error.
         for number, task_ids in sorted(by_group.items()):
             if len(task_ids) > 1:
                 joined = ", ".join(sorted(task_ids))
@@ -220,35 +222,35 @@ def _file_overlap_checks(*, groups: list[Group]) -> list[ValidationIssue]:
                     ValidationIssue(
                         level=_ERROR,
                         where=number,
-                        message=f"同组内文件 {path} 被多个 Task 占用：{joined}",
+                        message=f"File {path} is owned by multiple Tasks in the same group: {joined}",
                     )
                 )
-        # 文件跨 ≥2 个组 → warning（协作信号）。
+        # File shared by ≥2 groups → warning (collaboration signal).
         if len(by_group) > 1:
             groups_str = ", ".join(sorted(by_group))
             issues.append(
                 ValidationIssue(
                     level=_WARNING,
                     where=path,
-                    message=f"文件 {path} 跨组重叠：{groups_str}",
+                    message=f"File {path} overlaps across groups: {groups_str}",
                 )
             )
     return issues
 
 
 def _dag_acyclic_checks(*, groups: list[Group]) -> list[ValidationIssue]:
-    """全局 depends-on 图（含跨组）无环；有环报 error。"""
-    # 1. 构图：节点 = 当前版 Task 限定 ID；边 = depends-on（解析为限定 ID）。
+    """Global depends-on graph (including cross-group) must be acyclic; report error if cycle exists."""
+    # 1. Build graph: nodes = current-version Task qualified IDs; edges = depends-on (resolved to qualified IDs).
     current_ids = _current_ids(groups=groups)
     adjacency: dict[str, list[str]] = {}
     for group in groups:
         for task in group.tasks:
             node = model.qualified_id(group=group.number, task_id=task.id)
             targets = [_resolve_ref(ref=ref, group=group.number) for ref in task.depends_on]
-            # 只对存在的节点连边；指向不存在的由引用校验报告。
+            # Only connect edges to existing nodes; references to non-existent nodes are reported by reference validation.
             adjacency[node] = [t for t in targets if t in current_ids]
 
-    # 2. DFS 检测环。
+    # 2. Detect cycles using DFS.
     cycle = _find_cycle(adjacency=adjacency)
     if cycle is None:
         return []
@@ -256,13 +258,13 @@ def _dag_acyclic_checks(*, groups: list[Group]) -> list[ValidationIssue]:
         ValidationIssue(
             level=_ERROR,
             where=cycle[0],
-            message=f"depends-on 存在环：{' -> '.join(cycle)}",
+            message=f"depends-on contains a cycle: {' -> '.join(cycle)}",
         )
     ]
 
 
 def _reference_checks(*, groups: list[Group]) -> list[ValidationIssue]:
-    """depends-on / relates-to / 血缘字段引用的 Task 必须存在（当前版或历史版）。"""
+    """Tasks referenced in depends-on / relates-to / lineage fields must exist (in current version or history)."""
     known = _known_ids(groups=groups)
     issues: list[ValidationIssue] = []
     for group in groups:
@@ -283,14 +285,14 @@ def _reference_checks(*, groups: list[Group]) -> list[ValidationIssue]:
                         ValidationIssue(
                             level=_ERROR,
                             where=where,
-                            message=f"{field_name} 指向不存在的 Task：{ref}",
+                            message=f"{field_name} refers to a nonexistent Task: {ref}",
                         )
                     )
     return issues
 
 
 def _validate_doc(*, data: object, json_schema: dict, where: str) -> list[ValidationIssue]:
-    """对单个文档跑 JSON Schema，每个错误产出一条 error issue。"""
+    """Run JSON Schema on each individual document; produce one error issue per schema violation."""
     validator = Draft202012Validator(json_schema)
     issues: list[ValidationIssue] = []
     for error in sorted(validator.iter_errors(data), key=str):
@@ -301,7 +303,7 @@ def _validate_doc(*, data: object, json_schema: dict, where: str) -> list[Valida
 
 
 def _current_ids(*, groups: list[Group]) -> set[str]:
-    """全部当前版 Task 的限定 ID 集合。"""
+    """Set of qualified IDs for all current-version Tasks."""
     return {
         model.qualified_id(group=group.number, task_id=task.id)
         for group in groups
@@ -310,7 +312,7 @@ def _current_ids(*, groups: list[Group]) -> set[str]:
 
 
 def _known_ids(*, groups: list[Group]) -> set[str]:
-    """已知 Task 限定 ID = 当前版 ∪ 历史版（血缘可指向已废弃/旧版 Task）。"""
+    """Known Task qualified IDs = current version ∪ historical versions (lineage can reference abandoned/old-version Tasks)."""
     known = _current_ids(groups=groups)
     for group in groups:
         for task_id in group.history:
@@ -319,12 +321,12 @@ def _known_ids(*, groups: list[Group]) -> set[str]:
 
 
 def _resolve_ref(*, ref: str, group: str) -> str:
-    """组内简写 T3 → 限定 group/T3；已含 '/' 的视为跨组限定 ID 原样返回。"""
+    """Shorthand T3 within a group → qualified ID group/T3; if already containing '/', treat as cross-group qualified ID and return as-is."""
     return ref if "/" in ref else model.qualified_id(group=group, task_id=ref)
 
 
 def _find_cycle(*, adjacency: dict[str, list[str]]) -> list[str] | None:
-    """DFS 找一条环路径（节点序列，首尾相同）；无环返回 None。"""
+    """Use DFS to find one cycle path (node sequence with matching endpoints); return None if acyclic."""
     WHITE, GRAY, BLACK = 0, 1, 2
     color = {node: WHITE for node in adjacency}
     stack: list[str] = []
@@ -334,7 +336,7 @@ def _find_cycle(*, adjacency: dict[str, list[str]]) -> list[str] | None:
         stack.append(node)
         for nxt in adjacency.get(node, []):
             if color.get(nxt, BLACK) == GRAY:
-                # 命中灰色节点 → 环；截取栈中该节点起的片段。
+                # Gray node encountered → cycle detected; extract the segment from that node to the current position in the stack.
                 idx = stack.index(nxt)
                 return [*stack[idx:], nxt]
             if color.get(nxt, BLACK) == WHITE:

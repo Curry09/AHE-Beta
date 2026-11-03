@@ -1,12 +1,12 @@
 ---
 number: "0079"
-title: 当前实验归档继承与追加迭代
+title: "Current experiment archive inheritance and appended iterations"
 issue: 0
 slug: experiment-continuation
-summary: 当前完整归档作为冻结父输入，新run先交付末轮反馈再追加用户轮，复用统一入口与恢复机制，不兼容旧版产物。
+summary: "Use the current complete archive as the frozen parent input; a new run first delivers feedback from the final round and then appends user rounds, reusing the unified entry point and recovery mechanism; legacy artifacts are unsupported."
 tasks:
   - id: T1
-    title: 当前归档来源与契约核验
+    title: "Current archive source and contract verification"
     status: done
     priority: P1
     tags: []
@@ -18,10 +18,10 @@ tasks:
       - backend/ahe_beta/experiment/continuation/source.py
       - backend/ahe_beta/experiment/schemas/continuation-export-v1.json
       - backend/tests/test_experiment_continuation_source.py
-    scope: 只读解析当前归档、末轮边界、输入与文件身份；不支持历史格式
-    acceptance: 只接收完整当前export；损坏/partial/身份矛盾/越界包拒绝；父配对按权威plan核验
+    scope: "Read-only parsing of the current archive, final-round boundary, inputs, and file identity; historical formats are unsupported"
+    acceptance: "Accept only complete current exports; reject corrupt, partial, identity-conflicting, or out-of-bounds packages; verify parent pairings against the authoritative plan"
   - id: T2
-    title: 规范导出与父证据报告投影
+    title: "Canonical export and parent evidence report projection"
     status: done
     priority: P1
     tags: []
@@ -37,10 +37,10 @@ tasks:
       - backend/tests/test_experiment_continuation_export.py
       - backend/tests/test_experiment_continuation_evidence.py
       - backend/tests/test_experiment_continuation_forge.py
-    scope: 按commit导出精确tree；父证据只读视图、当前报告映射与脱敏来源证明
-    acceptance: 旧main不能污染export；tree/mode/hash正确；报告重试唯一且不串号；父会话不计子指标、观测与授权一致
+    scope: "Export the exact tree by commit; provide read-only parent evidence views, current report mappings, and redacted provenance proofs"
+    acceptance: "Old main cannot contaminate the export; tree/mode/hash are correct; report retries are unique and do not mix up issue numbers; parent sessions do not count toward child metrics, and observations and authorization are consistent"
   - id: T3
-    title: 共用反馈交付阶段
+    title: "Shared feedback delivery stage"
     status: done
     priority: P1
     tags: []
@@ -58,10 +58,10 @@ tasks:
       - backend/tests/demand/test_triage.py
       - backend/tests/demand/test_divergent_gate.py
       - backend/tests/demand/test_grouped_architect.py
-    scope: 提取具体反馈pipeline；外层和角色内层共享显式前置依赖
-    acceptance: 两起点依赖一致且bootstrap外部操作域不冲突；交付卡死不开用户；普通轮序/恢复/grade封口合同不变
+    scope: "Extract the concrete feedback pipeline; outer and role-internal layers share explicit prerequisites"
+    acceptance: "Dependencies are consistent across both starting points and bootstrap external operation domains do not conflict; a stalled delivery does not start users; normal round ordering, recovery, and grade sealing contracts remain unchanged"
   - id: T4
-    title: 冻结继承配置及统一执行恢复
+    title: "Freeze inherited configuration and unify execution recovery"
     status: done
     priority: P1
     tags: []
@@ -86,10 +86,10 @@ tasks:
       - backend/tests/test_experiment_continuation_config.py
       - backend/tests/test_experiment_continuation_lifecycle.py
       - backend/tests/test_experiment_continuation_workload.py
-    scope: source=parent配置、原子冻结、精确seed、阶段角色装配、独立bootstrap恢复及统一交付完成判据
-    acceptance: 一轮追加仍交付；同task/persona/interaction编新绑定；不复制父ledger；恢复不重复副作用；新旧配置/两后端正常语义保持
+    scope: "source=parent configuration, atomic freezing, exact seed, stage role assembly, independent bootstrap recovery, and unified delivery completion criteria"
+    acceptance: "A one-round continuation still delivers; compile new bindings for the same task/persona/interaction; do not copy the parent ledger; recovery does not repeat side effects; preserve normal semantics for old and new configurations and both backends"
   - id: T5
-    title: 双语追加实验教程
+    title: "Bilingual experiment continuation tutorial"
     status: done
     priority: P1
     tags: []
@@ -105,10 +105,10 @@ tasks:
       - README.md
       - README.zh-CN.md
       - CLAUDE.md
-    scope: 提供完整当前父run收集到子配置/停止恢复/再次追加教程；更新支持边界
-    acceptance: 只用统一入口；中英命令一致；明确本地与逻辑轮号、旧包不支持及源事实保真
+    scope: "Provide a complete tutorial from collecting a current parent run through child configuration, stopping and recovery, and further continuation; update support boundaries"
+    acceptance: "Use only the unified entry point; keep Chinese and English commands consistent; clarify local and logical round numbers, lack of support for old packages, and fidelity to source facts"
   - id: T6
-    title: 合同与真实双后端验收
+    title: "Contract and real dual-backend acceptance"
     status: done
     priority: P1
     tags: []
@@ -122,39 +122,39 @@ tasks:
       - backend/tests/test_experiment_continuation_contract.py
       - backend/tests/fixtures/continuation/current-parent-v1.json
       - .github/workflows/experiment-contract.yml
-    scope: 崩溃边界/重复继承/普通路径回归；真实local和E2B非空交付与归档清理实证
-    acceptance: 两后端证实父反馈→真实交付→新增试用；当前源不变/新身份/正确累计轮号；无准入不冒充交付
+    scope: "Crash boundaries, repeated inheritance, and ordinary-path regression; empirical verification of non-empty delivery and archive cleanup on real local and E2B backends"
+    acceptance: "Both backends demonstrate parent feedback→real delivery→additional user trial; current source remains unchanged, identities are new, and cumulative round numbers are correct; do not claim delivery without admission"
 ---
 
-# 0079 · 当前实验归档继承与追加迭代
+# 0079 · Current Experiment Archive Inheritance and Continuation Iterations
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is structured source data (including the tasks DAG), and the body is a group-level rust-RFC nine-section overview. -->
 
 ## Summary
 
-为当前统一入口产生的完整实验归档增加继承能力：创建新 run，继承父实验最后一轮的 Harness、任务、persona 和真实用户反馈，先完成反馈处理及代码交付，再运行新增用户轮。新 run 继续使用现有 check/prepare/run/status/stop/resume/collect/destroy；父实验的身份、账本和归档保持不变。
+Add inheritance to complete experiment archives produced by the current unified entry point: create a new run that inherits the Harness, tasks, persona, and real user feedback from the parent experiment's final round, completes feedback processing and code delivery first, and then runs additional user rounds. The new run continues to use the existing check/prepare/run/status/stop/resume/collect/destroy commands; the parent experiment's identity, ledger, and archive remain unchanged.
 
-用户已明确无需兼容旧版实验产物。本组只支持带新导出契约的当前 schema 2 / workload contract 1 归档；不增加历史布局适配器、source/replay 选择、旧脚本转调或 snapshot 补齐。归档读取、父证据投影和反馈执行分别负责自己的事情，不引入第二套监督器。
+The user has explicitly stated that compatibility with legacy experiment artifacts is unnecessary. This group supports only current schema 2 / workload contract 1 archives with the new export contract; it adds no historical layout adapters, source/replay selection, legacy script forwarding, or snapshot backfilling. Archive reading, parent evidence projection, and feedback execution each handle their own responsibilities, without introducing a second supervisor.
 
 ## Motivation
 
-当前 resume 针对同一个 run 的中断恢复。COMPLETED run 直接 attach，恢复身份固定 run_id/config_hash/controller_sha/plan_hash，已完成轮直接返回 sealed_sha。普通实验最后一轮只做用户试用，不处理它产生的反馈。修改父配置的总轮数后 resume，既不能补跑末轮反馈，也违反输入冻结。
+Current resume handles interruption recovery for the same run. A COMPLETED run is attached directly; recovery identity is fixed to run_id/config_hash/controller_sha/plan_hash, and completed rounds return sealed_sha directly. The final round of an ordinary experiment only runs user trials and does not process the feedback they produce. Resuming after changing the total round count in the parent configuration neither processes the final round's feedback nor respects input freezing.
 
-用户需要的追加流程是：父 R5 已完成用户试用→创建子 run→处理 R5 反馈并交付→子用户试用逻辑 R6。当前运行代码、模型和后端可以重新冻结，但不能把父执行记录复制成子 run 的成功记录。
+The user needs this continuation flow: parent R5 completes user trials→create a child run→process R5 feedback and deliver→child user trials at logical R6. The current execution code, models, and backend may be frozen anew, but the parent's execution records must not be copied as successful records of the child run.
 
-还需补一项当前格式的生产端缺口：collection 排除 .git，工作区 main 可能停留在 seed，只 fetch origin/main。现有工作树与初始 materials/harness.tar.gz 不能证明最终版本。因此必须由当前控制器按最后一轮明确 SHA 导出代码，才有可核验的后续输入。
+A producer-side gap in the current format also needs to be addressed: collection excludes .git, and workspace main may remain at the seed, with only origin/main fetched. Neither the existing working tree nor the initial materials/harness.tar.gz can prove the final version. Therefore, the current controller must export code at the final round's explicit SHA to provide verifiable input for subsequent work.
 
 ## Guide-level explanation
 
-### 1. 父实验先完成并收集
+### 1. Complete and collect the parent experiment first
 
-父实验用当前统一入口正常运行到 COMPLETED，再执行 collect。新版本会把明确绑定末轮 SHA 的 Harness 导出、反馈和来源证明放进 artifacts.tar.gz，并在收集回执报告 continuation_ready。只有 COMPLETE、experiment_complete 和 continuation_ready 同时成立才可作为父来源。已销毁父计算资源不影响使用已收集的归档。
+Run the parent experiment normally to COMPLETED using the current unified entry point, then execute collect. The new version puts a Harness export explicitly bound to the final round's SHA, feedback, and provenance proofs into artifacts.tar.gz, and reports continuation_ready in the collection receipt. An archive may be used as a parent source only when COMPLETE, experiment_complete, and continuation_ready all hold. Destroying the parent compute resources does not affect use of the collected archive.
 
-本组不追溯升级旧冻结控制器。缺少新导出契约的过去归档明确提示不支持；不靠缓存或工作树猜出最终代码。
+This group does not retroactively upgrade old frozen controllers. Past archives lacking the new export contract are explicitly reported as unsupported; the final code is not guessed from caches or the working tree.
 
-### 2. 子实验声明继承
+### 2. Declare inheritance in the child experiment
 
-子配置仍是完整 schema 2 配置，runtime、models、roles、policies 和新增轮次按当前规则填写，只把输入来源改为：
+The child configuration remains a complete schema 2 configuration. Fill in runtime, models, roles, policies, and the additional round count according to current rules, changing only the input source to:
 
 ```json
 {
@@ -162,7 +162,7 @@ tasks:
   "workload": {"source": "parent"},
   "continuation": {
     "archive": "../parent/artifacts.tar.gz",
-    "sha256": "64位父归档SHA256"
+    "sha256": "64-character parent archive SHA256"
   },
   "rounds": {
     "count": 1,
@@ -172,9 +172,9 @@ tasks:
 }
 ```
 
-这是合入完整配置的片段，不是可直接运行的完整文件。首版固定继承父末轮的任务/persona/interaction 配对，每个新增轮重复这组配对；sessions_per_round 必须与父末轮人数一致。改变模型、后端或策略通过子配置显式声明，并记录父子差异。首版不支持借此替换任务或 persona；需要不同 workload 时使用普通新实验。
+This is a snippet to incorporate into a complete configuration, not a complete runnable file. The first version inherits the task/persona/interaction pairings from the parent's final round as-is and repeats these pairings for each additional round; sessions_per_round must match the number of users in the parent's final round. Changes to models, backends, or policies are declared explicitly in the child configuration, and parent-child differences are recorded. The first version does not support using this mechanism to replace tasks or personas; use an ordinary new experiment when a different workload is needed.
 
-无需新的 import 启动流程，继续用现有命令：
+No new import startup flow is needed; continue using the existing commands:
 
 ```bash
 python backend/scripts/experiment.py check --config child.json --offline
@@ -182,17 +182,17 @@ python backend/scripts/experiment.py prepare --config child.json --secrets-file 
 python backend/scripts/experiment.py run CHILD_RUN_ID --secrets-file .env.experiment
 ```
 
-check 返回父身份、末轮 SHA、反馈人数/报告数、输入摘要和缺口；prepare 原子冻结继承输入；run 先交付父反馈再开始用户。凭证来自子 profile，不读父 .env、旧 token 或父 Gitea 地址。
+check returns the parent identity, final-round SHA, feedback user count/report count, input summary, and gaps; prepare atomically freezes inherited inputs; run delivers the parent feedback before starting users. Credentials come from the child profile, not the parent .env, old tokens, or the parent's Gitea address.
 
-### 3. 轮次与停止恢复
+### 3. Rounds and stop/recovery
 
-rounds.count 表示新增用户轮数。父末轮为逻辑 R5、子 base_round=5 且 count=1 时，子内部 local_round=1，对外 lineage_round=6。反馈初始化是 continuation_bootstrap 阶段，不算新增用户轮。追加多轮时，中间新增轮正常交付，最后一轮仍只试用。
+rounds.count represents the number of additional user rounds. When the parent's final round is logical R5, the child's base_round=5, and count=1, the child has local_round=1 internally and lineage_round=6 externally. Feedback initialization is the continuation_bootstrap stage and does not count as an additional user round. When multiple rounds are appended, intermediate additional rounds deliver normally, while the final round still only runs trials.
 
-子 stop/resume 沿用已有入口，恢复本次初始化和新增轮。父 run 的 COMPLETED 状态及末轮 users-only 事实不变。父会话不计入子会话数、子评分或新增模型用量。
+Child stop/resume uses the existing entry points to recover this initialization and the additional rounds. The parent run's COMPLETED status and the users-only nature of its final round remain unchanged. Parent sessions do not count toward child session counts, child scores, or additional model usage.
 
 ## Reference-level explanation
 
-### 1. 模块边界与依赖方向
+### 1. Module boundaries and dependency direction
 
 ```text
 current archive → source validation → existing material freezing
@@ -202,137 +202,137 @@ current archive → source validation → existing material freezing
                               shared feedback pipeline → ordinary user loop
 ```
 
-- experiment/continuation/source.py：只理解当前归档及 export contract，验证和选择父末轮，返回数据；不 import backend/controller，不运行归档代码。
-- continuation/export.py：按指定 commit 导出精确 Harness tree 和来源证明，由两后端共用的冻结 controller 调用；不通过 provider 分支猜代码。
-- continuation/evidence.py、forge.py：分别提供父会话只读视图与新仓 report 映射；只依赖材料及现有 store/tracker 操作。
-- loop/feedback_pipeline.py：从现有 Orchestrator 提取具体 demand→owner→delivery→seal 操作；不认识归档、lineage 或路径。
-- materials/context/unified controller：分别冻结、传递非敏感上下文、装配执行。backend 继续按正常配置构建工作区、管理进程和清理资源，不增加“父实验恢复”分支。
+- experiment/continuation/source.py: Understands only the current archive and export contract, validates and selects the parent's final round, and returns data; does not import backend/controller or run archive code.
+- continuation/export.py: Exports the exact Harness tree and provenance proofs for a specified commit; called by the frozen controller shared by both backends; does not guess code through provider branches.
+- continuation/evidence.py, forge.py: Provide read-only views of parent sessions and report mappings in the new repository, respectively; depend only on materials and existing store/tracker operations.
+- loop/feedback_pipeline.py: Extracts concrete demand→owner→delivery→seal operations from the existing Orchestrator; has no knowledge of archives, lineage, or paths.
+- materials/context/unified controller: Freeze inputs, pass non-sensitive context, and assemble execution, respectively. The backend continues to build workspaces, manage processes, and clean up resources according to normal configuration, without adding a “parent experiment recovery” branch.
 
-controllers/feedback.py 是阶段角色的具体装配函数，复用现有定义与回调，并显式接收证据store、恢复域、round provider和分组产物根；不是通用agent工厂。它使bootstrap与普通阶段能够各自装配，避免unified.py复制大段角色构造或临时修改实例私有字段。
+controllers/feedback.py is the concrete assembly function for stage roles. It reuses existing definitions and callbacks and explicitly receives the evidence store, recovery domain, round provider, and grouped artifact root; it is not a generic agent factory. It lets bootstrap and ordinary stages be assembled independently, avoiding large blocks of role construction code in unified.py or temporary modifications to private instance fields.
 
-不增加 importer 插件系统、通用工作流平台、独立 launcher 或新 model 调用层。公共入口只新增配置来源，check/prepare 复用同一 source validator。
+Do not add an importer plugin system, a general workflow platform, a separate launcher, or a new model invocation layer. The public entry point adds only a configuration source; check/prepare reuse the same source validator.
 
-### 2. 配置、归档与材料冻结
+### 2. Configuration, archive, and material freezing
 
-continuation 是可选对象，仅 archive/sha256 两字段。存在时要求 harness.source=continuation、workload={source:parent}；三者必须同时出现，禁止混入另一个 Harness 或显式任务输入。省略时保持已有配置哈希、字段与行为，不增加默认 continuation。
+continuation is an optional object with only two fields, archive/sha256. When present, it requires harness.source=continuation and workload={source:parent}; all three must appear together, and another Harness or explicit task input must not be mixed in. When omitted, existing configuration hashes, fields, and behavior remain unchanged, and no default continuation is added.
 
-只接受当前 collect 的单层 artifacts.tar.gz：schema_version=2、workload_contract_version=1、带版本化 continuation export、原 controller invocation/recovery/collection 身份一致。读取 collection.files 的完整性清单、对应材料及 selected sessions。拒绝未知版本、PARTIAL、停止/失败父实验、缺 export、重复/出界/链接/特殊路径及展开预算超限。不支持 tar.zst、递归完整实验包或任意包内脚本；registry 声明的 task source archive、内层 Harness export 和 observation bundle 仍属于正常材料，按各自契约和预算检查。
+Accept only the current collect output as a single-layer artifacts.tar.gz: schema_version=2, workload_contract_version=1, a versioned continuation export, and consistent original controller invocation/recovery/collection identities. Read the collection.files integrity manifest, corresponding materials, and selected sessions. Reject unknown versions, PARTIAL, stopped/failed parent experiments, missing exports, duplicate/out-of-bounds/link/special paths, and packages exceeding extraction budgets. Do not support tar.zst, recursively packaged complete experiments, or arbitrary scripts inside packages; task source archives declared by the registry, inner Harness exports, and observation bundles remain normal materials and are checked against their respective contracts and budgets.
 
-父边界是全部预期用户完成且已 sealed 的最后一轮；其 user_sha/sealed_sha 必须相同，用户集合由冻结 plan 与 recovery units 决定，不由文件数或可修改标签推断。完成判据读取 collection 的 controller receipt、nonce、invocation 与 recovery，不要求不可变 manifest 的初始状态字段更新为 COMPLETED。外层 archive SHA 取子配置提供的 expected SHA；包内 collection.files 验证内容，不要求归档记录自身的 hash。
+The parent boundary is the last round in which all expected users have completed and which has been sealed; its user_sha/sealed_sha must be identical. The user set is determined by the frozen plan and recovery units, not inferred from file counts or mutable labels. Completion criteria read the collection's controller receipt, nonce, invocation, and recovery; they do not require the initial status field in the immutable manifest to be updated to COMPLETED. The outer archive SHA is the expected SHA supplied by the child configuration; collection.files inside the package verifies content, and the archive is not required to record its own hash.
 
-需要完整 session payload、对应 task_digest/persona 以及明确报告关联。没有报告也可继承，但必须明确为零，不能生成虚构反馈。有 pending report 时要求子 triager/architect 数量至少为一，不能因为角色设为零而悄悄跳过父反馈。父本身是 continuation run 时，还要核验其 bootstrap 完成且首个用户 SHA 等于 bootstrap sealed SHA，再接受它的末轮。
+Complete session payloads, corresponding task_digest/persona, and explicit report associations are required. Inheritance is allowed when there are no reports, but the count must explicitly be zero; fictional feedback must not be generated. When pending reports exist, the child must have at least one triager and one architect; parent feedback must not be silently skipped because roles are set to zero. If the parent is itself a continuation run, also verify that its bootstrap completed and its first user SHA equals the bootstrap sealed SHA before accepting its final round.
 
-prepare 从父 manifest 的 material registry 复制任务原始 source archive、instruction、setup/requirements lock、persona 卡等经过核验的输入，复用正常 task catalog 与工作区准备，不依赖父宿主路径或父活沙箱。task record 与 package 保持原样，包括 source/tasks/ID 的逻辑路径；source 目录虽不在父收集包中，也能从 registry 指向的 source_archive 重建。不得重新 _freeze_task、猜宿主源目录或改 package 路径导致 task_digest 变化。
+prepare copies verified inputs from the parent manifest's material registry, including original task source archives, instruction, setup/requirements lock, and persona cards, and reuses the normal task catalog and workspace preparation without relying on parent host paths or the parent's live sandbox. Preserve task records and packages as-is, including logical source/tasks/ID paths; although the source directory is not in the parent collection package, it can be reconstructed from the source_archive referenced by the registry. Do not rerun _freeze_task, guess the host source directory, or change package paths in a way that changes task_digest.
 
-export 记录 selected persona 卡的 canonical JSON digest、原 library hash及 roster strategy；继承从冻结卡库取原卡，不用 Session 的显示 persona 替代。子可以只保存选定卡，但必须标明原库选集，不能声称整个 library 文件字节不变。只取父末轮实际配对，按子 count 编译 R1..N 新计划；复用现有 binding 校验，不把父 plan_hash 冒充子 plan_hash。
+export records the canonical JSON digest of selected persona cards, the original library hash, and the roster strategy; inheritance takes the original cards from the frozen card library, not the display persona from Session. The child may save only selected cards, but must identify them as a selection from the original library and must not claim that the entire library file is byte-for-byte unchanged. Take only the actual pairings from the parent's final round and compile a new R1..N plan according to the child count; reuse existing binding validation and do not pass off the parent plan_hash as the child plan_hash.
 
-workload compiler 中新增明确的 inherited-pairs 输入路径，与普通编译共享 binding 生成/校验。父配对及摘要进入新 manifest 的 continuation 材料记录；read_session_plan 必须从这些冻结配对重新核验。配置仍保存用户声明的 source:parent，不把派生运行状态写回配置或伪造 task_package 外部路径。
+Add an explicit inherited-pairs input path to the workload compiler, sharing binding generation/validation with ordinary compilation. Parent pairings and digests go into the continuation material record in the new manifest; read_session_plan must revalidate from these frozen pairings. The configuration still stores the user-declared source:parent; do not write derived runtime state back into the configuration or fabricate external task_package paths.
 
-继承文件登记为 materials/continuation 下的相对路径+hash；子仍冻结当前 controller/OpenAgents source 与模型策略。manifest.lineage 至少包含 parent_run_id、parent_config_hash、parent_controller_sha、parent_plan_hash、parent_archive_sha256、base_round、parent_user_sha、parent_tree_id，以及声明的模型/后端/策略差异。没有复制父 resources、checkpoint identity、授权 grants 或 secret profile。
+Register inherited files as relative paths + hashes under materials/continuation; the child still freezes the current controller/OpenAgents source and model policies. manifest.lineage contains at least parent_run_id, parent_config_hash, parent_controller_sha, parent_plan_hash, parent_archive_sha256, base_round, parent_user_sha, parent_tree_id, and declared model/backend/policy differences. Parent resources, checkpoint identity, authorization grants, and secret profile are not copied.
 
-### 3. 当前 producer 的最终 Harness 导出
+### 3. Final Harness export by the current producer
 
-新增 continuation-export-v1.json，记录末轮 SHA/tree ID、源码 archive 及 SHA-256、逐 tracked 文件内容摘要/Git mode、所选末轮与 session/material 证明。controller 只在普通循环完整结束后按账本指定 SHA 导出；不用工作区 main/HEAD或最终缓存推断。允许 Git tree 的正常文件及 executable mode，拒绝链接/submodule/特殊 mode，不静默丢文件。
+Add continuation-export-v1.json, recording the final-round SHA/tree ID, source archive and SHA-256, per-tracked-file content digests/Git modes, and selected final-round and session/material proofs. The controller exports at the SHA specified by the ledger only after the ordinary loop has fully completed; it does not infer the code from workspace main/HEAD or the final cache. Allow normal Git tree files and executable modes; reject links/submodules/special modes without silently dropping files.
 
-导出文件放在正常收集目录，不覆盖 materials/harness.tar.gz。缺对象、私密/不支持文件或证据不一致时记录 unavailable，普通实验的已有结果保持有效；collect 可以完成，但 continuation_ready=false，后续 check 明确拒绝继承。COMPLETE 与可继承性是不同字段。
+Place export files in the normal collection directory without overwriting materials/harness.tar.gz. If objects are missing, files are private/unsupported, or evidence is inconsistent, record unavailable while preserving the validity of the ordinary experiment's existing results; collect may complete, but continuation_ready=false, and subsequent check explicitly rejects inheritance. COMPLETE and inheritability are separate fields.
 
-collector 保留一项明确的证据投影记录：发生已有凭证脱敏时，记录原文件 hash、归档 hash、credential_redaction 原因，不记录凭证值。父 Session 可作为已声明的脱敏证据使用，不能宣称其归档字节就是原始执行字节；task/Harness/persona 等可运行材料必须精确匹配其原 hash，脱敏改变它们则不能继承。
+The collector retains an explicit evidence projection record: when existing credential redaction occurs, record the original file hash, archive hash, and credential_redaction reason, without recording credential values. A parent Session may be used as declared redacted evidence, but its archived bytes must not be claimed to be the original execution bytes; runnable materials such as task/Harness/persona must exactly match their original hashes, and inheritance is not allowed if redaction changes them.
 
-首版使用精确源码 tree，不携带父 Git历史。子产生新 seed commit，提交正文绑定父 Harness commit，确保即使连续几代 tree、提交身份与秒级时间相同，父子 commit 仍不同；receipt明确 parent_commit 与 child_seed_commit 不同，child Git tree必须等于 parent_tree_id。外层 collector 使用 write_bytes，不能依赖外层 tar mode；按内层 export inventory 恢复 executable mode。建 index 必须包含父已 tracked 但被 .gitignore 忽略的文件，避免 clean filter/.gitattributes 改变 blob，逐 blob hash 与 write-tree 双重核验，不只运行 git add .。continuation seed 不重写父 .gitignore；runtime排除规则写入 .git/info/exclude，hook在 seed后安装。普通 builtin/archive seed保持既有语义。
+The first version uses the exact source tree without carrying parent Git history. The child creates a new seed commit whose commit message body binds the parent Harness commit, ensuring that parent and child commits differ even when consecutive generations have the same tree, commit identity, and second-level timestamp; the receipt explicitly states that parent_commit and child_seed_commit differ, and the child Git tree must equal parent_tree_id. The outer collector uses write_bytes and must not depend on outer tar modes; restore executable modes from the inner export inventory. Index construction must include files tracked by the parent but ignored by .gitignore, avoid clean filters/.gitattributes changing blobs, and verify both individual blob hashes and write-tree, not merely run git add .. The continuation seed does not rewrite the parent .gitignore; runtime exclusion rules go in .git/info/exclude, and hooks are installed after the seed. Ordinary builtin/archive seeds retain their existing semantics.
 
-### 4. 父证据与新仓 report 投影
+### 4. Parent evidence and report projection into the new repository
 
-子 run 创建自己所属的新仓。先完成 seed及远端初始化，再投影父末轮 pending reports，避免 _reset_to_initial 关闭已导入的报告。新建当前报告，不重放父 proposal/ready/PR/合并；父 forge 状态与评论只读归档，不继承 openagents/ready 标签。已关闭、拒绝或已交付的报告保持背景状态，不自动重新立项。
+The child run creates a new repository of its own. Complete seed and remote initialization first, then project pending reports from the parent's final round, preventing _reset_to_initial from closing imported reports. Create current reports; do not replay parent proposal/ready/PR/merge operations. Parent forge state and comments remain read-only archive data, and the openagents/ready label is not inherited. Closed, rejected, or delivered reports remain background context and are not automatically reopened as new work.
 
-报告按 parent archive/repo identity/number 构成 source namespace，原文与哈希保留；create_issue_once 的 operation key来自子身份及源报告摘要。实际发号后保存 source→current issue_map，新号与父号相同也不能混淆。原文中的 #号/URL显示为历史引用，不在自然语言里全局替换；当前可执行 references只由结构化映射生成。
+Reports use parent archive/repo identity/number as the source namespace, preserving original text and hashes; the create_issue_once operation key comes from the child identity and source report digest. After actual number assignment, save the source→current issue_map; even if the new number equals the parent number, they must not be confused. # numbers/URLs in the original text are displayed as historical references and are not globally replaced in natural language; current executable references are generated only from the structured mapping.
 
-导入 receipt保留 repo ID、child seed、source report hash、新号/URL与状态。远端已创建但本地未写回时，恢复用 marker/payload对账；外部内容改变或身份冲突报错，不以另建 issue完成重试。
+The import receipt retains the repo ID, child seed, source report hash, new number/URL, and status. If the remote issue was created but not yet written back locally, recovery reconciles using marker/payload; external content changes or identity conflicts raise an error, and retries are not completed by creating another issue.
 
-ContinuationEvidenceView 包装 child SessionStore与只读父材料。load/find_session_id_by_issue/load_user_feedback_envelope 根据明确 issue_map解析父SID，保留父 provenance；不调用父 save/reconcile/rebuild_index。bootstrap角色 index使用 selected父边界，派生视图的当前issue_numbers按映射生成，source refs仍单独保留；普通用户轮角色与 Metrics使用当前索引。父会话不写入子 sessions/index，不变成本次 user attempt；SID冲突拒绝覆盖。
+ContinuationEvidenceView wraps the child SessionStore and read-only parent materials. load/find_session_id_by_issue/load_user_feedback_envelope resolve parent SIDs using the explicit issue_map and preserve parent provenance; they do not call parent save/reconcile/rebuild_index. The bootstrap role index uses the selected parent boundary; the current issue_numbers in the derived view are generated from the mapping, while source refs are retained separately. Roles in ordinary user turns and Metrics use the current index. Parent sessions are not written to child sessions/index and do not become user attempts in this run; SID conflicts are rejected rather than overwritten.
 
-原生 observation bundle按原字节/hash复制到子当前 observation_root/SID，保留父manifest身份，使现有 ObservationProvider和 delivery_evidence同时读取；新 grants只根据映射和授权SID创建，不复制父grants。collector 若对 bundle 内任何字节脱敏，原 manifest 的嵌套 hash 将失效，此 bundle 必须 unavailable，不能改写原 manifest 后仍称原生保真。没有有效 observation时保持 unavailable，不重建伪日志。invalid/skipped/unverified_accept、拒绝理由及脱敏声明仍保留，不将感受转成已确认技术事实。
+Native observation bundles are copied byte-for-byte with their hashes to the child's current observation_root/SID, retaining the parent manifest identity so that both the existing ObservationProvider and delivery_evidence can read them. New grants are created only from the mapping and authorized SIDs; parent grants are not copied. If the collector redacts any bytes in a bundle, the nested hashes in the original manifest become invalid, and the bundle must be unavailable; it cannot be called natively faithful after rewriting the original manifest. If there is no valid observation, keep it unavailable; do not reconstruct fake logs. Preserve invalid/skipped/unverified_accept, rejection reasons, and redaction declarations; do not turn subjective impressions into confirmed technical facts.
 
-### 5. 共享反馈阶段与 bootstrap 恢复
+### 5. Shared Feedback Phase and Bootstrap Recovery
 
-抽出 recoverable demand、owner、delivery wait及seal为一个具体 FeedbackPipeline。普通轮 prerequisite=users；继承初始化 prerequisite=feedback_imported。依赖角色、recovery、fetch/wait、integrity_guard与SHA解析/检查，不接收 archive或provider对象。保留原有封口前检查编排仓完整性的时序，bootstrap同样适用，不能先记成功seal再发现越界修改。
+Extract recoverable demand, owner, delivery wait, and seal into one concrete FeedbackPipeline. Ordinary turns use prerequisite=users; inherited initialization uses prerequisite=feedback_imported. It depends on roles, recovery, fetch/wait, integrity_guard, and SHA resolution/checking, and does not accept archive or provider objects. Preserve the existing timing of checking orchestration repository integrity before sealing; this also applies to bootstrap. A successful seal must not be recorded before discovering out-of-bounds modifications.
 
-Triager和Divergent内层unit现有 users硬编码依赖要与同一显式 feedback_dependency绑定一致；正常路径仍为 users。Architect/grouped/Owner复用现有恢复绑定，顺序保持 triage∥divergent→architect→owner→delivery_wait→seal。不扩展 RecoveryStore为任意工作流。
+The existing hardcoded users dependencies in the Triager and Divergent inner units must be bound consistently to the same explicit feedback_dependency; the normal path remains users. Architect/grouped/Owner reuse the existing recovery bindings, keeping the order triage∥divergent→architect→owner→delivery_wait→seal. Do not extend RecoveryStore into an arbitrary workflow.
 
-bootstrap使用 checkpoints/continuation-bootstrap 的独立 RecoveryStore。身份来自子 run/config/controller及冻结初始化输入摘要；内部正 round=1只是该命名空间，不是父轮或子用户轮。起始stage为 feedback_imported，禁止伪造 users成功；receipt明确 phase、source边界、映射及input hash。
+Bootstrap uses a separate RecoveryStore at checkpoints/continuation-bootstrap. Its identity comes from the child run/config/controller and the digest of the frozen initialization inputs; the internal positive round=1 is only for this namespace, not a parent round or child user round. The starting stage is feedback_imported; do not fabricate a successful users stage. The receipt explicitly identifies the phase, source boundary, mapping, and input hash.
 
-外部副作用也必须隔离：bootstrap的 operation keys/UsageContext.operation 使用显式 continuation-bootstrap 前缀，普通轮原 key 不变。仅分开 ledger 目录不足以避免同仓 bootstrap round1 和用户 round1 的 create_issue_once/model-output key 碰撞。分组产物也用独立 phase 目录。父 round-* 标签保存在 source metadata，不进入当前执行标签；bootstrap 角色 round_provider 返回 None、恢复上下文仍用其内部正 round1，普通阶段恢复实际 local round，避免 filter_current_round 误丢父报告或把 bootstrap 提案串入普通轮。
+External side effects must also be isolated: bootstrap operation keys/UsageContext.operation use an explicit continuation-bootstrap prefix, while ordinary turn keys remain unchanged. Separating ledger directories alone is insufficient to avoid create_issue_once/model-output key collisions between bootstrap round1 and user round1 in the same repository. Grouping artifacts also use a separate phase directory. Parent round-* labels are preserved in source metadata and do not enter current execution labels; bootstrap roles' round_provider returns None, while the recovery context still uses its internal positive round1. Ordinary phases restore the actual local round, preventing filter_current_round from mistakenly dropping parent reports or mixing bootstrap proposals into ordinary turns.
 
-共用阶段提取保持普通持久化合同：stage=round_sealed、key=operation_key(local_round,"round_sealed","stage-marker")、input={user_sha,sealed_sha}、observed_postconditions.completed，以及原依赖关系。现有 grade 和 resume 直接核验这些字段，不能为了统一术语改成 seal 或更换普通 keys。
+The shared phase extraction preserves the ordinary persistence contract: stage=round_sealed, key=operation_key(local_round,"round_sealed","stage-marker"), input={user_sha,sealed_sha}, observed_postconditions.completed, and the original dependency relationships. Existing grade and resume directly verify these fields; do not change them to seal or replace ordinary keys for the sake of consistent terminology.
 
-核验 seed/投影→父证据视图及bootstrap恢复绑定→共用pipeline→固定准入集合及交付终态→新main为child_seed后代→保存sealed SHA并原子完成。零准入也要记录no_admissions及有效seal。卡死时停止在bootstrap，不提前开始新增用户。
+Verify seed/projection→parent evidence view and bootstrap recovery binding→shared pipeline→fixed admission set and delivery terminal state→new main is a descendant of child_seed→save the sealed SHA and complete atomically. Even with zero admissions, record no_admissions and a valid seal. If blocked, stop at bootstrap and do not start new users early.
 
-resume先对账初始化receipt及原有外部副作用。bootstrap已完成时，不重跑LLM、不重复建报告或交付。两个阶段经同一具体角色装配函数分别创建实例，传入对应 store/recovery/round_provider/产物根，不通过修改对象私有属性切换；随后调用现有用户循环。父已完成用户不会被复制进子ledger。
+Resume first reconciles the initialization receipt and existing external side effects. When bootstrap is complete, do not rerun the LLM or recreate reports or deliveries. The two phases create separate instances through the same concrete role assembly function, passing the corresponding store/recovery/round_provider/artifact root; do not switch by modifying private object attributes. Then call the existing user loop. Completed parent users are not copied into the child ledger.
 
-交付启用统一为 count>1 or continuation_present；角色roster、Vigil启动和两后端launch readiness使用同一语义。仅追加一轮也必须能交付父反馈。工程CI继续由子配置决定，E2B CI范围不随本组扩大。
+Delivery is uniformly enabled when count>1 or continuation_present; the role roster, Vigil startup, and launch readiness for both backends use the same semantics. Even when appending only one round, parent feedback must be deliverable. Engineering CI remains determined by the child configuration; the E2B CI scope is not expanded by this work.
 
-engine._completion 对继承run增加bootstrap完整/身份一致/input及映射hash一致/sealed有效判据，并要求主ledger R1.user_sha == bootstrap.sealed_sha，证明新增用户实际试用了本次交付，再叠加现有1..N用户轮封口条件；普通run不读取此域。status/logs返回bootstrap phase与local_round/lineage_round。batch/grade仍用本次run与本地编号，仅统计新增预测。
+For continuation runs, engine._completion adds criteria requiring bootstrap completion, identity consistency, matching input and mapping hashes, and a valid sealed SHA, and requires main ledger R1.user_sha == bootstrap.sealed_sha to prove that the new users actually tried this delivery, in addition to the existing sealing conditions for user rounds 1..N. Ordinary runs do not read this field. status/logs return the bootstrap phase and local_round/lineage_round. batch/grade continue to use this run and local numbering, counting only new predictions.
 
-### 6. 双后端与再次追加
+### 6. Both Backends and Subsequent Continuations
 
-两后端读取相同冻结catalog、persona、父证据与bootstrap输入；依赖安装、Git任务准备及正常任务环境验证仍由既有backend承担，本组不承诺离线安装或跨后端任意环境等价。父local→子E2B或反向时，目标后端不支持原任务必须在check/prepare明确拒绝，不用简化任务替代。
+Both backends read the same frozen catalog, persona, parent evidence, and bootstrap inputs. Dependency installation, Git task preparation, and normal task environment verification remain the responsibility of the existing backend; this work does not promise offline installation or arbitrary environment equivalence across backends. When moving from parent local→child E2B or vice versa, if the target backend does not support the original task, check/prepare must explicitly reject it; do not substitute a simplified task.
 
-子collect保留lineage、issue_map、bootstrap receipt、必要父证据及子末轮导出。祖先记录只带hash/identity/必要引用，不递归嵌套完整父归档。export明确记录 local_round=父count、lineage_round=父base_round+父count，以及父自身该轮用户units；后继只选直接父的末轮，不重新选择祖先会话或导入已处理祖先报告。
+Child collect retains lineage, issue_map, the bootstrap receipt, necessary parent evidence, and the child final-round export. Ancestor records contain only hashes/identities/necessary references and do not recursively nest complete parent archives. The export explicitly records local_round=parent count, lineage_round=parent base_round+parent count, and the parent’s own user units for that round. A successor selects only the direct parent's final round; it does not reselect ancestor sessions or import already processed ancestor reports.
 
-新子 base_round = parent.lineage.base_round（无lineage为0）+ parent.config.rounds.count，并与父export.lineage_round核对；新子 lineage_round=base_round+local_round。例如父R5→子新增两轮为逻辑R6/R7→再追加一轮为R8。父材料原文/hash在重复继承中不重标为当前执行。
+New child base_round = parent.lineage.base_round (0 if there is no lineage) + parent.config.rounds.count, cross-checked against parent export.lineage_round; new child lineage_round=base_round+local_round. For example, parent R5→two new child rounds are logical R6/R7→one further appended round is R8. Parent materials' original text/bytes and hashes are not relabeled as current execution during repeated inheritance.
 
-### 7. Task DAG与验收
+### 7. Task DAG and Acceptance
 
-T1当前归档读取/验证；T2终态导出与证据/报告投影，依赖T1；T3独立提取共用反馈pipeline及正常路径回归；T4依赖前三者接入配置/冻结/controller/生命周期；T5依赖T4写双语教程与能力审计；T6依赖T4/T5完成合同和真实双后端验收。文件互斥列表在frontmatter。端到端脚本 backend/scripts/e2e-spec-0079-experiment-continuation.sh。
+T1: read/validate current archives; T2: terminal-state export and evidence/report projection, depending on T1; T3: independently extract the shared feedback pipeline and test normal-path regressions; T4: integrate configuration/freeze/controller/lifecycle, depending on the first three; T5: write bilingual tutorials and perform a capability audit, depending on T4; T6: complete contract and real dual-backend acceptance, depending on T4/T5. The file mutual exclusion list is in the frontmatter. End-to-end script backend/scripts/e2e-spec-0079-experiment-continuation.sh.
 
-| 验收 | 必须观察的结果 |
+| Acceptance | Required observations |
 | --- | --- |
-| 来源和身份 | 新导出contract匹配末轮SHA/plan/receipt；PARTIAL/FAILED/缺导出/未知版本/损坏或越界包拒绝 |
-| 末轮配对 | 使用账本完成用户集，不按文件数猜；任务/persona/interaction与原内容身份保持，新增计划为1..N |
-| Harness | 本地main旧也按明确末轮SHA导出；子tree精确相同，parent/child commit分清，mode/ignore不被悄改 |
-| 证据映射 | 同号不串源；report重试唯一；父Session不改provenance、不进新指标；原观测同时到达需求和交付读取端 |
-| 脱敏和无效评价 | 保存original/archive hashes与原因；invalid/缺日志不变valid；可运行材料改变则不能继承 |
-| 恢复 | issue创建后、LLM输出保存后、交付等待和bootstrap sealed后分别中断；无重复副作用、不提前开新增用户 |
-| 操作域与封口合同 | bootstrap和普通R1的远端去重键不冲突；grouping/round过滤不串源；原grade封口字段不变；新增R1确实测试bootstrap sealed SHA |
-| 普通运行 | 无continuation旧hash、单轮不启Vigil、多轮末轮、resume、batch与grade行为保持原合同 |
-| 双后端实际执行 | 当前父run→真实父报告处理→至少一张准入票及OpenAgents真实交付→子用户试用；不能以零准入代替非空交付 |
-| 再追加与清理 | 子归档再次继承显示正确累计轮号，不递归嵌包；父字节不变、清理只针对子资源 |
+| Source and identity | New export contract matches the final-round SHA/plan/receipt; PARTIAL/FAILED/missing export/unknown version/corrupt or out-of-bounds packages are rejected |
+| Final-round pairing | Use the ledger's completed user set, not file counts; task/persona/interaction retain their original content identities, and the new plan is 1..N |
+| Harness | Even if local main is old, export using the explicit final-round SHA; child tree is exactly identical, parent/child commits are distinguished, and mode/ignore are not silently changed |
+| Evidence mapping | Identical numbers do not cross sources; report retries are unique; parent Session provenance is unchanged and excluded from new metrics; original observations reach both demand and delivery readers |
+| Redaction and invalid feedback | Preserve original/archive hashes and reasons; invalid/missing logs do not become valid; inheritance is prohibited if runnable materials change |
+| Recovery | Interrupt separately after issue creation, after LLM output is saved, during delivery wait, and after bootstrap is sealed; no duplicate side effects and no premature start of new users |
+| Operation domains and sealing contract | Remote deduplication keys for bootstrap and ordinary R1 do not collide; grouping/round filtering does not mix sources; original grade sealing fields remain unchanged; new R1 actually tests the bootstrap sealed SHA |
+| Ordinary runs | Without continuation, old hashes, single-round Vigil remaining disabled, the final round of multi-round runs, resume, batch, and grade retain their original contracts |
+| Actual dual-backend execution | Current parent run→real parent report processing→at least one admitted issue and actual OpenAgents delivery→child user trial; zero admissions cannot substitute for nonempty delivery |
+| Subsequent continuation and cleanup | Re-inheriting the child archive shows correct cumulative round numbering without recursively nested packages; parent bytes remain unchanged, and cleanup targets only child resources |
 
-小型fixture必须覆盖多个任务/persona的末轮子集、ignored tracked文件与executable mode、原生观测脱敏命中，以及父R5→子两轮→第三代一轮的R8编号。它们验证真实内容与执行归属，不能只比配置字段存在。
+Small fixtures must cover final-round subsets of multiple tasks/personas, ignored tracked files and executable mode, redaction affecting native observations, and R8 numbering for parent R5→two child rounds→one third-generation round. They verify actual content and execution ownership, not merely the presence of configuration fields.
 
-模型输出不能保证必然准入，验收需明确实际票与PR/sealed证据；无准入只能记为该分支验证通过。测试fixtures仅使用当前格式的脱敏小包，不提交旧实验产物或运行脚本。全仓pytest、Ruff、配置合同、spec检查及真实验收报告作为合入条件。
+Model output cannot guarantee admission; acceptance must explicitly identify actual issues and PR/sealed evidence. Zero admissions can only be recorded as passing verification of that branch. Test fixtures use only small redacted packages in the current format; do not commit old experiment artifacts or execution scripts. Repository-wide pytest, Ruff, configuration contracts, spec checks, and an actual acceptance report are merge conditions.
 
 ## Drawbacks
 
-增加精确末轮代码导出、父证据存储和报告映射，归档体积有所增长。只携带selected末轮与必要forge背景，祖先按摘要记录，控制增长而不丢当前所需证据。
+Precise final-round code export, parent evidence storage, and report mapping increase archive size. Carry only the selected final round and necessary forge context, and record ancestors by digest to control growth without losing evidence needed for the current run.
 
-子Git提交不保留父历史，需要以tree身份记录代码等价。目标后端仍须支持父任务的正常准备条件；更换模型或后端会影响可比性，lineage展示差异而不自动得出收敛结论。
+Child Git commits do not retain parent history, so code equivalence must be recorded by tree identity. The target backend must still support the normal preparation conditions for the parent task; changing models or backends affects comparability, and lineage displays the differences without automatically concluding convergence.
 
-不兼容没有新export的归档，符合用户收窄范围的要求；不追溯升级已冻结旧controller。
+Archives without the new export are incompatible, consistent with the user's narrowed scope; already frozen old controllers are not retroactively upgraded.
 
 ## Rationale and alternatives
 
-选择“当前归档+新run+独立反馈初始化”，保持父事实和现有生命周期，并允许明确换模型追加。
+Choose “current archive+new run+independent feedback initialization” to preserve parent facts and the existing lifecycle while allowing explicit model changes for continuations.
 
-不改父rounds/hash后resume，也不复制users或删seal：完成轮不会补需求，且混淆执行归属。独立bootstrap域复用RecoveryStore与现有副作用对账，避免把用户计划、评分和batch全面改号。
+Do not modify parent rounds/hash and then resume, or copy users or delete seals: completed rounds will not process additional demand, and doing so would confuse execution ownership. The independent bootstrap domain reuses RecoveryStore and existing side-effect reconciliation, avoiding wholesale renumbering of user plans, scoring, and batch.
 
-不新增通用archive adapter或独立import命令：当前只有一个生产端和一种输入格式，现有check/prepare即可完成检查与冻结。也不在local/E2B backend恢复父进程或复活父repo；新run沿用当前资源治理。
+Do not add a generic archive adapter or standalone import command: there is currently only one producer and one input format, and existing check/prepare can perform validation and freezing. Nor should the local/E2B backend restore the parent process or revive the parent repo; the new run follows current resource governance.
 
-选择源码tree snapshot而非整个Git历史；按父commit导出并核验tree，保留原源码事实，同时避免旧hooks/config/PR历史进入执行面。不同seed SHA明确映射，不作错误的SHA相同声明。
+Choose a source tree snapshot rather than the entire Git history; export by parent commit and verify the tree, preserving the original source facts while preventing old hooks/config/PR history from entering the execution surface. Explicitly map different seed SHAs; do not falsely claim that the SHAs are identical.
 
-首版workload固定继承父末轮，减少任务转换与输入覆盖的歧义。将来若确需改任务，再设计明确的fork语义；不在当前接口增加一组泛化迁移开关。
+The first version's workload is fixed to inherit the parent's final round, reducing ambiguity in task conversion and input overrides. If task changes are genuinely needed later, design explicit fork semantics then; do not add a set of generalized migration switches to the current interface.
 
 ## Prior art
 
-必要背景均已就地说明。代码证据来自：Orchestrator._run_recoverable_round的完成短路和现有需求/交付恢复；RecoveryIdentity及begin_unit依赖一致性；SessionStore的provenance/索引/证据读取；prepare_materials/verify_materials的原子冻结；engine._completion封口判据；Observations grants与delivery asset读取。
+All necessary background is explained in place. Code evidence comes from: the completion short-circuit and existing demand/delivery recovery in Orchestrator._run_recoverable_round; RecoveryIdentity and begin_unit dependency consistency; SessionStore provenance/index/evidence reads; atomic freezing in prepare_materials/verify_materials; engine._completion sealing criteria; Observations grants and delivery asset reads.
 
-现有统一controller负责两后端装配，当前task catalog和plan已经分离逻辑身份与provider坐标，可复用其原始材料注册。collector排除.git及seed工作树可能过旧的事实说明需要规范导出，不能把当前归档“看起来有代码”当成可继承证明。
+The existing unified controller handles assembly for both backends. The current task catalog and plan already separate logical identity from provider coordinates, and their original material registration can be reused. The collector's exclusion of .git and the possibility that the seed working tree is stale demonstrate the need for a standardized export; the fact that the current archive “appears to contain code” cannot be treated as proof that it can be inherited.
 
 ## Unresolved questions
 
-本稿已收窄为当前格式、完成末轮、新身份、固定继承workload、可显式换模型/后端、精确tree导出与独立bootstrap域；无旧格式兼容或历史场景恢复待选项。
+This draft is narrowed to the current format, a completed final round, a new identity, a fixed inherited workload, explicit model/backend changes, exact tree export, and an independent bootstrap domain; no old-format compatibility or historical scenario recovery options remain open.
 
-实施必须实证父manifest的原生观测校验、tree/mode/ignore保真、实际两后端非空交付、重复继承和崩溃对账。未通过时修订设计并展示证据，不能绕过identity或伪造日志。
+Implementation must empirically verify native observation validation against the parent manifest, tree/mode/ignore fidelity, actual nonempty delivery on both backends, repeated inheritance, and crash reconciliation. If verification fails, revise the design and present evidence; do not bypass identity or fabricate logs.
 
 ## Future possibilities
 
-可后续增加UI父子对比、显式更换workload的fork、父非末轮边界及已有反馈重评。任意snapshot/活服务/private任务能力仍属于任务环境层；本组不增加旁路，也不把这些能力与当前归档追加耦合。
+Possible future additions include UI parent-child comparison, forks that explicitly change the workload, parent boundaries before the final round, and reevaluation of existing feedback. Arbitrary snapshot/live service/private task capabilities still belong to the task environment layer; this work adds no bypass and does not couple those capabilities to continuation from current archives.

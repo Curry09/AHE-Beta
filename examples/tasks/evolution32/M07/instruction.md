@@ -1,1 +1,1 @@
-在仓库中完成一项兼容性修复。请记住：不得新增运行时依赖、公共 API 不能破坏旧调用、最终必须保留一个迁移说明。中途可继续追问细节。
+Complete a compatibility fix in the repository. Please remember: do not add runtime dependencies, the public API must not break existing calls, and a migration note must ultimately be retained. You may continue to ask for details along the way.

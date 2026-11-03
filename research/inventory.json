@@ -48,7 +48,11 @@
       "reason": "Former v1 runtime, configuration or one-time migration",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "fb2531de0b0c2edd4ff2f9fe9f000ae5e59dff1573adfea13e8bdc6d4812e732",
-      "destination_sha256": "fb2531de0b0c2edd4ff2f9fe9f000ae5e59dff1573adfea13e8bdc6d4812e732"
+      "destination_sha256": "44894429a91bac5579b59f780714517a8904552b13b87e48d08f841860cdc58e",
+      "translation": {
+        "language": "en",
+        "source_sha256": "fb2531de0b0c2edd4ff2f9fe9f000ae5e59dff1573adfea13e8bdc6d4812e732"
+      }
     },
     {
       "original_path": "backend/auto_designer/experiment/health.py",
@@ -57,7 +61,11 @@
       "reason": "Former v1 runtime, configuration or one-time migration",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "e53f1cfcf0e7272ab4f29e7f73423ffa7dff16ad65c772e2f111bb56ecd78a12",
-      "destination_sha256": "e53f1cfcf0e7272ab4f29e7f73423ffa7dff16ad65c772e2f111bb56ecd78a12"
+      "destination_sha256": "f28917225fe4adf1b9146fcfe1d312305e0410826f08f301c36f5c9c826a7065",
+      "translation": {
+        "language": "en",
+        "source_sha256": "e53f1cfcf0e7272ab4f29e7f73423ffa7dff16ad65c772e2f111bb56ecd78a12"
+      }
     },
     {
       "original_path": "backend/deploy/experiment/docker-compose.yml",
@@ -457,7 +465,11 @@
       "reason": "Former v1 runtime, configuration or one-time migration",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "1371679dff329833b4506604a002981a44819c73906df0470ebb93194c18543f",
-      "destination_sha256": "1371679dff329833b4506604a002981a44819c73906df0470ebb93194c18543f"
+      "destination_sha256": "11fe41e2a65ec1a61787d42d6e8bb28fdf0facef376ad5730bc228496dabf325",
+      "translation": {
+        "language": "en",
+        "source_sha256": "1371679dff329833b4506604a002981a44819c73906df0470ebb93194c18543f"
+      }
     },
     {
       "original_path": "backend/scripts/offline_demo.py",
@@ -670,7 +682,11 @@
       "reason": "Former v1 runtime, configuration or one-time migration",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "9128aa1aa2b4a3516f585d864235961adfe39dd6a6e581f0fea78d6977439cde",
-      "destination_sha256": "9128aa1aa2b4a3516f585d864235961adfe39dd6a6e581f0fea78d6977439cde"
+      "destination_sha256": "4a0d5bf888cee3525a497312d619ce786efe459cee3f6bf838cd0861b136d89a",
+      "translation": {
+        "language": "en",
+        "source_sha256": "9128aa1aa2b4a3516f585d864235961adfe39dd6a6e581f0fea78d6977439cde"
+      }
     },
     {
       "original_path": "backend/scripts/run_mixed_closed_loop.py",
@@ -755,7 +771,11 @@
       "reason": "Former v1 runtime, configuration or one-time migration",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "950337835822f4ef51c42cb8baad9c71b849bc2eb2436c860e621521e347fa04",
-      "destination_sha256": "950337835822f4ef51c42cb8baad9c71b849bc2eb2436c860e621521e347fa04"
+      "destination_sha256": "0ac70791e8dab5a7ea01de73eeed59819de0d36b4aedca452e99968a514aff89",
+      "translation": {
+        "language": "en",
+        "source_sha256": "950337835822f4ef51c42cb8baad9c71b849bc2eb2436c860e621521e347fa04"
+      }
     },
     {
       "original_path": "backend/tests/experiment/test_cli.py",
@@ -764,7 +784,11 @@
       "reason": "Former v1 runtime, configuration or one-time migration",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "aee5d00ca509d83d4d3aa049bb319b3f417711f9798c51d72d76ce10d2ba884c",
-      "destination_sha256": "aee5d00ca509d83d4d3aa049bb319b3f417711f9798c51d72d76ce10d2ba884c"
+      "destination_sha256": "8f652dc5d1b75619a91f3d854170dd9f5c6d4bf73b47c861e4ef0c63301fe521",
+      "translation": {
+        "language": "en",
+        "source_sha256": "aee5d00ca509d83d4d3aa049bb319b3f417711f9798c51d72d76ce10d2ba884c"
+      }
     },
     {
       "original_path": "backend/tests/experiment/test_config.py",
@@ -773,7 +797,11 @@
       "reason": "Former v1 runtime, configuration or one-time migration",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "cf88b34647b1a22320dd0e07fba19bb3494bf2adb09d886e546462c878698ab5",
-      "destination_sha256": "cf88b34647b1a22320dd0e07fba19bb3494bf2adb09d886e546462c878698ab5"
+      "destination_sha256": "67c85701b5843a7223a6e49a7f6019f05f39e8b11f3675e16d867005063bf185",
+      "translation": {
+        "language": "en",
+        "source_sha256": "cf88b34647b1a22320dd0e07fba19bb3494bf2adb09d886e546462c878698ab5"
+      }
     },
     {
       "original_path": "backend/tests/experiment/test_health.py",
@@ -782,7 +810,11 @@
       "reason": "Former v1 runtime, configuration or one-time migration",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "ba5842b73a599af3906205abe001ef9f887d9e5b92ccfc63c47fba7b03144ac4",
-      "destination_sha256": "ba5842b73a599af3906205abe001ef9f887d9e5b92ccfc63c47fba7b03144ac4"
+      "destination_sha256": "213477243639f22831a0e5fa48be81678cb7021091ad0ca67fcb60e6f3c5f72e",
+      "translation": {
+        "language": "en",
+        "source_sha256": "ba5842b73a599af3906205abe001ef9f887d9e5b92ccfc63c47fba7b03144ac4"
+      }
     },
     {
       "original_path": "backend/tests/experiment/test_runtime.py",
@@ -791,7 +823,11 @@
       "reason": "Former v1 runtime, configuration or one-time migration",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "9055e428a3579be760f916ac99862c59d8e79175e9b668d9e43476653e6f2d22",
-      "destination_sha256": "9055e428a3579be760f916ac99862c59d8e79175e9b668d9e43476653e6f2d22"
+      "destination_sha256": "bfa475eb663197ab34f63227c4f114a4b18fc088467a41a61eb38119518f32cb",
+      "translation": {
+        "language": "en",
+        "source_sha256": "9055e428a3579be760f916ac99862c59d8e79175e9b668d9e43476653e6f2d22"
+      }
     },
     {
       "original_path": "backend/tests/test_migrate_trunk_main.py",
@@ -800,7 +836,11 @@
       "reason": "Former v1 runtime, configuration or one-time migration",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "db03efbd458adb6f540a07b49f2b47b5553ddd153d6dc8a03543265f13b4b248",
-      "destination_sha256": "db03efbd458adb6f540a07b49f2b47b5553ddd153d6dc8a03543265f13b4b248"
+      "destination_sha256": "4bc401b63658a07fe5b1320287a14b6147db3199bd284673ae55c2bb6c7edd02",
+      "translation": {
+        "language": "en",
+        "source_sha256": "db03efbd458adb6f540a07b49f2b47b5553ddd153d6dc8a03543265f13b4b248"
+      }
     },
     {
       "original_path": "backend/tests/test_run_auditable_experiment.py",
@@ -827,7 +867,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "c431929f4e3a0bc2cd9720abc1069c6313dc398fdd709daa4eec2a6ecfcb4336",
-      "destination_sha256": "c431929f4e3a0bc2cd9720abc1069c6313dc398fdd709daa4eec2a6ecfcb4336"
+      "destination_sha256": "cf7b07c07757199f7880b9e2d3fb7b02ab6cae25db98b9f34ba699b5064d89ef",
+      "translation": {
+        "language": "en",
+        "source_sha256": "c431929f4e3a0bc2cd9720abc1069c6313dc398fdd709daa4eec2a6ecfcb4336"
+      }
     },
     {
       "original_path": "evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md",
@@ -836,7 +880,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "a3e40652f41dae4ccf39117828ebd58356341bffc1912c2a7fcad5f8b35ff77a",
-      "destination_sha256": "a3e40652f41dae4ccf39117828ebd58356341bffc1912c2a7fcad5f8b35ff77a"
+      "destination_sha256": "9a993236057faf889ea506f4aab6633a5902187b67d3f51e25635b96d578a44c",
+      "translation": {
+        "language": "en",
+        "source_sha256": "a3e40652f41dae4ccf39117828ebd58356341bffc1912c2a7fcad5f8b35ff77a"
+      }
     },
     {
       "original_path": "evaluation/harness-suite-20260920/EXPERIMENT-RUNBOOK-ordinary-1-4-five-rounds.md",
@@ -845,7 +893,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "9a0999fed92acd1bc38e5b33e6cc47a38eb1b3e1d5a14589efb9a32d9041d328",
-      "destination_sha256": "9a0999fed92acd1bc38e5b33e6cc47a38eb1b3e1d5a14589efb9a32d9041d328"
+      "destination_sha256": "58fda0ed6a7c7341e6e46ef82b380418d513ea87e5b7302236b88e71fb7ef3f0",
+      "translation": {
+        "language": "en",
+        "source_sha256": "9a0999fed92acd1bc38e5b33e6cc47a38eb1b3e1d5a14589efb9a32d9041d328"
+      }
     },
     {
       "original_path": "evaluation/harness-suite-20260920/N1-E2B-RUNBOOK.md",
@@ -980,7 +1032,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "bef261c2f1b857b963d421acec21900c3b60a3239f82e5df81dc8ae7770abc84",
-      "destination_sha256": "bef261c2f1b857b963d421acec21900c3b60a3239f82e5df81dc8ae7770abc84"
+      "destination_sha256": "6ed70bfa213352a2012e10268e63cb9d0539fbd48211737e716dd8af8402b64d",
+      "translation": {
+        "language": "en",
+        "source_sha256": "bef261c2f1b857b963d421acec21900c3b60a3239f82e5df81dc8ae7770abc84"
+      }
     },
     {
       "original_path": "evaluation/harness-suite-20260920/freeze-record.json",
@@ -1178,7 +1234,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "9db7be0c4d861b1f57cf4d783971f2384c9fa6063b801401f6932eac8e2857ae",
-      "destination_sha256": "9db7be0c4d861b1f57cf4d783971f2384c9fa6063b801401f6932eac8e2857ae"
+      "destination_sha256": "b5d29b0194f3189d815caa3fb3a251e91c7eeaff3c00fcf069498046e1dd8c41",
+      "translation": {
+        "language": "en",
+        "source_sha256": "9db7be0c4d861b1f57cf4d783971f2384c9fa6063b801401f6932eac8e2857ae"
+      }
     },
     {
       "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M07/evaluation.json",
@@ -1277,7 +1337,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "9b9a94676c50cc3186b5220491feb33f8e1c93ec4ce8e28c245eb3cb7cf2e9c5",
-      "destination_sha256": "9b9a94676c50cc3186b5220491feb33f8e1c93ec4ce8e28c245eb3cb7cf2e9c5"
+      "destination_sha256": "5473fa9c1f6d541a4181166b234f13572ef91c50448d6f83c4321506cc2cb34a",
+      "translation": {
+        "language": "en",
+        "source_sha256": "9b9a94676c50cc3186b5220491feb33f8e1c93ec4ce8e28c245eb3cb7cf2e9c5"
+      }
     },
     {
       "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M09/evaluation.json",
@@ -1385,7 +1449,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "5d0a140a535eb379830cfe76f0ef62dffd07cb9bbe335b15072c50144f04c73e",
-      "destination_sha256": "5d0a140a535eb379830cfe76f0ef62dffd07cb9bbe335b15072c50144f04c73e"
+      "destination_sha256": "a0bef31618e32cd120dfadec7cf0098bc36cae6764fe79bf44c5879e30b8e5db",
+      "translation": {
+        "language": "en",
+        "source_sha256": "5d0a140a535eb379830cfe76f0ef62dffd07cb9bbe335b15072c50144f04c73e"
+      }
     },
     {
       "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/M10/evaluation.json",
@@ -1484,7 +1552,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "98a5a184a428c6a51f70841a08842011e21b50f888135a8bc7357493c74e6874",
-      "destination_sha256": "98a5a184a428c6a51f70841a08842011e21b50f888135a8bc7357493c74e6874"
+      "destination_sha256": "1ca18ef14b7b3a2a401d5d4ac174a3f2c0a0e9aef229b6c70621a3caf57e8c4a",
+      "translation": {
+        "language": "en",
+        "source_sha256": "98a5a184a428c6a51f70841a08842011e21b50f888135a8bc7357493c74e6874"
+      }
     },
     {
       "original_path": "evaluation/harness-suite-20260920/mechanism-seeds/README.md",
@@ -1601,7 +1673,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "368653bdac61b937d950a9fe84d776e98b0fd0b56246f44d45669ab5ec52f294",
-      "destination_sha256": "368653bdac61b937d950a9fe84d776e98b0fd0b56246f44d45669ab5ec52f294"
+      "destination_sha256": "b344024d4d4633b541675a4e12bd9a3b6097244ea92371e6245e5ca759fd6a97",
+      "translation": {
+        "language": "en",
+        "source_sha256": "368653bdac61b937d950a9fe84d776e98b0fd0b56246f44d45669ab5ec52f294"
+      }
     },
     {
       "original_path": "evaluation/harness-suite-20260920/remote_historical_billing.py",
@@ -1772,7 +1848,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "877a6613078cf41617980a9134daf5ecf588f3630b798a05fe6b61b01380f6b4",
-      "destination_sha256": "877a6613078cf41617980a9134daf5ecf588f3630b798a05fe6b61b01380f6b4"
+      "destination_sha256": "e27ed65f5cd5a911c12cce759ff6f7e418bc7018db162274d478f58499088b14",
+      "translation": {
+        "language": "en",
+        "source_sha256": "877a6613078cf41617980a9134daf5ecf588f3630b798a05fe6b61b01380f6b4"
+      }
     },
     {
       "original_path": "evaluation/harness-suite-20260920/schemas/batch-result.schema.json",
@@ -1871,7 +1951,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "70b4aaab0862abe9a2ad397219cfb9c8235e2e91ce4908176e8cf86bd527e3bd",
-      "destination_sha256": "70b4aaab0862abe9a2ad397219cfb9c8235e2e91ce4908176e8cf86bd527e3bd"
+      "destination_sha256": "8b698717405dacc7e9b2dea0ef698c25c60e2da882faeb126329b6f0d2cb8ebb",
+      "translation": {
+        "language": "en",
+        "source_sha256": "70b4aaab0862abe9a2ad397219cfb9c8235e2e91ce4908176e8cf86bd527e3bd"
+      }
     },
     {
       "original_path": "evaluation/harness-suite-20260920/task-manifest.json",
@@ -1880,7 +1964,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "663ee8abd354671434b172494a6e261cd04f39458d8f3dc9ea7424712f0cb0e7",
-      "destination_sha256": "663ee8abd354671434b172494a6e261cd04f39458d8f3dc9ea7424712f0cb0e7"
+      "destination_sha256": "48dfab1ef22a426c105968078e51059839c37e513bebc2201288006ada7bdea5",
+      "translation": {
+        "language": "en",
+        "source_sha256": "663ee8abd354671434b172494a6e261cd04f39458d8f3dc9ea7424712f0cb0e7"
+      }
     },
     {
       "original_path": "evaluation/harness-suite-20260920/tools/checkpoint_store.py",
@@ -1916,7 +2004,11 @@
       "reason": "Frozen historical research; reproduce with recorded checkout",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "774c191ba5d6425a1bc7e66ee70f7b23f10df8011bd69f6c61450eb65e65f7ed",
-      "destination_sha256": "774c191ba5d6425a1bc7e66ee70f7b23f10df8011bd69f6c61450eb65e65f7ed"
+      "destination_sha256": "3f24f75778b0dc5a7fc06809822cbc09bba062238079ad09056d66f076cacb54",
+      "translation": {
+        "language": "en",
+        "source_sha256": "774c191ba5d6425a1bc7e66ee70f7b23f10df8011bd69f6c61450eb65e65f7ed"
+      }
     },
     {
       "original_path": "evaluation/harness_bench/README.md",
@@ -2681,7 +2773,11 @@
       "reason": "Old-format template, distinct from frozen research config",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
       "source_sha256": "3c874cb4617d3a3fe10fbe6ada2080cad6aeda59a0b025177816e221c5d98b55",
-      "destination_sha256": "3c874cb4617d3a3fe10fbe6ada2080cad6aeda59a0b025177816e221c5d98b55"
+      "destination_sha256": "e2ab38808757f7b4b67e3f4223b393f5871288f31211d915f33faadbd4a9c3ed",
+      "translation": {
+        "language": "en",
+        "source_sha256": "3c874cb4617d3a3fe10fbe6ada2080cad6aeda59a0b025177816e221c5d98b55"
+      }
     },
     {
       "original_path": "examples/models.env.example",

@@ -1,7 +1,7 @@
 """Canonical normalized proposal projection shared by all downstream roles.
 
-The projection deliberately excludes raw user reports. Historical mixed bodies are
-trimmed at the legacy evidence heading; detailed evidence remains available through
+The projection deliberately excludes raw user reports. Mixed bodies are trimmed
+at the raw report heading; detailed evidence remains available through
 session timeline tools and tracker comments.
 """
 
@@ -27,14 +27,14 @@ from ahe_beta.demand.issue_schema import (
 )
 from ahe_beta.observations.grants import authorized_sessions
 
-_LEGACY_EVIDENCE_HEADING = "## 原始用户报告（案例证据，非实现对象）"
+_RAW_REPORT_HEADING = "## Original user report (case evidence, not an implementation target)"
 _BODY_LIMIT = 3000
 _CANONICAL_LABELS = frozenset(
     {REPORT, PROPOSAL, READY, OPENAGENTS, FROM_TRIAGE, FROM_ARCHITECT, FROM_DIVERGENT}
     | set(PRIORITIES)
 )
 _SESSION_REF = re.compile(
-    r"^\s*(?:[-*]\s*)?(?:session_id|会话)\s*[:：]\s*([^\n]+)",
+    r"^\s*(?:[-*]\s*)?session_id\s*:\s*([^\n]+)",
     re.MULTILINE | re.IGNORECASE,
 )
 _SESSION_TAG = re.compile(
@@ -58,8 +58,12 @@ class ProposalView:
 
 
 def normalized_proposal_body(body: str) -> str:
-    """Return only the normalized proposal section, including for legacy mixed bodies."""
-    return (body or "").split(_LEGACY_EVIDENCE_HEADING, 1)[0].strip()[:_BODY_LIMIT]
+    """Return only the normalized proposal section, excluding appended raw reports."""
+    return _without_raw_report(body or "").strip()[:_BODY_LIMIT]
+
+
+def _without_raw_report(body: str) -> str:
+    return body.split(_RAW_REPORT_HEADING, 1)[0]
 
 
 def proposal_view(issue, *, store=None) -> ProposalView:
@@ -98,7 +102,7 @@ def format_proposal_view(issue, *, store=None) -> str:
         metadata.append(f"provenance={view.provenance}")
     if view.covers:
         metadata.append(f"covers={','.join(f'#{number}' for number in view.covers)}")
-    body = view.body or "（无规范化正文）"
+    body = view.body or "(No normalized body)"
     sessions = evidence_session_ids([issue])
     if sessions:
         metadata.append(f"evidence_sessions={','.join(sorted(sessions))}")
@@ -110,13 +114,15 @@ def format_proposal_view(issue, *, store=None) -> str:
         }
     )
     return f"- #{view.number} [{'; '.join(metadata)}] {view.title}\n  {body}" + (
-        f"\n  可信执行条件（独立于正文裁剪）：{execution}" if execution else ""
+        f"\n  Trusted execution conditions (independent of body truncation): {execution}"
+        if execution
+        else ""
     )
 
 
 def format_proposal_list(issues: list, *, store=None) -> str:
     if not issues:
-        return "（空）"
+        return "(empty)"
     return "\n".join(format_proposal_view(issue, store=store) for issue in issues)
 
 
@@ -133,14 +139,14 @@ def format_proposal_reference(issue) -> str:
 
 def format_proposal_reference_list(issues: list) -> str:
     if not issues:
-        return "（空）"
+        return "(empty)"
     return "\n".join(format_proposal_reference(issue) for issue in issues)
 
 
 def evidence_session_ids(issues: list) -> set[str]:
     """Extract bounded session handles from normalized proposal evidence.
 
-    This is intentionally lexical rather than semantic: a Architect may inspect
+    This is intentionally lexical rather than semantic: an Architect may inspect
     only evidence a preceding role actually cited.  It never scans the session
     store to discover additional tickets, and malformed/host-path-like values
     are ignored by the conservative token pattern.
@@ -150,7 +156,7 @@ def evidence_session_ids(issues: list) -> set[str]:
     for issue in issues:
         # References may follow a long normalized body; never lose the authority
         # chain to the display text budget. Raw legacy reports remain excluded.
-        body = str(getattr(issue, "body", "") or "").split(_LEGACY_EVIDENCE_HEADING, 1)[0]
+        body = _without_raw_report(str(getattr(issue, "body", "") or ""))
         for match in _SESSION_REF.finditer(body):
             for value in re.split(r"[,，、\s]+", match.group(1)):
                 value = value.strip("`\"'[]")

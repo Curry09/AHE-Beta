@@ -140,7 +140,7 @@ class GapService:
                     labels.append("from-divergent")
                 found = self.tracker.create_issue(
                     IssueDraft(
-                        title="诊断观测补强：" + request["question"][:120],
+                        title="Improve diagnostic observability: " + request["question"][:120],
                         body=body,
                         labels=labels,
                     )

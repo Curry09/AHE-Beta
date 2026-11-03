@@ -1,9 +1,12 @@
-"""把 spec-0005 控制信封 sim 用户 agent 接进 spec-0003/0007 闭环。
+"""Connect the spec-0005 simulated user to the spec-0003/0007 evolution loop.
 
-Orchestrator 只认 run_session_fn(persona, scenario, harness)（返回值不管，落盘/提交由实现负责）。
-本模块产出这样一个 fn：内部跑 sim.loop.run_session（真 persona LLM × 真 harness），逐轮经 on_turn
-回调供观测层（看板）实时展示；会话末把 issue_artifact 提交到真 tracker、SessionResult 转 models.Session
-落 store。persona 以 9 维 sim persona 为准，展示用 models.Persona 由调用方反向派生后按 identity 配对传入。
+Orchestrator calls run_session_fn(persona, scenario, harness), passing through its return value;
+the implementation owns persistence and submission. This module builds that function around
+sim.loop.run_session, using a real persona LLM and harness. Its on_turn callback supplies live
+turn updates to the dashboard. At session end, it submits issue_artifact to the tracker,
+converts SessionResult to models.Session, and saves it to the store.
+The simulation uses a 9-dimensional persona. The caller derives the display-side models.Persona
+and matches the two representations by identity before invoking the session.
 """
 
 from __future__ import annotations
@@ -56,8 +59,8 @@ from ahe_beta.user.sim.runtime import (
 )
 from ahe_beta.user.sim.workspace import materialize as materialize_workspace
 
-# 观测回调：(identity, sim_persona, 进行中/最终的 SessionResult, running, *, session_id) -> None。
-# session_id 仅收尾（running=False）时携带（session 已落 store），供看板归档关联全量会话。
+# Observation callback: (identity, sim_persona, in-progress/final SessionResult, running, *, session_id) -> None.
+# session_id is only included when wrapping up (running=False) after the session is persisted to store, for dashboard archival to correlate full session context.
 SimTurnHook = Callable[..., None]
 
 
@@ -537,19 +540,20 @@ def _export_prediction(
 
 
 def result_to_turns(res: SessionResult) -> list[Turn]:
-    """SessionResult → models.Turn 序列：每轮先 harness 文本、后 user 消息（空则跳过）。
+    """SessionResult → sequence of models.Turn: each round contains harness text first, then user message (skipped if empty).
 
-    `TurnLog.harness_output` 是「本轮 persona 看到的*上一轮* harness 回复」快照，可能跨空转
-    轮重复携带同一值。故按「相邻去重」只在 harness
-    回复真正变化（= 有新一轮回复）时记一条 harness 轮，否则同一条 completion 会被展开成多条、
-    与 user 消息错位（曾使落盘 transcript 现 `user, harness×N, user` 的假象）。
+    `TurnLog.harness_output` is a snapshot of "the *previous* harness reply seen by this round's persona", which may repeat
+    across empty-turn forwarding. Thus using "adjacent deduplication": we only record one harness turn when the harness
+    reply actually changes (= a new round of replies arrives); otherwise the same completion would expand into multiple turns,
+    misaligning with user messages (previously caused persisted transcripts to show false patterns like `user, harness×N, user`).
     """
     turns: list[Turn] = []
     prev_ho: str | None = None
     for t in res.turns:
         ho = t.harness_output.strip()
-        if ho and ho != prev_ho:  # 仅新一轮 harness 回复才记，连续相同快照视为同一条
-            # steps = 该回复的内层迭代过程（观测层展开才看，persona 只吃 content）
+        # Record only when a new round of harness replies arrives; treat consecutive identical snapshots as one record
+        if ho and ho != prev_ho:
+            # steps = internal iteration trace of this reply (visible only at observation layer expansion; persona only consumes content)
             turns.append(Turn(role="harness", content=ho, steps=list(t.harness_steps or [])))
         if ho:
             prev_ho = ho
@@ -560,7 +564,7 @@ def result_to_turns(res: SessionResult) -> list[Turn]:
             "give_up",
         }:
             turns.append(Turn(role="user", content=t.message.strip()))
-    # 悬挂中的 harness 回复（已到手、尚未随下一条 TurnLog 落日志）：实时快照补上这半边
+    # Pending harness reply (received but not yet logged with the next TurnLog): inject this real-time snapshot to complete the picture
     pending = (res.pending_harness_output or "").strip()
     if pending and pending != prev_ho:
         turns.append(
@@ -570,7 +574,7 @@ def result_to_turns(res: SessionResult) -> list[Turn]:
 
 
 def result_to_sim_trace(res: SessionResult) -> SimTrace:
-    """SessionResult → 可落盘的 god-view：TurnLog 决策时间线原样投影，心路与对话片段同条共置。"""
+    """Persist the complete TurnLog decision timeline from SessionResult, keeping reasoning and conversation snippets together."""
     derived = None
     if res.feeling_derived is not None:
         derived = FeelingScore(score=res.feeling_derived.score, reason=res.feeling_derived.reason)
@@ -634,20 +638,29 @@ def result_to_sim_trace(res: SessionResult) -> SimTrace:
 
 
 def _infer_kind(body: str) -> str:
-    """Spec-0025/T2：粗判 issue kind（type 标签）。sim issue 绝大多数是失败/不满驱动 → bug；
-    出现明确"希望/能不能/增加/支持…"这类诉求词则猜 feature。**只是暂定**——triage agent 会确认/纠正。
+    """Spec-0025/T2: coarse-grained issue kind classification (type label). Most sim issues stem from failure/dissatisfaction → bug;
+    when explicit request keywords like "hope/can we/add/support..." appear, infer feature. **Tentative only**—the triage agent will confirm/correct.
     """
     text = (body or "").lower()
-    feature_hints = ("希望", "能不能", "增加", "支持", "feature", "would be nice", "add a", "wish")
+    feature_hints = (
+        "hope",
+        "can you",
+        "add ",
+        "support ",
+        "feature",
+        "would be nice",
+        "add a",
+        "wish",
+    )
     return "feature" if any(h in text for h in feature_hints) else "bug"
 
 
 def _issue_draft_from_body(body: str, *, round_no: int | None = None) -> IssueDraft:
-    """raw 用户 issue → Gitea 建 issue 入参（Spec-0025/T2）。
+    """Raw user issue → parameters for creating issue in Gitea (Spec-0025/T2).
 
-    body = 用户可见报告原文（persona 第一人称，用户看不到代码 → 只有用户视角症状）。标签三件套：
-    暂定 type(bug/feature，triage 会确认) + `needs-triage`(待 triage，dev 不领) + 可选 `round-N`。
-    标题取正文首行。TRIAGE 区字段（根因/边界/验收）留空待 triage agent 读码+轨迹补。
+    body = user-visible issue report in original text (persona in first person; user cannot see code → only symptoms from user perspective). Label triplet:
+    tentative type (bug/feature; triage will confirm) + `needs-triage` (awaiting triage; not to be picked by dev) + optional `round-N`.
+    Title taken from first line of body. TRIAGE section fields (root cause/boundary/acceptance) left empty for triage agent to populate after reading code + trace.
     """
     text = body or ""
     first = next((ln.strip() for ln in text.splitlines() if ln.strip()), "simulated user issue")
@@ -666,16 +679,16 @@ def make_sim_run_session_fn(
     on_turn: SimTurnHook | None = None,
     round_provider: Callable[[], int | None] | None = None,
 ) -> Callable[..., Session]:
-    """返回 Orchestrator 用的 run_session_fn。
+    """Return run_session_fn for Orchestrator use.
 
-    client_factory: 每局新建 persona client（Spec-0017/T2）。AgenticPersonaClient 是会话级
-    有状态的（bind_session 写 _persona/_workspace_dir），a 段多用户会话并行后跨局复用单实例
-    必串台（后 bind 覆盖先 bind）；底层 ApiPersonaClient.complete 无会话态可全局共享，工厂
-    只新建外壳。
-    sim_personas: 展示用 models.Persona.identity -> 9 维 sim persona（权威画像）。
-    on_turn: 逐轮（含终止轮）+ 收尾各回调一次，供调用方发 agent 活动到看板。
-    round_provider: Spec-0025/T6——每局收尾建 issue 前调一次取当前轮号，给 raw issue 盖 `round-N`
-    标签（供增量 triage 与观测曲线）。None（或返回 None）则不盖轮号，兼容旧调用。
+    client_factory: creates a fresh persona client per session (Spec-0017/T2). AgenticPersonaClient is stateful at session scope
+    (bind_session writes _persona/_workspace_dir); reusing a single instance across multiple concurrent user sessions in one stage
+    must serialize (later bind overwrites earlier bind); the underlying ApiPersonaClient.complete is stateless and can be globally shared,
+    factory only creates the wrapper.
+    sim_personas: models.Persona.identity → 9-dimensional sim persona mapping (authoritative profiles) for display.
+    on_turn: fires once per round (including terminal round) + once at wrap-up, for caller to emit agent activity to dashboard.
+    round_provider: Spec-0025/T6—called once at session wrap-up before creating issue, returns current round number to tag raw issue with `round-N`
+    label (for incremental triage and observation curves). None (or returns None) skips round tagging, compatible with legacy callers.
     """
 
     observation_root = Path(
@@ -764,7 +777,7 @@ def make_sim_run_session_fn(
         validate_session_provenance(session, provenance)
         _save_and_publish(session, tracker=tracker, store=store)
         if on_turn is not None:
-            # 收尾：标 running=False，带 session_id 供看板归档关联全量会话。
+            # Wrap-up: mark running=False, include session_id for dashboard archival to correlate full session.
             on_turn(persona.identity, sim_persona, res, False, session_id=session.session_id)
         return session
 
@@ -812,19 +825,20 @@ def make_sim_run_session_fn(
         pending = store.load_actor_checkpoint(session_id, expected_provenance=provenance)
         if pending is not None:
             return complete_actor(pending)
-        client = client_factory()  # Spec-0017/T2：每局独立实例，bind 互不覆盖
+        # Spec-0017/T2: independent instance per session; bind calls do not overwrite each other
+        client = client_factory()
 
-        # spec-0008/T1 v2：共享工作区。orchestrator 每局先 materialize 一份工作区，经 launcher 注入
-        # harness（SANDBOX_WORK_DIR）并把同一目录 workspace_dir 传到这里——两侧 cwd 同指一处，harness
-        # 改、用户 agent 同目录核实。这里复用传入目录绑定内层 client，不再自行 materialize。
-        # 兼容直连调用（不经 orchestrator）：未传 workspace_dir 但 scenario 带 workspace 时，回落自行
-        # materialize（等价 v1）。守卫式 bind_session：仅 AgenticPersonaClient 暴露，Scripted/Api 跳过。
+        # spec-0008/T1 v2: shared workspace. Orchestrator materializes one workspace per session, injects it via launcher as harness
+        # (SANDBOX_WORK_DIR) and passes the same directory as workspace_dir here—both sides' cwd point to the same place; harness
+        # modifications and user agent verification happen in the same directory. Reuse the passed directory to bind the inner client; no separate materialization.
+        # Backward compatibility with direct calls (not via orchestrator): if workspace_dir is not passed but scenario includes workspace, fall back to self-
+        # materialization (equivalent to v1). Guarded bind_session: only AgenticPersonaClient exposes it; Scripted/Api skip.
         ws = as_runtime(workspace_dir) if workspace_dir is not None else None
         if ws is None and scenario.workspace is not None:
             ws = as_runtime(materialize_workspace(scenario.workspace), owns_tmp=True)
-            # Spec-0009/T3：回落路径 materialize 后对称调 ensure_deps（与 orchestrator 主路径同构），
-            # 使这条生产接缝「建了工作区即备好依赖」，不静默缺依赖。orchestrator 已传 workspace_dir
-            # 的主路径依赖由 orchestrator 就位，故仅在此回落分支 ensure，不重复调。
+            # Spec-0009/T3: the fallback calls ensure_deps after materialization, matching the orchestrator path,
+            # so workspace setup includes dependency preparation rather than silently skipping it. The orchestrator's main
+            # path already provisions dependencies where workspace_dir is passed, so ensure is called only in this fallback branch to avoid duplication.
             ensure_deps(ws, scenario.workspace)
         if ws is not None:
             _freeze_prediction_base(ws)

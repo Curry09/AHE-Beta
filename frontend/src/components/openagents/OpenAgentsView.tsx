@@ -36,11 +36,11 @@ export function OpenAgentsView(props: {
           <div className="openagents-kicker">OpenAgents delivery</div>
           <h2>OpenAgents</h2>
           <p>
-            openagents → ready → PR → needs-human / conflict → main。这里保持只读，展示
-            AHE-Beta 已暴露的 Gitea 观测数据。
+            openagents → ready → PR → needs-human / conflict → main. This read-only view shows
+            the Gitea observations available through AHE-Beta.
           </p>
         </div>
-        <div className="openagents-source-grid" aria-label="数据源状态">
+        <div className="openagents-source-grid" aria-label="Data source status">
           <SourceChip source={snapshot.sources.issues} />
           <SourceChip source={snapshot.sources.delivery} />
           <SourceChip source={snapshot.sources.commits} />
@@ -52,7 +52,7 @@ export function OpenAgentsView(props: {
         </div>
       </section>
 
-      <section className="openagents-kpis warehouse-signboard" aria-label="OpenAgents 状态">
+      <section className="openagents-kpis warehouse-signboard" aria-label="OpenAgents Status">
         <Kpi label="openagents handoff" value={snapshot.kpis.handoff} hint="awaiting vigil intake" />
         <Kpi label="PR" value={snapshot.kpis.pulls} hint="/api/delivery open PR" />
         <Kpi label="needs-human" value={snapshot.kpis.needsHuman} hint="PR + issue" tone="danger" />
@@ -65,11 +65,11 @@ export function OpenAgentsView(props: {
             <span>OpenAgents flow</span>
             <b>openagents → ready → PR → needs-human / conflict → main</b>
           </div>
-          <p>每张卡片都对应真实 issue / PR / commit；没有真实数据时只显示空态，不造 mock。</p>
+          <p>Each card represents an actual issue, PR, or commit. Sections remain empty when no data is available.</p>
         </div>
-        <div className="warehouse-round-strip" aria-label="轮次状态">
+        <div className="warehouse-round-strip" aria-label="Round status">
           <span>
-            <b>当前轮次</b>
+            <b>Current round</b>
             {snapshot.currentRound}
           </span>
           <span>
@@ -93,7 +93,7 @@ export function OpenAgentsView(props: {
             subtitle="Owner admit"
             count={openagentsIssues.length}
             source={snapshot.sources.issues}
-            empty="暂无 openagents issue。"
+            empty="No openagents handoffs yet."
           >
             {openagentsIssues.map((item) => (
               <IssueCard key={item.issue.number} item={item} onSelect={props.onSelect} />
@@ -104,7 +104,7 @@ export function OpenAgentsView(props: {
             subtitle="vigil intake"
             count={readyIssues.length}
             source={snapshot.sources.issues}
-            empty="暂无 ready issue。"
+            empty="No ready issues yet."
           >
             {readyIssues.map((item) => (
               <IssueCard key={item.issue.number} item={item} onSelect={props.onSelect} />
@@ -115,7 +115,7 @@ export function OpenAgentsView(props: {
             subtitle="branch / review / merge"
             count={snapshot.pulls.length}
             source={snapshot.stationSources.pulls}
-            empty="暂无 open PR。"
+            empty="No open PRs yet."
           >
             {snapshot.pulls.map((item) => (
               <PullCard key={item.pull.number} item={item} />
@@ -134,7 +134,7 @@ export function OpenAgentsView(props: {
             subtitle="commit / round anchor"
             count={snapshot.commits.length}
             source={snapshot.stationSources.commits}
-            empty="暂无 main commit。"
+            empty="No main commits yet."
           >
             {snapshot.commits.map((item) => (
               <CommitCard key={item.commit.sha} item={item} onSelect={props.onSelect} />
@@ -145,15 +145,15 @@ export function OpenAgentsView(props: {
 
       <section className="openagents-footnote warehouse-footnote">
         <div>
-          <b>数据来源</b>
+          <b>Data source</b>
           <span>/api/issues</span>
           <span>/api/delivery</span>
           <span>/api/commits</span>
           <span>/api/state</span>
         </div>
         <p>
-          当前 demo 不读取 OpenAgents 内部 work_queue / timing / stream。需求漏斗 ready：
-          {funnelReady === null ? "—" : funnelReady}。
+          This view does not read internal OpenAgents work_queue, timing, or stream data. Ready requirements:
+          {funnelReady === null ? "—" : funnelReady}.
         </p>
       </section>
     </main>
@@ -284,14 +284,14 @@ function GateStation(props: {
         <b>{count}</b>
       </div>
       <div className="warehouse-station-body">
-        {count === 0 && loading ? <div className="empty">读取 needs-human / conflict…</div> : null}
+        {count === 0 && loading ? <div className="empty">Loading needs-human / conflicts…</div> : null}
         {count === 0 && unavailableSources.length > 0 ? (
           <div className="disconnected">
-            {[...new Set(unavailableSources.map((source) => source.label))].join("；")}
+            {[...new Set(unavailableSources.map((source) => source.label))].join("; ")}
           </div>
         ) : null}
         {count === 0 && !loading && unavailableSources.length === 0 ? (
-          <div className="empty">暂无 needs-human / conflict。</div>
+          <div className="empty">No items requiring human action or conflict resolution.</div>
         ) : null}
         {props.pulls.length > 0 && <GateGroup title="PR needs-human" pulls={props.pulls} />}
         {props.issues.length > 0 && (

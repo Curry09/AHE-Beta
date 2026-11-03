@@ -1,7 +1,8 @@
-"""蒸馏侧（spec-0006）：persona 卡库读写 + 契约约束校验。
+"""Distillation side (spec-0006): persona card library read/write + contract constraint validation.
 
-卡 schema 的唯一公共契约见 tools/persona-distill/card-schema.md；
-卡 → sim 9 维 Persona 的注入映射见 ahe_beta.user.sim.persona_io（0006/T2）。
+The only public contract for card schema is in tools/persona-distill/card-schema.md;
+the card → sim 9-dimensional Persona injection mapping is in ahe_beta.user.sim.persona_io
+(0006/T2).
 """
 
 from ahe_beta.distill.library import (

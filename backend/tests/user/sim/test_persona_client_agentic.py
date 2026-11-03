@@ -1,8 +1,8 @@
-"""内层 tool-using agent（AgenticPersonaClient，spec-0008/T4）。
+"""Inner tool-using agent (AgenticPersonaClient, spec-0008/T4).
 
-离线覆盖有界 tool-calling 循环：tool_call→observe→最终 contract；blind 退化纯文本；
-超步数 / 非法 JSON 兜底；端到端经 run_session + billing-split fixture 不影响外层引擎；
-ScriptedPersonaClient 不回归。FakeToolLLM + FakeSandbox 全离线。
+Offline bounded tool-calling loop: tool_call→observe→final contract; blind degrades to plain text;
+exceed step limit / invalid JSON fallback; end-to-end via run_session + billing-split fixture without affecting the outer engine;
+ScriptedPersonaClient does not regress. FakeToolLLM + FakeSandbox fully offline.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ def _persona(d1: D1Eval) -> Persona:
 
 
 class FakeToolLLM:
-    """按脚本逐次返回文本；脚本耗尽时按当前阶段返回最小合法对象。"""
+    """Return text sequentially per script; when script exhausted, return minimal legal object for current stage."""
 
     def __init__(self, scripted: list[str] | None = None) -> None:
         self.scripted = list(scripted or [])
@@ -97,7 +97,7 @@ class FakeSandbox:
 
 
 # --------------------------------------------------------------------------
-# (a) 多步：tool_call -> observe -> 最终 contract
+# (a) Multi-step: tool_call -> observe -> final contract
 # --------------------------------------------------------------------------
 def test_tool_call_then_final_contract() -> None:
     sb = FakeSandbox()
@@ -120,7 +120,7 @@ def test_tool_call_then_final_contract() -> None:
 
     traces = drain_call_traces(c)
     assert len(traces) == 1
-    assert traces[0]["system"]  # 实际喂入的 inner_system，非整局 SYS 占位
+    assert traces[0]["system"]  # Actual inner_system fed in, not full-session SYS placeholder
     assert traces[0]["user"] == "<task>x</task>"
     kinds = [s["kind"] for s in traces[0]["steps"]]
     assert kinds[:2] == ["assistant", "tool"]
@@ -129,7 +129,7 @@ def test_tool_call_then_final_contract() -> None:
 
 
 # --------------------------------------------------------------------------
-# (b) blind/无工具 -> 纯文本判断，不建 sandbox
+# (b) blind/no tools -> pure text judgment, no sandbox constructed
 # --------------------------------------------------------------------------
 def test_blind_degrades_to_text_only() -> None:
     created: list[int] = []
@@ -154,12 +154,12 @@ def test_blind_degrades_to_text_only() -> None:
     c.bind_session(_persona(D1Eval.BLIND), "/ws")
 
     out = c.respond("SYS", "<task>x</task>")
-    assert created == []  # blind 无工具，不进入工具循环
+    assert created == []  # blind no tools, do not enter tool loop
     assert out["action"] == "send_message"
 
 
 # --------------------------------------------------------------------------
-# (c) max_inner_steps 是纯工具额度；用满后另行强制主观结论
+# (c) max_inner_steps is pure tool quota; when exhausted, force subjective conclusion separately
 # --------------------------------------------------------------------------
 def test_tool_budget_exhaustion_reserves_forced_conclusion() -> None:
     sb = FakeSandbox()
@@ -189,21 +189,21 @@ def test_forced_conclusion_never_dispatches_more_tools() -> None:
 
 
 # --------------------------------------------------------------------------
-# (d) 非法 JSON -> 先「只回 JSON」重试一次；两次都废才安全退化（unsure/free）
+# (d) Invalid JSON -> first retry with "return only JSON"; if both fail, safely degrade (unsure/free)
 # --------------------------------------------------------------------------
 def test_invalid_json_retry_then_raises_typed_error() -> None:
-    # 两次都非法：不得把 parse-failure 空壳当成真实 action。
+    # Both invalid: do not treat parse-failure shell as real action.
     llm = FakeToolLLM(["this is not json at all", "still not json"])
     c = AgenticPersonaClient(llm, sandbox_factory=lambda workspace=None: FakeSandbox())
     c.bind_session(_persona(D1Eval.EXPERT), "/ws")
 
     with pytest.raises(PersonaProtocolError, match="unparseable_json"):
         c.respond("SYS", "<task>x</task>")
-    assert len(llm.calls) == 2  # 确有重试
+    assert len(llm.calls) == 2  # Retry does occur
 
 
 def test_invalid_json_retry_recovers() -> None:
-    # 首次非法、重试给出合法 contract -> 恢复真实意图，而非降级/伪造
+    # First invalid, retry yields legal contract -> restore actual intent, not downgrade/fabricate
     good = json.dumps(
         {"perceive": "ok", "verdict": "satisfied", "action": "accept", "message": "great"}
     )
@@ -336,22 +336,23 @@ def test_run_session_two_illegal_act_tool_objects_yield_zero_accept() -> None:
 
 
 # --------------------------------------------------------------------------
-# (e) 端到端：run_session + 真 fixture，外层引擎不受影响
+# (e) End-to-end: run_session + real fixture, outer engine unaffected
 # --------------------------------------------------------------------------
 def test_integration_run_session_unaffected() -> None:
     persona = _persona(D1Eval.COMPETENT)
     ws = materialize(WorkspaceSpec(fixture="billing-split"))
-    llm = FakeToolLLM()  # 默认每轮给 accept；OPENING 会被投影为 send_message，下一轮 accept 终止
-    c = AgenticPersonaClient(llm)  # 真 Sandbox over ws
+    # Default accept each round; OPENING projected as send_message, next round accept terminates
+    llm = FakeToolLLM()
+    c = AgenticPersonaClient(llm)  # Real Sandbox over ws
     c.bind_session(persona, ws)
 
     res = run_session(persona, c, ScriptedHarness(), "task")
-    assert res.turns  # 跑起来了
-    assert res.feeling is not None  # 自评产出（外层流程完整）
+    assert res.turns  # Up and running
+    assert res.feeling is not None  # Self-assessment output (outer process complete)
 
 
 # --------------------------------------------------------------------------
-# (f) ScriptedPersonaClient 不回归
+# (f) ScriptedPersonaClient does not regress
 # --------------------------------------------------------------------------
 def test_scripted_client_still_works() -> None:
     user = (
@@ -364,7 +365,7 @@ def test_scripted_client_still_works() -> None:
 
 
 # --------------------------------------------------------------------------
-# (g) 中途 report_issue：不终止；可闲置；写入 drain → SessionResult
+# (g) Mid-process report_issue: does not terminate; can idle; write to drain → SessionResult
 # --------------------------------------------------------------------------
 def test_report_issue_tool_continues_and_drains() -> None:
     sb = FakeSandbox()
@@ -385,14 +386,14 @@ def test_report_issue_tool_continues_and_drains() -> None:
     c.bind_session(_persona(D1Eval.COMPETENT), "/ws")
 
     out = c.respond("SYS", "<task>x</task>")
-    assert out["action"] == "send_message"  # 未因开单而终止
+    assert out["action"] == "send_message"  # Not terminated due to issue creation
     notes = c.drain_issue_notes()
     assert notes == ["split is off by a cent"]
-    assert c.drain_issue_notes() == []  # 已清空
+    assert c.drain_issue_notes() == []  # Already cleared
 
 
 def test_report_issue_idle_when_unused() -> None:
-    """允许闲置：从不调用 report_issue 时 notes 为空，不影响既有路径。"""
+    """Allow idling: when report_issue is never called, notes remain empty and do not affect existing paths."""
     sb = FakeSandbox()
     llm = FakeToolLLM(
         [
@@ -427,7 +428,7 @@ def test_run_session_collects_mid_session_issue_notes() -> None:
     persona = _persona(D1Eval.COMPETENT)
     llm = FakeToolLLM(
         [
-            # OPENING · judge：首轮只按任务文本判断，不调用 private tool
+            # OPENING · judge: first round judges only by task text, does not call private tool
             json.dumps(
                 {
                     "perceive": "still starting",
@@ -444,7 +445,7 @@ def test_run_session_collects_mid_session_issue_notes() -> None:
                     "gap": False,
                 }
             ),
-            # 下一轮 · judge：记录一笔真实问题后再判断；intent / act → 接受
+            # Next round · judge: record one real issue first, then judge; intent / act → accept
             json.dumps({"tool": "report_issue", "args": {"body": "docs are wrong about /status"}}),
             json.dumps({"perceive": "done", "verdict": "satisfied"}),
             json.dumps(

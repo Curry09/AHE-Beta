@@ -1,7 +1,7 @@
-# harness specs
+# Harness specifications
 
-<!-- Spec-0040/T3：drafter 落点；spec CLI 由 vigil 镜像提供，不进 harness 依赖。 -->
+When delivery uses `rfc: agent`, the drafter writes specifications (`NNNN-slug.md`)
+in this directory. The implementer carries out their tasks.
 
-交付面 `rfc: agent` 时，drafter 在本目录落下施工规格（`NNNN-slug.md`），implementer 按 Task 实现。
-
-`spec` CLI 由 vigil 容器提供（OpenAgents 镜像内），不进本仓依赖。
+The OpenAgents delivery environment provides the `spec` CLI; it is not a runtime
+dependency of the harness.

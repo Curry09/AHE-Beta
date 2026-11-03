@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -22,6 +23,10 @@ from ahe_beta.user.session_store import SessionStore
 from ahe_beta.user.sim.persona_client import ApiPersonaClient
 
 BACKEND = Path(__file__).resolve().parents[1]
+INTERNAL_NOTE = re.compile(
+    r"\bSpec[-_ ]?\d{3,}\b|compatibility-named|backwards compatibility|code identifier",
+    re.IGNORECASE,
+)
 
 
 @pytest.fixture
@@ -195,6 +200,11 @@ def test_demand_runtime_sends_full_system_prompt_and_executes_stop_tool(
     messages = requests[0]["messages"]
     expected = (definition / "systemprompt.md").read_text(encoding="utf-8").rstrip("\n")
     assert [msg["content"] for msg in messages if msg["role"] == "system"] == [expected]
+    assert not re.search(r"[\u3400-\u9fff]", expected)
+    assert not INTERNAL_NOTE.search(expected)
+    assert not INTERNAL_NOTE.search(json.dumps(requests[0]["tools"]))
+    for item in requests[0]["tools"]:
+        assert not re.search(r"[\u3400-\u9fff]", item["function"].get("description", ""))
     assert any(
         msg["role"] == "user" and "offline role request" in msg["content"] for msg in messages
     )
@@ -306,7 +316,9 @@ def test_triage_finalizer_keeps_native_tool_evidence_and_audits_history(
         else "tool_result" in json.dumps(msg)
         for msg in messages
     )
-    assert "最后一次有界收尾" in json.dumps(messages[-1]["content"], ensure_ascii=False)
+    assert "last bounded opportunity to finish" in json.dumps(
+        messages[-1]["content"], ensure_ascii=False
+    )
     assert requests[0]["max_tokens"] == requests[-1]["max_tokens"] == 32768
     records = [
         json.loads(path.read_text()) for path in (tmp_path / "role-runs" / "demand").glob("*.json")

@@ -3,17 +3,17 @@ name: divergent_pm
 max_context_tokens: 256000
 system_prompt: ./systemprompt.md
 system_prompt_type: file
-# structured：使用模型原生结构化工具调用，工具参数由 NexAU 按 schema 校验。
+# structured: use native structured model tool calls; NexAU validates tool arguments against the schema.
 tool_call_mode: structured
-# 预算覆盖体验索引分析、渐进式会话取证以及 submit schema 校验失败后的重试。
+# The budget covers experience index analysis, progressive session evidence collection, and retries after submit schema validation failures.
 max_iterations: 120
 
 middlewares:
-  # 工作区 jail 将源码读取限制在 harness 仓；会话证据只能经投影工具渐进获取。
+  # The workspace jail limits source reads to the harness repo; session evidence is available only progressively through projection tools.
   - import: ahe_beta.guards.workspace_jail:WorkspaceJailMiddleware
 
 llm_config:
-  # 分角色配置：创新者 agent 用 DEMAND_LLM_*。
+  # Role configuration: the product PM uses DEMAND_LLM_*.
   model: ${env.DEMAND_LLM_MODEL}
   base_url: ${env.DEMAND_LLM_BASE_URL}
   api_key: ${env.DEMAND_LLM_API_KEY}
@@ -21,8 +21,8 @@ llm_config:
   timeout: 300
   api_type: openai_chat_completion
 
-# 本地 sandbox：只读 harness 仓（公共运行时逐调用绑定试用 SHA 的源码快照）用于验证产品现状；
-# 产品 PM 不修改文件或 Git 状态。
+# Local sandbox: read-only harness repo (the shared runtime binds each call to a source snapshot of the trial SHA) verifies the current product state;
+# The product PM does not change files or Git state.
 sandbox_config:
   type: local
 
@@ -36,26 +36,26 @@ tools:
   - name: list_directory
     yaml_path: ./tools/list_directory.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:list_directory
-  # 在无 shell 环境中先定位相关内容，再按需读取必要片段。
+  # Locate relevant content without a shell, then read the necessary excerpts on demand.
   - name: search_file_content
     yaml_path: ./tools/search_file_content.tool.yaml
     binding: nexau.archs.tool.builtin.file_tools:search_file_content
-  # 按需取一局用户模拟的完整决策时间线（投影：无 LLM system/user 原片）；
-  # 编排侧读 SessionStore，jail 仍禁直接读 sessions/。
+  # Fetch the full decision timeline for one user simulation on demand (projected: no raw LLM system/user messages);
+  # the orchestration side reads SessionStore; the jail still blocks direct reads of sessions/.
   - name: get_session_timeline
     yaml_path: ./tools/get_session_timeline.tool.yaml
     binding: ahe_beta.demand.session_timeline:get_session_timeline
-  # 下钻某一拍：harness 内层 tool 序列（截断）+ stop_kind；timeline 不够细时再用。
+  # Drill into a beat: truncated harness internal tool sequence and stop_kind; use when the timeline lacks detail.
   - name: get_harness_beat
     yaml_path: ./tools/get_harness_beat.tool.yaml
     binding: ahe_beta.demand.session_timeline:get_harness_beat
-  # 再展开某一步正文（硬顶字符）；beat 里 truncated=true 且确需细看时才调。
+  # Expand one step body further (hard character limit); call only when the beat has truncated=true and more detail is necessary.
   - name: get_harness_step
     yaml_path: ./tools/get_harness_step.tool.yaml
     binding: ahe_beta.demand.session_timeline:get_harness_step
-  # Spec-0028：收尾工具——agent 以工具参数原生吐结构化候选（input_schema = agent_contract
-  # .rfc_input_schema() 的生成副本，受 drift-guard 守护）；nexau 在调用层强校验，漂移/缺字段被拒→重试。
-  # stop tool 的返回值（proposals 的 JSON）成为 agent.run 的返回，driver json.loads 取用。
+  # Spec-0028: final tool: the agent emits structured candidates natively as tool arguments (input_schema is a generated copy of agent_contract
+  # .pm_input_schema(), protected by drift-guard); nexau validates at the call layer, rejecting drift/missing fields for retry.
+  # The stop tool return value (proposals JSON) becomes the agent.run result, read by driver json.loads.
   - name: submit_divergent
     yaml_path: ./tools/submit_divergent.tool.yaml
     binding: ahe_beta.demand.submit_tools:submit_divergent

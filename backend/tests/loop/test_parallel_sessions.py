@@ -1,12 +1,12 @@
-# Spec-0017/T4：多用户会话并行化端到端回归（全 Fake，不依赖真 LLM/Gitea）。
-"""穿透真实用户侧栈（Orchestrator → make_sim_run_session_fn → sim run_session →
-ScriptedPersonaClient × ScriptedHarness → SessionStore/FakeTracker/live）验证三件事：
+# Spec-0017/T4: multi-user session parallelization end-to-end regression (all Fake, no real LLM/Gitea dependency).
+"""Traverse real user-side stack (Orchestrator → make_sim_run_session_fn → sim run_session →
+ScriptedPersonaClient × ScriptedHarness → SessionStore/FakeTracker/live) to verify three things:
 
-① 并发正确性：8 局并发后 sessions 目录 8 个全量文件、index.json 恰 8 条、live 槽位/归档完整
-   （精确计数，可捕获竞态丢更新回归）；
-② 慢会话注入：慢会话不阻塞其余会话收割（快会话先完成，慢会话最后收尾）；
-③ 崩溃注入：harness send 抛异常 → 会话内 [harness error] 信号路径在并发下仍成立，
-   会话正常落盘、不影响同批其他会话。
+① Concurrency correctness: after 8 concurrent sessions, sessions directory has all 8 complete files, index.json has exactly 8 entries, live slots/archive intact
+   (precise counts to catch lost-update race regressions);
+② Slow session injection: slow session does not block harvesting of other sessions (fast sessions complete first, slow session finalized last);
+③ Crash injection: harness send raises exception → [harness error] signal path within session holds under concurrency,
+   session persists normally, does not affect other sessions in batch.
 """
 
 from __future__ import annotations
@@ -46,17 +46,17 @@ def _seed_repo(tmp_path: Path) -> Path:
 
 
 class _ScriptedLauncher:
-    """每次 launch 新建一个 ScriptedHarness（一句柄一会话，与真 launcher 同构）。"""
+    """Each launch creates a new ScriptedHarness (one handle per session, isomorphic to real launcher)."""
 
     def launch(self, ref: str, workspace_dir: str | None = None):
         return ScriptedHarness()
 
 
 class _CrashingHarness:
-    """send 必炸的 harness：验证 loop 侧 [harness error] 转译在并发下仍成立。"""
+    """harness that must crash on send: verify [harness error] translation at loop side holds under concurrency."""
 
     def send(self, message: str) -> str:
-        raise RuntimeError("boom: 协议违例")
+        raise RuntimeError("boom: Protocol violation")
 
     def reset(self) -> None:
         pass
@@ -66,9 +66,9 @@ class _CrashingHarness:
 
 
 def _rig(tmp_path: Path, n_users: int):
-    """组一套真实用户侧栈：返回 (fixed_set, run_session_fn, store, tracker, data_dir, done)。
+    """Assemble a real user-side stack: return (fixed_set, run_session_fn, store, tracker, data_dir, done).
 
-    done: 收尾回调按完成先后记录 identity（观测完成顺序用）。
+    done: conclusion callback records identity in completion order (observe completion sequence).
     """
     sp = expert()
     identities = [f"U{i:02d}" for i in range(n_users)]
@@ -85,18 +85,18 @@ def _rig(tmp_path: Path, n_users: int):
     done: list[str] = []
 
     def on_turn(identity, sim_p, res, running, *, session_id=None):
-        # 与 run.py on_sim_turn 同构的最小接线：逐轮 upsert 槽位，收尾归档（走 live 锁路径）。
+        # Minimal wiring isomorphic to run.py on_sim_turn: upsert slots each round, archive at conclusion (traverse live lock path).
         update_agent(
             data_dir=data_dir,
             agent_id=f"user-{identity}",
             role="user",
             label=identity,
             running=running,
-            status="对话中…" if running else f"已完成 · {res.end_reason}",
+            status="In conversation…" if running else f"Completed · {res.end_reason}",
             round_no=1,
         )
         if not running:
-            done.append(identity)  # list.append 原子，无需额外锁
+            done.append(identity)  # list.append is atomic, no additional lock needed
             live_archive_agent(
                 data_dir=data_dir,
                 agent_id=f"user-{identity}",
@@ -115,7 +115,7 @@ def _rig(tmp_path: Path, n_users: int):
 
 
 def test_eight_parallel_sessions_land_completely(tmp_path) -> None:
-    """① 并发正确性：8 局（并发 4）后全量文件/索引/live 槽位/归档/issue 一个不少。"""
+    """① Concurrency correctness: after 8 sessions (4 concurrent) all complete files/index/live slots/archive/issues present."""
     repo = _seed_repo(tmp_path)
     fixed_set, fn, store, tracker, data_dir, done = _rig(tmp_path, n_users=8)
 
@@ -130,30 +130,34 @@ def test_eight_parallel_sessions_land_completely(tmp_path) -> None:
     orch.run_round("c")
 
     entries = store.index()
-    assert len(entries) == 8  # index 恰 8 条（丢条目即竞态回归）
+    # index has exactly 8 entries (missing entries indicate race regression)
+    assert len(entries) == 8
     full_files = {p.name for p in (tmp_path / "sessions").glob("*.json")} - {"index.json"}
-    assert len(full_files) == 8  # 全量文件 8 个
+    assert len(full_files) == 8  # all 8 complete files
     for e in entries:
-        assert store.load(e["session_id"]).session_id == e["session_id"]  # 逐个可回读
+        # Readable sequentially, one at a time
+        assert store.load(e["session_id"]).session_id == e["session_id"]
 
     agents = read_agents(data_dir=data_dir)
-    assert [a["label"] for a in agents] == [f"U{i:02d}" for i in range(8)]  # 槽位全在且稳定有序
+    # All slots present and stable in order
+    assert [a["label"] for a in agents] == [f"U{i:02d}" for i in range(8)]
     assert all(a["running"] is False for a in agents)
     history = read_history(data_dir=data_dir)
-    assert len(history) == 8 and all(h["round"] == 1 for h in history)  # 按轮归档完整
+    # Complete per-round archival
+    assert len(history) == 8 and all(h["round"] == 1 for h in history)
     assert sorted(done) == [f"U{i:02d}" for i in range(8)]
-    # expert × ScriptedHarness 确定性走 file_issue → 每局一条 issue 落 tracker
+    # expert × ScriptedHarness deterministic path: file_issue → one issue per session lands on tracker
     assert len(tracker.list_open_issues()) == 8
 
 
 def test_slow_session_does_not_block_fast_ones(tmp_path) -> None:
-    """② 慢会话注入：U00 每轮多睡 0.3s，其余秒回——快会话先收尾，慢会话最后，且不互相等。"""
+    """② Slow session injection: U00 sleeps an additional 0.3s per round, others respond in seconds—fast sessions complete first, slow session last, no mutual waiting."""
     repo = _seed_repo(tmp_path)
     fixed_set, inner_fn, store, tracker, data_dir, done = _rig(tmp_path, n_users=4)
 
     def fn(persona, scenario, harness, *, workspace_dir=None):
         if persona.identity == "U00":
-            time.sleep(0.3)  # 模拟慢 harness/慢 LLM：整局起步即慢
+            time.sleep(0.3)  # Simulate slow harness / slow LLM: entire session starts slow
         return inner_fn(persona, scenario, harness, workspace_dir=workspace_dir)
 
     orch = Orchestrator(
@@ -166,21 +170,21 @@ def test_slow_session_does_not_block_fast_ones(tmp_path) -> None:
     )
     orch.run_round("c")
 
-    assert len(store.index()) == 4  # 快慢全部落盘
-    # 并行下快会话不等慢会话：U00 睡着时其余三局已完成 → U00 必最后收尾。
-    # （若退化为串行，U00 第一个跑、第一个完成，此断言即失败。）
+    assert len(store.index()) == 4  # All fast and slow persisted to disk
+    # Under parallelism, fast sessions do not wait for slow: U00 sleeps while the other three sessions complete → U00 must finish last.
+    # (If degraded to serial, U00 runs first and completes first, this assertion fails.)
     assert done[-1] == "U00" and set(done) == {"U00", "U01", "U02", "U03"}
 
 
 def test_crashing_harness_still_lands_as_signal_among_healthy_peers(tmp_path) -> None:
-    """③ 崩溃注入：坏 harness 的 send 全炸——会话不炸整轮，[harness error] 进 transcript，
-    同批健康会话不受影响（0012 信号转译 × 0017 并行的组合回归）。"""
+    """③ Crash injection: bad harness send always fails—session does not crash entire round, [harness error] enters transcript,
+    healthy sessions in same batch unaffected (0012 signal translation × 0017 parallelism regression combination)."""
     repo = _seed_repo(tmp_path)
     fixed_set, fn, store, tracker, data_dir, done = _rig(tmp_path, n_users=3)
 
     class _MixedLauncher:
-        """U00 那局拿到必炸 harness：launch 按调用次序分配——阶段二提交顺序即 fixed_set 顺序，
-        max_parallel_users=1 下第一次 launch 恰为 U00（串行时序确定）。"""
+        """U00 session receives a guaranteed-crash harness: launch allocates by invocation order—phase two submission order is fixed_set order,
+        under max_parallel_users=1 first launch is exactly U00 (serial timing deterministic)."""
 
         def __init__(self) -> None:
             self.calls = 0
@@ -195,16 +199,19 @@ def test_crashing_harness_still_lands_as_signal_among_healthy_peers(tmp_path) ->
         fixed_set=fixed_set,
         run_session_fn=fn,
         initial_ref="main",
-        max_parallel_users=1,  # 串行时序使「第 1 次 launch = U00」确定；信号路径与并发度无关
+        # Serial timing ensures "1st launch = U00"; signal path independent of concurrency
+        max_parallel_users=1,
     )
-    orch.run_round("c")  # 不抛：崩溃已在会话内转信号
+    orch.run_round("c")  # No throw: crash already translated to signal within session
 
     entries = store.index()
-    assert len(entries) == 3  # 崩溃局照样落盘（有梯度），健康局不受影响
+    # Crashed session persisted nonetheless (with gradation), healthy sessions unaffected
+    assert len(entries) == 3
     by_id = {store.load(e["session_id"]).persona.identity: e["session_id"] for e in entries}
     crashed = store.load(by_id["U00"])
     texts = " ".join(t.content for t in crashed.transcript.turns)
-    assert "[harness error]" in texts  # 崩溃如实进 transcript（persona 视角可感知）
+    # Crash faithfully enters transcript (detectable from persona perspective)
+    assert "[harness error]" in texts
     for ident in ("U01", "U02"):
         healthy = store.load(by_id[ident])
         assert all("[harness error]" not in t.content for t in healthy.transcript.turns)

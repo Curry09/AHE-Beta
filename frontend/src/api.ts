@@ -1,4 +1,4 @@
-// fetch 客户端：本地/后端托管模式走 /api；GitHub Pages 模式走历史实验的静态 API 快照。
+// Fetch client: local/backend-hosted mode uses /api; GitHub Pages mode uses static API snapshots of historical experiments.
 
 import type {
   AgentsResponse,
@@ -39,7 +39,7 @@ export function getSelectedExperimentId(): string | null {
 export function formatSnapshotTime(recordedAt: string): string {
   const time = new Date(recordedAt);
   return Number.isNaN(time.getTime())
-    ? "记录时间未知"
+    ? "Recorded time unknown"
     : `${time.toISOString().slice(0, 19).replace("T", " ")} UTC`;
 }
 
@@ -74,7 +74,7 @@ export const getCommit = (sha: string) => get<CommitDetailResponse>(`/commits/${
 export const getConfig = () => get<ConfigResponse>("/config");
 export const getSession = (id: string) => get<SessionDetail>(`/sessions/${id}`);
 export const getOverview = () => get<OverviewResponse>("/overview");
-export const getDelivery = () => get<DeliveryResponse>("/delivery"); // Spec-0032/T7：交付面观测
+export const getDelivery = () => get<DeliveryResponse>("/delivery"); // Spec-0032/T7: delivery observations
 export const getUsageSummary = (round?: number) =>
   get<UsageSummary>(`/usage/summary${round ? `?round_no=${round}` : ""}`);
 export const getUsageEvents = (round?: number) =>

@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""单局 SWE-bench_Verified seed × persona × 真 harness（验证长任务/等待路径）。
+"""Single-session SWE-bench_Verified seed × persona × real harness (validate long tasks / waiting paths).
 
-Spec-0037/T6: 可选覆盖 --tempo/--d42/--d43 测重构轴（非 CI 门禁）。
+Spec-0037/T6: optional override --tempo/--d42/--d43 to test refactored axes (not CI gate).
 
-用法（仓根）：
+Usage (repo root):
   PYTHONPATH=backend PYTHONUNBUFFERED=1 .venv/bin/python -u \\
     -m tools.dev.probes.probe_swebench_persona \\
     --dataset /path/to/test.parquet --harness-repo /path/to/harness \
     --instance psf__requests-2931 --persona sr-01-willison
 
-  # 可一次多题：
+  # Multiple instances at once:
   --instance psf__requests-2931 --instance pytest-dev__pytest-7571
 
-必填文件：--dataset PATH --harness-repo PATH。
-使用 --check-inputs 仅检查材料，不调用模型。
-可选覆盖（测重构轴用）：
+Required files: --dataset PATH --harness-repo PATH.
+Use --check-inputs to validate materials only, do not invoke model.
+Optional overrides (for testing the refactored axes):
   --tempo impatient|steady|patient
-  --d42 every_step|phase_check|fire_forget   过程卷入
-  --d43 feedback|handover|resend|give_up|file_issue  质量失败策略
+  --d42 every_step|phase_check|fire_forget   process involvement
+  --d43 feedback|handover|resend|give_up|file_issue  quality failure strategy
   --persona-library PATH
 """
 
@@ -40,7 +40,7 @@ def _load_instance(instance_id: str) -> dict:
     import pyarrow.parquet as pq
 
     if not SWEBENCH_PARQUET.is_file():
-        raise SystemExit(f"缺 parquet: {SWEBENCH_PARQUET}")
+        raise SystemExit(f"Missing parquet: {SWEBENCH_PARQUET}")
     table = pq.read_table(
         SWEBENCH_PARQUET,
         columns=["instance_id", "repo", "base_commit", "problem_statement", "difficulty"],
@@ -61,7 +61,7 @@ def _load_instance(instance_id: str) -> dict:
                 "problem_statement": str(prompt),
                 "difficulty": str(difficulty),
             }
-    raise SystemExit(f"parquet 无 instance: {instance_id}")
+    raise SystemExit(f"Instance not found in parquet: {instance_id}")
 
 
 def _setup_cmd() -> list[str]:
@@ -269,26 +269,26 @@ def main() -> None:
         action="append",
         dest="instances",
         required=True,
-        help="SWE-bench instance_id（可重复）",
+        help="SWE-bench instance_id (repeatable)",
     )
     parser.add_argument("--persona", default="sr-01-willison")
     parser.add_argument(
         "--tempo",
         default=None,
         choices=["patient", "steady", "impatient"],
-        help="覆盖卡内时间气质",
+        help="Override the card time temperament",
     )
     parser.add_argument(
         "--d42",
         default=None,
         choices=["every_step", "phase_check", "fire_forget"],
-        help="覆盖过程卷入",
+        help="Override process involvement",
     )
     parser.add_argument(
         "--d43",
         default=None,
         choices=["feedback", "handover", "resend", "give_up", "file_issue"],
-        help="覆盖质量失败策略",
+        help="Override the quality-failure strategy",
     )
     parser.add_argument(
         "--harness-repo",
@@ -307,7 +307,7 @@ def main() -> None:
 
     harness_repo = Path(args.harness_repo)
     if not (harness_repo / "entry.py").is_file():
-        raise SystemExit(f"harness 仓缺 entry.py: {harness_repo}")
+        raise SystemExit(f"Harness repository is missing entry.py: {harness_repo}")
     instances = [_load_instance(iid) for iid in args.instances]
     if args.check_inputs:
         print(

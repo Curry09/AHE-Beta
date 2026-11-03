@@ -10,21 +10,21 @@ export function ExperimentPicker(props: {
     ?? (props.selected ? undefined : props.experiments[0]);
   return (
     <div className="experiment-picker">
-      <span className="experiment-picker-label">历史快照</span>
+      <span className="experiment-picker-label">Historical snapshot</span>
       <select
-        aria-label="选择历史实验快照"
+        aria-label="Select historical experiment snapshot"
         value={props.selected ?? props.experiments[0].id}
         onChange={(event) => props.onSelect(event.target.value)}
       >
         {props.experiments.map((experiment) => (
           <option key={experiment.id} value={experiment.id}>
-            {experiment.title} · 当时状态 {experiment.status}
+            {experiment.title} · Recorded state {experiment.status}
           </option>
         ))}
       </select>
       {selected && (
         <span className="snapshot-recorded-at">
-          记录时间：<time dateTime={selected.updated_at}>{formatSnapshotTime(selected.updated_at)}</time>
+          Recorded time: <time dateTime={selected.updated_at}>{formatSnapshotTime(selected.updated_at)}</time>
         </span>
       )}
     </div>

@@ -1,10 +1,10 @@
-# 结构综合运行时行为聚合单测：事后扫 Session.steps/reply + harness 预算钮。
-"""验证 runtime_agg：
+# Structural composite runtime behavior aggregation unit test: post-scan Session.steps/reply + harness budget knobs
+"""Verify runtime_agg:
 
-- 空库 → 明示无数据；
-- 从 harness 轮 steps/reply 推出 0 步占比、timeout 标签、中位数；
-- 从仓内 entry.py / agent.yaml 读出预算常量；
-- 格式化文本含关键数字且不做归因散文。
+- Empty store → explicitly no data;
+- Derive 0-step ratio, timeout tags, median from harness round steps/reply;
+- Read budget constants from repo entry.py / agent.yaml;
+- Format text with key numbers, no causal prose.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def _save_session(
             persona=_persona(),
             scenario=SeedScenario(description="s"),
             transcript=Transcript(turns=turns),
-            feeling=FeelingScore(score=2, reason="慢"),
+            feeling=FeelingScore(score=2, reason="Slow"),
         )
     )
 
@@ -62,7 +62,7 @@ def test_empty_store_formats_as_no_data(tmp_path: Path) -> None:
     repo = tmp_path / "harness"
     repo.mkdir()
     text = format_runtime_agg(aggregate_runtime(store=store, harness_repo=repo, recent_n=50))
-    assert "暂无会话数据" in text
+    assert "No session data" in text
 
 
 def test_aggregates_zero_step_timeout_and_budget(tmp_path: Path) -> None:
@@ -70,7 +70,7 @@ def test_aggregates_zero_step_timeout_and_budget(tmp_path: Path) -> None:
     repo = tmp_path / "harness"
     _write_budget(repo, timeout=120, retries=1, max_iter=30)
 
-    # 一局：一轮 0 步 timeout；一轮有 2 个 tool step。
+    # One session: one round with 0-step timeout; one round with 2 tool steps
     _save_session(
         store,
         harness_turns=[
@@ -84,7 +84,7 @@ def test_aggregates_zero_step_timeout_and_budget(tmp_path: Path) -> None:
             ),
         ],
     )
-    # 另一局：纯 interrupted、0 步。
+    # Another session: pure interrupted, 0 steps
     _save_session(
         store,
         harness_turns=[("[interrupted] stopped by user", [])],
@@ -97,18 +97,18 @@ def test_aggregates_zero_step_timeout_and_budget(tmp_path: Path) -> None:
     assert agg.n_timeout_reply == 1
     assert agg.n_interrupted_reply == 1
     assert agg.n_harness_error_reply == 1
-    assert agg.n_tool_steps == 1  # 只有 kind=tool 计入；tool_result 不计
+    assert agg.n_tool_steps == 1  # Only kind=tool counts; tool_result does not
     assert agg.median_steps == 0  # steps lens: 0, 2, 0 → median 0
     assert agg.call_timeout_s == 120
     assert agg.run_retries == 1
     assert agg.max_iterations == 30
 
     text = format_runtime_agg(agg)
-    assert "0 步轮：2/3" in text
+    assert "Zero-step turns: 2/3" in text
     assert "timeout=1" in text
     assert "_CALL_TIMEOUT=120s × _RUN_RETRIES=1" in text
     assert "max_iterations=30" in text
-    assert "未做归因" in text
+    assert "without attribution" in text
 
 
 def test_recent_n_window_keeps_only_tail(tmp_path: Path) -> None:
@@ -117,7 +117,7 @@ def test_recent_n_window_keeps_only_tail(tmp_path: Path) -> None:
     repo.mkdir()
     for _ in range(3):
         _save_session(store, harness_turns=[("ok", [{"kind": "assistant", "text": "hi"}])])
-    # recent_n=1 → 只扫最后一局（1 个 harness 轮）
+    # recent_n=1 → scan only the last session (1 harness round)
     agg = aggregate_runtime(store=store, harness_repo=repo, recent_n=1)
     assert agg.n_sessions == 1
     assert agg.n_harness_turns == 1
@@ -132,4 +132,4 @@ def test_missing_budget_files_still_aggregate(tmp_path: Path) -> None:
     agg = aggregate_runtime(store=store, harness_repo=repo, recent_n=10)
     assert agg.call_timeout_s is None
     assert agg.max_iterations is None
-    assert "未读到预算常量" in format_runtime_agg(agg)
+    assert "No budget constants found" in format_runtime_agg(agg)

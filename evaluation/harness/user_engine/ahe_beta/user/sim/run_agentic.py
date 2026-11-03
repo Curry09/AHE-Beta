@@ -1,14 +1,15 @@
-"""run_agentic.py — 实测内层 tool-using 用户 agent 是否真去操作工作区（spec-0008）。
+"""run_agentic.py—measure whether inner tool-using user agent truly operates the workspace (spec-0008).
 
     python -m ahe_beta.user.sim.run_agentic expert
 
-给 persona 一个真实工作区（seed_workspaces/billing-split），用 AgenticPersonaClient 跑一局，
-对阵 SplitBillHarness（助手提议 round() 等分实现，100/3 丢一分钱）。每一步内层工具调用与
-**真实执行输出**都打印出来，看 agent 是不是用 read/run/write 在自己工作区核实，而非只读 harness 文本。
+Give persona a real workspace (seed_workspaces/billing-split), run one session with AgenticPersonaClient
+against SplitBillHarness (assistant proposes round() equal-split implementation, loses one cent on 100/3).
+Each step's inner tool invocation and **real execution output** are printed; observe whether agent uses
+read/run/write in its own workspace to verify, rather than only reading harness text.
 
-LLM 后端自动选择：
-- 检测到 NexAU 网关 env（USER_LLM_BASE_URL+USER_LLM_API_KEY）或 OPENAI_API_KEY -> 真模型（ApiPersonaClient.complete）；
-- 否则 -> 内置确定性「专家」决策桩 _ExpertToolLLM（离线也能看清工具循环机制）。
+LLM backend auto-selected:
+- Detects NexAU gateway env (USER_LLM_BASE_URL+USER_LLM_API_KEY) or OPENAI_API_KEY -> real model (ApiPersonaClient.complete);
+- Otherwise -> built-in deterministic 'expert' decision stub _ExpertToolLLM (can see tool loop mechanism offline).
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from .sandbox import Sandbox
 from .scenarios import SplitBillHarness
 from .workspace import materialize
 
-# 助手提议的「丢分」实现 + 一个 100/3 自检，专家会把它落进自己的工作区真跑。
+# Assistant's proposed 'lose a cent' implementation + one 100/3 self-check, expert runs it in their own workspace.
 _PROBE_CODE = (
     "def split_bill(total, n):\n"
     "    share = round(total / n, 2)\n"
@@ -37,8 +38,8 @@ _PROBE_CODE = (
 
 
 class _ExpertToolLLM:
-    """离线确定性「专家」：拿到提议代码后，先 write 一个自检脚本、再 run，读到真实 sum=99.99
-    才下负向判断（grounded 在真实执行，而非读 harness 文本）。仅用于无网关时演示工具循环。"""
+    """Offline deterministic 'expert': given proposed code, first write a self-check script, then run, read real
+    sum=99.99 before making negative judgment (grounded in real execution, not harness text). Used only for demo tool loop when no gateway."""
 
     def __call__(self, messages: list[dict]) -> str:
         last = messages[-1]["content"]
@@ -57,7 +58,7 @@ class _ExpertToolLLM:
         ho = _extract(turn_user, "harness_output").strip()
         space = _extract(turn_user, "action_space")
 
-        # 开局：还没有交付物 -> 派任务（要求加 split_bill 并跑几种人数，含 3 人）
+        # Initial: no deliverable yet -> dispatch task (require adding split_bill and run multiple party sizes, including 3)
         if not ho or ho == "(empty)":
             return json.dumps(
                 {
@@ -69,7 +70,7 @@ class _ExpertToolLLM:
                 }
             )
 
-        # 已经从真实运行里读到 99.99（自己 run 的 tool_result，或 harness 文本）-> 下负向判断
+        # Already read 99.99 from real execution (tool_result from own run or harness text) -> make negative judgment
         if "99.99" in last:
             return json.dumps(
                 {
@@ -82,7 +83,7 @@ class _ExpertToolLLM:
                 }
             )
 
-        # 有交付物但还没核实 -> 进入工具循环：先写自检脚本，再跑
+        # Have deliverable but not yet verified -> enter tool loop: write self-check script first, then run
         assistant_calls = [m["content"] for m in messages if m["role"] == "assistant"]
         already_wrote = any("write_file" in c for c in assistant_calls)
         if already_wrote:
@@ -101,10 +102,10 @@ class _ExpertToolLLM:
 
 
 # --------------------------------------------------------------------------
-# 观测包装
+# Observation wrapper
 # --------------------------------------------------------------------------
 class _LoggingLLM:
-    """打印每次内层模型输出，并标注工具调用 / tool_result 观察。"""
+    """Print each inner model output, annotate tool invocation / tool_result observation."""
 
     def __init__(self, inner) -> None:
         self._inner = inner
@@ -129,7 +130,7 @@ class _LoggingLLM:
 
 
 class _LoggingSandbox:
-    """包真 Sandbox，打印真实 shell 执行（证明确实在工作区里跑了，而非读文本）。"""
+    """Authentic Sandbox: print real shell execution (proof that it actually ran in the workspace, not just read text)."""
 
     def __init__(self, workspace: str | None = None) -> None:
         self._i = Sandbox(workspace=workspace)
@@ -165,7 +166,7 @@ def _make_llm():
 
 
 def main() -> None:
-    persona = expert()  # 专家：有 read/run/write 工具、严格验收、倾向核实
+    persona = expert()  # Expert: has read/run/write tools, strict acceptance, inclines to verify
     llm, _live = _make_llm()
     ws = materialize(WorkspaceSpec(fixture="billing-split"))
     print(f"workspace materialized at: {ws}\n")

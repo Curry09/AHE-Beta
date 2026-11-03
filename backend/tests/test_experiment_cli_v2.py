@@ -23,7 +23,7 @@ def test_task_text_emits_existing_package_without_credentials(
         runtime, "backend_v2", lambda **kwargs: pytest.fail("no provider for task import")
     )
     instruction = tmp_path / "instruction.md"
-    original = "实现一个小工具。\r\nPreserve the user's text.\r\n".encode()
+    original = "Implement a small utility。\r\nPreserve the user's text.\r\n".encode()
     instruction.write_bytes(original)
     output = tmp_path / "converted"
     assert (

@@ -1,12 +1,12 @@
 ---
 number: "0008"
-title: 用户 agent 内层 tool-using（自有环境核实）
+title: "User agent inner tool use (verification in its own environment)"
 issue: 8
 slug: user-agent-inner-tooluse
-summary: 本组把 spec-0005 用户侧的「单次 `respond()` 主观判断」升级为**可在自有环境核实的内层 tool-using agent**： 让模拟用户像真人一样，在起疑时用**自己的工具栈**（读码 / 跑命令 / 写脚本）在自有 sandbox **真执行**， 使 `verdict` grounded 在真实结果而非脑补。**外层控制信封（动作空间 / 状态机 / 体感 / 终止）原样不动**， 唯一接缝是 `PersonaClient.respond(system, user) -> dict`。落点 `backend/ahe_beta/user/sim/`，是 0005/T3 的演进。
+summary: "This group upgrades the user-side “single `respond()` subjective judgment” in spec-0005 to an **inner tool-using agent that can verify in its own environment**: like a real person, the simulated user uses **its own tool stack** (reading code / running commands / writing scripts) to **actually execute** in its own sandbox when suspicious, grounding `verdict` in real results rather than speculation. **The outer control envelope (action space / state machine / user experience / termination) remains unchanged**; the only integration point is `PersonaClient.respond(system, user) -> dict`. The implementation target is `backend/ahe_beta/user/sim/`, an evolution of 0005/T3."
 tasks:
   - id: T1
-    title: seed 工作区扩展与共享注入（harness/用户 agent 同目录）
+    title: "Seed workspace extension and shared injection (harness/user agent in the same directory)"
     status: done
     priority: P1
     tags: []
@@ -32,10 +32,10 @@ tasks:
       - backend/tests/user/sim/test_workspace.py
       - backend/tests/harness/test_launcher.py
       - backend/tests/loop/test_orchestrator.py
-    scope: '1) models.py：SeedScenario 增 `workspace: WorkspaceSpec | None = None`（默认 None 时退化为今天的纯文本行为，全部既有路径不破）。2) workspace.py：定义 WorkspaceSpec（fixture 名/相对路径、setup 步骤占位）+ materialize(spec, dest) -> str，MVP 仅 copytree 落一个全新隔离目录并返回其路径。3) seed_workspaces/billing-split/：in-repo fixture——一个最小 stdlib-only 项目（manifest.yaml 描述元信息，project/billing/core.py 为可跑代码）。4) 共享工作区接线（v2）：orchestrator.py 每局在 launch *之前* 调 materialize 落地一份工作区 workspace_dir，并把它同时传给 launcher 与 run_session；launcher.py 的 launch(ref, workspace_dir=None) 把它作为 SANDBOX_WORK_DIR 注入 harness 子进程 env（harness entry 已读此变量当 bash 工作根）；sim_user.py 的 run(..., workspace_dir=None) 改为复用传入目录绑定内层 client（不再自行 materialize），未传时退化按 scenario.workspace 自落（直连兼容）。不实现依赖供给（venv/pip）、不实现 git 来源——仅本地 fixture copytree。不改 run_session/respond 引擎签名，不改 harness 协议。'
-    acceptance: SeedScenario(workspace=None) 时所有既有行为不变；to_dict/from_dict 对有/无 workspace 都往返一致（旧 dict 缺字段→None）。给定 billing-split spec，materialize 返回一个全新存在的目录，内含 project/billing/core.py 且可被 python 直接 import/执行（stdlib-only）。两次 materialize 返回不同目录、互不影响（隔离性）。launcher.launch 传 workspace_dir 时，harness 子进程 env 含 SANDBOX_WORK_DIR=workspace_dir（断言注入）；不传时不含该键由 harness 自建 tmp（退化）。orchestrator 每局在 launch 之前 materialize，并把同一 workspace_dir 同时喂给 launch 与 run_session（断言 launch 与 run_session 收到的目录是同一个）。sim_user 传入 workspace_dir 时直接绑定它、不再自行 materialize；未传但 scenario.workspace 非空时回落自落地；ws 为空或 client 无 bind_session 时不调用、不报错。run_session/respond 引擎签名与 harness 协议不变。manifest.yaml 可被解析。
+    scope: "1) models.py: Add `workspace: WorkspaceSpec | None = None` to SeedScenario (defaulting to None falls back to today's text-only behavior, preserving all existing paths). 2) workspace.py: Define WorkspaceSpec (fixture name/relative path, setup-step placeholders) + materialize(spec, dest) -> str; the MVP only uses copytree to create a fresh isolated directory and returns its path. 3) seed_workspaces/billing-split/: An in-repo fixture—a minimal stdlib-only project (manifest.yaml describes metadata; project/billing/core.py contains runnable code). 4) Shared workspace wiring (v2): For each session, orchestrator.py calls materialize *before* launch to create a workspace workspace_dir, and passes it to both launcher and run_session; launch(ref, workspace_dir=None) in launcher.py injects it into the harness subprocess env as SANDBOX_WORK_DIR (the harness entry already reads this variable as the bash working root); run(..., workspace_dir=None) in sim_user.py reuses the supplied directory to bind the inner client (no longer calling materialize itself), falling back to materializing from scenario.workspace when no directory is supplied (direct-connection compatibility). Do not implement dependency provisioning (venv/pip) or git sources—only local fixture copytree. Do not change the run_session/respond engine signatures or the harness protocol."
+    acceptance: "All existing behavior remains unchanged with SeedScenario(workspace=None); to_dict/from_dict round-trip consistently both with and without workspace (a missing field in an old dict → None). Given a billing-split spec, materialize returns a fresh, existing directory containing project/billing/core.py, which can be directly imported/executed by python (stdlib-only). Two materialize calls return different directories that do not affect each other (isolation). When workspace_dir is passed to launcher.launch, the harness subprocess env contains SANDBOX_WORK_DIR=workspace_dir (assert injection); when it is not passed, the env does not contain this key and the harness creates its own tmp (fallback). For each session, orchestrator calls materialize before launch and supplies the same workspace_dir to both launch and run_session (assert that launch and run_session receive the same directory). When workspace_dir is passed to sim_user, it binds directly to that directory without calling materialize itself; when no directory is passed but scenario.workspace is nonempty, it falls back to materializing the workspace itself; when ws is empty or the client has no bind_session, no call is made and no error is raised. The run_session/respond engine signatures and harness protocol remain unchanged. manifest.yaml can be parsed."
   - id: T2
-    title: 内层原子工具与 sandbox
+    title: "Inner atomic tools and sandbox"
     status: done
     priority: P1
     tags: []
@@ -49,10 +49,10 @@ tasks:
       - backend/ahe_beta/user/sim/tools.py
       - backend/ahe_beta/user/sim/sandbox.py
       - backend/tests/user/sim/test_tools.py
-    scope: '1) tools.py：实现 read_file / run_shell / write_file 三个原子工具（统一签名、统一返回 {ok, stdout/content, error}）；web_search 仅留函数/schema 占位、调用即返回未实现。定义 tool_stack(d1) -> list[tool]：按 D1 给出可用工具子集（复用 0005/T2 的 cap_mask 思路做门控）。2) sandbox.py：Sandbox(workspace: str | None = None)——workspace 给定时以其为 cwd（来自 T1 materialize），缺省时建一个空 tempdir；提供受限 run_shell（超时、捕获 stdout/stderr、工作目录隔离）与文件读写，约束在 workspace 子树内。非安全沙箱（不做 Docker/seccomp），仅最小隔离执行上下文。'
-    acceptance: 三个原子工具在 Sandbox 内可用且路径不逃逸子树；run_shell 超时与非零退出码被正确捕获。Sandbox(workspace=dir) 以 dir 为 cwd、能跑 T1 的 billing-split fixture 里的代码；workspace=None 时退化为空 tempdir 仍可独立工作。tool_stack：blind 得空集、shallow 无 write_file、competent/expert 含 write_file；web_search 始终返回未实现。
+    scope: "1) tools.py: Implement three atomic tools, read_file / run_shell / write_file (a uniform signature and uniform return value {ok, stdout/content, error}); retain only a function/schema placeholder for web_search, returning not implemented when called. Define tool_stack(d1) -> list[tool]: Provide the available tool subset according to D1 (reuse the cap_mask gating approach from 0005/T2). 2) sandbox.py: Sandbox(workspace: str | None = None)—use workspace as cwd when supplied (from T1 materialize), or create an empty tempdir by default; provide restricted run_shell (timeout, stdout/stderr capture, working-directory isolation) and file reads/writes constrained to the workspace subtree. This is not a security sandbox (no Docker/seccomp), only a minimal isolated execution context."
+    acceptance: "The three atomic tools are usable within Sandbox, and paths cannot escape the subtree; run_shell timeouts and nonzero exit codes are captured correctly. Sandbox(workspace=dir) uses dir as cwd and can run the code in T1's billing-split fixture; workspace=None falls back to an empty tempdir and still works independently. tool_stack: blind gets an empty set, shallow has no write_file, and competent/expert include write_file; web_search always returns not implemented."
   - id: T3
-    title: prompt 行为框架（可选核实）与 skill 占位接口
+    title: "Prompt behavioral framework (optional verification) and placeholder skill interface"
     status: done
     priority: P1
     tags: []
@@ -70,10 +70,10 @@ tasks:
       - backend/ahe_beta/user/sim/clauses.py
       - backend/ahe_beta/user/sim/skills.py
       - backend/tests/user/sim/test_inner_prompt.py
-    scope: 1) prompt.py / clauses.py：改 BLOCK-G——声明可用工具（来自 T2 tool_stack）、把核实定性为「可选、有成本的角色内动作」，给出何时值得核实/何时直接主观判断的原则（不强制）。改 BLOCK-P——按 D1 渲染「你能做哪些核实/拿到哪些工具」，按 D3 与当前 trust/起疑状态渲染「你此刻的核实倾向」。2) skills.py：select_skills(persona) -> list[Skill] 占位（D2 驱动），Skill 仅含 name + prompt 片段；本轮返回内置极简集合或空，不接真实 playbook 库。3) 把工具清单与 skill 片段拼进内层 system 段的装配函数（供 T4 调用）。
-    acceptance: build_inner_system 对不同 D1 渲染不同工具清单（blind 无工具、competent/expert 含 write_file）；对不同 D3/trust 渲染不同核实倾向句（低 trust/严 D3 更倾向核实）。BLOCK-G 明确「核实可选、有成本、默认主观判断」。select_skills 占位可调用、返回结构正确且片段不含任何 bug/答案特定内容。装配产物可被 T4 直接用作内层 system。
+    scope: "1) prompt.py / clauses.py: Update BLOCK-G—declare available tools (from T2 tool_stack), characterize verification as an “optional, costly in-character action,” and provide principles for when verification is worthwhile and when to make a subjective judgment directly (not mandatory). Update BLOCK-P—render “what verification you can perform/which tools you have” according to D1, and render “your current inclination to verify” according to D3 and the current trust/suspicion state. 2) skills.py: A placeholder select_skills(persona) -> list[Skill] (driven by D2), with Skill containing only name + a prompt fragment; return a minimal built-in set or an empty set in this round, without connecting to a real playbook library. 3) An assembly function that incorporates the tool list and skill fragments into the inner system section (for T4 to call)."
+    acceptance: "build_inner_system renders different tool lists for different D1 values (blind has no tools; competent/expert include write_file); it renders different statements of verification inclination for different D3/trust values (low trust/strict D3 increases the inclination to verify). BLOCK-G explicitly states “verification is optional and costly; subjective judgment is the default.” The select_skills placeholder is callable, returns the correct structure, and its fragments contain no bug-specific or answer-specific content. T4 can use the assembled output directly as the inner system."
   - id: T4
-    title: 内层 tool-using agent（AgenticPersonaClient）
+    title: "Inner tool-using agent (AgenticPersonaClient)"
     status: done
     priority: P1
     tags: []
@@ -90,110 +90,110 @@ tasks:
     files:
       - backend/ahe_beta/user/sim/persona_client.py
       - backend/tests/user/sim/test_persona_client_agentic.py
-    scope: 1) persona_client.py：新增 AgenticPersonaClient 实现 PersonaClient 协议。respond() 内部跑有界循环：构建内层 system（调 T3 build_inner_system）→ 喂 LLM → 解析 tool_call → 在 Sandbox（T2，cwd=T1 共享工作区）执行 → 回灌结果 → 直到 LLM 给出最终结构化输出或到步数上限。核实主路径（T1 v2 共享工作区）：harness 已把改动直接写进同一目录，内层 LLM 用 read_file/run_shell 当场读/跑 harness 的真实改动来核实——不需要从文本抠代码。仅当 harness 没写盘、只给了文本建议时（迫不得已），内层 LLM 才可用 write_file 把文本里的代码落进工作区再跑（兜底能力，非常态、非写死机制）。保留既有 ApiPersonaClient/ScriptedPersonaClient 不破坏。2) 输出契约与 0005 完全一致（perceive/verdict/action/message），交回外层 resolve_action/apply_verdict。
-    acceptance: AgenticPersonaClient.respond 返回字段与现协议一致、可被外层 resolve_action/apply_verdict 直接消费。给定一个会触发工具调用的 FakeToolLLM 脚本：循环正确执行 tool_call→observe→最终输出；blind persona（空工具）退化为纯文本判断。超步数/非法输出/工具异常时退化为合法主观判断、外层不崩。端到端经 run_session + T1 billing-split fixture 跑通一局（FakeSandbox 或真 Sandbox），外层引擎无改动。
+    scope: "1) persona_client.py: Add AgenticPersonaClient implementing the PersonaClient protocol. Inside respond(), run a bounded loop: build the inner system (call T3 build_inner_system) → feed it to the LLM → parse tool_call → execute in Sandbox (T2, cwd=T1 shared workspace) → feed the results back → until the LLM produces final structured output or reaches the step limit. Main verification path (T1 v2 shared workspace): the harness has already written its changes directly to the same directory, and the inner LLM uses read_file/run_shell to immediately read/run the harness's actual changes for verification—no need to extract code from text. Only when the harness has not written to disk and has provided only textual suggestions (as a last resort) may the inner LLM use write_file to write the code from the text into the workspace and then run it (a fallback capability, not the normal path or a hardcoded mechanism). Preserve the existing ApiPersonaClient/ScriptedPersonaClient without breaking them. 2) The output contract is exactly the same as 0005 (perceive/verdict/action/message), handed back to the outer resolve_action/apply_verdict."
+    acceptance: "AgenticPersonaClient.respond returns fields consistent with the current protocol, consumable directly by the outer resolve_action/apply_verdict. Given a FakeToolLLM script that triggers tool calls: the loop correctly executes tool_call→observe→final output; a blind persona (no tools) falls back to text-only judgment. When the step limit is exceeded, output is invalid, or a tool raises an exception, fall back to a valid subjective judgment without crashing the outer layer. Complete one end-to-end session through run_session + the T1 billing-split fixture (FakeSandbox or real Sandbox), with no changes to the outer engine."
 ---
 
-# 0008 · 用户 agent 内层 tool-using（自有环境核实）
+# 0008 · Inner tool-using user agent (verification in its own environment)
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level rust-RFC nine-section overview. -->
 
 ## Summary
 
-本组把 spec-0005 用户侧的「单次 `respond()` 主观判断」升级为**可在自有环境核实的内层 tool-using agent**：
-让模拟用户像真人一样，在起疑时用**自己的工具栈**（读码 / 跑命令 / 写脚本）在自有 sandbox **真执行**，
-使 `verdict` grounded 在真实结果而非脑补。**外层控制信封（动作空间 / 状态机 / 体感 / 终止）原样不动**，
-唯一接缝是 `PersonaClient.respond(system, user) -> dict`。落点 `backend/ahe_beta/user/sim/`，是 0005/T3 的演进。
+This group upgrades the spec-0005 user side's「single `respond()` subjective judgment」to an **inner tool-using agent that can verify in its own environment**:
+the simulated user, like a real person, uses **its own tool stack** (reading code / running commands / writing scripts) to **actually execute** checks in its own sandbox when suspicious,
+grounding `verdict` in real results rather than speculation. **The outer control envelope (action space / state machine / user experience / termination) remains unchanged**,
+and the sole seam is `PersonaClient.respond(system, user) -> dict`. The implementation lands at `backend/ahe_beta/user/sim/` and is an evolution of 0005/T3.
 
-数据流脊柱（编号即执行序：先立工作区 T1，再内层执行 T2/T4，T3 并行）：
+Data flow spine (numbering is execution order: establish the workspace in T1, then execute internally in T2/T4, with T3 in parallel):
 
 ```
-seed 场景 + 工作区 (T1: SeedScenario.workspace ─► orchestrator 每局先 materialize ─► 全新项目目录 = 两侧共享)
-   │  注入链：orchestrator 把同一 workspace_dir 同时喂 launcher(注入 SANDBOX_WORK_DIR 给 harness 子进程)
-   │  与 run_session → sim_user bind_session(persona, workspace_dir)（run_session/harness 协议不动）
+seed scenario + workspace (T1: SeedScenario.workspace ─► orchestrator materializes it before each session ─► fresh project directory = shared by both sides)
+   │  Injection chain: orchestrator passes the same workspace_dir to both launcher (which injects SANDBOX_WORK_DIR into the harness subprocess)
+   │  and run_session → sim_user bind_session(persona, workspace_dir) (run_session/harness protocol unchanged)
    ▼
-外层控制信封 (0005/T5 run_session, 原样不动)
-   │  接缝 respond(system,user) -> {perceive,verdict,action,message}
+Outer control envelope (0005/T5 run_session, unchanged)
+   │  Interface respond(system,user) -> {perceive,verdict,action,message}
    ▼
-内层 tool-using agent (T4 AgenticPersonaClient)
-   ├─ 工具 = tool_stack(D1) ─► 原子工具 read_file/run_shell/write_file(+web_search 占位) 在 Sandbox(workspace) 真跑 (T2)
-   ├─ prompt 行为框架: 可选核实（CAN=D1 工具门控, WILL=trust/D3/起疑, 默认不查） (T3)
-   └─ skill 占位: D2 领域 playbook 扩展（通用、非 bug 特定, held-out） (T3)
+Inner tool-using agent (T4 AgenticPersonaClient)
+   ├─ Tools = tool_stack(D1) ─► atomic tools read_file/run_shell/write_file (+web_search placeholder) execute in Sandbox(workspace) (T2)
+   ├─ Prompt behavior framework: optional verification (CAN=D1 tool gating, WILL=trust/D3/suspicion, no checking by default) (T3)
+   └─ Skill placeholder: D2 domain playbook extensions (general-purpose, not bug-specific, held-out) (T3)
 ```
 
-读图即读任务：**T1** 先立工作区底座（现仓 seed 场景全仓只有 `description: str`，磁盘上没有项目可跑）——给
-`SeedScenario` 加可选 workspace，每局 materialize 一个 in-repo 基线项目 fixture 当 sandbox 的 cwd；**T2** 造内层
-agent 的「手」——原子工具 + sandbox（以工作区为 cwd）+ 按 D1 门控的工具集；**T3** 把 system prompt 的核实语义
-从「义务」改为「可选、有成本」，并立 skill 占位接口（与 T1/T2 并行）；**T4** 把单次 `respond()` 换成有界
-tool-calling 内层循环（控制反转只局部发生在这个接缝内）。执行序由 `depends-on` 表达且与编号一致：
-**T1 → T2 → T4**，T3 并行。
+The diagram maps directly to the tasks: **T1** first establishes the workspace foundation (the current repository's seed scenarios contain only `description: str`, with no project on disk to run)——add an optional workspace to
+`SeedScenario` and materialize an in-repo baseline project fixture per session as the sandbox cwd; **T2** builds the inner
+agent's「hands」——atomic tools + sandbox (using the workspace as cwd) + a tool set gated by D1; **T3** changes the system prompt's verification semantics
+from「an obligation」to「optional and costly」and establishes a skill placeholder interface (in parallel with T1/T2); **T4** replaces the single `respond()` with a bounded
+tool-calling inner loop (control inversion occurs only locally within this seam). Execution order is expressed by `depends-on` and matches the numbering:
+**T1 → T2 → T4**, with T3 in parallel.
 
-**动机**：0005 的能力分叉靠 prompt G1「请 LLM 自律不偷看答案」+ 文本感知，脆弱——强模型会「心算」bug、
-或靠脑补伪造负向感知。本组让能力分叉落在**工具可达性（D1 机械门控）+ 真实执行结果 + 是否起疑（可选核实）**上：
-blind 无工具只能凭文本，shallow 能跑但写不出测试套件，competent/expert 能自写测试，而 expert 的「构造刁钻边界」
-是不可化约的技巧差、归 prompt 行为。
+**Motivation**: 0005's capability differentiation relies on prompt G1「asking the LLM to exercise self-discipline and not peek at the answer」+ text-based perception, which is fragile——a strong model may「work out」a bug mentally,
+or fabricate negative perceptions through speculation. This group bases capability differentiation on **tool accessibility (D1 mechanical gating) + actual execution results + whether suspicion arises (optional verification)**:
+blind has no tools and can rely only on text, shallow can run code but cannot write a test suite, competent/expert can write their own tests, while the expert's ability to「construct tricky edge cases」
+is an irreducible skill difference governed by prompt behavior.
 
-**仍是纯主观、benchmark 仍 held-out**：真实执行结果对任何人都一样、**不是 gold**（与 0005 推迟的客观真值线
-`gold/GAP/ESCAPED_BUG/control-plane` 无关，工作区亦不含 gold 测试）；能力分叉 = 工具门控 + 主观解读 + 是否起疑；
-体感/状态仍只吃主观 `verdict`。核实是 persona 的角色内**可选**动作——真人（含专家）不会每次都跑，只在起疑且值得
-时才查；默认不查。
+**Still purely subjective, benchmark still held-out**: actual execution results are the same for everyone and **are not gold** (unrelated to the objective ground-truth line
+`gold/GAP/ESCAPED_BUG/control-plane` deferred by 0005; the workspace also contains no gold tests); capability differentiation = tool gating + subjective interpretation + whether suspicion arises;
+user experience/state still consume only subjective `verdict`. Verification is an **optional** in-character action for the persona——real people (including experts) do not run checks every time, only when suspicious and when it is worthwhile;
+by default, they do not check.
 
-**harness 与用户 agent 共享同一工作区（v2 掰正，关键）**：本组目标场景一直是「助手（harness）能改、也能跑，用户
-agent 在同一目录真核实」——纯文本建议核不了真。故 T1 把工作区做成两侧共享的同一目录：orchestrator 每局先
-materialize，经 launcher 把 SANDBOX_WORK_DIR 注入 harness 子进程、同一目录绑定内层 client；harness（bash 工具）落地
-的改动，用户 agent 内层 sandbox 当场可读可跑（共享 FS，非 advisory 文本）。初版曾把此设为「harness 仅 advisory、用户
-贴进自己的工作区拷贝、共享工作区留完全解耦的第二期上游 spec」——现掰正为缺陷假设：共享工作区即在本组 T1 落地（仅
-追加可选 workspace_dir 接线，退化路径对纯文本场景与直连调用零破坏），不再另立上游 spec。两侧无并发写竞争靠逐轮
-stdio 串行天然保证。
+**The harness and user agent share the same workspace (v2 correction, critical)**: this group's target scenario has always been「the assistant (harness) can modify and run code, and the user
+agent actually verifies in the same directory」——purely textual advice cannot be truly verified. Therefore, T1 makes the workspace one directory shared by both sides: the orchestrator first
+materializes it per session, injects SANDBOX_WORK_DIR into the harness subprocess via the launcher, and binds the same directory to the inner client; changes written by the harness (bash tool)
+are immediately readable and runnable by the user agent's inner sandbox (shared FS, not advisory text). The initial version treated this as「the harness is advisory only, the user
+pastes into their own workspace copy, and a shared workspace is deferred to a completely decoupled second-phase upstream spec」——this is now corrected as a flawed assumption: the shared workspace is implemented in this group's T1 (only
+adding optional workspace_dir wiring, with a fallback path that leaves pure-text scenarios and direct calls unaffected), with no separate upstream spec. Turn-by-turn
+stdio serialization naturally ensures no concurrent write contention between the two sides.
 
-**与 0005 及闭环的关系**：本组是 0005/T3 LLM 后端的演进，外层 0005/T5 引擎保持 judge→intent→act 控制信封，但外层动作只表达对 harness/会话的外部动作。`web_search` 工具、skill
-真内容、依赖供给（venv/pip，MVP 用 stdlib-only 场景绕过）本轮**仅占位 / 留钩子**（skill 受「通用领域方法、绝不
-bug/benchmark 特定」红线约束，对接 0006 蒸馏）。外层 `verify_self`/`pending_self_obs` 已退役：读文件、跑命令、看 diff、验证测试输出等私有查验均是内层 AgenticPersonaClient 行为，主要用于 judge 阶段形成 grounded `perceive/verdict`；若用户需要 harness 提供证据，则通过外层 `send_message` 发自然语言请求。是否给内层喂显式状态信号、git 工作区来源、与 0003/T2 `nexau_runtime` 的 tool-calling 形态并轨，集中记在各 Task
-open-questions，归后续 Task/组。
+**Relationship to 0005 and the closed loop**: this group evolves the 0005/T3 LLM backend. The outer 0005/T5 engine retains the judge→intent→act control envelope, but outer actions express only external actions toward the harness/session. `web_search` tools, actual skill
+content, and dependency provisioning (venv/pip, bypassed in the MVP with stdlib-only scenarios) are **placeholders / hooks only** this round (skills are constrained by the red line「general domain methods, never
+bug/benchmark-specific」and integrate with 0006 distillation). Outer `verify_self`/`pending_self_obs` have been retired: private checks such as reading files, running commands, inspecting diffs, and verifying test output are all inner AgenticPersonaClient behavior, primarily used to form grounded `perceive/verdict` during the judge phase; if the user needs evidence from the harness, they make a natural-language request through outer `send_message`. Whether to feed explicit state signals to the inner agent, the source of the git workspace, and alignment with the tool-calling form of 0003/T2 `nexau_runtime` are recorded in the respective Task
+open-questions for subsequent Tasks/groups.
 
 ## Motivation
 
-0005 版用户 agent 的能力分叉完全靠 prompt 层的自律约束（「请 LLM 自律别偷看答案」）与纯文本感知，这一机制脆弱：强模型会心算 bug、或凭空脑补出负向感知，`verdict` 因而与真实结果脱钩。要把分叉落在更硬的地基上——工具可达性（机械门控）+ 真实执行结果——需要三层递进的基础设施，外加一个收口任务。
+The 0005 user agent's capability differentiation relies entirely on prompt-level self-discipline constraints (「asking the LLM to exercise self-discipline and not peek at the answer」) and purely text-based perception. This mechanism is fragile: a strong model may work out a bug mentally or invent negative perceptions from nothing, causing `verdict` to become detached from actual results. Grounding the differentiation on a firmer foundation——tool accessibility (mechanical gating) + actual execution results——requires three progressive layers of infrastructure, plus a final integration task.
 
-第一层是执行的落脚点（T1）：现仓 seed 场景全仓只有 `description: str`，磁盘上没有任何可执行的项目，内层 agent 若要「真核实」便无处下手，只能在空 tempdir 里跑孤立片段、跑不起有依赖或多模块的代码。更进一步，本项目的目标场景始终是「harness（助手）能改、也能跑，用户 agent 在同一目录真核实」——若像初版设想那样让工作区各持私有副本、harness 仅输出文本建议，文本建议终究核不了真；因此 T1 须把工作区做成 harness 子进程与用户 agent 内层 sandbox **共享**的同一目录，harness 落地的改动，用户 agent 当场可读可跑。
+The first layer is a place to execute (T1): the current repository's seed scenarios contain only `description: str`, with no executable project on disk. If the inner agent is to「actually verify」, it has nowhere to start and can only run isolated snippets in an empty tempdir, unable to run code with dependencies or multiple modules. Furthermore, this project's target scenario has always been「the harness (assistant) can modify and run code, and the user agent actually verifies in the same directory」——if, as initially envisioned, each side holds a private workspace copy and the harness outputs only textual advice, that advice cannot ultimately be truly verified. T1 must therefore make the workspace a single directory **shared** by the harness subprocess and the user agent's inner sandbox, so changes written by the harness are immediately readable and runnable by the user agent.
 
-有地方跑之后，第二层是能真正执行的「手」（T2）：三个原子工具（read_file / run_shell / write_file）与一个以工作区为 cwd 的最小 sandbox，按 persona 的 D1 维度机械门控可用工具集——blind 无工具只能凭文本，shallow 能读能跑但写不出测试，competent/expert 才拿 write_file 能自写测试，能力分叉从此钉在工具可达性上而非 prompt 自律。原子工具是不可再分的最小可组合单元，run_tests/construct_edge_cases 这类是「原子工具 + LLM 推理」涌现出的复合行为，不该做成工具（否则语义臃肿、易出实现问题）。
+Once there is a place to run, the second layer provides「hands」that can actually execute (T2): three atomic tools (read_file / run_shell / write_file) and a minimal sandbox with the workspace as cwd, mechanically gating the available tool set by the persona's D1 dimension——blind has no tools and can rely only on text, shallow can read and run but cannot write tests, and only competent/expert receive write_file to write their own tests. Capability differentiation is thereby anchored in tool accessibility rather than prompt self-discipline. Atomic tools are the smallest composable units that cannot be subdivided further; run_tests/construct_edge_cases and similar behaviors are composite behaviors emerging from「atomic tools + LLM reasoning」and should not be made into tools (otherwise their semantics become bloated and implementation problems are more likely).
 
-第三层是让工具被恰当使用的行为框架（T3）：仅有工具不足以避免退化——要么从不核实（退化回 0005 纯文本），要么每轮都核实（不真实、烧成本）。真人的核实是可选且有成本的决策，只在起疑且值得时才查；T2 已经用机械门控保住了「能不能查」（CAN）的底线，T3 要在 prompt 层刻画「会不会查、查多狠」（WILL）这层个性差异，并为 D2 高深度 persona 预留 skill 占位扩展位，受「通用领域方法、绝不 bug/benchmark 特定」红线约束。
+The third layer is a behavioral framework for appropriate tool use (T3): tools alone are insufficient to prevent degeneration——either never verifying (reverting to 0005's pure text), or verifying every turn (unrealistic and costly). Real people make an optional, costly decision to verify, checking only when suspicious and when it is worthwhile; T2 already mechanically gates the baseline of「whether they can check」(CAN), while T3 must characterize the individual differences in「whether they will check and how thoroughly」(WILL) at the prompt level, and reserve a skill placeholder extension point for high-depth D2 personas, subject to the red line「general domain methods, never bug/benchmark-specific」.
 
-最后由 T4 收口：把底座（T1 工作区）、手（T2 工具/sandbox）、行为框架（T3 prompt）接成一个真正会用工具核实的内层 agent AgenticPersonaClient。关键约束是「只换接缝、不动信封」——`PersonaClient.respond(system, user) -> dict` 是唯一改动点，外层引擎对内层是 LLM 心算还是真跑工具无感知，风险因而被收敛在一个类里，可灰度、可回退。
+Finally, T4 integrates everything: connect the foundation (T1 workspace), hands (T2 tools/sandbox), and behavioral framework (T3 prompt) into AgenticPersonaClient, an inner agent that actually uses tools to verify. The key constraint is「change only the seam, not the envelope」——`PersonaClient.respond(system, user) -> dict` is the only change point; the outer engine is unaware of whether the inner agent is reasoning mentally with an LLM or actually running tools. Risk is therefore contained within one class, allowing gradual rollout and rollback.
 
 ## Guide-level explanation
 
-执行序即编号：T1 → T2 → T4，T3 与 T1/T2 并行，产物汇入 T4。
+Execution order matches the numbering: T1 → T2 → T4, with T3 parallel to T1/T2 and its output feeding into T4.
 
-T1 打地基：给 SeedScenario 加一个可选 workspace 字段，让 seed 场景不再只带纯文本 description，还能携带一个 in-repo 基线项目；新增的 workspace.py 的 materialize() 在每局把 fixture（首个落地的是 stdlib-only、无第三方依赖的 billing-split）拷成一个全新隔离目录，供内层 sandbox 当 cwd。v2 版进一步把 materialize 上移到 orchestrator，在 launch 之前统一落地一份工作区，经 launcher 把它以 SANDBOX_WORK_DIR 注入 harness 子进程 env、同一目录同时绑定到内层 client——harness 直接改、用户 agent 同目录真核实，两侧共享同一文件系统（不再各持私有副本）。本任务最先做，T2 的 sandbox、T4 的内层 agent 才有真实项目可跑。
+T1 lays the foundation: add an optional workspace field to SeedScenario so seed scenarios can carry an in-repo baseline project instead of only a pure-text description; the new workspace.py's materialize() copies the fixture (the first implementation is billing-split, stdlib-only with no third-party dependencies) into a fresh isolated directory for each session, for use as the inner sandbox's cwd. The v2 version further moves materialize up to the orchestrator, which materializes one workspace before launch, injects it into the harness subprocess env as SANDBOX_WORK_DIR via the launcher, and simultaneously binds the same directory to the inner client——the harness modifies files directly and the user agent actually verifies in the same directory, with both sides sharing the same filesystem (no longer holding separate private copies). This task comes first so T2's sandbox and T4's inner agent have a real project to run.
 
-有了工作区，T2 造出内层 agent 的「手」：三个原子工具 read_file / run_shell / write_file（外加 web_search 占位、本轮不实现），以及一个最小 sandbox 执行环境（tempfile + subprocess），以 T1 materialize 出的工作区目录为 cwd。工具集按 persona 的 D1 维度机械门控（tool_stack(D1)）：能力低的人物拿不到 write_file，从机制上挡住「自写测试套件」这类高能力动作。
+With the workspace in place, T2 builds the inner agent's「hands」: three atomic tools read_file / run_shell / write_file (plus a web_search placeholder, not implemented this round), and a minimal sandbox execution environment (tempfile + subprocess), using the workspace directory materialized by T1 as cwd. The tool set is mechanically gated by the persona's D1 dimension (tool_stack(D1)): lower-capability personas do not receive write_file, mechanically blocking high-capability actions such as「writing their own test suite」.
 
-与 T1/T2 并行的 T3 负责把内层 system prompt 的核实语义从「义务」改为「可选、有成本」：核实是 persona 的角色内动作，只在起疑且值得时才查，默认不查（真人含专家都不会每次都跑）。BLOCK-G 写清工具的「可选核实」框架，BLOCK-P 按 D1（能不能查/会用哪些工具）与 D3/trust（会不会查、阈值多严）刻画核实倾向；并立 skill 占位接口（select_skills，D2 驱动）让专家 persona 能挂领域 playbook（本轮只占位、纯 prompt 引导）。在 0031 收敛后，judge prompt 会明确：若当前 verdict 依据不足且低成本可查，私有查验应在 judge 内层工具循环中完成；不再把查验推迟为 act 阶段的 `verify_self`。
+T3, parallel to T1/T2, changes the verification semantics of the inner system prompt from「an obligation」to「optional and costly」: verification is an in-character persona action, performed only when suspicious and when worthwhile, and not by default (real people, including experts, do not run checks every time). BLOCK-G specifies the tools'「optional verification」framework; BLOCK-P characterizes verification tendencies by D1 (whether they can check / which tools they can use) and D3/trust (whether they will check and how strict the threshold is); it also establishes a skill placeholder interface (select_skills, D2-driven) so expert personas can attach domain playbooks (placeholder only this round, purely prompt guidance). After 0031 converges, the judge prompt will make clear: if the current verdict has insufficient basis and can be checked at low cost, private checks should be completed in the judge's inner tool loop; checks are no longer deferred to `verify_self` in the act phase.
 
-T4 是收口任务：把 PersonaClient 的单次「纯函数判断」respond() 换成一个有界 tool-calling 内层循环 AgenticPersonaClient——内层 LLM 拿 T3 装配的 system 与 T2 的工具集，在 T1 落地的共享工作区 sandbox 里真执行核实，循环若干步后产出与现协议完全一致的输出（perceive/verdict/action/message）。控制反转只局部发生在这一个接缝内，外层控制信封（0005/T5 run_session、动作空间、状态机、体感、终止）保持分层：act 阶段只选择 `send_message` 或终止动作，私有查验不再作为外层 action。
+T4 is the integration task: replace PersonaClient's single「pure-function judgment」respond() with AgenticPersonaClient, a bounded tool-calling inner loop——the inner LLM receives the system assembled by T3 and the tool set from T2, actually executes verification in the shared workspace sandbox materialized by T1, and after several loop steps produces output fully consistent with the current protocol (perceive/verdict/action/message). Control inversion occurs locally within this one seam; the outer control envelope (0005/T5 run_session, action space, state machine, user experience, termination) remains layered: the act phase selects only `send_message` or a termination action, and private checks are no longer outer actions.
 
-T4 的私有工具结果还要生成轻量会话记忆：每次 respond 中出现 tool/tool_result/tool_error 时，框架将工具动作与该阶段 `parsed.perceive` 的短结论整理为 `private_evidence`，供后续 main/waiting judge/intent/act 读取。这样用户会记住自己已经私下读过哪些文件、跑过哪些命令、观察到哪些事实或冲突；完整 raw 输出仍只在 sim_trace 中落盘，不回灌进 prompt。
+T4's private tool results must also generate lightweight session memory: whenever tool/tool_result/tool_error appears in a respond call, the framework organizes the tool actions and the short conclusion from that phase's `parsed.perceive` into `private_evidence` for subsequent main/waiting judge/intent/act to read. This allows the user to remember which files they have already read privately, which commands they have run, and which facts or conflicts they have observed; complete raw output is still persisted only in sim_trace and is not fed back into the prompt.
 
 ## Reference-level explanation
 
-以下按四个技术层展开：工作区与注入链（T1）→ 原子工具与 sandbox（T2，依赖 T1 提供的 cwd）→ prompt 行为框架与 skill 占位（T3，与 T1/T2 并行）→ 内层循环 AgenticPersonaClient（T4，收口，依赖前三者）。
+The following expands on four technical layers: workspace and injection chain (T1) → atomic tools and sandbox (T2, depending on the cwd provided by T1) → prompt behavioral framework and skill placeholder (T3, parallel to T1/T2) → inner loop AgenticPersonaClient (T4, integration, dependent on the preceding three).
 
-### 共享工作区与注入链（T1）
+### Shared workspace and injection chain (T1)
 
-共享工作区注入链（v2；关键：run_session 与 respond 引擎签名、harness stdio 协议均不动）：orchestrator.run_round 每局先在 launch *之前* 落地工作区——scenario.workspace 非空时 `workspace_dir = materialize(scenario.workspace)`（为空则 None，退化为今天行为）─► 同一 workspace_dir 走两条边喂给两侧：(A) `launcher.launch(sha, workspace_dir=workspace_dir)`，launcher 把它写进子进程 env 的 SANDBOX_WORK_DIR，harness entry._setup_workspace() 读到即以它当 bash 工作根（不再自建 harness_ws_* tmp）；(B) `run_session(persona, scenario, harness, workspace_dir=workspace_dir)`，sim_user 不再自行 materialize，而是守卫式 `client.bind_session(persona=sim_persona, workspace_dir=workspace_dir)`，内层 T4 AgenticPersonaClient 据此建 Sandbox(workspace=workspace_dir)（T2）当 cwd。两侧 cwd 同指一个目录 ⇒ harness 子进程落地的文件改动，用户 agent 内层 sandbox 当场可读可跑（共享 FS、非 advisory 文本）。为何 materialize 上移到 orchestrator：launch 发生在 run_session 之前，要让 harness 与用户 agent 同目录，落地必须早于 launch 这一刻、且 workspace_dir 须同时可达两侧——orchestrator 是唯一同时持有 launcher 与 run_session 的层。为何仍走 bind 而非 run_session 文本参数：run_session 只喂 system/user 文本、不传 persona/workspace 对象，会话级的 persona(选工具集)+workspace(建 Sandbox) 只能经 bind_session 注入；对 Scripted/Api 无此方法即 no-op。SessionRunner 协议新增 keyword-only `workspace_dir: str | None = None`，旧直连调用（不传）按 scenario.workspace 自落、行为不变。每局一份全新拷贝、互不污染；session 结束可清理。fixture 仍 stdlib-only，把 materialize 压到「只 copytree」，依赖供给推后；fixture 置 backend/seed_workspaces/ 作版本化资产，与 benchmark held-out 红线无关（工作区不含 gold 测试）。
+Shared workspace injection chain (v2; critical: the run_session and respond engine signatures and the harness stdio protocol remain unchanged): orchestrator.run_round first materializes the workspace for each session *before* launch——when scenario.workspace is nonempty, `workspace_dir = materialize(scenario.workspace)` (otherwise None, falling back to current behavior) ─► the same workspace_dir feeds both sides through two paths: (A) `launcher.launch(sha, workspace_dir=workspace_dir)`, the launcher writes it to the subprocess env as SANDBOX_WORK_DIR, and harness entry._setup_workspace() reads it and uses it as the bash working root (no longer creating its own harness_ws_* tmp); (B) `run_session(persona, scenario, harness, workspace_dir=workspace_dir)`, sim_user no longer materializes independently, instead using guarded `client.bind_session(persona=sim_persona, workspace_dir=workspace_dir)`, and the inner T4 AgenticPersonaClient uses it to create Sandbox(workspace=workspace_dir) (T2) as cwd. Both cwds point to the same directory ⇒ file changes written by the harness subprocess are immediately readable and runnable by the user agent's inner sandbox (shared FS, not advisory text). Why move materialize up to the orchestrator: launch happens before run_session, so to put the harness and user agent in the same directory, materialization must precede launch and workspace_dir must be accessible to both sides——the orchestrator is the only layer holding both launcher and run_session. Why still use bind instead of a run_session text parameter: run_session feeds only system/user text and does not pass persona/workspace objects, so session-level persona (selecting the tool set) + workspace (creating the Sandbox) can only be injected via bind_session; for Scripted/Api, which lack this method, it is a no-op. The SessionRunner protocol adds keyword-only `workspace_dir: str | None = None`; old direct calls (which do not pass it) materialize from scenario.workspace themselves, with unchanged behavior. Each session gets a fresh copy, isolated from the others; it can be cleaned up when the session ends. The fixture remains stdlib-only, reducing materialize to「only copytree」and deferring dependency provisioning; the fixture is placed at backend/seed_workspaces/ as a versioned asset, unrelated to the benchmark held-out red line (the workspace contains no gold tests).
 
-**接口**
+**Interfaces**
 
-WorkspaceSpec：dataclass，字段 `fixture: str`（seed_workspaces 下的目录名）、`setup: list[str] = []`（命令钩子，占位，本轮不执行）；带 to_dict/from_dict。materialize(spec, dest_root=None) -> str：拷 seed_workspaces/<fixture>/project 到新建隔离目录返其绝对路径。SeedScenario：新增 `workspace: WorkspaceSpec | None = None`（序列化兼容旧数据：缺字段→None）。launcher：`HarnessLauncher.launch(ref, workspace_dir: str | None = None) -> HarnessInterface`——workspace_dir 非空时把 SANDBOX_WORK_DIR=workspace_dir 并入子进程 env（覆盖 params.yaml 同名键），为空则保持今天行为（harness 自建 tmp 工作区）；签名向后兼容（仅追加 keyword）。SessionRunner 协议：`__call__(persona, scenario, harness, *, workspace_dir: str | None = None) -> object`。orchestrator：run_round 内 `workspace_dir = materialize(scenario.workspace) if scenario.workspace else None`，再 `launch(sha, workspace_dir=...)` 与 `run_session(..., workspace_dir=...)`。sim_user.run(persona, scenario, harness, *, workspace_dir=None)：ws 取 workspace_dir，缺省回落 `materialize(scenario.workspace)`（scenario.workspace 非空时），ws 非空且 client 暴露 bind_session 时 `bind_session(persona, workspace_dir=ws)`；run_session/respond 引擎签名与 harness 协议不变。
+WorkspaceSpec: a dataclass with fields `fixture: str` (directory name under seed_workspaces) and `setup: list[str] = []` (command hook, a placeholder, not executed in this round); includes to_dict/from_dict. materialize(spec, dest_root=None) -> str: copies seed_workspaces/<fixture>/project to a newly created isolated directory and returns its absolute path. SeedScenario: add `workspace: WorkspaceSpec | None = None` (serialization remains compatible with old data: missing field → None). launcher: `HarnessLauncher.launch(ref, workspace_dir: str | None = None) -> HarnessInterface`—when workspace_dir is nonempty, merge SANDBOX_WORK_DIR=workspace_dir into the subprocess env (overriding the same key in params.yaml); when empty, retain current behavior (the harness creates its own tmp workspace); keep the signature backward compatible (append keyword arguments only). SessionRunner protocol: `__call__(persona, scenario, harness, *, workspace_dir: str | None = None) -> object`. orchestrator: within run_round, `workspace_dir = materialize(scenario.workspace) if scenario.workspace else None`, then `launch(sha, workspace_dir=...)` and `run_session(..., workspace_dir=...)`. sim_user.run(persona, scenario, harness, *, workspace_dir=None): use workspace_dir for ws, falling back to `materialize(scenario.workspace)` when omitted (if scenario.workspace is nonempty); when ws is nonempty and client exposes bind_session, `bind_session(persona, workspace_dir=ws)`; the run_session/respond engine signatures and harness protocol remain unchanged.
 
-**测试**
+**Tests**
 
-test_workspace.py：(a) materialize 落地后目录存在、含预期文件、可执行 core.py；(b) 两次 materialize 隔离（改一份不影响另一份）；(c) WorkspaceSpec 默认 setup 为空且本轮不执行、to_dict/from_dict 往返；(d) SeedScenario.workspace 默认 None、老构造方式仍可用、序列化往返兼容旧数据；(e) sim_user 桥接：传入 workspace_dir 时直接按 (persona, workspace_dir) 调 bind_session 且不再自行 materialize（用 fake client + monkeypatch materialize 断言未被调），未传但 scenario.workspace 非空时回落 materialize 后绑定，ws 为空或 client 无 bind_session 时不调用、不报错。test_launcher.py：(f) launch 传 workspace_dir 时子进程 env 含 SANDBOX_WORK_DIR=workspace_dir（用 fake/捕获 Popen 断言），不传时不含该键（退化）。test_orchestrator.py：(g) run_round 每局在 launch 之前 materialize（用 spy 断言调用顺序），并把同一 workspace_dir 同时传给 launch 与 run_session；scenario.workspace 为 None 时两者均收 None（退化、不 materialize）。
+test_workspace.py: (a) after materialize, the directory exists, contains the expected files, and can execute core.py; (b) two materialize calls are isolated (modifying one copy does not affect the other); (c) WorkspaceSpec defaults to an empty setup that is not executed in this round, and supports a to_dict/from_dict round trip; (d) SeedScenario.workspace defaults to None, the old construction pattern still works, and serialization round trips remain compatible with old data; (e) sim_user bridging: when workspace_dir is passed, call bind_session directly with (persona, workspace_dir) without performing materialize itself (use a fake client + monkeypatch materialize to assert it is not called); when workspace_dir is omitted but scenario.workspace is nonempty, fall back to materialize and then bind; when ws is empty or client has no bind_session, do not call it and do not raise an error. test_launcher.py: (f) when workspace_dir is passed to launch, the subprocess env contains SANDBOX_WORK_DIR=workspace_dir (assert using a fake/captured Popen); when omitted, that key is absent (fallback behavior). test_orchestrator.py: (g) run_round calls materialize before launch for each session (use a spy to assert the call order), and passes the same workspace_dir to both launch and run_session; when scenario.workspace is None, both receive None (fallback behavior, no materialize).
 
-**文件（单一 writer 所有权）**
+**Files (single-writer ownership)**
 
   - `backend/ahe_beta/user/sim/workspace.py`
   - `backend/seed_workspaces/billing-split/project/billing/core.py`
@@ -206,95 +206,95 @@ test_workspace.py：(a) materialize 落地后目录存在、含预期文件、�
   - `backend/tests/harness/test_launcher.py`
   - `backend/tests/loop/test_orchestrator.py`
 
-### 原子工具与 Sandbox（T2）
+### Atomic Tools and Sandbox (T2)
 
-Sandbox 持有一个工作目录（workspace 或新建 tempdir），所有工具调用相对它解析路径、禁止逃逸到子树外。run_shell 经 subprocess 执行、带 timeout 与输出截断。tool_stack(D1)：blind→[]（无工具），shallow→[read_file, run_shell]，competent/expert→[read_file, run_shell, write_file]（+ web_search 占位永远不真实启用）。门控在「给 LLM 暴露哪些工具」这一层就发生（机制保底），不依赖 prompt 自律。工具本身工作区无关：workspace=None 时用空 tempdir 即可独立建、独立单测——故对 T1 是顺序/测试层面的软依赖（让 sandbox 测试能跑真实 fixture），而非硬代码依赖。
+Sandbox holds a working directory (a workspace or a newly created tempdir); all tool calls resolve paths relative to it and prohibit escaping its subtree. run_shell executes via subprocess, with a timeout and output truncation. tool_stack(D1): blind→[] (no tools), shallow→[read_file, run_shell], competent/expert→[read_file, run_shell, write_file] (+ a web_search placeholder that is never actually enabled). Gating occurs at the layer that determines which tools are exposed to the LLM (enforced by the mechanism), without relying on prompt compliance. The tools themselves are workspace-independent: with workspace=None, an empty tempdir suffices for independent construction and unit testing—so T1 is a soft dependency in terms of sequencing/testing (allowing sandbox tests to run real fixtures), rather than a hard code dependency.
 
-**接口**
+**Interfaces**
 
-read_file(sandbox, path) -> {ok, content|error}；run_shell(sandbox, cmd, timeout=...) -> {ok, stdout, stderr, returncode}；write_file(sandbox, path, content) -> {ok|error}；web_search(query) -> {ok: False, error: "not_implemented"}（占位）。Sandbox(workspace: str | None = None)，属性 cwd；方法 resolve(path)（防逃逸）、cleanup()。tool_stack(d1: D1) -> list[ToolSpec]，ToolSpec 含 name/schema/callable，供 T4 暴露给 LLM 并供 T3 prompt 渲染工具清单。
+read_file(sandbox, path) -> {ok, content|error}; run_shell(sandbox, cmd, timeout=...) -> {ok, stdout, stderr, returncode}; write_file(sandbox, path, content) -> {ok|error}; web_search(query) -> {ok: False, error: "not_implemented"} (placeholder). Sandbox(workspace: str | None = None), with property cwd and methods resolve(path) (prevents escape) and cleanup(). tool_stack(d1: D1) -> list[ToolSpec], where ToolSpec contains name/schema/callable, for T4 to expose to the LLM and T3 to render the tool list in the prompt.
 
-**测试**
+**Tests**
 
-test_tools.py：(a) read/write/run 在 sandbox 内正常工作；(b) 路径逃逸（../../）被拒；(c) run_shell 超时/非零码返回结构正确；(d) Sandbox(workspace=临时 billing-split 拷贝) 能 import/跑 core.py；(e) tool_stack 各 D1 档位返回正确工具子集；(f) web_search 返回 not_implemented。用真实 tempdir + 小脚本，不 mock subprocess。
+test_tools.py: (a) read/write/run work correctly within the sandbox; (b) path traversal (../../) is rejected; (c) run_shell returns the correct structure on timeout/nonzero exit codes; (d) Sandbox(workspace=a temporary billing-split copy) can import/run core.py; (e) tool_stack returns the correct tool subset for each D1 level; (f) web_search returns not_implemented. Use real tempdirs + small scripts; do not mock subprocess.
 
-**文件（单一 writer 所有权）**
+**Files (single-writer ownership)**
 
   - `backend/ahe_beta/user/sim/tools.py`
   - `backend/ahe_beta/user/sim/sandbox.py`
   - `backend/tests/user/sim/test_tools.py`
 
-### Prompt 行为框架与 skill 占位（T3）
+### Prompt Behavior Framework and Skill Placeholders (T3)
 
-CAN（能力，机械）：T2 tool_stack(D1) 决定暴露哪些工具——prompt 只如实描述，不靠它门控。WILL（意愿，prompt）：BLOCK-P 用 D3（验收严格度）+ trust/consecutive_blame 状态渲染倾向句，例如低 trust/高 D3 → 更倾向核实，反之直接接受。核实定性为「可选成本动作」：默认走主观判断，只有起疑且收益值得才动用工具。阶段归属：私有核实服务 judge 的 `perceive/verdict`；act 阶段没有 private verification action，只能 `send_message` 要 harness 给证据/继续运行，或选择终止。skill 注入点在 T4 内层循环的 system 段，本任务只立接口与装配位；skill 片段是通用方法论（如「先复现再定位」），严禁含具体 bug/答案。clauses 把这些做成可单测的纯函数（输入 persona+state，输出文本片段）。
+CAN (capability, mechanical): T2 tool_stack(D1) determines which tools are exposed—the prompt only describes them accurately and does not perform gating. WILL (willingness, prompt): BLOCK-P uses D3 (acceptance strictness) + trust/consecutive_blame state to render tendency statements; for example, low trust/high D3 → greater inclination to verify, and the reverse favors direct acceptance. Verification is characterized as an “optional action with a cost”: subjective judgment is the default, and tools are used only when doubts arise and the benefit justifies the cost. Phase assignment: private verification serves the judge's `perceive/verdict`; the act phase has no private verification action and can only `send_message` to ask the harness for evidence/to continue running, or choose to terminate. The skill injection point is the system section of the T4 inner loop; this task only establishes the interface and assembly point. Skill snippets contain general methodology (such as “reproduce first, then locate the cause”) and must never contain a specific bug/answer. clauses implement these as unit-testable pure functions (input: persona+state; output: text snippets).
 
-**接口**
+**Interfaces**
 
-build_inner_system(persona, tools, skills, state) -> str：装配内层 system（含 BLOCK-G 可选核实框架 + BLOCK-P 个性倾向 + 工具清单 + skill 片段）。clause_verification_policy(persona, state) -> str；clause_capability(persona, tools) -> str。select_skills(persona) -> list[Skill]；Skill(name: str, prompt: str)。这些函数被 T4 在每次构建内层 prompt 时调用。
+build_inner_system(persona, tools, skills, state) -> str: assembles the inner system prompt (including the BLOCK-G optional verification framework + BLOCK-P personality tendencies + tool list + skill snippets). clause_verification_policy(persona, state) -> str; clause_capability(persona, tools) -> str. select_skills(persona) -> list[Skill]; Skill(name: str, prompt: str). T4 calls these functions whenever it builds the inner prompt.
 
-**测试**
+**Tests**
 
-test_inner_prompt.py：(a) 各 D1 档位工具清单文案正确；(b) clause_verification_policy 随 D3/trust 变化（高严格/低信任 → 倾向核实，反之接受）；(c) BLOCK-G 含「可选/有成本」措辞；(d) select_skills 返回 Skill 列表、片段为通用方法（断言不含 benchmark/bug 关键字占位校验）；(e) build_inner_system 端到端拼装包含工具清单与 skill 段。纯文本断言、不调 LLM。
+test_inner_prompt.py: (a) the tool-list wording is correct for each D1 level; (b) clause_verification_policy varies with D3/trust (high strictness/low trust → inclination to verify; the reverse favors acceptance); (c) BLOCK-G includes wording conveying “optional/has a cost”; (d) select_skills returns a list of Skill objects, with snippets containing general methods (assert the absence of benchmark/bug keywords as a placeholder check); (e) end-to-end assembly by build_inner_system includes the tool list and skill section. Use text-only assertions; do not call an LLM.
 
-**文件（单一 writer 所有权）**
+**Files (single-writer ownership)**
 
   - `backend/ahe_beta/user/sim/prompt.py`
   - `backend/ahe_beta/user/sim/clauses.py`
   - `backend/ahe_beta/user/sim/skills.py`
   - `backend/tests/user/sim/test_inner_prompt.py`
 
-### 内层循环：AgenticPersonaClient（T4）
+### Inner Loop: AgenticPersonaClient (T4)
 
-循环：respond(system,user) → tool_stack(D1)+build_inner_system → 内层多轮 [LLM→tool_call→Sandbox.run→observe]，有步数/超时上限兜底 → LLM 产出最终 JSON（与现协议同字段）→ 校验后返回。会话级上下文：persona 与工作区由 sim_user 桥接经 bind_session(persona, workspace_dir) 在每局开始绑定（run_session 不传 persona、签名不动）；respond 用绑定的 workspace 建 Sandbox(workspace=dir)。该 dir 即 T1 v2 落地的 harness/用户 agent 共享目录——harness 子进程已把改动写进来，内层 LLM 直接 read_file/run_shell 读/跑这些真实改动核实，verdict grounded 在真实执行结果（共享 FS，非从文本 advisory 抠代码）；harness 仅给文本未写盘的迫不得已情形下，write_file 作为兜底能力把文本代码落地再核（涌现，非写死）。失败兜底：LLM 不产出合法 JSON / 工具异常 / 超步数时，退化为一次主观判断（保证永远返回合法输出，外层不崩）。无工具的 blind persona、或未 bind_session（无 workspace）时自然退化为纯文本判断（等价旧行为）。respond 若经历 private tool-use，应把工具动作和最终 `perceive` 摘要交给外层记录为 private_evidence；该摘要是用户记忆，不是对 harness 的消息，也不是完整 raw trace。
+Loop: respond(system,user) → tool_stack(D1)+build_inner_system → multiple inner turns of [LLM→tool_call→Sandbox.run→observe], bounded by step/time limits → LLM produces final JSON (with the same fields as the current protocol) → validate and return. Session-level context: persona and workspace are bound at the start of each session by the sim_user bridge through bind_session(persona, workspace_dir) (run_session does not receive persona, and its signature remains unchanged); respond uses the bound workspace to construct Sandbox(workspace=dir). This dir is the shared harness/user-agent directory materialized by T1 v2—the harness subprocess has already written its changes there, and the inner LLM directly uses read_file/run_shell to read/run those actual changes for verification, grounding the verdict in real execution results (shared FS, rather than extracting code from textual advisories); in unavoidable cases where the harness provides only text without writing to disk, write_file serves as a fallback capability to write the textual code to disk and then verify it (emergent, not hardcoded). Failure fallback: if the LLM fails to produce valid JSON, a tool raises an exception, or the step limit is exceeded, fall back to a single subjective judgment (ensuring valid output is always returned and the outer layer does not crash). A blind persona with no tools, or a client without bind_session (no workspace), naturally falls back to text-only judgment (equivalent to the old behavior). If respond performs private tool-use, it should pass the tool actions and the final `perceive` summary to the outer layer for recording as private_evidence; this summary is user memory, not a message to the harness or a complete raw trace.
 
-**接口**
+**Interfaces**
 
-AgenticPersonaClient(llm, *, max_inner_steps: int = ..., timeout: float = ...) 实现 respond(system: str, user: str) -> dict（同 PersonaClient 协议，返回 {perceive, verdict, action, message}）；另有 bind_session(persona, workspace_dir: str | None) 由 sim_user 每局调用绑定会话级 persona+工作区（未绑定则退化纯文本）。内部依赖：T2 tool_stack/Sandbox、T3 build_inner_system、T1 工作区（经 sim_user bind_session 注入）。对外层 0005/T5 run_session 与 respond(system,user) 两个签名均零改动。
+AgenticPersonaClient(llm, *, max_inner_steps: int = ..., timeout: float = ...) implements respond(system: str, user: str) -> dict (the same PersonaClient protocol, returning {perceive, verdict, action, message}); it also provides bind_session(persona, workspace_dir: str | None), called by sim_user for each session to bind the session-level persona+workspace (falling back to text-only behavior if not bound). Internal dependencies: T2 tool_stack/Sandbox, T3 build_inner_system, and the T1 workspace (injected through sim_user bind_session). Both outer-layer 0005/T5 signatures, run_session and respond(system,user), remain entirely unchanged.
 
-**测试**
+**Tests**
 
-test_persona_client_agentic.py：(a) FakeToolLLM 多步 tool_call → FakeSandbox observe → 最终 JSON，断言循环步数与最终契约；(b) blind/空工具退化纯文本；(c) 超 max_inner_steps 兜底返回合法输出；(d) LLM 吐非法 JSON 时退化主观判断；(e) 集成：run_session + T1 fixture，断言外层状态机/终止不受影响、输出可被 resolve_action 消费；(f) ScriptedPersonaClient 仍工作（不回归）。
+test_persona_client_agentic.py: (a) FakeToolLLM performs multiple tool_call steps → FakeSandbox observe → final JSON; assert the loop step count and final contract; (b) blind/empty tools fall back to text-only behavior; (c) exceeding max_inner_steps falls back to valid output; (d) invalid JSON from the LLM triggers fallback to subjective judgment; (e) integration: run_session + T1 fixture; assert that the outer state machine/termination is unaffected and the output can be consumed by resolve_action; (f) ScriptedPersonaClient still works (no regression).
 
-**文件（单一 writer 所有权）**
+**Files (single-writer ownership)**
 
   - `backend/ahe_beta/user/sim/persona_client.py`
   - `backend/tests/user/sim/test_persona_client_agentic.py`
 
-依赖 DAG：`T1 → T2`，`T1 → T4`，`T2 → T4`，`T3 → T4`
+Dependency DAG: `T1 → T2`, `T1 → T4`, `T2 → T4`, `T3 → T4`
 
 ## Drawbacks
 
-<!-- 待填 -->
+<!-- TODO -->
 
 ## Rationale and alternatives
 
-环境与隔离层面的取舍：T1 只支持本地 fixture + stdlib-only，换来 materialize 的极简（纯 copytree）、可重现、零网络，代价是带第三方依赖的场景暂不可跑（留 setup 钩子占位）；工作区选择两侧共享同一目录而非各持私有副本，换来 harness 改动对用户 agent 即时可见可跑（真核实而非文本 advisory），代价是并发写同一 FS 须有保证——本框架逐轮 stdio 协议天然串行（harness send 与用户回合不并发），故可接受；materialize 上移到 orchestrator 让工作区在 launch 前就绪，代价是 orchestrator/launcher 各加一个可选 keyword 入参（跨组文件改动但向后兼容，`workspace=None`/`workspace_dir=None` 的退化路径对既有纯文本场景与直连调用零破坏，渐进式落地）。T2 的 Sandbox 同样只取最小隔离（cwd 限定 + 超时），不做 Docker/nsjail 级别的强隔离——可接受，因为执行的是助手提议的代码、用户自愿在自己机器上跑，威胁模型与生产沙箱不同，强隔离留后续；三个工具选择原子而非复合（如 run_tests/construct_edge_cases），换来语义清晰、易测、可组合，代价是高能力行为只能靠 LLM 编排涌现、不可直接断言「跑了测试」；D1 三档机械门控简单可靠，但粒度较粗。
+Trade-offs in environment and isolation: T1 supports only local fixtures + stdlib-only, making materialize minimal (pure copytree), reproducible, and network-free, at the cost of being unable to run scenarios with third-party dependencies for now (a setup hook is reserved as a placeholder). Both sides share the same workspace directory rather than holding private copies, making harness changes immediately visible and runnable for the user agent (actual verification rather than textual advisory), at the cost of requiring guarantees around concurrent writes to the same FS—the framework's turn-by-turn stdio protocol is inherently serial (harness send and user turns do not run concurrently), so this is acceptable. Moving materialize up to the orchestrator makes the workspace ready before launch, at the cost of adding one optional keyword argument each to the orchestrator/launcher (cross-group file changes, but backward-compatible; the fallback paths of `workspace=None`/`workspace_dir=None` cause no breakage for existing text-only scenarios or direct calls, enabling incremental rollout). T2's Sandbox likewise provides only minimal isolation (cwd restriction + timeout), not strong isolation at the Docker/nsjail level—this is acceptable because the code being executed is proposed by the assistant and users voluntarily run it on their own machines; the threat model differs from that of a production sandbox, and strong isolation is left for later. The three tools are atomic rather than composite (such as run_tests/construct_edge_cases), providing clear semantics, easy testing, and composability, at the cost of requiring high-capability behavior to emerge through LLM orchestration, with no direct assertion that "tests were run"; D1's three-tier mechanical gating is simple and reliable, but relatively coarse-grained.
 
-行为控制层面的取舍：T3 用纯 prompt 引导刻画 WILL（会不会查、查多狠），实现轻、可演进，但不如机制硬——LLM 可能不完全遵循倾向；CAN 的底已由 T2 机械门控兜住，prompt 只补 competent↔expert 之间的软差异。skill 仅占位、不接真实 playbook 库，避免过早设计，代价是短期专家与普通能力的 prompt 差异有限。把核实定性为可选，会让低意愿 persona 很少核实——这是期望行为（更真实），不是缺陷。
+Trade-offs in behavioral control: T3 uses pure prompt guidance to characterize WILL (whether to investigate and how thoroughly), making implementation lightweight and evolvable, but less rigid than a mechanical mechanism—the LLM may not fully follow the tendencies. T2's mechanical gating already provides the baseline for CAN, and the prompt only supplements the soft differences between competent↔expert. skill remains a placeholder, without connecting to a real playbook library, avoiding premature design at the cost of limited prompt differences between expert and ordinary capability in the short term. Making verification optional means low-willingness personas will rarely verify—this is expected behavior (more realistic), not a defect.
 
-收口层面的取舍：T4 内层 LLM 的多轮调用带来延迟与 token 成本上升，用 max_inner_steps/timeout 加上 T3 的「默认不查」共同控制；tool-calling 输出不稳定，用强制最终结构化 JSON + 失败退化为主观判断兜底应对。把改动收敛在 `PersonaClient.respond` 这一个接缝内，好处是风险隔离、可与 ScriptedPersonaClient 并存跑 CI，坏处是端到端真跑仍需真实 LLM，集成测试因此改用 FakeToolLLM + FakeSandbox 离线覆盖循环逻辑。
+Trade-offs in final integration: T4's multiple inner LLM calls increase latency and token costs, controlled jointly by max_inner_steps/timeout and T3's "do not investigate by default" approach; unstable tool-calling output is handled by requiring final structured JSON + falling back to subjective judgment on failure. Confining changes to the single seam `PersonaClient.respond` isolates risk and allows coexistence with ScriptedPersonaClient in CI, but actual end-to-end runs still require a real LLM, so integration tests instead use FakeToolLLM + FakeSandbox to cover the loop logic offline.
 
 ## Prior art
 
-整组沿用并演进已有 spec 的接口而非另起炉灶。T1 扩展 0001/T1 models.py 的 SeedScenario，其注入链横跨 0005/T5 的调用方 sim_user、0007/T2 的 orchestrator（materialize 上移之处）与 0003/T1 的 launcher（SANDBOX_WORK_DIR 注入之处）——三者 files 与本组重叠仅产生 validate warning（与 models.py 同时被 0001/0008/0009 引用属同一模式），run_session/respond 引擎签名与 harness stdio 协议不受影响；harness 侧读取该变量的入口在 backend/harness_template/entry.py 的 `_setup_workspace()`（agent.yaml 的 sandbox_config 声明），fixture 资产落于 backend/seed_workspaces/。T1 落地的目录被 T2 的 Sandbox 当作 cwd、被 T4 的 `AgenticPersonaClient.bind_session` 取用。
+This entire group reuses and evolves existing spec interfaces rather than starting from scratch. T1 extends SeedScenario in models.py from 0001/T1, and its injection chain spans the caller sim_user from 0005/T5, the orchestrator from 0007/T2 (where materialize is moved up), and the launcher from 0003/T1 (where SANDBOX_WORK_DIR is injected)—overlap between their files and this group produces only a validate warning (the same pattern as models.py being referenced simultaneously by 0001/0008/0009); the run_session/respond engine signatures and harness stdio protocol remain unaffected. The harness-side entry point for reading this variable is `_setup_workspace()` in backend/harness_template/entry.py (the sandbox_config declaration in agent.yaml), and fixture assets reside in backend/seed_workspaces/. The directory materialized by T1 is used as cwd by T2's Sandbox and consumed by T4's `AgenticPersonaClient.bind_session`.
 
-T2 的能力门控复用 0005/T2 的 cap_mask（D1）思路，不重新发明分级机制；其原子工具与 sandbox 被 T4 消费（暴露 tool_stack 给内层 LLM、用 Sandbox 真执行），工具清单则由 T3 渲染进 system prompt；run_tests/construct_edge_cases 这类复合行为不做成工具，而是归入 T3 的 prompt 行为框架、靠 LLM 编排涌现。
+T2's capability gating reuses the cap_mask (D1) approach from 0005/T2 rather than reinventing a tiering mechanism; its atomic tools and sandbox are consumed by T4 (exposing tool_stack to the inner LLM and using Sandbox for actual execution), while the tool list is rendered into the system prompt by T3. Composite behaviors such as run_tests/construct_edge_cases are not implemented as tools; instead, they fall within T3's prompt-based behavioral framework and emerge through LLM orchestration.
 
-T3 演进 0005/T3 的 prompt 结构（BLOCK-G/BLOCK-P）与 0005/T1 的 persona 维度（D1/D2/D3），工具清单来源即本组 T2 的 tool_stack；skill 占位受「通用、非 benchmark 特定」红线约束，对接 0006/T1 的蒸馏管线；其装配产物（build_inner_system）被 T4 在每次构建内层 prompt 时调用。
+T3 evolves the prompt structure (BLOCK-G/BLOCK-P) from 0005/T3 and the persona dimensions (D1/D2/D3) from 0005/T1; its tool list comes from this group's T2 tool_stack. The skill placeholder is constrained by the "general-purpose, not benchmark-specific" boundary and connects to the distillation pipeline from 0006/T1; its assembled output (build_inner_system) is invoked by T4 whenever it constructs an inner prompt.
 
-T4 是整条演进链的收口：它演进 0005/T3 的 LLM 后端、即 `PersonaClient.respond` 这一接缝，外层 0005/T5 的 run_session 引擎零改动；依赖本组 T2 的 tool_stack/Sandbox、T3 的 build_inner_system、T1 的工作区注入。其 tool-calling 内层循环形态未来可与 0003/T2 nexau_runtime 的 tool-calling 参考并轨（详见 Unresolved questions），本轮不强求统一实现。
+T4 is the final integration point of the entire evolution chain: it evolves the LLM backend from 0005/T3, namely the `PersonaClient.respond` seam, with zero changes to the outer run_session engine from 0005/T5; it depends on this group's T2 tool_stack/Sandbox, T3 build_inner_system, and T1 workspace injection. Its inner tool-calling loop may converge with the tool-calling reference in 0003/T2 nexau_runtime in the future (see Unresolved questions); a unified implementation is not required in this round.
 
 ## Unresolved questions
 
-依赖与来源：带第三方依赖场景的供给方式——setup 钩子用 cached venv 还是每局 pip、何时做（T1）；工作区来源是否需支持 git clone / 指定 commit，以对接更真实的项目快照并与 0009 SeedSource 的可插拔供给衔接（T1）；临时目录清理策略与磁盘占用上限（T1）。
+Dependencies and sources: how to supply scenarios with third-party dependencies—whether the setup hook uses a cached venv or pip per session, and when to implement this (T1); whether workspace sources need to support git clone / a specified commit, to connect to more realistic project snapshots and integrate with the pluggable supply of 0009 SeedSource (T1); temporary-directory cleanup policy and disk-usage limits (T1).
 
-隔离与工具边界：共享 FS 下 harness 与用户 agent 的写竞争，当前靠逐轮 stdio 串行天然规避，若将来 harness 异步/并发执行则需显式锁或快照隔离（T1）；共享目录里 harness 改动与用户 agent 核实过程的可观测性，即落盘 transcript 是否要记录工作区 diff（T1）；run_shell 是否需要资源上限（内存/CPU/网络禁用）做更强隔离（T2）；web_search 真实实现的接口与配额留后续（T2）；是否需要 apply_patch/diff 类工具，还是 write_file 已足够（T2）；D1 门控三档是否够，或需更细的工具-能力映射表（T2）。
+Isolation and tool boundaries: write contention between the harness and user agent on a shared FS is currently avoided naturally by turn-by-turn stdio serialization; if the harness executes asynchronously/concurrently in the future, explicit locks or snapshot isolation will be needed (T1); observability of harness changes and the user agent's verification process in the shared directory, specifically whether persisted transcripts should record workspace diffs (T1); whether run_shell needs resource limits (memory/CPU/network disabling) for stronger isolation (T2); the interface and quotas for a real web_search implementation are left for later (T2); whether apply_patch/diff-style tools are needed or write_file is sufficient (T2); whether three D1 gating tiers are enough or a finer-grained tool-to-capability mapping table is needed (T2).
 
-核实行为与 skill：skill 真实库的来源与组织——手写还是从成功会话蒸馏，仍受 held-out 约束（T3）；WILL 层纯 prompt 引导是否足够，还是需要给内层喂显式「核实预算/成本」信号做更硬的约束（T3）；核实倾向句的粒度取连续还是离散档位（T3）；是否要把外层已渐冗余的 verify_self 语义与内层可选核实统一表述，及是否索性清理外层 verify_self/pending_self_obs（核实已下沉内层）——这一问题横跨 T3 与 T4，尚未定论。
+Verification behavior and skill: the source and organization of a real skill library—handwritten or distilled from successful conversations, still subject to held-out constraints (T3); whether pure prompt guidance at the WILL layer is sufficient, or whether the inner layer needs explicit "verification budget/cost" signals for harder constraints (T3); whether verification-tendency statements should use continuous granularity or discrete tiers (T3); whether to unify the increasingly redundant outer verify_self semantics with inner optional verification, and whether to simply remove outer verify_self/pending_self_obs (verification has moved into the inner layer)—this question spans T3 and T4 and remains unresolved.
 
-收口与统一实现：是否给内层喂显式状态信号（patience/trust）以让核实意愿更可控（T4）；max_inner_steps/timeout 的默认值与成本上限（T4）；本组内层循环与 0003/T2 nexau_runtime 的 tool-calling 形态是否要统一成一套实现（T4）；真实 LLM 的 tool-calling schema 选型——function calling 还是文本协议（T4）。
+Final integration and unified implementation: whether to feed explicit state signals (patience/trust) to the inner layer to make willingness to verify more controllable (T4); defaults and cost caps for max_inner_steps/timeout (T4); whether this group's inner loop and the tool-calling form in 0003/T2 nexau_runtime should be unified into one implementation (T4); schema selection for real LLM tool-calling—function calling or a text protocol (T4).
 
 ## Future possibilities
 
-<!-- 待填 -->
+<!-- TODO -->
 

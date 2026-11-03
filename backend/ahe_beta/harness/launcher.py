@@ -1,11 +1,13 @@
-"""harness launcher（spec-0003/T1）：把某版 harness 程序接成 spec-0001 的 HarnessInterface。
+"""Launch a harness version as spec-0001's HarnessInterface (spec-0003/T1).
 
-按 git ref 把 harness 仓 checkout 到 data/harness_runs/<ref>/，起子进程跑其自带 entry，
-按 stdio JSONL 协议适配为 send/reset/close（Spec-0036）：
-  stdin  用户消息统一 write_message；外通道 interrupt/shutdown
-  stdout progress/status 等旁路照记；type=reply 为软唤醒（poll 不绑写旗标）
-控制名对 launcher 不透明（HELP.md 是能力真相源）。接收端放宽——未知旁路字段不报错。
-harness 内部 1 或 N 个 nexau 如何编排对 launcher 不可见（黑盒）。
+Check out the requested git ref under data/harness_runs/<ref>/, start the harness entry point
+in a subprocess, and adapt its stdio JSONL interface to send/reset/close (Spec-0036):
+  stdin: user messages use write_message; interrupt/shutdown use a separate control channel.
+  stdout: progress/status and other side-channel events are recorded; type=reply wakes a poller
+          without requiring a prior write flag.
+Control names are opaque to the launcher; HELP.md defines the harness's capabilities.
+Unknown side-channel fields are accepted. The harness's internal arrangement of one or more
+nexau agents remains hidden behind this interface.
 """
 
 from __future__ import annotations
@@ -51,14 +53,14 @@ _PARAMS_FILE = "params.yaml"
 # Process death is detected separately, even when an orphan holds stdout open.
 _POLL_INTERVAL = 5.0
 _SEND_ABS_CAP = 1800.0
-# 读线程 EOF / 进程退出时投进行队列的哨兵（与真实 stdout 行区分）。
+# Sentinel pushed to line queue on read thread EOF / process exit (distinct from actual stdout lines).
 _EOF = object()
 _SIDEBAND_PREVIEW_CAP = 500
 _POST_REPLY_DRAIN_SEC = 0.2
 
 
 def _sideband_preview(payload: dict) -> str:
-    """把旁路 JSON 压成短文本，供 control() 返回值与等待条展示。"""
+    """Compress side-channel JSON into short text for control() return value and wait condition display."""
     status = payload.get("status")
     if isinstance(status, dict):
         bits: list[str] = []
@@ -77,12 +79,12 @@ def _sideband_preview(payload: dict) -> str:
 
 
 def _is_control_ack_sideband(payload: dict) -> bool:
-    """是否算「对本 control 的应答旁路」（排除夹杂的纯 progress 工具活动条）。"""
+    """Check whether an event acknowledges this control, excluding interleaved tool-progress events."""
     return payload.get("type") != "progress"
 
 
 class _HarnessHandle:
-    """子进程句柄，实现 HarnessInterface。一句柄一子进程一会话。"""
+    """Subprocess handle, implements HarnessInterface. One handle per subprocess per session."""
 
     def __init__(
         self,
@@ -101,29 +103,29 @@ class _HarnessHandle:
         self._workspace_runtime = workspace_runtime
         self._proc: subprocess.Popen[str] | None = None
         self._closed = False
-        # 该版本 harness 的帮助文本（HELP.md）：面向用户的能力契约，
-        # 调用方据此形成对本工具"能干嘛/缺什么"的预期。缺文件则为空串。
+        # Help text (HELP.md) for this harness version: capability contract facing users;
+        # callers form expectations about "what it can do / what it lacks" based on this. Empty string if file missing.
         self.help_text = help_text
-        # 最近一次 send 的 harness 内层过程流（{kind,text} 序列）：协议 reply 之外的观测旁路，
-        # persona 只吃 send 返回的 reply、看不到 steps。调用方 send 后立即 getattr 读取。
+        # Inner harness process flow from most recent send ({kind,text} sequence): observation side-channel beyond protocol reply;
+        # persona consumes only send's returned reply, never sees steps. Callers read immediately after send via getattr.
         self.last_steps: list[dict] = []
-        # 本轮进行中已吐出的进度条（Codex 式活动摘要）：等待心跳时喂给用户 agent；
-        # 与 steps 同源压缩，但不等于完整过程流。纯 progress 与其它旁路都会尽量映到这里。
+        # Progress bar output emitted in this round (Codex-style activity summary): fed to user agent during heartbeat waits;
+        # Shares origin with steps but is not equivalent to the complete process flow. Pure progress and other sidebands are mapped here as much as possible.
         self.last_progress: list[dict] = []
-        # 本轮全部非 reply 旁路原文（progress/status/其它）；control() 用它判断旁路型控制已响应。
+        # Raw text of all non-reply sidebands in this round (progress/status/others); control() uses it to determine whether sideband-type control has responded.
         self.last_sideband: list[dict] = []
-        # 本轮 stdout 用户可见事件流（reply/progress/status/error/ack 等），按观察顺序保留；
-        # 不做 request/reply 配对推断，只记录 harness stdout 自身说了什么。
+        # This round's stdout user-visible event stream (reply/progress/status/error/ack, etc.), preserved in observation order;
+        # Does not infer request/reply pairing, only records what harness stdout itself said.
         self.last_visible_events: list[dict] = []
         self.visible_events: list[dict] = []
         self._usage_events: list[dict] = []
-        # 心跳/续等：进程级读线程把 stdout 行丢进队列；poll 在超时内 drain——
-        # 旁路累积，reply 为软唤醒（Spec-0036；不绑写路径）。
+        # Heartbeat/wait continuation: process-level read thread puts stdout lines into queue; poll drains within timeout—
+        # sidebands accumulate, reply provides soft wake-up (Spec-0036; not bound to write path).
         self._line_q: queue.Queue = queue.Queue()
         self._reader: threading.Thread | None = None
         self._t0 = 0.0
-        # 软状态：自上次 write_message 起是否仍在等一条 reply（供 interrupt/abs-cap/try_reply）。
-        # 不约束写、不约束 poll（Spec-0036）。
+        # Soft state: whether we are still waiting for a reply since the last write_message (for interrupt/abs-cap/try_reply).
+        # Does not constrain writes or poll (Spec-0036).
         self._awaiting_reply = False
         self._request_id = ""
         self._request_started_at = ""
@@ -142,8 +144,8 @@ class _HarnessHandle:
                 "AHE_BETA_HARNESS_MESSAGE_ACTIVITY_SECONDS must be positive finite seconds"
             )
         self.request_outcomes: list[dict[str, Any]] = []
-        # 最近一笔已结束请求的结构化终态。调用方必须能区分正常 reply 与
-        # "带 timeout/crash 文本的终局 reply"，不能再靠解析人类可见文本猜测。
+        # Structured terminal state of the most recent completed request. Caller must be able to distinguish normal reply from
+        # "terminal reply with timeout/crash text"; cannot rely on parsing human-readable text to guess.
         self.last_request_status = ""
         self._start()
 
@@ -154,7 +156,7 @@ class _HarnessHandle:
 
     @property
     def in_flight(self) -> bool:
-        """兼容旧名：是否自上次写消息起仍在等 reply（软状态，不挡写/读）。"""
+        """Backward compatibility alias: whether we are still waiting for a reply since the last message write (soft state, does not block writes/reads)."""
         return self._awaiting_reply
 
     def _record_visible_event(self, event_type: str, text: str, raw: dict) -> None:
@@ -169,7 +171,7 @@ class _HarnessHandle:
         self.visible_events.append(event)
 
     def drain_visible_events(self) -> list[dict]:
-        """取出本轮新 stdout 可见事件；不解释、不配对，只按观察顺序返回。"""
+        """Retrieve new stdout events visible in this round; no interpretation or pairing, only return in observation order."""
         events = list(self.last_visible_events)
         self.last_visible_events.clear()
         return events
@@ -202,7 +204,7 @@ class _HarnessHandle:
         return events
 
     def _start(self) -> None:
-        # 命令不存在 / entry 崩溃 → Popen 抛错，由 launch 上抛（附 entry 信息）。
+        # Command not found / entry crashed → Popen raises error, propagated by launch (with entry info).
         self._proc = subprocess.Popen(
             self._entry,
             cwd=str(self._cwd),
@@ -211,17 +213,17 @@ class _HarnessHandle:
             stdout=subprocess.PIPE,
             text=True,
             bufsize=1,
-            start_new_session=True,  # 独立进程组：超时/关闭时连 harness 起的子进程一并回收
+            start_new_session=True,  # Independent process group: on timeout/close, child processes spawned by harness are also reaped
         )
         self._line_q = queue.Queue()
         self._reader = threading.Thread(target=self._read_loop, daemon=True)
         self._reader.start()
 
     def _read_loop(self) -> None:
-        """进程存活期间持续 readline → 队列；EOF 投 _EOF 后退出。
+        """Continuously readline from process lifetime → queue; emit _EOF after reaching end of file and exit.
 
-        关流/断管时 readline 可能抛 ValueError(I/O on closed file) 或 OSError——视为 EOF，
-        不让 daemon 读线程抛未捕获异常（对齐 origin/main 对单行读线程的兜底）。
+        When closing stream/closing pipe, readline may raise ValueError(I/O on closed file) or OSError—treat as EOF,
+        prevent daemon read thread from raising uncaught exception (aligned with origin/main's fallback for single-line read threads).
         """
         stdout = self._proc.stdout if self._proc is not None else None
         if stdout is None:
@@ -239,7 +241,7 @@ class _HarnessHandle:
             self._line_q.put(line)
 
     def _kill_group(self, sig: int) -> None:
-        """给 harness 整个进程组发信号（含其 nexau/sandbox 子进程）；进程已亡则忽略。"""
+        """Send signal to the entire harness process group (including its nexau/sandbox child processes); ignore if process is dead."""
         if self._proc is None:
             return
         try:
@@ -304,12 +306,13 @@ class _HarnessHandle:
         return {"type": "shutdown"}
 
     def write_message(self, message: str) -> None:
-        """统一写入口（Spec-0036）：向 harness stdin 写入一条用户消息。
+        """Write a user message to harness stdin through the unified entry point (Spec-0036).
 
-        不区分「正式轮次 / 加塞」；堵/排队由 harness 决定。可连续多次调用。
+        Initial and interleaved messages use the same path. The harness decides whether to block or
+        queue them. Multiple consecutive writes are allowed.
         """
         if self._closed or self._proc is None:
-            raise RuntimeError("harness 句柄已关闭，不可再 send")
+            raise RuntimeError("Harness handle is closed; send is unavailable")
         assert self._proc.stdin is not None and self._proc.stdout is not None
         self.last_request_status = ""
         command = message.strip().split(maxsplit=1)[0].lower() if message.strip() else ""
@@ -459,15 +462,15 @@ class _HarnessHandle:
             )
 
     def begin(self, message: str) -> None:
-        """Deprecated alias of write_message（Spec-0036）。"""
+        """Deprecated alias of write_message (Spec-0036)."""
         self.write_message(message)
 
     def emit_message(self, message: str) -> None:
-        """Deprecated alias of write_message（Spec-0036）。"""
+        """Deprecated alias of write_message (Spec-0036)."""
         self.write_message(message)
 
     def _ingest_sideband(self, payload: dict) -> None:
-        """收下任意非 reply 旁路：原文进 last_sideband，并尽量映到 last_progress 供等待条。"""
+        """Accept any non-reply sideband: raw text goes into last_sideband and is mapped to last_progress where possible for wait conditions."""
         if payload.get("type") == "usage":
             self._usage_events.append(dict(payload))
             return
@@ -490,7 +493,7 @@ class _HarnessHandle:
         self.last_progress.append({"kind": kind, "text": _sideband_preview(payload)})
 
     def _post_reply_drain(self) -> None:
-        """短暂收下紧跟终态 reply 的旁路事件；不等待下一条终态 reply。"""
+        """Briefly accept sideband events immediately following terminal reply; do not wait for next terminal reply."""
         deadline = time.monotonic() + _POST_REPLY_DRAIN_SEC
         while True:
             remaining = deadline - time.monotonic()
@@ -525,14 +528,16 @@ class _HarnessHandle:
             self._ingest_sideband(payload)
 
     def poll(self, timeout: float) -> tuple[str, object]:
-        """在 timeout 秒内等下一条 type=reply（软唤醒，Spec-0036）。
+        """Wait up to timeout seconds for the next type=reply (soft wake-up, Spec-0036).
 
-        不要求写路径旗标。返回 ("reply", text) 或 ("pending", waited_sec)。
-        progress/status 等旁路照记并继续等。进程已死却无完整行则上抛；
-        显式任务期限先取消，独立收尾余量后才强停；新消息不续租。
+        No write-path flag is required. Return ("reply", text) or ("pending", waited_sec).
+        Record progress/status and other side-channel events while continuing to wait. Raise if the
+        process exits without leaving a complete line in the queue. On an explicit task deadline,
+        cancel first and allow a separate period for collecting final output before forcing a stop.
+        New messages do not extend the deadline.
         """
         if self._closed or self._proc is None:
-            raise RuntimeError("harness 句柄已关闭，不可 poll")
+            raise RuntimeError("Harness handle is closed; poll is unavailable")
         t_poll0 = time.monotonic()
         deadline = t_poll0 + max(0.0, timeout)
         while True:
@@ -545,27 +550,27 @@ class _HarnessHandle:
                 item = self._line_q.get(timeout=min(_POLL_INTERVAL, remaining))
             except queue.Empty:
                 if self._proc is not None and self._proc.poll() is not None:
-                    # 进程已退出：若队列已空且仍在等 reply，判崩溃；否则当作无更多输出。
+                    # Process has exited: if queue is empty and still waiting for reply, determine crash; otherwise treat as no more output.
                     if self._awaiting_reply:
                         self._kill_group(signal.SIGKILL)
                         self._awaiting_reply = False
                         self._finish_request("crashed", origin="transport")
                         raise RuntimeError(
-                            "harness 子进程已退出但未回完整行（崩溃/孤儿占管道）"
+                            "Harness subprocess exited without returning a complete line (crash or orphaned process holding the pipe)"
                         ) from None
                     return ("pending", time.monotonic() - t_poll0)
                 continue
             if item is _EOF:
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="transport")
-                raise RuntimeError("harness 子进程已退出（stdout EOF）")
+                raise RuntimeError("Harness subprocess exited (stdout EOF)")
             line = str(item)
             try:
                 payload = json.loads(line)
             except (json.JSONDecodeError, TypeError) as exc:
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="protocol")
-                raise RuntimeError(f"harness 协议违例：{line!r}（{exc}）") from exc
+                raise RuntimeError(f"Harness protocol violation: {line!r} ({exc})") from exc
             if (
                 not isinstance(payload, dict)
                 or not isinstance(payload.get("type"), str)
@@ -573,7 +578,9 @@ class _HarnessHandle:
             ):
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="protocol")
-                raise RuntimeError(f"harness 协议违例：需要含 type 的对象 {line!r}")
+                raise RuntimeError(
+                    f"Harness protocol violation: expected an object containing type, got {line!r}"
+                )
             if payload.get("type") == "error":
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="harness_error")
@@ -590,10 +597,10 @@ class _HarnessHandle:
             continue
 
     def try_reply(self) -> str | None:
-        """非阻塞：若 reply 已在 stdout 缓冲中则取出（软唤醒，不要求写旗标）。
+        """Non-blocking: retrieve reply if already in stdout buffer (soft wake-up, does not require write flag).
 
-        供心跳决策之后、执行动作之前调用：LLM 思考期间到的 reply 不应再被 give_up/interrupt 吞掉。
-        旁路行照常吞进 last_progress；队列空则返回 None。
+        Call after heartbeat decision but before executing action: reply arriving during LLM thinking should not be swallowed by give_up/interrupt.
+        Sideband lines are consumed into last_progress as usual; return None if queue is empty.
         """
         if self._closed or self._proc is None:
             return None
@@ -605,14 +612,14 @@ class _HarnessHandle:
             if item is _EOF:
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="transport")
-                raise RuntimeError("harness 子进程已退出（stdout EOF）")
+                raise RuntimeError("Harness subprocess exited (stdout EOF)")
             line = str(item)
             try:
                 payload = json.loads(line)
             except (json.JSONDecodeError, TypeError) as exc:
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="protocol")
-                raise RuntimeError(f"harness 协议违例：{line!r}（{exc}）") from exc
+                raise RuntimeError(f"Harness protocol violation: {line!r} ({exc})") from exc
             if (
                 not isinstance(payload, dict)
                 or not isinstance(payload.get("type"), str)
@@ -620,7 +627,9 @@ class _HarnessHandle:
             ):
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="protocol")
-                raise RuntimeError(f"harness 协议违例：需要含 type 的对象 {line!r}")
+                raise RuntimeError(
+                    f"Harness protocol violation: expected an object containing type, got {line!r}"
+                )
             if payload.get("type") == "error":
                 self._awaiting_reply = False
                 self._finish_request("crashed", origin="harness_error")
@@ -636,14 +645,14 @@ class _HarnessHandle:
             self._ingest_sideband(payload)
 
     def control(self, name: str) -> str:
-        """外通道：向 harness 发控制（用户侧主路径是 interrupt ≈ Ctrl+C）。
+        """External channel: send control to harness (user-side main path is interrupt ≈ Ctrl+C).
 
-        - interrupt（及同类终结型）：最终吐 reply，返回 reply 文本。
-        - 若 harness 仍对其它名吐旁路 ack：返回旁路预览。
-        不要求写路径旗标（Spec-0036）；进程须仍打开。
+        - interrupt (and similar terminal types): ultimately emit reply, return reply text.
+        - If harness still emits sidebands for other names: return sideband preview.
+        Does not require write path flag (Spec-0036); process must still be open.
         """
         if self._closed or self._proc is None:
-            raise RuntimeError("harness 句柄已关闭，不可发控制消息")
+            raise RuntimeError("Harness handle is closed; control messages are unavailable")
         before = len(self.last_sideband)
         self._write(self._interrupt_frame() if name == "interrupt" else {"type": name})
         # Control acknowledges existing work; it never renews a task deadline.
@@ -656,7 +665,7 @@ class _HarnessHandle:
                     return _sideband_preview(payload)
 
     def send(self, message: str) -> str:
-        """阻塞版：write_message + 等到下一条 reply（Spec-0036）。"""
+        """Blocking version: write_message + wait for next reply (Spec-0036)."""
         self.write_message(message)
         while True:
             kind, val = self.poll(min(self._limits.outer_seconds, 60.0))
@@ -665,14 +674,14 @@ class _HarnessHandle:
 
     def reset(self) -> None:
         if self._closed:
-            raise RuntimeError("harness 句柄已关闭，不可 reset")
+            raise RuntimeError("Harness handle is closed; reset is unavailable")
         self._terminate()
         self._pending_requests.clear()
         self._request_id = ""
-        self._start()  # 重启 entry = 开新一局（复位语义收在 launcher 一侧）
+        self._start()  # Restarting entry = starting a new round (reset semantics contained on launcher side)
 
     def shutdown(self) -> None:
-        """按 human-facing interface 结束进程；先发 shutdown，随后兜底回收进程组。"""
+        """End process per human-facing interface; send shutdown first, then fall back to process group reaping."""
         if not self._closed and self._proc is not None and self._proc.stdin is not None:
             try:
                 self._write(self._shutdown_frame())
@@ -682,7 +691,7 @@ class _HarnessHandle:
 
     def close(self) -> None:
         self._terminate()
-        self._closed = True  # 幂等
+        self._closed = True  # Idempotent
 
     def _terminate(self) -> None:
         self._awaiting_reply = False
@@ -697,9 +706,9 @@ class _HarnessHandle:
                 self._proc.wait(timeout=1)
             except (BrokenPipeError, OSError, AssertionError, subprocess.TimeoutExpired):
                 pass  # Busy/crashed processes still follow the existing bounded kill path.
-        # 顺序：先杀整组 → wait/兜底 SIGKILL → join 读线程 → 再关流、置空 _proc。
-        # readline 得 EOF 的前提是管道写端都关闭，故 join 放在 SIGKILL 兜底之后；
-        # _read_loop 已兜 (ValueError, OSError)。反序关流会与在途读线程抢 stdout。
+        # Order: kill entire group first → wait/fall back to SIGKILL → join read thread → then close streams, set _proc to None.
+        # readline gets EOF only when all write ends of pipes are closed; therefore join is placed after SIGKILL fallback;
+        # _read_loop already catches (ValueError, OSError). Reverse-closing the stream races with in-flight read threads for stdout.
         self._kill_group(signal.SIGTERM)
         self._proc.terminate()
         try:
@@ -720,13 +729,13 @@ class _HarnessHandle:
 
 
 class HarnessLauncher:
-    """按 ref 取出某版 harness 并启动，返回 HarnessInterface 句柄。"""
+    """Retrieve a harness version by ref and launch it; return a HarnessInterface handle."""
 
     def __init__(self, harness_repo: str, runs_root: str | Path = "data/harness_runs") -> None:
         self._harness_repo = harness_repo
         self._runs_root = Path(runs_root)
-        # Spec-0017/T5：a 段并行后同轮所有会话同 SHA → 同一 checkout dest，_checkout 的
-        # check-then-extract 必须进程内互斥（首线程干活，其余命中缓存）。
+        # Spec-0017/T5: after parallel segment a, all sessions in the same round with identical SHA → same checkout destination. The _checkout
+        # check-then-extract must be intra-process mutually exclusive (primary thread does work, others hit cache).
         self._checkout_lock = threading.Lock()
         from ahe_beta.observations.publication import framework_version
 
@@ -738,7 +747,7 @@ class HarnessLauncher:
         params = self._read_params(dest)
         entry = params["entry"]
         if not isinstance(entry, list) or not entry:
-            raise ValueError(f"params.yaml 的 entry 须为非空 argv 列表：{entry!r}")
+            raise ValueError(f"params.yaml entry must be a non-empty argv list: {entry!r}")
         argv = [str(a) for a in entry]
         runtime = as_runtime(workspace_dir) if workspace_dir is not None else None
         is_docker = isinstance(runtime, DockerWorkspaceRuntime)
@@ -775,8 +784,8 @@ class HarnessLauncher:
         # the one supported contract; the current Seed ignores this variable.
         env["HARNESS_STDIO_PROTOCOL"] = "stdio-jsonl-v1"
         if runtime is not None:
-            # Spec-0008/T1 v2：与用户 agent 共享同一工作区——把它注入 harness 的 SANDBOX_WORK_DIR，
-            # harness entry 读到即以它当 bash 工作根（不再自建 harness_ws_* tmp）；覆盖 params.yaml 同名键。
+            # Spec-0008/T1 v2: share the same workspace with the user agent—inject it into harness's SANDBOX_WORK_DIR;
+            # harness entry reads it and uses it as bash working root (no longer creates its own harness_ws_* tmp); overrides same-name key in params.yaml.
             env["SANDBOX_WORK_DIR"] = runtime.cwd
         if os.environ.get("HARNESS_LLM_MAX_CONTEXT_TOKENS"):
             env["LLM_MAX_CONTEXT_TOKENS"] = os.environ["HARNESS_LLM_MAX_CONTEXT_TOKENS"]
@@ -854,47 +863,47 @@ class HarnessLauncher:
 
     @staticmethod
     def _read_help_text(dest: Path) -> str:
-        """读该版本 harness 的帮助文本（HELP.md）；缺失即空串。"""
+        """Read the help text (HELP.md) of this harness version; return empty string if missing."""
         help_path = dest / "HELP.md"
         if not help_path.is_file():
             return ""
         return help_path.read_text(encoding="utf-8", errors="replace")
 
     def _resolve_sha(self, *, ref: str) -> str:
-        """把 ref（分支/tag/SHA）解析成确定的 commit SHA；非法 ref 抛 RuntimeError。"""
+        """Resolve a ref (branch/tag/SHA) to a definitive commit SHA; raise RuntimeError for invalid ref."""
         result = subprocess.run(
             ["git", "-C", self._harness_repo, "rev-parse", "--verify", f"{ref}^{{commit}}"],
             capture_output=True,
         )
         if result.returncode != 0:
             raise RuntimeError(
-                f"解析 ref {ref!r} 失败：{result.stderr.decode(errors='replace')[:200]}"
+                f"Failed to resolve ref {ref!r}: {result.stderr.decode(errors='replace')[:200]}"
             )
         return result.stdout.decode().strip()
 
     def _checkout(self, *, ref: str) -> Path:
-        # 按 commit SHA 而非 ref 名缓存：release 这类会变的分支，内容一变就落到新目录，
-        # 绝不复用陈旧 checkout（曾导致跑的是旧 entry.py、harness 静默空回复）。
+        # Cache by commit SHA, not ref name: branches like release can change content, and when they do, fall into new directory,
+        # never reuse stale checkout (once caused running old entry.py and harness silently returning no reply).
         sha = self._resolve_sha(ref=ref)
         dest = self._runs_root / f"{ref.replace('/', '_')}-{sha[:12]}"
-        # Spec-0017/T5：并行会话同 SHA 同 dest，check-then-extract 全程持锁——无锁时多线程同时
-        # 通过存在性检查后并发 extractall 同一目录，params.yaml 被两条 tar 流叠写出重复键/乱字节；
-        # 且 A 半解压时 B 会把「非空目录」误判为完整缓存复用（生产实跑踩中）。
+        # Spec-0017/T5: parallel sessions with same SHA to same dest must hold lock throughout check-then-extract—without lock, multiple threads
+        # pass the existence check then concurrently extractall to the same directory, causing params.yaml to be overwritten by two tar streams with duplicate keys/garbled bytes;
+        # and while A is mid-extraction, B misidentifies "non-empty directory" as complete cache and reuses it (hit this in production).
         with self._checkout_lock:
             if dest.is_dir() and any(dest.iterdir()):
-                return dest  # 同 ref 同 SHA（内容一致）→ 安全复用
+                return dest  # same ref, same SHA (identical content) → safe to reuse
             result = subprocess.run(
                 ["git", "-C", self._harness_repo, "archive", "--format=tar", sha],
                 capture_output=True,
             )
             if result.returncode != 0:
                 raise RuntimeError(
-                    f"checkout {ref!r}@{sha[:12]} 失败："
+                    f"checkout {ref!r}@{sha[:12]} failed: "
                     f"{result.stderr.decode(errors='replace')[:200]}"
                 )
-            # 解压到唯一临时目录后原子 rename 占位：半解压目录绝不可能以 dest 之名存在——进程
-            # 中途崩溃只留无害 *.tmp* 孤儿（不匹配任何 dest 名，不污染缓存）；跨进程并发时输者
-            # rename 失败（dest 已被赢者完整就位）→ 弃自己的 tmp、复用 dest。
+            # Extract to unique temp directory then atomically rename to claim the slot: partially-extracted directory can never exist under dest name—if process
+            # crashes mid-operation, only harmless *.tmp* orphans remain (don't match any dest name, don't pollute cache); under cross-process concurrency, the loser's
+            # rename fails (dest already fully in place by the winner) → discard its tmp, reuse dest.
             self._runs_root.mkdir(parents=True, exist_ok=True)
             tmp = Path(tempfile.mkdtemp(dir=self._runs_root, prefix=dest.name + ".tmp"))
             try:
@@ -908,13 +917,13 @@ class HarnessLauncher:
             except OSError:
                 shutil.rmtree(tmp, ignore_errors=True)
                 if not (dest.is_dir() and any(dest.iterdir())):
-                    raise  # 不是「别人已就位」而是真失败：如实上抛
+                    raise  # not "someone else already in place" but a true failure: propagate the error as-is
             return dest
 
     def _read_params(self, dest: Path) -> dict[str, Any]:
         params_path = dest / _PARAMS_FILE
         if not params_path.is_file():
-            raise FileNotFoundError(f"harness 缺 {_PARAMS_FILE}：{params_path}")
-        # Spec-0017/T5：ruamel 的 YAML 实例非线程安全（解析器内部状态跨调用共享），并行 launch
-        # 下共享模块级单例会被并发 load 互相搅乱 → 每次解析新建实例（构造开销微不足道）。
+            raise FileNotFoundError(f"Harness is missing {_PARAMS_FILE}: {params_path}")
+        # Spec-0017/T5: ruamel's YAML instance is not thread-safe (parser internal state shared across calls), parallel launch
+        # sharing a module-level singleton can scramble concurrent loads → create a fresh instance per parse (construction overhead is negligible).
         return dict(YAML(typ="safe").load(params_path))

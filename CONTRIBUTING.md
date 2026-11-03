@@ -2,7 +2,7 @@
 
 English | [简体中文](CONTRIBUTING.zh-CN.md)
 
-Contributions are welcome, including bug reports, documentation improvements and code changes. Start with the [README](README.md) for the project workflow and the [architecture guide](docs/ARCHITECTURE.md) for the main components. Architecture and detailed design documents are currently mostly in Chinese.
+Contributions are welcome, including bug reports, documentation improvements and code changes. Start with the [README](README.md) for the project workflow and the [architecture guide](docs/ARCHITECTURE.md) for the main components. Design specifications are maintained in English under [docs/specs](docs/specs/README.md); the original Chinese specifications are preserved under [docs/specs-zh-CN](docs/specs-zh-CN/README.md).
 
 ## Report a bug
 
@@ -11,6 +11,8 @@ Use the [bug report template](.github/ISSUE_TEMPLATE/bug_report.md) and include 
 ## Prepare a change
 
 Keep each pull request focused on one problem or feature. For a new feature or a behavior change across modules, create or update the relevant design document before implementation. The [spec guide](docs/specs/README.md) explains how to create a spec and reserve its number.
+
+Write new code comments, docstrings and specifications in English. Keep comments focused on intent, constraints and behavior that are not clear from the code itself.
 
 When changing dependencies, include the updated lockfile in the same pull request. When changing the delivery interface or evidence transport, also validate against the corresponding OpenAgents revision and record both repository commits. See the [OpenAgents contribution guide](https://github.com/Curry09/OpenAgents/blob/main/CONTRIBUTING.md) for changes in that repository.
 

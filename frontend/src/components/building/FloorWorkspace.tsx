@@ -3,18 +3,18 @@ import type { BuildingMode, FloorModel, RoundFilter } from "./buildingModel";
 import { historyLabel, shortStatus } from "./buildingModel";
 
 function modeLabel(mode: BuildingMode, round: RoundFilter): string {
-  if (mode === "live") return "当前办公";
-  if (mode === "replay" && round !== "all") return `第 ${round} 轮复盘`;
-  return "全部轮次汇总";
+  if (mode === "live") return "Currently working";
+  if (mode === "replay" && round !== "all") return `Round ${round} retrospective`;
+  return "All rounds summary";
 }
 
 const WORKSPACE_KIND: Record<AgentRole, { label: string; hint: string }> = {
-  user: { label: "USER LAB", hint: "体验舱 / 访谈台" },
-  triager: { label: "TRIAGE DESK", hint: "队列 / 分诊台" },
-  architect: { label: "ARCHITECT", hint: "白板 / 方案墙" },
-  divergent: { label: "DIVERGENT ROOM", hint: "灵感板 / 候选池" },
-  owner: { label: "OWNER GATE", hint: "准入台 / Ready 队列" },
-  developer: { label: "DELIVERY BOUNDARY", hint: "openagents 交接令牌" },
+  user: { label: "USER LAB", hint: "Experience lab / Interview desk" },
+  triager: { label: "TRIAGE DESK", hint: "Queue / Triage desk" },
+  architect: { label: "ARCHITECT", hint: "Whiteboard / Proposal wall" },
+  divergent: { label: "DIVERGENT ROOM", hint: "Idea board / Candidate pool" },
+  owner: { label: "OWNER GATE", hint: "Admission desk / Ready Queue" },
+  developer: { label: "DELIVERY BOUNDARY", hint: "openagents Handoff token" },
 };
 
 export function FloorWorkspace(props: {
@@ -36,14 +36,14 @@ export function FloorWorkspace(props: {
           </span>
           <div>
             <div className="building-kicker">{floor.floorNo}F · {modeLabel(mode, round)}</div>
-            <h2>{floor.name}工区</h2>
+            <h2>{floor.name} workspace</h2>
             <p>{floor.subtitle}</p>
           </div>
         </div>
         <div className="floor-workspace-meta">
           <span>{workspace.label}</span>
           <em>{workspace.hint}</em>
-          <strong>{mode === "summary" ? `${floor.history.length} 条归档` : `${floor.activeCount}/${floor.capacity} 使用中`}</strong>
+          <strong>{mode === "summary" ? `${floor.history.length} archived entries` : `${floor.activeCount}/${floor.capacity} occupied`}</strong>
         </div>
       </div>
 
@@ -63,8 +63,8 @@ export function FloorWorkspace(props: {
                   {agent.running ? <span className="dot on" /> : <span className={`role-dot ${floor.role}`} />}
                   <strong>{agent.label}</strong>
                 </span>
-                <span>{shortStatus(agent.status || "待命中")}</span>
-                {agent.round != null && agent.round > 0 && <em>第 {agent.round} 轮</em>}
+                <span>{shortStatus(agent.status || "On standby")}</span>
+                {agent.round != null && agent.round > 0 && <em>Round {agent.round}</em>}
               </span>
             </button>
           ))}
@@ -84,8 +84,8 @@ export function FloorWorkspace(props: {
                   <span className={`role-dot ${floor.role}`} />
                   <strong>{item.label}</strong>
                 </span>
-                <span>{shortStatus(item.status || "已归档")}</span>
-                <em>第 {item.round} 轮 · {historyLabel(item)}</em>
+                <span>{shortStatus(item.status || "Archived")}</span>
+                <em>Round {item.round} · {historyLabel(item)}</em>
               </span>
             </button>
           ))}
@@ -95,9 +95,9 @@ export function FloorWorkspace(props: {
             <div className="floor-summary-room">
               <div className="summary-num">{floor.history.length}</div>
               <div>
-                <strong>全部轮次产出</strong>
-                <p>当前 live：{floor.liveAgents.length} 个 agent</p>
-                <p>{latest ? `最近：第 ${latest.round} 轮 · ${latest.label} · ${historyLabel(latest)}` : "暂无历史归档"}</p>
+                <strong>All rounds output</strong>
+                <p>Current live: {floor.liveAgents.length} Items agent</p>
+                <p>{latest ? `Latest: round ${latest.round} · ${latest.label} · ${historyLabel(latest)}` : "No historical archives"}</p>
               </div>
             </div>
             {floor.history.slice(-12).reverse().map(({ item, index }) => (
@@ -114,8 +114,8 @@ export function FloorWorkspace(props: {
                     <span className={`role-dot ${floor.role}`} />
                     <strong>{item.label}</strong>
                   </span>
-                  <span>{shortStatus(item.status || "已归档")}</span>
-                  <em>第 {item.round} 轮 · {historyLabel(item)}</em>
+                  <span>{shortStatus(item.status || "Archived")}</span>
+                  <em>Round {item.round} · {historyLabel(item)}</em>
                 </span>
               </button>
             ))}
@@ -126,18 +126,18 @@ export function FloorWorkspace(props: {
           <div key={`${floor.role}-empty-${i}`} className="floor-empty-seat" aria-hidden="true">
             <span className="seat-avatar empty">○</span>
             <span className="seat-monitor" />
-            <span>空工位</span>
+            <span>Empty workstation</span>
           </div>
         ))}
 
         {mode !== "summary" && floor.activeCount === 0 && floor.emptySeats === 0 && (
-          <div className="floor-empty">该楼层当前没有可展示工位</div>
+          <div className="floor-empty">No workstations to display on this floor</div>
         )}
       </div>
 
       <div className="floor-log-list">
-        <div className="block-title">最近动态</div>
-        {floor.recentLogs.length === 0 && <div className="empty">暂无动态</div>}
+        <div className="block-title">Recent activity</div>
+        {floor.recentLogs.length === 0 && <div className="empty">No recent activity</div>}
         {floor.recentLogs.map((log, i) => (
           <div key={`${log.source}-${i}-${log.t ?? ""}`} className={`floor-log-row ${log.kind}`}>
             <span>{log.source}</span>

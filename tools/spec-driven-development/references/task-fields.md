@@ -1,72 +1,97 @@
-# Spec Fields Reference (rust-RFC form, issue #69)
+# Spec Fields Reference
 
-A spec group = one markdown file `docs/specs/<NNNN-slug>.md`:
-- **frontmatter** (machine-read): group metadata + a `tasks[]` work-breakdown (structured).
-- **body** (human/agent-read): the group-level **rust-RFC 9-section overview** (the feature
-  told once, self-contained).
+A spec group is one English Markdown file, `docs/specs/NNNN-slug.md`:
 
-Authored via `spec new` / `spec add-task` or by editing the markdown directly, then
-`spec validate` + `spec render` + `spec graph`. Canonical key order is produced by the CLI —
-**don't hand-format frontmatter**.
+- YAML frontmatter holds group metadata and the `tasks` work breakdown.
+- The body holds the self-contained, group-level rust-RFC nine-section overview.
 
-## Group-level overview (body — rust-RFC 9 sections)
+Use `./tools/spec-driven-development/spec new` and `add-task` to create records.
+Edit existing frontmatter fields and body sections directly; preserve the CLI's
+key order. Then run `validate`, `render`, and
+`graph --package-root backend/ahe_beta` through the same launcher. There are no
+per-Task YAML files or `amend` command. Previous definitions live in git history.
 
-The feature's whole story lives here, **before** any task breakdown. Single spec must be
-self-contained: a reader understands it without opening any other spec. Reproduce, don't
-cross-reference — say "复述胜过一个引用". `spec new` scaffolds all 9 headings.
+## Group Frontmatter
 
-| Section (`## heading`) | What goes in it |
+| Field | Type | Meaning |
+|---|---|---|
+| `number` | string or integer | Four-digit group number; the CLI writes a quoted string. |
+| `title` | string | English group title. |
+| `issue` | integer | Associated issue number. |
+| `slug` | string | English kebab-case filename suffix. |
+| `summary` | string | Required non-empty, one-line explanation of what changes and why. |
+| `tasks` | list[Task] | Current Task rows, including completed Tasks that map to live code. |
+
+The schema requires `number`, `title`, `issue`, `slug`, and `tasks`. Semantic
+validation also requires a non-empty `summary`.
+
+## Group Overview
+
+Write the feature's whole design before breaking it into Tasks. A reader must
+understand the feature without opening another Spec. Restate required background
+and decisions; other Spec IDs are context, not substitutes for explanation.
+`new` scaffolds these headings in this order:
+
+| Section (`## heading`) | Content |
 |---|---|
-| `Summary` | One paragraph: what this feature is. **(required)** |
-| `Motivation` | Current state + why change. Reproduce background in place — **no load-bearing「见 Spec-NNNN」refs**. **(required)** |
-| `Guide-level explanation` | Teach it as if it already exists; examples. |
-| `Reference-level explanation` | Technical design **+ the DAG / file-allocation breakdown** (task table, mermaid), **+ the e2e script path** (`scripts/*.sh`, picked up by the PR signpost). **(required)** |
-| `Drawbacks` | Why we should *not* do this. |
-| `Rationale and alternatives` | Why this design; **at least one alternative considered**. **(required)** |
-| `Prior art` | Precedents (other projects/langs/papers); "none" is fine. |
-| `Unresolved questions` | Open questions to settle (replaces the old per-Task `open-questions`). |
-| `Future possibilities` | Natural follow-on evolution. |
+| `Summary` | What the feature does. **Required.** |
+| `Motivation` | Current behavior, the problem, and why change is needed. Restate background here. **Required.** |
+| `Guide-level explanation` | Explain usage as if the feature already exists, with examples. |
+| `Reference-level explanation` | Technical design, interfaces, Task DAG, file-allocation table, and relevant end-to-end script paths such as `backend/scripts/*.sh`. **Required.** |
+| `Drawbacks` | Costs, limitations, and reasons against the design. |
+| `Rationale and alternatives` | Why this design was chosen and at least one alternative considered. **Required.** |
+| `Prior art` | Relevant projects, languages, or papers; state when there is none. |
+| `Unresolved questions` | Questions intentionally left open after discussion. |
+| `Future possibilities` | Natural follow-up work. |
 
-`spec validate` errors if any **required** section is empty, and warns on suspected bare
-cross-spec refs (`Spec-NNNN [决策 N] / Spec-NNNN/Tn`) inside the overview.
+Validation errors on empty required sections and warns about suspected bare
+cross-Spec references, such as `Spec-0012` or `Spec-0012/T2`. A warning calls for
+checking that the needed explanation is present in this Spec.
 
-## Task fields (frontmatter — the work-breakdown row)
+## Task Identity and Status
 
-A Task is no longer a prose carrier — it's a **work-breakdown + file-allocation row** under
-the overview. The design narrative lives in the overview above; the Task only declares *who
-owns what* and *how to verify it*.
+A Task is a work-breakdown and file-ownership row. Its design rationale belongs
+in the group overview.
 
-### Identity & status (structured, machine-validated)
+| Field | Type | Meaning |
+|---|---|---|
+| `id` | string | Group-local ID matching `T[0-9A-Za-z]+`, usually `T1`; qualified references use `NNNN/T1`. |
+| `title` | string | Short English Task title. |
+| `status` | enum | `pending`, `in-progress`, or `done` in the current snapshot. |
+| `priority` | enum | `P0`, `P1`, `P2`, or `P3`. |
+| `tags` | list[str] | Optional labels. |
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `id` | `T<n>` | group-local id (`T3`); cross-group qualified id is `NNNN/T3` |
-| `title` | string | short Task title |
-| `status` | enum | `pending` \| `in-progress` \| `done` \| `abandoned` |
-| `priority` | enum | `P0` \| `P1` \| `P2` \| `P3` |
-| `tags` | list[str] | freeform labels |
+`done` Tasks remain in the snapshot while they map to live code. Although the
+status enum recognizes `abandoned`, semantic validation rejects it in a current
+group. Use `abandon` to remove that Task; git retains earlier definitions.
 
-`done` Tasks **stay in the snapshot** (they map to live code). `abandoned` Tasks are removed
-from the snapshot by `spec abandon` (history lives in git).
+## Task Relations and File Ownership
 
-### Relations & parallelism
+| Field | Type | Meaning |
+|---|---|---|
+| `depends-on` | list[str] | Blocking dependencies. Use local IDs or qualified `NNNN/Tn` IDs; the global DAG must be acyclic. |
+| `relates-to` | list[{ref,type}] | Non-blocking links; `type` is `extends`, `supersedes`, or `note`. |
+| `parallel` | bool | Hint that a Task can run alongside siblings; dependencies still govern execution. |
+| `files` | list[str] | Exact repository-relative paths owned by this Task. Required and disjoint within the group. |
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `depends-on` | list[str] | blocking deps; cross-group uses `NNNN/Tn`. Enters the global DAG (no cycles). |
-| `relates-to` | list[{ref,type}] | non-blocking links; `type` ∈ `extends` \| `supersedes` \| `note` |
-| `parallel` | bool | hint that this Task can run alongside siblings |
-| `files` | list[str] | exact files this Task owns. **Required + disjoint within a group.** This is the single-writer ownership declaration (理念 6) and the structured source for issue #71's runtime owner checks. |
+The `files` list is the single-writer ownership declaration and the structured
+source for issue #71's runtime ownership checks. Same-group overlap is a
+validation error; cross-group overlap is a warning requiring coordination.
+Combine Tasks that need the same file, or allocate that file to a separate Task.
 
-### Short prose (frontmatter, one line each)
+## Task Scope and Acceptance
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `scope` | str | what this Task changes (one line) |
-| `acceptance` | str | a verifiable acceptance criterion. **Required.** |
+| Field | Type | Meaning |
+|---|---|---|
+| `scope` | string | One-line explanation of what the Task changes. |
+| `acceptance` | string | Required, verifiable acceptance criterion. |
 
-## Required vs optional
+The Task schema requires the keys `id`, `title`, `status`, `priority`, `files`, and
+`acceptance`. Supply concrete paths and meaningful acceptance criteria; schema
+presence checks alone do not establish a complete plan. Optional lists and prose
+default to empty, and `parallel` defaults to `false`.
 
-Required per Task: `id`, `title`, `status`, `priority`, `files`, `acceptance`.
-Required per group: metadata `summary` (one-line TL;DR) + the 4 required overview sections.
-Everything else defaults empty — fill what the feature actually needs.
+Keep groups to at most six Tasks as a design guideline. The current CLI does not
+maintain per-Task history fields (`version`, `updated`, `change-reason`, or lineage
+fields); do not use those fields to record revisions. Edit the current Task and
+use git plus dated design documents for history.

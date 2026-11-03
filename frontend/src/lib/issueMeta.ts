@@ -1,15 +1,15 @@
-// Spec-0025/T8 + 0029/T10：issue 的 plane / provenance / kind / 优先级 / 轮号 派生（前端展示用）。
-// 与后端 backend/ahe_beta/demand/issue_schema.py 的标签投影同构：优先用后端已附的字段，
-// 缺省（老后端只给 labels）时按 labels 客户端兜底——保证「字段缺省退化不崩」。
+// Spec-0025/T8 + 0029/T10: derive issue plane / provenance / kind / priority / round for frontend display.
+// Mirrors the backend/ahe_beta/demand/issue_schema.py label projection: prefer fields supplied by the backend,
+// and fall back to client-side label inference when absent (older backends only provide labels), ensuring graceful degradation.
 
 import type { Issue, Plane, Provenance, TriageStatus } from "../types";
 
 const USER_KINDS = ["bug", "feature", "chore", "document"];
 const PRIORITIES = ["P0", "P1", "P2", "P3"];
 const RFC_LABEL = "RFC";
-// Spec-0029 终态标签（新老并集）：命中即不在任何平面。
+// Spec-0029 terminal labels (old and new): matching issues belong to no plane.
 const TERMINAL = ["declined", "merged", "rejected", "needs-info", "gate-dropped", "superseded"];
-// triage 状态优先级：越决定性者胜（对齐后端 triage_status）。
+// Triage status precedence: the most decisive status wins (aligned with backend triage_status).
 const STATUS_ORDER: TriageStatus[] = [
   "rejected",
   "needs-info",
@@ -49,12 +49,12 @@ export function isRfc(issue: Issue): boolean {
   return issueKind(issue) === "rfc";
 }
 
-// Spec-0029：三平面投影（与后端 issue_schema.plane 同构）。优先服务端字段，缺省按 labels 兜底：
-// 新平面标签优先 → 终态 null → 旧标签映射（needs-triage→report、triaged|RFC→ready、divergent→proposal）。
+// Spec-0029: three-plane projection (mirrors backend issue_schema.plane). Prefer server fields; fall back to labels:
+// New plane labels take precedence → terminal null → legacy label mapping (needs-triage→report, triaged|RFC→ready, divergent→proposal).
 export function planeOf(issue: Issue): Plane | null {
   if (issue.plane !== undefined) return issue.plane ?? null;
   const ls = new Set(issue.labels ?? []);
-  // Spec-0032：openagents（Owner 准入交接令牌）与 ready 同属 READY 平面（vigil 盖 ready 前的窗口）。
+  // Spec-0032: openagents (Owner admission handoff token) shares the READY plane with ready, before vigil applies ready.
   if (ls.has("ready") || ls.has("openagents")) return "ready";
   if (ls.has("proposal")) return "proposal";
   if (ls.has("report")) return "report";
@@ -65,7 +65,7 @@ export function planeOf(issue: Issue): Plane | null {
   return null;
 }
 
-// Spec-0029：提案来源（from-triage/from-architect/from-divergent）。
+// Spec-0029: proposal provenance (from-triage/from-architect/from-divergent).
 export function provenanceOf(issue: Issue): Provenance | null {
   if (issue.provenance !== undefined) return issue.provenance ?? null;
   const ls = issue.labels ?? [];
@@ -75,13 +75,13 @@ export function provenanceOf(issue: Issue): Provenance | null {
   return null;
 }
 
-// merged/declined 终态判定（已关闭票的徽标用）。
+// Detect merged/declined terminal states for closed-issue badges.
 export function terminalOf(issue: Issue): string | null {
   const ls = issue.labels ?? [];
   return TERMINAL.find((t) => ls.includes(t)) ?? null;
 }
 
-// 可执行 backlog（dev 可领 / 观测计数口径）：open 且 triaged 或 RFC，且未被 needs-triage/取代/驳回排除。
+// Executable backlog (claimable by dev / observation counts): open and triaged or RFC, excluding needs-triage/superseded/rejected issues.
 export function isBacklog(issue: Issue): boolean {
   if (issue.state !== "open") return false;
   const ls = new Set(issue.labels ?? []);
@@ -89,7 +89,7 @@ export function isBacklog(issue: Issue): boolean {
   return !["needs-triage", "superseded", "rejected", "needs-info"].some((x) => ls.has(x));
 }
 
-// 积压龄：自创建至今的天数（backlog 项标龄用，含跨轮积压的直观信号）。无有效时间 → null。
+// Backlog age: days since creation, including carryover across rounds. Invalid timestamps → null.
 export function ageDays(createdAt: string | null | undefined): number | null {
   if (!createdAt) return null;
   const t = new Date(createdAt).getTime();

@@ -1,12 +1,12 @@
 ---
 number: "0068"
-title: Architect 角色彻底改名与旧 Developer 遗留清理
+title: "Complete Architect Role Rename and Cleanup of Legacy Developer Remnants"
 issue: 0
 slug: architect-clean-rename
-summary: 在开发阶段直接统一 Architect、demand 与配置名称；有效边界检查归入 guards，移除旧 Designer/dev 入口及失效提交中间件，不建设迁移或旧版拒绝设施。
+summary: "Unify Architect, demand, and configuration names directly during development; place effective boundary checks under guards, remove the old Designer/dev entry points and inactive commit middleware, and do not build migration or legacy-rejection facilities."
 tasks:
   - id: T1
-    title: 需求包、边界检查与角色名称统一
+    title: "Unification of Requirement Packages, Boundary Checks, and Role Names"
     status: done
     priority: P0
     tags: []
@@ -48,10 +48,10 @@ tasks:
       - backend/ahe_beta/user/sim/loop.py
       - backend/ahe_beta/web/api.py
       - backend/ahe_beta/web/issue_timeline.py
-    scope: 共享包改为 demand，删除旧 Designer 模块/类/参数；同步 import、角色字段、授权和恢复操作名称，不因命名调整升级 schema 或增加旧名称检测。将仍使用的 workspace_jail、repo_guard、harness_boundary 迁入 guards，删除旧 dev 包及两个未接线提交中间件，不保留转发入口。
-    acceptance: 新包和新类可加载，旧入口不存在；正常恢复无重复副作用，已有结构/身份/摘要检查与 PM 证据隔离不变。guards 三模块行为保持；不增加命名迁移、旧环境变量拒绝或旧记录识别层。
+    scope: "Rename the shared package to demand and delete the old Designer modules/classes/parameters; synchronize imports, role fields, authorization, and recovery operation names without upgrading the schema or adding old-name detection for the naming change. Move the still-used workspace_jail, repo_guard, and harness_boundary into guards; delete the old dev package and the two unwired commit middleware components, without retaining forwarding entry points."
+    acceptance: "The new packages and classes can be loaded, and the old entry points do not exist; normal recovery has no duplicate side effects, and existing structure/identity/summary checks and PM evidence isolation remain unchanged. The three guards modules preserve their behavior; do not add naming migration, old-environment-variable rejection, or old-record identification layers."
   - id: T2
-    title: Agent 定义与启动配置切换
+    title: "Switch Agent Definitions and Launch Configuration"
     status: done
     priority: P0
     tags: []
@@ -80,10 +80,10 @@ tasks:
       - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/ahe_beta/experiment/controllers/swebench.py
       - examples/experiments/u1-e2b.json
-    scope: 当前 Agent 定义、包内 controller 与 v2 示例统一使用 architect 及共享需求模型参数；旧 env 模板、auditable wrapper 和 scaling 示例已归档，不再映射为活入口。
-    acceptance: 现行定义可加载，两个 v2 示例离线校验通过；角色和环境字段为新名称，归档配置不进入当前运行输入。
+    scope: "Current Agent definitions, in-package controllers, and v2 examples consistently use architect and the shared requirements-model parameters; old environment templates, auditable wrappers, and scaling examples are archived and no longer mapped as active entry points."
+    acceptance: "Current definitions can be loaded, and the two v2 examples pass offline validation; role and environment fields use the new names, and archived configuration does not enter current runtime inputs."
   - id: T3
-    title: 当前开发工具与执行接口命名
+    title: "Naming of Current Development Tools and Execution Interfaces"
     status: done
     priority: P1
     tags: []
@@ -109,10 +109,10 @@ tasks:
       - tools/dev/replay/replay_roles_offline.py
       - tools/dev/replay/replay_architect_owner_from_repo.py
       - evaluation/harness_bench/harbor_historical_user_agent.py
-    scope: 保留维护中的 tools/dev 回放、探针和交付验证的 Architect 命名；历史研究 launchers 与 mixed wrapper 已归档，不注册为当前实验入口。
-    acceptance: 当前开发工具名称和 imports 一致，显式凭证与输入生效；帮助可加载，产物不被当作新一轮用户评估。
+    scope: "Retain the Architect naming in maintained tools/dev replay, probe, and delivery-verification tools; historical research launchers and mixed wrappers are archived and are not registered as current experiment entry points."
+    acceptance: "Current development-tool names and imports are consistent, explicit credentials and inputs take effect, help can be loaded, and artifacts are not treated as a new user-evaluation round."
   - id: T4
-    title: 看板角色与显示名称统一
+    title: "Unification of Dashboard Roles and Display Names"
     status: done
     priority: P1
     tags: []
@@ -133,10 +133,10 @@ tasks:
       - frontend/src/lib/issueMeta.ts
       - frontend/src/styles.css
       - frontend/src/types.ts
-    scope: 统一前端角色、roster、history、楼层和 CSS，删除旧标签转换；直接消费新字段，不添加版本握手、快照迁移或旧快照拒绝界面。
-    acceptance: 新角色在实时、历史和用量视图显示正确，前端测试与构建通过；无命名版本门禁和旧名称转换层。
+    scope: "Unify frontend roles, roster, history, floors, and CSS; delete old-label conversion; consume the new fields directly, without adding version handshakes, snapshot migration, or an old-snapshot rejection interface."
+    acceptance: "The new role displays correctly in real-time, history, and usage views; frontend tests and builds pass; there is no naming-version gate or old-name conversion layer."
   - id: T5
-    title: 当前文档与 Spec 索引更新
+    title: "Update Current Documentation and Spec Index"
     status: done
     priority: P1
     tags: []
@@ -196,10 +196,10 @@ tasks:
       - docs/specs/OVERVIEW.md
       - docs/architect-grouping.md
       - docs/usage-monitoring.md
-    scope: 同步双语入口、配置、架构、脚本文档及活跃 Spec 路径；明确这是开发期直接重命名，移除本轮增加的版本迁移和拒绝策略文档。更新 guards 职责并退役失效中间件任务，冻结历史保留。
-    acceptance: 当前说明与实际新名称一致，未宣称存在面向已发布用户的升级契约；Spec validate/render/graph 正确。当前文档不把失效提交中间件描述为生效机制，也不宣称 OpenAgents 等价实现它们。
+    scope: "Synchronize bilingual entry points, configuration, architecture, script documentation, and active Spec paths; make clear that this is a direct development-time rename, and remove the version-migration and rejection-policy documentation added in this round. Update guards responsibilities and retire the inactive middleware task, while preserving the historical archive."
+    acceptance: "Current documentation matches the actual new names and does not claim an upgrade contract for published users; Spec validate/render/graph are correct. Current documentation does not describe inactive commit middleware as an effective mechanism and does not claim that OpenAgents or an equivalent implementation provides them."
   - id: T6
-    title: 行为回归与离线流程验证
+    title: "Behavioral Regression and Offline Workflow Verification"
     status: done
     priority: P0
     tags: []
@@ -251,51 +251,51 @@ tasks:
       - backend/tests/tracker/test_gitea_timeline.py
       - backend/tests/web/test_api.py
       - backend/tests/test_invocation.py
-    scope: 保留当前需求、恢复、API 和开发工具命名行为回归；旧 designer/dev 已删除文件与 v1/scaling 测试不再属于活文件映射。
-    acceptance: 当前命名回归、阶段恢复、工具帮助与两个公开 v2 示例通过；历史归档原始记录不改写，不将未执行的历史流程标为已验收。
+    scope: "Retain regression coverage for the current request, recovery, API, and development-tool naming behavior; deleted legacy designer/dev files and v1/scaling tests no longer belong to the living file mapping."
+    acceptance: "The current naming regression, stage recovery, tool help, and two public v2 examples pass; do not rewrite original records in historical archives or mark historical workflows that were not executed as accepted."
 ---
 
-# 0068 · Architect 角色彻底改名与旧 Developer 遗留清理
+# 0068 · Complete Renaming of the Architect Role and Cleanup of Legacy Developer Artifacts
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: the frontmatter contains structured source data (including the tasks DAG), and the body is a nine-section group-level rust-RFC overview. -->
 
 ## Summary
 
-> 0071 清理后的当前映射：living tasks 仅保留已经存在的新需求包、Agent 定义、包内 controller、维护工具、当前文档与测试。旧名称左侧路径、已删除 dev 中间件、历史研究 launcher、旧 schema 模板与 v1 测试不再映射为活代码；下文命名迁移表保留原前后对照与动机。历史资料与原源码版本从 research/inventory.json 追溯，不作为当前执行入口。
+> Current mapping after 0071 cleanup: living tasks retain only the existing new request packages, Agent definitions, package-level controllers, maintenance tools, current documentation, and tests. Paths on the left side using old names, deleted dev middleware, historical research launchers, old schema templates, and v1 tests no longer map to live code; the naming migration table below preserves the original before-and-after comparison and rationale. Historical materials and original source versions are traceable from research/inventory.json and are not current execution entry points.
 
-本组此前完成需求角色命名与旧 Developer 遗留清理。2026-11-02 根据论文术语，将项目名统一为 AHE-Beta，架构角色统一为 Architect；当前实施分支为 `refactor/ahe-beta-architect`。沿用开发阶段直接统一命名的方式，不建立角色旧名兼容层。
+This group previously completed request-role renaming and cleanup of legacy Developer artifacts. On 2026-11-02, following the terminology used in the paper, the project name was standardized as AHE-Beta and the architecture role as Architect; the current implementation branch is `refactor/ahe-beta-architect`. As during the development phase, the naming is unified directly, without establishing compatibility layers for the old role names.
 
-将需求面执行**跨提案结构综合**的角色统一命名为 **Architect（架构师）**。删除旧 `Designer` 类、模块、参数及配置别名；同步目录、脚本、环境变量、JSON 字段、Agent 身份、恢复键、看板和当前文档，避免出现“新界面、旧协议”的两套命名。
+The role that performs **cross-proposal structural synthesis** on the request side is uniformly named **Architect**. Delete old `Designer` classes, modules, parameters, and configuration aliases; synchronize directories, scripts, environment variables, JSON fields, Agent identities, recovery keys, dashboards, and current documentation to avoid two naming systems consisting of a “new interface and old protocol.”
 
-本次是开发阶段的命名整理，不改变角色的决策职责、证据边界、covers 吸收行为、模型参数和交付流程。源码、配置和看板直接使用新名称；不为此升级 schema、增加角色版本握手或识别旧实验。项目展示名称为 `AHE-Beta`，Python 顶层包为 `ahe_beta`，自身环境变量采用 `AHE_BETA_*`。OpenAgents 固定版本的证据标识及交付日志字段、已发布镜像地址与冻结历史记录保留其真实名称；日志字段仅在交付边界映射，不作为本仓配置别名。冻结历史保持原样，开发者按需手动处理自己的实验输入。
+This is naming cleanup during development and does not change the role’s decision responsibilities, evidence boundaries, covers absorption behavior, model parameters, or delivery process. Source code, configuration, and dashboards directly use the new names; this does not upgrade the schema, add role-version handshakes, or identify old experiments. The project display name is `AHE-Beta`, the top-level Python package is `ahe_beta`, and its own environment variable uses `AHE_BETA_*`. Evidence identifiers for the fixed OpenAgents version, delivery-log fields, published image addresses, and frozen historical records retain their actual names; log fields are mapped only at the delivery boundary and do not serve as configuration aliases in this repository. Frozen history remains unchanged; developers manually handle their own experimental inputs as needed.
 
-同时清理退役 Developer 的目录遗留：仍使用的 workspace_jail、repo_guard、harness_boundary 迁至 `guards/`，删除已无运行时引用的 commit_checkpoint、completion_gate 及其专属测试，最终移除旧 `dev/` 包。
+Also clean up directory remnants of the retired Developer: move the still-used workspace_jail, repo_guard, and harness_boundary to `guards/`; delete commit_checkpoint, completion_gate, and their dedicated tests, which no longer have runtime references; and finally remove the old `dev/` package.
 
 ## Motivation
 
-当前这个角色读取 Triage 和既有交付路线的规范化 proposal、ready 摘要与体验趋势，按需读取已授权证据，分析多条提案的共同矛盾与结构机制，输出结构 proposal。每条结构产物至少引用两个可见来源；它决定 `covers`，由驱动器在创建成功后吸收相应开放来源。PM 独立发现产品机会，Owner 协调交接并保留独立验收，OpenAgents 完成实现。该角色不承担整个产品的设计与开发职责，故 Architect 比 Designer 更准确。
+This role reads normalized proposals, ready summaries, and experience trends from Triage and existing delivery paths, reads authorized evidence as needed, analyzes common contradictions and structural mechanisms across multiple proposals, and outputs structural proposals. Each structural artifact must cite at least two visible sources; it determines `covers`, which the driver absorbs from the corresponding open sources after successful creation. PM independently discovers product opportunities, Owner coordinates handoffs and retains independent acceptance, and OpenAgents completes implementation. This role does not take responsibility for the design and development of the entire product, so Architect is more accurate than Designer.
 
-目前职责提示词已经使用结构综合语义，技术表面仍散落 `Designer`、`designer`、`DESIGNER_*`、`designer_run` 等名称。上一轮未提交方案又引入新旧类名并存、环境变量回退和前端转换，用户明确要求删除这些兼容层。
+The current responsibility prompt already uses structural-synthesis semantics, but the technical surface still contains names such as `Designer`, `designer`, `DESIGNER_*`, and `designer_run`. The previous uncommitted proposal introduced coexistence of new and old class names, environment-variable fallback, and frontend conversion; the user explicitly requires these compatibility layers to be deleted.
 
-影响范围不局限一个类：`backend/agent_defs/designer/`、共享 Python 包、脚本动态 import、审计配置冻结、恢复操作键、角色用量归属、静态导出、CSS 和日期目录中的可执行实验脚本均直接消费这些名称。只改静态 import 或显示文字会导致脚本失效、恢复重复执行或看板悄悄漏掉记录。
+The scope is not limited to one class: `backend/agent_defs/designer/`, the shared Python package, dynamic imports in scripts, frozen audit configuration, recovery operation keys, role usage attribution, static exports, CSS, and executable experimental scripts in date-based directories all directly consume these names. Changing only static imports or display text would cause scripts to fail, recovery to execute repeatedly, or the dashboard to silently omit records.
 
-`dev/` 也存在职责与目录名不符的问题：旧内置 Developer 已退役，三个仍在使用的边界检查与两个未接线中间件却放在同一目录。删除整个目录会误删有效检查；原样保留又会误导读者以为仍有自有 Developer，因此将有效机制归入 guards，并移除无调用的遗留代码。
+`dev/` also has a mismatch between its responsibilities and directory name: the old built-in Developer has been retired, while three still-used boundary checks and two unconnected middleware components remain in the same directory. Deleting the entire directory would remove valid checks; retaining it unchanged would mislead readers into thinking it still contains its own Developer. Therefore, move the valid mechanisms into guards and remove the unused legacy code.
 
 ## Guide-level explanation
 
-### 当前唯一术语
+### Current Sole Terminology
 
-| 层次 | 唯一名称 | 含义 |
+| Layer | Sole name | Meaning |
 | --- | --- | --- |
-| 角色 | `Architect` / 架构师 | 综合跨提案关系并形成结构改进方向 |
-| 动作 | `architect` | 执行结构综合；动作名不是旧角色别名 |
-| 产物 | synthesis proposal / 结构提案 | 保持现有 What、Why、可验证结果及 covers 契约 |
-| 需求面共享包 | `ahe_beta.demand` | 同时承载 Triage、PM、Architect、Owner 和共享取证/运行时 |
-| 角色实现 | `demand/architect.py`、`demand/grouped_architect.py` | `Architect`、`SynthesisOutcome`、`GroupedArchitect` |
-| Agent 定义 | `backend/agent_defs/architect/` | 该角色的 YAML、提示词和全部工具定义 |
-| 共享需求模型配置 | `DEMAND_LLM_*` | 仍由需求侧多个角色共享，不假称 Architect 专属模型 |
+| Role | `Architect` / Architect | Synthesizes relationships across proposals and forms structural improvement directions |
+| Action | `architect` | Performs structural synthesis; the action name is not an alias for the old role |
+| Artifact | synthesis proposal / structural proposal | Retains the existing What, Why, verifiable results, and covers contract |
+| Shared request-side package | `ahe_beta.demand` | Simultaneously hosts Triage, PM, Architect, Owner, and shared evidence/runtime |
+| Role implementation | `demand/architect.py`, `demand/grouped_architect.py` | `Architect`, `SynthesisOutcome`, `GroupedArchitect` |
+| Agent definition | `backend/agent_defs/architect/` | The role’s YAML, prompt, and complete tool definitions |
+| Shared request-model configuration | `DEMAND_LLM_*` | Still shared by multiple request-side roles; it is not falsely presented as Architect-specific |
 
-开发入口示例：
+Example development entry point:
 
 ```python
 from ahe_beta.demand.architect import Architect, SynthesisOutcome
@@ -303,92 +303,92 @@ from ahe_beta.demand.grouped_architect import GroupedArchitect, group_architect_
 # Orchestrator(..., architects=[...])
 ```
 
-本地配置使用 `N_ARCHITECTS`、`ARCHITECT_GROUPING` 和 `DEMAND_LLM_MODEL/API_KEY/BASE_URL/REASONING_EFFORT`。审计实验中使用 `roster.architect`、`models.architect`、`execution.architect_grouping`。模拟用户和被试 Harness 的模型配置不变。
+Local configuration uses `N_ARCHITECTS`, `ARCHITECT_GROUPING`, and `DEMAND_LLM_MODEL/API_KEY/BASE_URL/REASONING_EFFORT`. Audited experiments use `roster.architect`, `models.architect`, and `execution.architect_grouping`. Model configuration for simulated users and subject Harnesses remains unchanged.
 
-实现只读取新变量和新字段，不保留旧参数、别名、回退或双写，也不增加检查旧变量是否存在的代码。未配置可选开关时继续使用原有默认行为；普通必填字段和类型检查保留。
+The implementation reads only the new variables and fields; it retains no old parameters, aliases, fallbacks, or dual writes, and it does not add code to check whether old variables exist. When an optional switch is not configured, the existing default behavior continues; ordinary required-field and type checks remain in place.
 
-冻结实验和快照不批量改写。开发者按实验需要手动准备输入，不由本次重命名引入自动迁移、旧版识别或拒绝层；正常断点恢复继续依赖已有结构、身份与摘要检查。
+Frozen experiments and snapshots are not rewritten in bulk. Developers manually prepare inputs as required by each experiment; this renaming does not introduce automatic migration, legacy-version identification, or rejection layers. Normal checkpoint recovery continues to depend on the existing structure, identity, and summary checks.
 
-共享边界检查统一由 `ahe_beta.guards` 提供；它不是新的 Developer 实现。现有有效检查继续执行，两份已失效的提交纪律中间件不再提供。
+Shared boundary checks are provided uniformly by `ahe_beta.guards`; it is not a new Developer implementation. Existing valid checks continue to run, while the two obsolete submission-discipline middleware components are no longer provided.
 
 ## Reference-level explanation
 
-### 1. 重命名映射与删除清单
+### 1. Renaming Mapping and Deletion List
 
-| 旧名称 | 新名称 / 处理 |
+| Old name | New name / handling |
 | --- | --- |
-| `backend/ahe_beta/designer/` | 整包迁至 `backend/ahe_beta/demand/`，所有 Python import、YAML binding、动态加载路径同步 |
-| `designer.py`、`grouped_designer.py` | 删除旧模块；唯一实现为 `architect.py`、`grouped_architect.py`，不留重导出 shim |
-| `Designer`、`DesignOutcome`、`GroupedDesigner` | `Architect`、`SynthesisOutcome`、`GroupedArchitect` |
-| `group_designer_stage`、`filter_designer_round`、`designer_batch_scope` | `group_architect_stage`、`filter_architect_round`、`architect_batch_scope` |
-| `designers`、`_designers`、`make_designer_status` | `architects`、`_architects`、`make_architect_status`；不保留旧参数/property |
-| `backend/agent_defs/designer/` | 整目录迁至 `backend/agent_defs/architect/`；相对工具路径仍可解析，旧目录删除 |
-| `backend/tests/designer/` | `backend/tests/demand/`；测试模块随角色文件改名 |
-| `test_designer.py`、`test_grouped_designer.py` | `test_architect.py`、`test_grouped_architect.py` |
-| `N_DESIGNERS`、`DESIGNER_GROUPING` | `N_ARCHITECTS`、`ARCHITECT_GROUPING`；删除回退与双写 |
-| `DESIGNER_LLM_*` | `DEMAND_LLM_*`，包含 reasoning effort；四类 agent 配置、分组调用、调用元数据与脱敏列表一起更新 |
-| JSON/roster/model 的 `designer` | `architect`；保留各角色原有模型选择行为 |
-| `designer_grouping`、`designer_run` | `architect_grouping`、`architect_run` |
+| `backend/ahe_beta/designer/` | Move the entire package to `backend/ahe_beta/demand/`; synchronize all Python imports, YAML bindings, and dynamic loading paths |
+| `designer.py`, `grouped_designer.py` | Delete the old modules; the sole implementations are `architect.py` and `grouped_architect.py`, with no re-export shim |
+| `Designer`, `DesignOutcome`, `GroupedDesigner` | `Architect`, `SynthesisOutcome`, `GroupedArchitect` |
+| `group_designer_stage`, `filter_designer_round`, `designer_batch_scope` | `group_architect_stage`, `filter_architect_round`, `architect_batch_scope` |
+| `designers`, `_designers`, `make_designer_status` | `architects`, `_architects`, `make_architect_status`; retain no old parameters/properties |
+| `backend/agent_defs/designer/` | Move the entire directory to `backend/agent_defs/architect/`; relative tool paths must remain resolvable, and the old directory is deleted |
+| `backend/tests/designer/` | `backend/tests/demand/`; rename the test module together with the role file |
+| `test_designer.py`, `test_grouped_designer.py` | `test_architect.py`, `test_grouped_architect.py` |
+| `N_DESIGNERS`, `DESIGNER_GROUPING` | `N_ARCHITECTS`, `ARCHITECT_GROUPING`; delete fallback and dual writes |
+| `DESIGNER_LLM_*` | `DEMAND_LLM_*`, including reasoning effort; update the four agent configuration types, grouped calls, call metadata, and redaction list together |
+| JSON/roster/model `designer` | `architect`; retain each role’s existing model-selection behavior |
+| `designer_grouping`, `designer_run` | `architect_grouping`, `architect_run` |
 | Agent ID `designer-N` / `designer-grouping` | `architect-N` / `architect-grouping` |
-| recovery stage / job name / operation key 的角色片段 | 统一 `architect`，分组键改 `grouped-architect`；按新片段生成摘要，不复用旧哈希 |
-| CSS `--role-designer`、`.role-designer`、`.role-dot.designer` | 同步为 `architect`，保留配色与布局 |
-| 前端 `roleLabel` 旧名称转换 | 删除该兼容逻辑；新 API、静态快照与组件使用同一角色类型 |
-| `docs/designer-grouping.md` | `docs/architect-grouping.md`，同步入链 |
+| Role fragments in recovery stage / job name / operation key | Standardize on `architect`, change the grouping key to `grouped-architect`; generate summaries from the new fragment and do not reuse old hashes |
+| CSS `--role-designer`, `.role-designer`, `.role-dot.designer` | Synchronize to `architect` while retaining colors and layout |
+| Frontend `roleLabel` old-name conversion | Delete this compatibility logic; the new API, static snapshots, and components use the same role type |
+| `docs/designer-grouping.md` | `docs/architect-grouping.md`, synchronized into the chain |
 
-包名使用 `demand`，因为把共享目录改成 `architect` 会把 Triage/PM/Owner 错误放到某一角色名下。只有具体 Agent 定义目录叫 `architect`。
+The package name uses `demand` because changing the shared directory to `architect` would incorrectly place Triage/PM/Owner under a single role name. Only the concrete Agent definition directory is named `architect`.
 
-角色改名不要求重命名所有英语 design：`design-only` 实验模式、generic design 文案按实际含义保留。`from-architect` 是来源动作标签，`submit_rfcs` 是现有工具协议名，都不是 Designer 兼容入口，本次不改变其语义。
+Role renaming does not require renaming every use of the English word design: `design-only` experimental mode and generic design wording remain according to their actual meanings. `from-architect` is a source action label, and `submit_rfcs` is an existing tool protocol name; neither is a Designer compatibility entry point, so their semantics are unchanged in this change.
 
-### 2. 启动配置与凭证
+### 2. Startup Configuration and Credentials
 
-- 普通入口、审计入口、offline replay 和分组模型调用直接使用新变量与字段；不同时输出新旧变量。
-- `DEMAND_LLM_*` 保持原有共享模型策略，已有 model、base URL、API key、max_tokens、timeout 和 reasoning effort 行为不变。
-- 新 API key 名继续经过已有调用记录和异常脱敏路径；用假凭证验证，不输出真实 key。
-- 不新增 `naming.py` 之类的旧名称检测设施，也不因改名把实验配置或 recovery schema 升至版本 2。
-- 保留已有必填字段、数据结构、配置 hash、controller SHA、恢复身份和操作摘要检查；不是取消实验本身的完整性要求。
+- Ordinary entry points, audit entry points, offline replay, and grouped model calls directly use the new variables and fields; they do not output both new and old variables.
+- `DEMAND_LLM_*` retains the existing shared model strategy, including the current behavior for model, base URL, API key, max_tokens, timeout, and reasoning effort.
+- The new API key name continues through the existing call-record and exception-redaction paths; use fake credentials for verification and do not output a real key.
+- Do not add old-name detection facilities such as `naming.py`, and do not upgrade the experiment configuration or recovery schema to version 2 because of the renaming.
+- Retain existing required fields, data structures, configuration hash, controller SHA, recovery identity, and operation-summary checks; this does not cancel the experiment’s integrity requirements.
 
-### 3. 恢复、观测与实验材料
+### 3. Recovery, Observability, and Experiment Materials
 
-- 新生成的阶段、grouping unit、receipt、operation key 使用 `architect`，其余恢复状态机逻辑保持不变。
-- 同次实验的中断/续跑继续校验 frozen input 与副作用回执，已完成结构提案不重复生成；分组并行继续保证一个来源只由一个 worker 领取。
-- live/history/usage/invocation、角色授权与 gap 来源识别使用新名称；PM 输入隔离和引用 session 范围不变。
-- API、静态导出和前端直接读写新角色字段，不增加 `role_contract_version`、前端版本握手或旧快照错误页面。
-- 已有 `frontend/public/experiments/`、实验归档、账单、freeze-record、原始 trace/receipt 和冻结配置保持字节不变。需要使用历史材料时由开发者手动决定输入和运行源码，不建设通用迁移或拒绝层。
+- Newly generated stages, grouping units, receipts, and operation keys use `architect`; all other recovery state-machine logic remains unchanged.
+- Interrupt/resume runs of the same experiment continue to validate frozen inputs and side-effect receipts; completed structural proposals are not generated again; grouped parallel execution continues to ensure that each source is claimed by only one worker.
+- Live/history/usage/invocation, role authorization, and gap-source identification use the new names; PM input isolation and referenced session scope remain unchanged.
+- The API, static exports, and frontend directly read and write the new role fields; do not add `role_contract_version`, a frontend version handshake, or an old-snapshot error page.
+- Existing `frontend/public/experiments/`, experiment archives, billing, freeze records, original traces/receipts, and frozen configuration remain byte-for-byte unchanged. When historical materials are needed, developers manually decide the inputs and source code to run; no general migration or rejection layer is built.
 
-### 4. scripts 与 evaluation 执行入口
+### 4. scripts and evaluation Execution Entry Points
 
-脚本名称按真实职责整理：
+Script names are organized according to their actual responsibilities:
 
-| 旧脚本 | 新脚本 |
+| Old script | New script |
 | --- | --- |
 | `backend/scripts/probe_timeout_to_designer.py` | `probe_timeout_to_architect.py` |
-| `backend/scripts/replay_design_from_sessions.py` | `replay_roles_from_sessions.py`，它实际编排多个需求角色 |
+| `backend/scripts/replay_design_from_sessions.py` | `replay_roles_from_sessions.py`, which actually orchestrates multiple request-side roles |
 | `backend/scripts/replay_observation_design.py` | `replay_observation_synthesis.py` |
 | `backend/scripts/replay_architect_owner_from_repo.py` | `replay_architect_owner_from_repo.py` |
 | `backend/scripts/replay_pm_synth_owner_offline.py` | `replay_pm_architect_owner_offline.py` |
 
-其他脚本保留与角色无关的文件名，但修改 import、CLI choices、定义目录、输出字段、文件名、测试 monkeypatch 和模型环境。特别检查字符串拼接的模块名，例如 `module = "designer"` 后动态构造 patch 路径，不能只扫描静态 import。
+Other scripts retain filenames unrelated to roles, but update imports, CLI choices, definition directories, output fields, filenames, test monkeypatches, and model environments. In particular, check module names assembled through string concatenation, such as the dynamically constructed patch path after `module = "designer"`; scanning only static imports is insufficient.
 
-`evaluation/harness-suite-20260920/` 虽有日期，里面的 launchers、远程 smoke、状态同步和 dashboard 仍为可执行代码，纳入修改。现有带日期的冻结 JSON 不原地迁移；从它们派生、经去敏的新命名示例放到 `examples/experiments/architect-*.json`，明确重新填入待运行版本的源码和资产 pin。当前示例使用新字段，操作者自行准备实际实验输入；脚本不承担识别旧命名并引导迁移的职责。这不声明旧实验已经用新源码复现成功。
+Although `evaluation/harness-suite-20260920/` contains a date, its launchers, remote smoke tests, state synchronization, and dashboard remain executable code and are included in the changes. Existing dated frozen JSON files are not migrated in place; newly named examples derived from them after redaction go into `examples/experiments/architect-*.json`, with an explicit requirement to re-enter the source and asset pins for the version to be run. Current examples use the new fields, and operators prepare the actual experimental inputs themselves; the scripts do not identify old naming and guide migration. This does not assert that old experiments have been successfully reproduced with the new source code.
 
-### 5. 旧 dev 目录清理与 guards 归位
+### 5. Cleanup of the Old dev Directory and Relocation to guards
 
-`backend/ahe_beta/dev/` 源于旧的内置 Developer。当前交付已经由独立 OpenAgents CLI 执行，但目录内并非全部退役：四类需求 Agent 仍在 YAML 中使用文件访问中间件，主运行入口仍安装 Harness 提交钩子，主入口和 SWE-bench 入口仍校验编排仓完整性。两份旧提交纪律中间件则只被自身测试引用，未发现运行时装配。
+`backend/ahe_beta/dev/` originated from the old built-in Developer. Current delivery is performed by the independent OpenAgents CLI, but not everything in the directory is retired: four types of request Agents still use file-access middleware in YAML, the main runtime entry point still installs the Harness submission hook, and the main entry point and SWE-bench entry point still validate orchestration-repository integrity. The two old submission-discipline middleware components are referenced only by their own tests, and no runtime assembly was found.
 
-| 当前文件 | 处理 | 实际职责 / 证据 |
+| Current file | Action | Actual responsibility / evidence |
 | --- | --- | --- |
-| `dev/workspace_jail.py` | 移至 `guards/workspace_jail.py` | Triage、Architect、PM、Owner YAML 直接加载，约束工具文件路径并接入按调用授权的观测制品读取 |
-| `dev/repo_guard.py` | 移至 `guards/repo_guard.py` | `backend/run.py` 与 `run_swebench_closed_loop.py` 拍摄编排仓快照，并向 Orchestrator 传入完整性校验回调 |
-| `dev/harness_boundary.py` | 移至 `guards/harness_boundary.py` | `backend/run.py` 创建 seed Harness 后安装 pre-commit 钩子，拒绝密钥文件与 `.openagents` 状态入库 |
-| `dev/commit_checkpoint.py` | 删除，不迁移 | 旧 Developer 的阶段性提交催促，当前仅自身单测调用 |
-| `dev/completion_gate.py` | 删除，不迁移 | 旧 Developer 的 complete_task 收尾检查，当前仅自身单测调用 |
-| `dev/__init__.py` | 删除；新建 `guards/__init__.py` | 新包描述为编排与工具访问的边界检查，不再描述为开发角色实现 |
+| `dev/workspace_jail.py` | Move to `guards/workspace_jail.py` | Triage, Architect, PM, and Owner YAML files load it directly; constrains tool file paths and integrates observation artifact reads authorized per call |
+| `dev/repo_guard.py` | Move to `guards/repo_guard.py` | `backend/run.py` and `run_swebench_closed_loop.py` capture orchestration-repository snapshots and pass integrity-check callbacks to the Orchestrator |
+| `dev/harness_boundary.py` | Move to `guards/harness_boundary.py` | `backend/run.py` creates the seed Harness and then installs a pre-commit hook that rejects secret files and `.openagents` state from being committed |
+| `dev/commit_checkpoint.py` | Delete, do not migrate | Phase-based commit prompting from the old Developer; currently called only by its own unit tests |
+| `dev/completion_gate.py` | Delete, do not migrate | Completion check for the old Developer's complete_task cleanup; currently called only by its own unit tests |
+| `dev/__init__.py` | Delete; create `guards/__init__.py` | The new package describes boundary checks for orchestration and tool access, rather than implementation by a development role |
 
-清理后目录形态：
+Directory layout after cleanup:
 
 ```text
 backend/ahe_beta/
-  demand/                 # Triage / PM / Architect / Owner 及共享需求处理
+  demand/                 # Triage / PM / Architect / Owner and shared demand processing
   guards/
     __init__.py
     workspace_jail.py
@@ -396,40 +396,40 @@ backend/ahe_beta/
     harness_boundary.py
 ```
 
-本次仅移动仍在使用的检查、删除确定未接线的旧中间件，不改变三项检查的强度与触发位置：
+This change only moves checks that are still in use and deletes old middleware confirmed to be unwired. It does not change the strength or trigger locations of the three checks:
 
-- 四类 YAML middleware binding 使用 `ahe_beta.guards.workspace_jail:WorkspaceJailMiddleware`。`workspace_jail` 内对 observation provider 的引用改为 `ahe_beta.demand.observation_provider`；声明制品、session 授权范围、允许读取的源码及临时工具输出范围、Triage 的运行态目录限制保持原行为。
-- 文件路径中间件不是操作系统沙箱；不把目录重命名描述成新增隔离能力。现有拒绝/放行语义不因 OpenAgents 接管交付而删掉。
-- `repo_guard` 仍在启动时记录当前基线、在已有轮次边界校验；保留原有缓存文件忽略规则。检查失败仍传播并中止，不能改为只打日志或事后提醒。
-- `harness_boundary` 仍在 seed 提交之后安装自包含钩子；生成文本不依赖编排包 import，注释来源改为 guards。保留 `.env`、`.env.*` 与 `.openagents` 拒绝规则，以及 `.env.example` 和正常产品源码/文档的允许规则；现有 seed smoke 工作流的对应检查不因包移动而改变。
-- 不新建内置 Developer，不把 CommitCheckpoint / CompletionGate 注入 OpenAgents，不把删除未接线代码宣传为“已将其质量保证迁给 OpenAgents”。OpenAgents 原有交付与质量门继续独立生效。
+- The four YAML middleware bindings use `ahe_beta.guards.workspace_jail:WorkspaceJailMiddleware`. The reference to the observation provider in `workspace_jail` is changed to `ahe_beta.demand.observation_provider`; artifact declarations, session authorization scope, the allowed source and temporary-tool-output ranges, and Triage's runtime-directory restriction retain their existing behavior.
+- The file-path middleware is not an operating-system sandbox; renaming a directory must not be described as adding isolation capability. Existing deny/allow semantics are not removed because OpenAgents takes over delivery.
+- `repo_guard` still records the current baseline at startup and validates at existing round boundaries; the existing cache-file ignore rules are retained. Check failures still propagate and abort execution; they must not be changed to log-only behavior or post-hoc reminders.
+- `harness_boundary` still installs a self-contained hook after the seed commit; generated text does not depend on importing the orchestration package, and the comment source is changed to guards. The `.env`, `.env.*`, and `.openagents` rejection rules, as well as the allow rules for `.env.example` and normal product source/docs, are retained; the corresponding checks in the existing seed smoke workflow are unchanged by the package move.
+- Do not create a built-in Developer, inject CommitCheckpoint / CompletionGate into OpenAgents, or advertise deletion of unwired code as “quality assurance has been migrated to OpenAgents.” OpenAgents' existing delivery and quality gates continue to take effect independently.
 
-测试目录处理：`tests/dev/test_workspace_jail.py`、`test_repo_guard.py`、`test_harness_boundary.py` 迁到 `tests/guards/` 并更新 import；`test_commit_checkpoint.py`、`test_completion_gate.py` 随其失效实现删除。保留需求观测测试对 WorkspaceJail 的跨模块验证，新加 `tests/guards/test_guard_wiring.py` 检查 seed launcher 钩子安装并加载四类真实 YAML 检查 middleware/tool 接线，避免只剩 helper 单测。
+Test-directory handling: `tests/dev/test_workspace_jail.py`, `test_repo_guard.py`, and `test_harness_boundary.py` are moved to `tests/guards/` and their imports are updated; `test_commit_checkpoint.py` and `test_completion_gate.py` are deleted along with their now-invalid implementations. Retain the requirements-observation test's cross-module verification of WorkspaceJail, and add `tests/guards/test_guard_wiring.py` to check seed-launcher hook installation and the loading of four categories of real YAML check middleware/tool wiring, so that only helper unit tests do not remain.
 
-最终 `backend/ahe_beta/dev/` 与 `backend/tests/dev/` 都不存在，不留 `ahe_beta.dev` re-export、模块别名或旧目录软链接。残留扫描只针对具体旧包/中间件符号，不禁止 `developer` 这个有效交付角色，也不误删项目级开发环境命名。
+Ultimately, neither `backend/ahe_beta/dev/` nor `backend/tests/dev/` exists, and no `ahe_beta.dev` re-export, module alias, or symlink to the old directory remains. Residual scanning targets only specific old package/middleware symbols; it must not prohibit `developer`, which is a valid delivery role, or incorrectly delete project-level development-environment naming.
 
-当前 Spec 的活跃文件映射同步迁移到 guards；只对应两份已删中间件的任务通过 Spec 工具退役并更新现状摘要，不继续标注为生效的 done 任务。其它仍映射活跃机制的任务保留。旧实现和旧审计结果由 Git 历史与冻结报告留存，本次不重写历史证据。
+The active-file mappings for the current Specs are migrated to guards in sync; tasks corresponding only to the two deleted middleware components are retired through the Spec tool and their status summaries are updated, rather than continuing to mark them as effective done tasks. Other tasks that still map to active mechanisms are retained. The old implementation and old audit results remain in Git history and frozen reports; this change does not rewrite historical evidence.
 
-### 6. 一次性残留核对
+### 6. One-time residual verification
 
-实施结束时用搜索检查活动源码、YAML binding、入口脚本、配置示例、当前说明和路径名，确认旧角色实现和有效检查的旧包路径已清理。此核对属于本次审查，不新增永久命名扫描器、专用扫描测试或 CI 步骤。
+At the end of implementation, use search to inspect active source code, YAML bindings, entry scripts, configuration examples, current documentation, and path names, confirming that old role implementations and old package paths for valid checks have been removed. This verification belongs to this review and does not add a permanent naming scanner, dedicated scan test, or CI step.
 
-核对时区分项目身份（`ahe-beta`、`ahe_beta`、`AHE_BETA_*`）、既有 Gitea 账号身份和不可变历史，不进行全仓机械替换。本规格的旧新映射用于审查，不代表保留旧入口。
+During verification, distinguish project identities (`ahe-beta`, `ahe_beta`, `AHE_BETA_*`), existing Gitea account identities, and immutable history; do not perform a mechanical repository-wide replacement. The old-to-new mapping in this specification is for review and does not represent a retained old entry point.
 
-活跃编号 Spec 的现状叙述、文件路径与引用同步更新，角色词 slug 改为 `architect`，数字编号稳定；冻结审计记录不改写。OVERVIEW / ARCHITECTURE 由 CLI 重建，README 保持中英文一致。
+The current-state descriptions, file paths, and references for active-numbered Specs are updated together; the role-word slug is changed to `architect` while numeric identifiers remain stable; frozen audit records are not rewritten. OVERVIEW / ARCHITECTURE are rebuilt by the CLI, and README remains consistent in Chinese and English.
 
-### 7. Task DAG 与文件分配
+### 7. Task DAG and file allocation
 
-精确源/目标文件列表在 frontmatter，迁移时源路径与目标路径均归同一 Task；Task 之间无文件重叠。模块移动完成前不并行改其旧 import，任务按下面依赖执行。
+The precise source/target file lists are in frontmatter; during migration, the source and target paths are assigned to the same Task. Tasks do not overlap in files. Do not change old imports in parallel before the module move is complete; execute tasks according to the dependencies below.
 
-| Task | 范围 | 验收重点 |
+| Task | Scope | Acceptance focus |
 | --- | --- | --- |
-| T1 | Python 需求包、guards、导入消费者、后端角色数据与恢复 | 旧 Designer/dev 包及失效中间件删除；有效检查、授权与恢复行为保留 |
-| T2 | agent_defs、主 launcher、模型/profile 与配置示例 | 角色与 guards 路径可加载；hook/完整性接线保留；配置不双写 |
-| T3 | replay/probe/e2e/export 与 evaluation 执行脚本 | 静态和动态路径、CLI、输出、新示例全部对齐 |
-| T4 | 前端 API、类型、楼层与 CSS | 新角色可见；无版本握手或 label 转换层 |
-| T5 | 当前文档与 Spec 映射、双语入口、派生视图 | guards 职责明确；失效任务退役；当前路径有效，历史不改写 |
-| T6 | 现有行为测试、一次性搜索复核与离线 e2e | 无额外命名门禁；有效检查的行为和接线均验证 |
+| T1 | Python requirements package, guards, import consumers, backend role data, and recovery | Delete old Designer/dev packages and invalid middleware; retain valid checks, authorization, and recovery behavior |
+| T2 | agent_defs, main launcher, model/profile, and configuration examples | Role and guards paths load; hook/integrity wiring is retained; configuration is not duplicated |
+| T3 | replay/probe/e2e/export and evaluation execution scripts | Static and dynamic paths, CLI, outputs, and new examples are aligned |
+| T4 | Frontend API, types, floor, and CSS | New roles are visible; no version handshake or label-conversion layer |
+| T5 | Current documentation and Spec mappings, bilingual entry points, and derived views | Guards responsibilities are clear; invalid tasks are retired; current paths are valid and history is not rewritten |
+| T6 | Existing behavior tests, one-time search verification, and offline e2e | No additional naming gate; behavior and wiring of valid checks are both verified |
 
 ```mermaid
 flowchart LR
@@ -441,55 +441,55 @@ flowchart LR
     T5 --> T6
 ```
 
-### 8. 可执行验收
+### 8. Executable acceptance
 
-离线端到端脚本为 `backend/scripts/e2e-architect-naming.sh`。它不调用付费模型、不连接真实 Gitea、不启动交付容器；使用假模型与 FakeTracker 验证：新版配置 → agent 定义加载 → 跨两提案结构综合 → covers 处理 → Owner 交接 → 中断/恢复 → 观测与快照新字段。
+The offline end-to-end script is `backend/scripts/e2e-architect-naming.sh`. It does not call paid models, connect to real Gitea, or start delivery containers; it uses a fake model and FakeTracker to verify: new configuration → agent-definition loading → structural synthesis across two proposals → covers handling → Owner handoff → interruption/recovery → new observation and snapshot fields.
 
-验收包括：
+Acceptance includes:
 
-- 旧 Designer/dev 模块、旧 agent_defs 目录和 tests/dev 目录不存在；新包所有 import、全部 YAML 工具 binding、所有保留脚本的动态加载测试通过。
-- 新配置、共享模型环境和正常恢复流程成功；不增加专门识别旧字段、旧环境变量或旧 checkpoint 的命名门禁。
-- 正常 synthesis 与分组 synthesis 输出及来源吸收与重命名前一致；证据授权、PM 隔离、调用 token/耗时归属保持原约束。
-- 当前后端、静态导出和前端类型使用 `architect` / `architect_run`，不增加角色版本字段或旧快照拒绝界面。
-- 四角色 YAML 实际加载 guards 中间件；允许路径能读取、越界路径被拒，观测制品授权不扩大。保留需求流程通过实际中间件访问观测文件的回归。
-- 临时 Harness 仓安装生成 hook 后，提交正常产品文件/文档与 `.env.example` 成功，提交 `.env` / `.env.local` / `.openagents` 被拒。hook 在独立仓执行，不需要安装 ahe-beta。
-- 临时编排仓未变化时完整性检查通过；非忽略文件变化或 HEAD 改变时抛错，Orchestrator 传播失败而非继续该轮。主入口和 SWE-bench 入口的绑定位置保持。
-- 全量 pytest、前端测试与构建、Ruff lint/format、Spec validate/render/graph 通过，派生视图无漂移。
-- 一次性搜索没有未解释的活动旧引用；冻结历史校验和未变化，不为测试改写历史材料。
-- 最终 git diff 中不含兼容导出、旧参数、环境回退、双写键或前端旧角色转换；提交前完成用户复查与名称残留审计。
+- The old Designer/dev modules, old agent_defs directory, and tests/dev directory do not exist; all imports for the new package, all YAML tool bindings, and dynamic-loading tests for all retained scripts pass.
+- New configuration, the shared model environment, and the normal recovery flow succeed; no dedicated naming gate is added to identify old fields, old environment variables, or old checkpoints.
+- Normal synthesis and grouped-synthesis outputs, source absorption, and renaming are unchanged from before; evidence authorization, PM isolation, and call-token/time attribution retain their existing constraints.
+- The current backend, static export, and frontend types use `architect` / `architect_run`; no role-version field or old-snapshot rejection UI is added.
+- The four role YAML files actually load guards middleware; allowed paths can be read, out-of-scope paths are rejected, and observation-artifact authorization is not expanded. The requirements workflow continues to pass regression coverage that accesses observation files through the actual middleware.
+- After a generated hook is installed in a temporary Harness repository, normal product files/docs and `.env.example` are accepted, while commits containing `.env` / `.env.local` / `.openagents` are rejected. The hook runs in an independent repository and does not require ahe-beta to be installed.
+- The integrity check passes when the temporary orchestration repository is unchanged; changes to non-ignored files or a changed HEAD raise an error, and the Orchestrator propagates the failure instead of continuing the round. The binding locations for the main entry point and SWE-bench entry point remain unchanged.
+- Full pytest, frontend tests and build, Ruff lint/format, and Spec validate/render/graph pass; derived views have no drift.
+- One-time search finds no unexplained active references to old names; frozen-history verification and unchanged content remain intact, and historical materials are not rewritten for tests.
+- The final git diff contains no compatibility exports, old parameters, environment fallbacks, duplicate-write keys, or frontend conversion for old roles; user review and residual-name auditing are completed before commit.
 
-验证结果（2026-09-29）：完整 Python 回归 1021 passed、2 skipped（未安装可选 tau2）；前端 9 tests passed、生产构建通过；Ruff、Spec validate、OpenAgents 固定提交 ee87df3 的配置契约检查通过。50 份基线校验和及 74 份冻结文件逐字节比较通过。一次性搜索确认运行代码无命名拒绝模块或角色版本握手。未调用真实模型或交付服务。最终名称审计确认：当前源码中独立的 designer 仅用于既有 Gitea 账号（8 处），其余保留于项目身份、冻结历史及本 Spec 的改名前后对照；没有旧角色入口或兼容层。用户已授权提交本次改动。
+Verification results (2026-09-29): full Python regression: 1021 passed, 2 skipped (optional tau2 not installed); frontend: 9 tests passed, production build passed; Ruff, Spec validate, and the configuration-contract checks for the fixed OpenAgents commit ee87df3 passed. Byte-for-byte comparison passed for 50 baseline checksums and 74 frozen files. One-time search confirmed that runtime code contains no naming-rejection module or role-version handshake. No real models or delivery services were called. The final name audit confirmed that the only independent uses of designer in the current source refer to existing Gitea accounts (8 occurrences); all other occurrences remain in project identities, frozen history, and the before/after rename comparison in this Spec. There is no old role entry point or compatibility layer. The user has authorized committing this change.
 
-人工复核：检查目录、import、脚本、模型环境与 UI 名称，再执行离线流程脚本。确认四类需求 Agent 实际加载 guards、正常恢复未重复副作用；不验收命名迁移或旧数据拒绝功能。
+Manual review: inspect directories, imports, scripts, model environments, and UI names, then run the offline workflow script. Confirm that the four requirements Agents actually load guards and that normal recovery does not repeat side effects; do not accept naming migration or rejection of old data as functionality.
 
 ## Drawbacks
 
-这是一次开发期的跨目录整理，改动范围大于显示名称调整。本地 `.env`、脚本和实验输入由开发者同步更新；尚无已发布用户，因此不为本次改名维护升级协议。
+This is a cross-directory cleanup during development, with a larger change scope than a display-name adjustment. Local `.env`, scripts, and experiment inputs are updated in sync by developers; there are no released users yet, so no upgrade protocol is maintained for this rename.
 
-共享目录移动会带来大量 import 和 Spec 文件映射修改，纯 rename 与行为变化需要分开审查。为降低风险，职责和算法保持不变，使用可执行的残留扫描与恢复副作用测试证明边界，而非仅靠查找替换。
+Moving shared directories causes many import and Spec-file mapping changes; pure renames and behavioral changes need to be reviewed separately. To reduce risk, responsibilities and algorithms remain unchanged, and executable residual scans and recovery-side-effect tests are used to demonstrate the boundaries rather than relying only on search-and-replace.
 
-清理 dev 包还需要验证真实装配，防止文件已移动但 YAML、hook 或完整性回调漏改。删除中间件的依据是当前没有运行时调用；不据此承诺 OpenAgents 提供完全相同的旧提交纪律。
+Cleaning up the dev package also requires validating real assembly to prevent files from moving while YAML, hooks, or integrity callbacks remain unupdated. The middleware is deleted because it currently has no runtime callers; this does not promise that OpenAgents provides exactly the same old commit discipline.
 
 ## Rationale and alternatives
 
-- **只改显示名**：工作量小，但 agent_defs、脚本、字段和恢复记录继续两套术语，无法满足本次要求，放弃。
-- **保留 Designer shim、环境回退和读时转换**：可兼容历史，但引入长期双命名；这正是用户要求删除的方案，放弃。
-- **不区分标识用途的全局替换**：会改坏第三方协议、已发布镜像和冻结证据。当前代码、配置与文档统一使用新名；外部固定标识及历史原件按实际用途保留。
-- **共享包直接改为 architect**：会把 Triage/PM/Owner 归入单个角色之下；采用中性的 `demand` 包，具体角色与 agent_defs 单独命名。
-- **为每个需求角色新增独立模型环境前缀**：会扩大模型路由与实验控制范围；本次用 `DEMAND_LLM_*` 表达既有共享机制，不改变共享策略。
-- **建设命名迁移或旧输入拒绝层**：当前没有实际用户，会增加不必要的运行时、测试与文档维护成本；直接更新当前实现和开发配置，不采用版本握手或专门门禁。
-- **直接删除 dev 整包**：会切断需求 Agent 的文件范围约束、编排仓完整性校验及 Harness 提交钩子，放弃。
-- **只把 dev 改成 guards、把五个模块全搬过去**：会把无运行时引用的两份旧中间件伪装为现役机制，放弃；只迁移三个有效模块。
-- **将旧提交中间件移植进 OpenAgents**：涉及另一个仓库的质量门和执行协议，不是此次命名/遗留清理的目标，不实施。
+- **Change only display names**: Lower effort, but agent_defs, scripts, fields, and recovery records would continue using two sets of terminology and would not satisfy this requirement; rejected.
+- **Retain a Designer shim, environment fallback, and read-time conversion**: Could preserve historical compatibility, but would introduce long-term dual naming; this is precisely the approach the user asked to remove, so it is rejected.
+- **Perform a global replacement without distinguishing identifier uses**: This would break third-party protocols, published images, and frozen evidence. Current code, configuration, and documentation use the new names consistently; external fixed identifiers and historical originals are retained according to their actual uses.
+- **Rename the shared package directly to architect**: This would place Triage/PM/Owner under a single role; the neutral `demand` package is used instead, with specific roles and agent_defs named separately.
+- **Add an independent model-environment prefix for each requirements role**: This would expand model routing and experiment-control scope; this change uses `DEMAND_LLM_*` to express the existing shared mechanism without changing the sharing strategy.
+- **Build a naming-migration or old-input-rejection layer**: There are currently no actual users, so this would add unnecessary runtime, test, and documentation maintenance costs; update the current implementation and development configuration directly without adopting a version handshake or dedicated gate.
+- **Delete the entire dev package directly**: This would sever the requirements Agents' file-scope constraints, orchestration-repository integrity checks, and Harness commit hooks; rejected.
+- **Change only dev to guards and move all five modules there**: This would disguise the two middleware components with no runtime references as active mechanisms; rejected. Only the three valid modules are migrated.
+- **Port the old commit middleware into OpenAgents**: This concerns another repository's quality gates and execution protocol and is outside the target of this naming/residual cleanup; not implemented.
 
 ## Prior art
 
-现有实现已将结构提案来源标为 `from-architect`，并在 prompt 与工具契约中限定跨提案综合职责，说明职责命名本来已向 synthesis 收敛。当前审计入口冻结 controller SHA、配置与计划，恢复层校验 schema 和操作身份；本方案保留这些现有机制，不额外建立命名版本边界。
+The existing implementation already labels structural-proposal sources as `from-architect` and limits cross-proposal synthesis responsibilities in the prompt and tool contract, showing that responsibility naming had already converged toward synthesis. The current audit entry point freezes the controller SHA, configuration, and plan, while the recovery layer validates the schema and operating identity; this proposal retains these existing mechanisms and does not add a naming-version boundary.
 
 ## Unresolved questions
 
-无。按用户最新要求，保留 demand/guards 和新配置命名，移除为此次改名增加的迁移、版本握手、拒绝和永久扫描设施。
+None. Per the user's latest requirements, retain the demand/guards and new configuration naming, and remove the migration, version handshake, rejection, and permanent scanning facilities added for this rename.
 
 ## Future possibilities
 
-需求角色独立模型配置或项目整体改名可另行讨论，不由本规格隐式触发。未来确有已发布用户和升级需求时，再按实际需求设计兼容策略。
+Independent model configuration for requirements roles or renaming the project as a whole can be discussed separately and is not implicitly triggered by this specification. If there are released users and upgrade requirements in the future, design a compatibility strategy based on the actual needs at that time.

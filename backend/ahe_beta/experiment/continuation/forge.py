@@ -59,8 +59,8 @@ def _verify_remote_report(*, tracker: Any, draft: IssueDraft, mapped: dict, oper
     if observed.get("title") == draft.title and observed.get("body") == expected_body:
         return
     audit = (
-        "## 原始用户报告（案例证据，非实现对象）\n\n"
-        f"**原始标题：** {draft.title}\n\n{expected_body}"
+        "## Original user report (case evidence, not an implementation target)\n\n"
+        f"**Original title:** {draft.title}\n\n{expected_body}"
     )
     if not any(
         comment.get("body", "").startswith(audit)

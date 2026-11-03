@@ -1,61 +1,53 @@
-# Ordinary N=1/N=4 五轮实验迁移手册
+# Ordinary N=1/N=4 Five-Round Experiment Migration Runbook
 
-本文是把实验迁移到另一台机器或交给另一位执行者时的操作契约。正式配置见
-[`configs/ordinary-1-4-five-rounds.json`](configs/ordinary-1-4-five-rounds.json)。
-论文主实验、数量 scaling 和其他消融组见
-[`EXPERIMENT-MATRIX.md`](EXPERIMENT-MATRIX.md)。N=1/N=4 是工程 pilot，不自动等同于
-论文矩阵中的分层 S4。
+This document is the operational contract for migrating the experiment to another machine or handing it to another operator. See the official configuration at
+[`configs/ordinary-1-4-five-rounds.json`](configs/ordinary-1-4-five-rounds.json).
+See the paper’s main experiment, quantity scaling, and other ablation groups at
+[`EXPERIMENT-MATRIX.md`](EXPERIMENT-MATRIX.md). N=1/N=4 is an engineering pilot and is not automatically equivalent to the paper matrix’s stratified S4.
 
-## 1. 实验问题与固定变量
+## 1. Experimental Question and Fixed Variables
 
-本实验比较两条相互独立的 harness 演化线：
+This experiment compares two independent harness evolution tracks:
 
-| 实验 | 任务 | 每轮交互 | 轮数 |
+| Experiment | Tasks | Interaction per round | Rounds |
 |---|---|---|---:|
-| `ordinary-1-glm53-v0-r5` | O03 | 模拟用户 | 5 |
-| `ordinary-4-glm53-v0-r5` | O03、O09、O14、O18 | O03 模拟用户，O09 直出，O14 模拟用户，O18 使用 benchmark-native user | 5 |
+| `ordinary-1-glm53-v0-r5` | O03 | Simulated user | 5 |
+| `ordinary-4-glm53-v0-r5` | O03, O09, O14, O18 | O03 simulated user, O09 direct output, O14 simulated user, O18 benchmark-native user | 5 |
 
-两条线都从 `baseline-v0-cade14d` 开始，但不能共享后续 revision、Gitea、
-session、checkpoint 或 artifact。这样比较的是任务规模对闭环演化的影响，而不是
-两条线互相污染后的结果。
+Both tracks start from `baseline-v0-cade14d`, but must not share subsequent revisions, Gitea, sessions, checkpoints, or artifacts. This makes it possible to compare the effect of task scale on closed-loop evolution, rather than results contaminated by interaction between the two tracks.
 
-固定角色和模型：
+Fixed roles and models:
 
-- Harbor 任务内的 harness：Boyue `glm-5.3-flash`。
-- Harbor 任务内的历史用户模拟：Boyue `glm-5.3-flash`。
-- Harbor 任务内的 designer/developer：Boyue `glm-5.3`。
-- PM/divergent：关闭，`N_DIVERGENTS=0`。
-- Owner：机械验收，`review=false`，不调用 LLM。
+- Harness inside Harbor tasks: Boyue `glm-5.3-flash`.
+- Historical user simulation inside Harbor tasks: Boyue `glm-5.3-flash`.
+- Designer/developer inside Harbor tasks: Boyue `glm-5.3`.
+- PM/divergent: disabled, `N_DIVERGENTS=0`.
+- Owner: mechanical acceptance, `review=false`; does not call an LLM.
 
-## 2. 超时和轮次语义
+## 2. Timeout and Round Semantics
 
-每个 task 的 agent 时间预算优先取官方 task metadata；没有官方预算时使用
-1800 秒。Harbor 外层 watchdog 固定为：
+For each task, the agent time budget should preferentially use the official task metadata; if no official budget is available, use 1800 seconds. The Harbor outer watchdog is fixed at:
 
 ```text
 outer_timeout = official_agent_timeout + 600 seconds
 ```
 
-额外 600 秒只用于 artifact/checkpoint 落盘，不允许继续模型执行。五轮不是五次
-独立 baseline：第 1 轮从 v0 开始，第 `r+1` 轮使用第 `r` 轮 owner gate 后发布的
-harness revision。若某轮未发布，则沿用上一轮 revision。
+The additional 600 seconds are only for writing artifacts/checkpoints to disk; model execution must not continue. Five rounds are not five independent baselines: round 1 starts from v0, and round `r+1` uses the harness revision released after the round `r` owner gate. If a round does not release a revision, continue using the previous revision.
 
-每轮的边界是：
+The boundary for each round is:
 
-1. Harbor Docker task 执行该轮全部 task，收集 harness transcript、用户 trace、patch 和 grader 输出。
-2. 将 session、用户反馈、objective grader 结果写入本轮 checkpoint。
-3. 本地 designer 只读取本轮冻结输入，生成设计交付物。
-4. 本地 developer 根据设计和 trace 修改当前 harness revision。
-5. mechanical owner 执行门禁；通过则发布新 revision，否则保留旧 revision。
-6. 写入 `round-{r}.json` 和压缩 checkpoint，然后进入下一轮。
+1. Harbor Docker tasks execute all tasks for the round and collect harness transcripts, user traces, patches, and grader outputs.
+2. Write sessions, user feedback, and objective grader results to the round’s checkpoint.
+3. The local designer reads only the frozen inputs for this round and produces design deliverables.
+4. The local developer modifies the current harness revision based on the design and traces.
+5. The mechanical owner runs the gate; if it passes, release a new revision; otherwise, retain the old revision.
+6. Write `round-{r}.json` and a compressed checkpoint, then proceed to the next round.
 
-恢复只能从最近一个完整 checkpoint 继续；不要从半截进程内存恢复，也不要重写已
-完成 trial。未完成轮次整体幂等重跑。
+Recovery may only resume from the latest complete checkpoint; do not recover from the in-memory state of a partially completed process, and do not rewrite completed trials. Rerun any incomplete round in its entirety, idempotently.
 
-## 3. 机器和凭证准备
+## 3. Machine and Credential Preparation
 
-在仓库根目录准备 Python 3.12、Harbor 0.23.0、Docker，以及本仓库的依赖。凭证只放在
-执行机环境或本地 ignored 文件中，绝不写进 JSON、日志或 git：
+At the repository root, prepare Python 3.12, Harbor 0.23.0, Docker, and this repository’s dependencies. Store credentials only in the execution machine’s environment or in a local ignored file; never write them to JSON, logs, or git:
 
 ```bash
 export BOYUE_API_KEY='...'
@@ -78,32 +70,26 @@ export ANTHROPIC_SMALL_FAST_MODEL='glm-5.3'
 export PYTHONPATH="$PWD"
 ```
 
-Harbor 任务内的四个角色共用 Boyue 网关，但每个角色仍使用独立的模型变量，便于
-审计和恢复。凭证只从 Harbor secret/env 注入，不写入 task artifact。正式路径使用
-Harbor Docker；当前 Harbor 0.23.0 没有 E2B environment adapter，E2B 不能写成已接通
-的正式 backend。
+The four roles inside Harbor tasks share the Boyue gateway, but each role still uses a separate model variable for auditing and recovery. Inject credentials only through Harbor secrets/env; do not write them to task artifacts. The official path uses Harbor Docker; the current Harbor 0.23.0 has no E2B environment adapter, so E2B must not be described as a connected official backend.
 
-历史 v0 harness archive 需要由执行者从受控 artifact store 取回，并核对：
+The historical v0 harness archive must be retrieved by the operator from the controlled artifact store, and the following must be verified:
 
 ```text
 HSE_HARNESS_ARCHIVE=.artifacts/harness-v0-cade14d.tar.gz
 sha256 = dd7cdd91a4dc170af3662cdca28d2ed9fbd0dd2676e57ce9a4041146a488e011
 ```
 
-NexAU 使用冻结的官方源码快照随启动包上传到 sandbox，并在 `/opt/hse-venv` 中以本地
-editable 方式安装；不依赖 PyPI 上的 `nexau==0.4.1`（该包未发布到当前 PyPI）。
+NexAU is uploaded to the sandbox at startup with a frozen snapshot of the official source code, and installed locally in editable mode in `/opt/hse-venv`; it does not rely on PyPI’s `nexau==0.4.1` (this package has not been published to the current PyPI).
 
-## 4. 先做 canary，再做正式 trial
+## 4. Run a Canary First, Then the Formal Trials
 
-仓库中的 `harbor-ordinary-o03` 是链路 canary。它的 `tests/test.sh` 只验证
-`session.json` 和 `model.patch` 存在，并写入 reward `1`；这个 reward 不是 SWE 正式
-准确率，不能放进论文主表。
+`harbor-ordinary-o03` in the repository is a pipeline canary. Its `tests/test.sh` only verifies that `session.json` and `model.patch` exist, and writes reward `1`; this reward is not official SWE accuracy and must not be included in the paper’s main table.
 
-准备 archive 后运行：
+After preparing the archive, run:
 
 ```bash
 mkdir -p .artifacts
-# 从受控 artifact store 放入 .artifacts/harness-v0-cade14d.tar.gz
+# Place the artifact store from the controlled source into .artifacts/harness-v0-cade14d.tar.gz
 sha256sum .artifacts/harness-v0-cade14d.tar.gz
 
 uvx --from harbor==0.23.0 harbor run \
@@ -136,13 +122,11 @@ uvx --from harbor==0.23.0 harbor run \
   --agent-env HSE_TASK_INSTANCE=pvlib__pvlib-python-1478
 ```
 
-通过标准是：sandbox 创建成功、model transcript 出现、用户 loop 能读写同一
-`/testbed`、artifact 下载完整、无 Harbor exception。canary 通过后才允许换成正式
-task package 和官方 grader。
+Pass criteria: sandbox creation succeeds, a model transcript is produced, the user loop can read and write the same `/testbed`, the artifact downloads completely, and there are no Harbor exceptions. Only after the canary passes may it be replaced with the formal task package and official grader.
 
-## 5. 正式五轮执行顺序
+## 5. Formal Five-Round Execution Order
 
-正式执行者必须为每条实验线建立独立的以下资源：
+The operator must create the following resources independently for each experiment track:
 
 ```text
 experiment process
@@ -154,11 +138,9 @@ checkpoint root
 artifact root
 ```
 
-不要使用 `backend/deploy/gitea/docker-compose.yml` 的固定 singleton stack；并行实验
-使用 `backend/deploy/experiment/docker-compose.yml` 生成唯一 project name 和端口。
+Do not use the fixed singleton stack in `backend/deploy/gitea/docker-compose.yml`; for parallel experiments, use `backend/deploy/experiment/docker-compose.yml` to generate unique project names and ports.
 
-伪代码级执行顺序如下，实际 task provisioning 由 benchmark-specific Harbor
-executor 完成：
+The pseudocode-level execution order is as follows; actual task provisioning is handled by the benchmark-specific Harbor executor:
 
 ```text
 for experiment in [ordinary-1-glm53-v0-r5, ordinary-4-glm53-v0-r5]:
@@ -175,14 +157,11 @@ for experiment in [ordinary-1-glm53-v0-r5, ordinary-4-glm53-v0-r5]:
         checkpoint(round, revision)
 ```
 
-任务结果必须记录：task ID、benchmark、revision、model、interaction mode、persona
-seed、official/outer timeout、provider、sandbox ID、grader version、reward、
-end_reason、artifact hashes、infrastructure status。基础设施失败不能当作 task
-failure 计入准确率，但必须单独报告。
+Task results must record: task ID, benchmark, revision, model, interaction mode, persona seed, official/outer timeout, provider, sandbox ID, grader version, reward, end_reason, artifact hashes, and infrastructure status. Infrastructure failures must not be counted as task failures in accuracy, but must be reported separately.
 
-## 6. 结果和恢复
+## 6. Results and Recovery
 
-每轮至少保存：
+Save at least the following for each round:
 
 ```text
 runs/<experiment_id>/round-<r>/trials/<task_id>/result.json
@@ -194,24 +173,20 @@ runs/<experiment_id>/checkpoints/round-<r>.tar.gz
 runs/<experiment_id>/summary.json
 ```
 
-主表同时报告：task success、harness completion、user feeling、interaction
-failure、official deadline、infrastructure failure。不能只报告 Harbor 的平均
-reward，也不能把 canary reward 当 benchmark accuracy。
+The main table must report: task success, harness completion, user experience, interaction failure, official deadline, and infrastructure failure. Do not report only Harbor’s average reward, and do not treat the canary reward as benchmark accuracy.
 
-若进程中断：读取最近 checkpoint，确认已完成 trial 的 artifact hash 不变，只重跑
-当前未完成 round；不要重新生成 manifest、换 task revision、换 persona seed 或把
-另一条实验线的 release revision 回灌进来。
+If the process is interrupted: read the latest checkpoint, confirm that artifact hashes for completed trials are unchanged, and rerun only the currently incomplete round; do not regenerate the manifest, change the task revision, change the persona seed, or feed the release revision from the other experiment track back into this one.
 
-## 7. 迁移前检查清单
+## 7. Pre-Migration Checklist
 
-- [ ] `configs/ordinary-1-4-five-rounds.json` hash 已记录。
-- [ ] O03/O09/O14/O18 的 task revision、grader 和 image digest 与 freeze record 一致。
-- [ ] `baseline-v0-cade14d` archive hash 正确。
-- [ ] Boyue `glm-5.3-flash` and `glm-5.3` probes succeed from the Harbor task environment。
-- [ ] Harbor full-loop canary executes user, harness, designer, developer, and owner phases in one task。
-- [ ] Selected Harbor environment creates, starts, uploads/downloads artifacts, and deletes cleanly。
-- [ ] PM 为关闭，Owner 为 mechanical `review=false`。
-- [ ] N=1、N=4 使用不同 artifact/Gitea/revision lineage。
-- [ ] official timeout 与 outer timeout 分开记录。
-- [ ] canary 与正式 grader 结果分开存放、分开报告。
-- [ ] 全局配置检查确认没有 OpenRouter endpoint、key 或 model。
+- [ ] `configs/ordinary-1-4-five-rounds.json` hash has been recorded.
+- [ ] The task revisions, graders, and image digests for O03/O09/O14/O18 match the freeze record.
+- [ ] `baseline-v0-cade14d` archive hash is correct.
+- [ ] Boyue `glm-5.3-flash` and `glm-5.3` probes succeed from the Harbor task environment.
+- [ ] The Harbor full-loop canary executes the user, harness, designer, developer, and owner phases in one task.
+- [ ] The selected Harbor environment creates, starts, uploads/downloads artifacts, and deletes cleanly.
+- [ ] PM is closed; Owner is mechanical `review=false`.
+- [ ] N=1 and N=4 use different artifact/Gitea/revision lineages.
+- [ ] Official timeout and outer timeout are recorded separately.
+- [ ] Canary and official grader results are stored and reported separately.
+- [ ] A global configuration check confirms there is no OpenRouter endpoint, key, or model.

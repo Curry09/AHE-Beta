@@ -1,4 +1,4 @@
-"""结构综合 get_session_timeline：使用事件投影（去仿真外壳，保留珍贵上帝视角标注）。"""
+"""Structurally synthesize get_session_timeline: use event projection (strip the simulation shell, preserve the precious god's-eye-view annotations)."""
 
 from __future__ import annotations
 
@@ -254,7 +254,7 @@ def test_projection_keeps_precious_godview_drops_sim_machinery(tmp_path: Path) -
     assert "[on_track|" not in wait["thought"]
     assert wait["saw_activity"] and "rg cssPlugin" in wait["saw_activity"][0]
     assert "huge stdout" not in blob
-    # gap：不对齐才带 available
+    # gap: include available only when misaligned
     assert wait["capability_gap"]["available"] == [
         "keep_waiting",
         "send_message",
@@ -262,7 +262,7 @@ def test_projection_keeps_precious_godview_drops_sim_machinery(tmp_path: Path) -
         "give_up",
     ]
 
-    # Spec-0024/T6：插话 queued 在 open 之后；随后 heard 仍 answers 指向 begin 那条
+    # Spec-0024/T6: interjection is queued after open; the subsequent heard still has answers pointing to the begin one
     opening = next(
         e for e in events if e.get("did") == "send_message" and e.get("utterance") == "u1"
     )
@@ -325,7 +325,7 @@ def test_harness_beat_drilldown_clips_and_classifies(tmp_path: Path) -> None:
     assert by_issue["user_did"] == "send_message"
     assert by_issue["n_steps_raw"] == 4
     assert by_issue["n_steps_returned"] == 4
-    # tool_result 截断，不全量 stdout
+    # tool_result is truncated; not the full stdout
     blob = json.dumps(by_issue)
     assert "xxxx" not in blob or by_issue["steps"][1].get("truncated") is True
     assert any(s.get("truncated") for s in by_issue["steps"] if s["kind"] == "tool_result")
@@ -333,7 +333,7 @@ def test_harness_beat_drilldown_clips_and_classifies(tmp_path: Path) -> None:
 
 
 def test_harness_beat_prefers_turn_with_harness_activity(tmp_path: Path) -> None:
-    """同 turn 号：优先返回带 harness_steps/output 的拍。"""
+    """Same turn number: prefer returning the beat that has harness_steps/output."""
     store = SessionStore(tmp_path)
     sess = _session_rich()
     store.save(sess)

@@ -1,12 +1,12 @@
 ---
 number: "0052"
-title: Architect 提案覆盖与重复合并权责
+title: "Architect Proposal Coverage and Duplicate Consolidation Responsibilities"
 issue: 0
 slug: architect-covers-consolidation
-summary: 由 Architect 基于全量 ProposalView 决定哪些 triage/proposal 被结构提案吸收；covers 作为唯一简化指令，目标提案创建后直接合并关闭被覆盖来源，Owner 只负责交付路由。
+summary: "The Architect determines which triage/proposals are absorbed by structural proposals based on the complete ProposalView; covers is the sole simplification directive, directly merging and closing covered sources after the target proposal is created. The Owner is responsible only for delivery routing."
 tasks:
   - id: T1
-    title: Architect covers 合并语义与状态迁移
+    title: "Architect covers merge semantics and state transitions"
     status: done
     priority: P0
     tags: []
@@ -17,10 +17,10 @@ tasks:
       - backend/ahe_beta/demand/architect.py
       - backend/ahe_beta/demand/issue_schema.py
       - backend/ahe_beta/demand/role_contract.py
-    scope: 把 Architect 产出的 covers 定义为吸收指令。结构提案创建成功后，将仍处于 report/proposal 平面的 covered 来源合并关闭并记录 merged-into；未被 covers 的提案保持独立。不得新增 Owner 语义复核或验收映射验证。
-    acceptance: Architect 创建带 covers 的结构提案后，covered triage/proposal 进入 closed+merged，结构提案保持 proposal；无 covers 或未被覆盖的提案保持 open；covers 仍只引用当轮可见的开放来源。
+    scope: "Define covers produced by the Architect as an absorption directive. After a structural proposal is successfully created, merge and close covered sources still on the report/proposal plane and record merged-into; proposals not covered by covers remain independent. Do not add Owner semantic review or acceptance mapping validation."
+    acceptance: "After Architect creates a structural proposal with covers, covered triage/proposal items transition to closed+merged, while the structural proposal remains proposal; proposals without covers or not covered remain open; covers still references only open sources visible in the current round."
   - id: T2
-    title: Owner 退回纯交付路由
+    title: "Return Owner to delivery-only routing"
     status: done
     priority: P0
     tags: []
@@ -34,10 +34,10 @@ tasks:
       - backend/agent_defs/architect/systemprompt.md
       - backend/agent_defs/owner/systemprompt.md
       - backend/agent_defs/owner/tools/submit_admission.tool.yaml
-    scope: 移除 Owner 对 covers 和语义合并的责任；Owner 只处理交接 admission，保留既有精确重复兼容路径但不承担跨提案去重。同步模型可见语义。
-    acceptance: Owner prompt 不再声称 covers 只作关系或由 Owner merge；Architect prompt 明确 covers 会吸收并关闭来源；Owner 不会因 covers 关系关闭来源。
+    scope: "Remove Owner's responsibility for covers and semantic merging; Owner handles only handoff admission, retaining the existing exact-duplicate compatibility path without taking responsibility for cross-proposal deduplication. Synchronize model-visible semantics."
+    acceptance: "The Owner prompt no longer claims that covers only represents relationships or that Owner performs merges; the Architect prompt makes clear that covers absorbs and closes sources; Owner does not close sources based on covers relationships."
   - id: T3
-    title: 覆盖合并回归测试与规格验证
+    title: "Coverage merging regression tests and specification verification"
     status: done
     priority: P1
     tags: []
@@ -52,112 +52,112 @@ tasks:
       - backend/tests/demand/test_role_contract.py
       - backend/tests/demand/test_agent_contract.py
       - docs/specs/0052-architect-covers-consolidation.md
-    scope: 更新 Architect/Owner 行为测试与 tool/schema drift 检查，并完成 spec validate/render/graph 及 Python 静态检查。
-    acceptance: 覆盖合并、非覆盖保留、Owner 纯路由和 prompt/schema 语义测试通过；pytest、ruff、spec validate/render/graph 与 git diff --check 通过。
+    scope: "Update Architect/Owner behavior tests and tool/schema drift checks, and complete spec validate/render/graph and Python static checks."
+    acceptance: "Tests for coverage merging, retention of uncovered items, Owner-only routing, and prompt/schema semantics pass; pytest, ruff, spec validate/render/graph, and git diff --check pass."
 ---
 
-# 0052 · Architect 提案覆盖与重复合并权责
+# 0052 · Architect Proposal Coverage and Duplicate Merging Responsibilities
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a nine-section rust-RFC overview for the group. -->
 
 ## Summary
 
-需求面不再由 Owner 重新裁决提案之间的语义重复。Architect/Architect 读取统一的
-ProposalView，已经拥有跨 triage、Divergent 与既有结构提案的上下文，因此由它通过
-`covers` 明确哪些开放 report/proposal 被当前结构提案吸收。结构提案创建成功后，driver
-直接把 `covers` 中的开放来源合并关闭，并写入 `merged-into` 审计行。Owner 仅负责将仍然
-开放的 proposal 交接到 OpenAgents；不新增第二道语义审核、验收映射或人工确认。
+On the requirements side, Owner no longer re-adjudicates semantic duplication between proposals. Architect/Architect reads the unified
+ProposalView and already has context across triage, Divergent, and existing structural proposals, so it uses
+`covers` to specify which open reports/proposals the current structural proposal absorbs. After the structural proposal is successfully created, the driver
+directly merges and closes the open sources in `covers` and writes an `merged-into` audit line. Owner is responsible only for handing
+still-open proposals off to OpenAgents; no second semantic review, acceptance mapping, or manual confirmation is added.
 
 ## Motivation
 
-当前未提交的角色治理改动把 Owner 改成 Delivery Router，同时把 `covers` 降格为仅供
-规划展示的关系元数据。这会留下一个实际空洞：Triage 产生的 proposal 与 Architect 产生
-的结构 proposal 即使明显重复，也没有角色负责将其从独立交付集合中去掉；Owner 还会把
-未列出的提案默认交接。结果是重复工作进入 OpenAgents，且决定权与最有上下文的角色错位。
+The current uncommitted role-governance changes turn Owner into a Delivery Router while downgrading `covers` to relationship metadata
+used only for planning displays. This leaves a practical gap: even when a proposal produced by Triage and a structural proposal produced
+by Architect clearly duplicate each other, no role is responsible for removing them from the set of independent deliveries; Owner also
+hands off unlisted proposals by default. The result is duplicate work entering OpenAgents, with decision-making authority misaligned with the role that has the most context.
 
-本组只恢复必要的合并闭环，不恢复 Owner 的产品评审职责。目标是让“是否被结构提案吸收”
-成为 Architect 的单一语义决定，同时保持 issue 状态迁移、审计关系和失败隔离等既有平台能力。
+This group restores only the necessary merging loop, without restoring Owner's product-review responsibilities. The goal is to make “whether a source is absorbed by a structural proposal”
+a semantic decision owned solely by Architect, while preserving existing platform capabilities such as issue state transitions, audit relationships, and failure isolation.
 
 ## Guide-level explanation
 
-一轮需求面按以下规则运行：
+A round on the requirements side follows these rules:
 
-1. Triage、Divergent 和 Architect 生成 proposal；Architect 在本轮可见的 ProposalView 上
-   形成结构提案。
-2. Architect 提交结构提案时，`covers` 列出它决定吸收的开放来源票号。`covers` 不再是
-   “请 Owner 考虑”的建议，而是 Architect 已作出的合并决定。
-3. driver 先创建结构提案，取得目标票号，再对 `covers` 中仍在 report/proposal 平面的
-   来源执行现有 `MERGED` 状态迁移，并追加 `merged-into: #目标票号`。
-4. 没有出现在 `covers` 中的来源继续开放；Owner 后续把这些 proposal（包括新的结构提案）
-   直接交接。Owner 不重新判断价值方向、根因或实现方案。
+1. Triage, Divergent, and Architect generate proposals; Architect uses the ProposalView visible in the current round
+   to form structural proposals.
+2. When Architect submits a structural proposal, `covers` lists the open source issue numbers it has decided to absorb. `covers` is no longer
+   a suggestion for “Owner to consider,” but a merge decision Architect has already made.
+3. The driver first creates the structural proposal and obtains its target issue number, then applies the existing `MERGED` state transition to
+   sources in `covers` that are still on the report/proposal planes, and appends `merged-into: #target-issue-number`.
+4. Sources not included in `covers` remain open; Owner subsequently hands these proposals (including the new structural proposal)
+   off directly. Owner does not reassess value direction, root causes, or implementation approaches.
 
-本组不表示 issue 可以“半关闭”：单个来源要么整体并入并关闭，要么保留为独立交付项。
-需要独立验收的部分不应放入 `covers`；以后若需要拆分，应先把来源拆成多个 issue。
+This group does not allow an issue to be “partially closed”: an individual source is either merged in full and closed or retained as an independent delivery item.
+Parts requiring independent acceptance should not be included in `covers`; if splitting is needed later, first split the source into multiple issues.
 
 ## Reference-level explanation
 
-### 权责
+### Responsibilities
 
-| 角色 | 合并权责 |
+| Role | Merging responsibilities |
 |---|---|
-| Triage | 只处理当前 report 的规范化，不跨票判重 |
-| Divergent | 发现能力类 proposal，不关闭既有票 |
-| Architect/Architect | 基于全量 ProposalView 决定结构提案及其 `covers` 来源 |
-| Owner | 只将开放 proposal 打包交接；不消费 `covers` 进行语义合并 |
-| driver/tracker | 按 Architect 已提交的 `covers` 执行创建后状态迁移和审计记录 |
+| Triage | Normalizes only the current report; does not deduplicate across issues |
+| Divergent | Discovers capability proposals; does not close existing issues |
+| Architect/Architect | Decides on structural proposals and their `covers` sources based on the full ProposalView |
+| Owner | Only packages open proposals for handoff; does not consume `covers` for semantic merging |
+| driver/tracker | Executes post-creation state transitions and audit recording according to `covers` submitted by Architect |
 
-### `covers` 与状态
+### `covers` and State
 
-`covers: #n #m` 是结构提案正文中的唯一机器行。Architect driver 继续过滤不存在、已
-关闭或不在 report/proposal 平面的票号，避免新提案引用已不可合并的对象。有效来源在目标
-创建后使用既有 `transition_issue(state="closed", labels=...)` 迁移到 `MERGED`；目标
-提案自身仍位于 `PROPOSAL` 平面，等待 Owner 交接。合并关系通过来源评论中的
-`merged-into: #目标` 保留，既有 issue 正文和历史评论不删除。
+`covers: #n #m` is the only machine-readable line in the structural proposal body. The Architect driver continues to filter out issue numbers that do not exist, are already
+closed, or are not on the report/proposal planes, preventing new proposals from referencing objects that can no longer be merged. After the target
+is created, valid sources use the existing `transition_issue(state="closed", labels=...)` to transition to `MERGED`; the target
+proposal itself remains on the `PROPOSAL` plane, awaiting Owner handoff. The merge relationship is preserved through
+`merged-into: #target` in source comments; existing issue bodies and historical comments are not deleted.
 
-合并动作应按来源票号确定性执行，并允许重复运行时跳过已经不是开放来源的票；单条迁移
-失败不影响目标提案或其他来源，失败应进入 Architect outcome/事件，而不是静默吞掉。
-这属于现有 tracker 的可靠状态迁移，不是新的语义验证层。
+Merge operations should execute deterministically by source issue number and allow repeated runs to skip issues that are no longer open sources; failure of an individual transition
+must not affect the target proposal or other sources, and failures should be recorded in Architect outcomes/events rather than silently swallowed.
+This is reliable state transition handling in the existing tracker, not a new semantic validation layer.
 
-### Owner 边界
+### Owner Boundaries
 
-Owner 的模型输入和 submit schema 不需要新增合并字段。Owner 不读取 `covers` 来关闭来源，
-未被模型列出的 proposal 仍按现有 fail-open 规则直接交接。保留已有 exact-duplicate
-兼容路径时，它只是历史数据的机械兼容，不代表 Owner 获得语义去重权；新的跨票语义合并
-唯一由 Architect 的 `covers` 触发。
+Owner's model input and submit schema do not need new merge fields. Owner does not read `covers` to close sources;
+proposals not listed by the model are still handed off directly under the existing fail-open rules. If the existing exact-duplicate
+compatibility path is retained, it is merely mechanical compatibility for historical data and does not grant Owner semantic deduplication authority; new cross-issue semantic merges
+are triggered exclusively by Architect's `covers`.
 
 ## Drawbacks
 
-Architect 的判断错误会直接影响哪些票继续独立交付；这是把决定权放回拥有全局上下文的角色
-所接受的代价。为保持流程简单，本组不增加验收映射或第二个模型审核，因此结构提案必须
-承担被覆盖来源的完整目标表达。`covers` 只能整体关闭来源，不能表达同一 issue 的部分
-验收被承接。
+Incorrect Architect judgments directly affect which issues continue as independent deliveries; this is the accepted cost of returning decision-making authority to the role
+with global context. To keep the workflow simple, this group adds neither acceptance mapping nor a second model review, so structural proposals must
+fully express the goals of the covered sources. `covers` can only close sources in full; it cannot express that only part of the acceptance requirements
+of a single issue have been taken over.
 
 ## Rationale and alternatives
 
-选择 Architect 而不是 Owner，是因为 Architect 同时看到开放 triage/proposal、ready 参照、
-体验趋势和运行聚合，最适合判断共同机制与重复关系；Owner 的上下文和职责已经收敛为交付
-路由。选择复用 `covers` 而不是新增 `consolidates` 字段，是为了减少 schema、prompt、
-状态解析和前端字段的同步面。
+Architect is chosen over Owner because Architect sees open triage/proposal items, ready references,
+experience trends, and run aggregates together, making it best suited to judge common mechanisms and duplication relationships; Owner's context and responsibilities have already narrowed to delivery
+routing. Reusing `covers` instead of adding an `consolidates` field reduces the synchronization surface across schemas, prompts,
+state parsing, and frontend fields.
 
-不采用“Owner 继续做语义去重”：这会重新引入职责重叠，并使生成器与交付路由器都拥有
-产品合并判断。不采用自动文本判重作为主路径：标题/正文完全相同只能识别狭窄的机械重复，
-无法解决 triage 与结构提案的语义覆盖。不采用新的“部分关闭”状态：它会扩散到 plane、
-Owner 过滤、OpenAgents intake 和 UI，且一个 issue 的交付边界不再清楚。
+“Owner continues semantic deduplication” is rejected: it would reintroduce overlapping responsibilities and give both the generator and delivery router
+product-level merge authority. Automatic text deduplication is rejected as the primary path: exact title/body matches identify only a narrow class of mechanical duplicates
+and cannot address semantic coverage between triage and structural proposals. A new “partially closed” state is rejected: it would spread into planes,
+Owner filtering, OpenAgents intake, and the UI, and obscure the delivery boundary of an issue.
 
 ## Prior art
 
-Spec-0029 曾把 `covers` 级联合并放在 Owner 准入阶段；Spec-0042 后续把 Owner 改为轻量
-路由器并暂时将 `covers` 定义为关系。0052 恢复“结构提案可吸收来源”的行为，但将语义
-决定点前移到 Architect，保留三平面标签和 `MERGED`/`merged-into` 的既有机器表示。
+Spec-0029 previously placed `covers` cascading merges at Owner admission; Spec-0042 later turned Owner into a lightweight
+router and temporarily defined `covers` as a relationship. 0052 restores the behavior in which “structural proposals can absorb sources,” but moves the semantic
+decision point earlier to Architect, retaining the three-plane labels and the existing machine representations `MERGED`/`merged-into`.
 
 ## Unresolved questions
 
-本组暂不解决以下问题：多个 Architect 并行时对同一来源产生冲突的结构提案如何仲裁；来源
-被合并后是否需要在前端默认折叠；以及跨多个结构提案的优先级如何展示。这些问题不改变
-本组的最小语义：单次 Architect 产物中的 `covers` 是关闭依据。
+This group does not yet address how to arbitrate conflicting structural proposals targeting the same source when multiple Architects run in parallel; whether merged
+sources should be collapsed by default in the frontend; or how to display priorities across multiple structural proposals. These questions do not change
+this group's minimal semantics: `covers` in a single Architect output is the basis for closure.
 
 ## Future possibilities
 
-如果未来需要保留部分验收或允许一票被多个结构提案共同承接，可在不改变 Architect 语义
-权责的前提下增加显式拆票/子验收模型。任何新状态或新机器行都必须先更新 issue_schema、
-OpenAgents intake、web 投影和对应 spec，不能把“部分关闭”继续隐含在 `covers` 中。
+If partial acceptance needs to be retained in the future, or a single issue needs to be jointly taken over by multiple structural proposals, an explicit issue-splitting/sub-acceptance model can be added
+without changing Architect's semantic responsibilities. Any new state or machine-readable line must first update issue_schema,
+OpenAgents intake, web projections, and the corresponding spec; “partial closure” must not remain implicit in `covers`.

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""探针：等待进度场景 × three 决策（intent + WAIT_GAP）。
+"""Probe: await progress scenario × three decisions (intent + WAIT_GAP).
 
-用法（仓根）：
+Usage (repo root):
   PYTHONPATH=backend .venv/bin/python -m tools.dev.probes.probe_wait_progress
 
-菜单：keep_waiting / send_message / interrupt / give_up（Spec-0022/0023）。
-凭证通过 --secrets-file 显式提供，或预先注入环境变量。
+Menu: keep_waiting / send_message / interrupt / give_up (Spec-0022/0023).
+Credentials provided explicitly via --secrets-file or pre-injected in environment.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[3] / "backend"
 
 
 class ScriptedProgressHarness:
-    """begin/poll harness：按脚本吐 progress，再 reply / 可被 interrupt。"""
+    """begin/poll harness: emit progress per script, then reply / can be interrupted."""
 
     def __init__(self, *, activities: list[list[str]], reply: str = "done.") -> None:
         self._activities = activities

@@ -1,17 +1,22 @@
-# Spec-0025/T1：平台层标准 issue schema——每 kind 声明式字段，分 USER/TRIAGE 区，校验 + 确定性渲染。
-"""标准 issue 格式的单一真源（平台层，dev 够不着——issue 格式是平台制品，不可被 harness 进化改动）。
+# Spec-0025/T1: platform-layer standard issue schema—declarative fields per kind, split USER/TRIAGE sections, validation + deterministic rendering.
+"""Standard issue format, owned by the platform and inaccessible to the harness.
 
-**LLM 只填字段值，格式由 render 保证**——不靠 LLM 自觉对齐格式，也不靠 Gitea 表单（issue 全程走 API
-创建，Gitea 的 ISSUE_TEMPLATE 只作用于 Web UI，校验不到 API）。
+The issue format is a platform artifact; harness changes cannot redefine it.
+**The LLM supplies field values; render guarantees the layout.** Formatting does not depend
+on the model following a template or on Gitea forms: all issues are submitted through the
+API, while Gitea's ISSUE_TEMPLATE affects only the Web UI and cannot validate API requests.
 
-Spec-0027/T1 收敛：schema 只声明「规范化产物」字段——即 triage / architect agent 定位后填的字段
-（根因区域/边界/验收、RFC 的 问题/根因/…），是 dev 的 Definition of Ready。用户报的 issue **body 是
-自由文本**（真实 persona 不填模板），不再声明 USER 段模板（原 USER 段从未接线、已删）。契约的机器
-校验交给 nexau 工具层（见 architect/agent_contract.py 由本 SCHEMAS 生成 submit 工具 input_schema）。
+Spec-0027/T1: the schema contains only normalized output fields populated after investigation
+by triage / architect agents (root-cause region/boundary/acceptance, RFC questions/root-causes/…).
+These fields define the developer's Definition of Ready. A user-reported issue **body is free text**;
+a real persona does not fill out a template. The unused USER section template has been removed.
+Machine validation is delegated to nexau's tool layer (see demand/agent_contract.py), which
+generates submit-tool input_schema from these SCHEMAS.
 
-`validate(kind, fields)` 校验必填在；`render(kind, fields)` 渲染 `### <label>` 分节 markdown（供 triage
-挂 comment / RFC body）。`section` 参数随本次收敛退化为单一值，保留仅为向后兼容。加新 kind 只增
-SCHEMAS 声明、不改 validate/render 逻辑。
+`validate(kind, fields)` checks required fields. `render(kind, fields)` produces `### <label>`
+Markdown sections for triage comments / RFC bodies. The `section` parameter now has only one
+value and remains for backward compatibility. Adding a kind requires only a SCHEMAS entry,
+with no changes to validate/render logic.
 """
 
 from __future__ import annotations
@@ -22,53 +27,53 @@ from dataclasses import dataclass
 USER = "user"
 TRIAGE = "triage"
 
-# 优先级枚举（单一真源，高→低）。由 **triage agent** 按严重度 × 那局体感判定（Spec-0025/T3），
-# 以标签形式落库——不列为 body 字段，只作标签枚举供 dispatch / 前端徽标用。
+# Priority enum, highest first: **triage agent** combines severity with user experience in the session (Spec-0025/T3).
+# Stored as labels rather than a body field, for dispatch and frontend badges.
 PRIORITIES = ("P0", "P1", "P2", "P3")
 
-# ---- 三平面标签（Spec-0029/T1：资格只看这三个词，写侧新数据只产它们）----
-REPORT = "report"  # 平面1 证据：用户 sim 的原始报告（自由文本），谁都不能领
-PROPOSAL = "proposal"  # 平面2 提案：一律不可领；由生成器（triage/architect/divergent）产出
-READY = "ready"  # 平面3 工作队列：唯一可领白名单，Owner 准入后才有
-# Spec-0032/T3：交付面交接令牌（OpenAgents vigil 的发现标签）。Owner 准入改打它而非直接打 ready——
-# vigil `_intake` 对已带 ready 的票直接跳过、curator 依赖排序只在「本轮有新准入」时触发，Owner 直打
-# ready 会把 curator 饿死；vigil 发现本标签后自己盖 ready（幂等）。读侧把它与 ready 同视为 READY 平面。
+# ---- Three-plane labels (Spec-0029/T1): claimability uses these labels; new writes use only this vocabulary. ----
+REPORT = "report"  # Plane 1: free-text report from the user simulation; not claimable
+PROPOSAL = "proposal"  # Plane 2: proposal from triage/architect/divergent; never claimable
+READY = "ready"  # Plane 3: claimable work queue, entered only after Owner admission
+# Spec-0032/T3: Owner admission applies this delivery handoff label for OpenAgents vigil to discover, rather than applying ready directly.
+# vigil `_intake` skips ready issues; curator sorts dependencies only for newly admitted issues. If Owner applied
+# ready directly, curator would miss them. vigil applies ready idempotently on discovery; both labels project to the READY plane.
 OPENAGENTS = "openagents"
-# 终态标签（关闭时替换平面标签落上；写侧保证平面标签与终态标签不并存）
+# Terminal labels (replace plane labels on close; write-side ensures plane labels and terminal labels never coexist)
 DECLINED = (
-    "declined"  # 被驳回关闭（triage reject/needs_info、Owner decline；原因记 comment/close reason）
+    "declined"  # Closed: triage reject/needs_info or Owner decline; reason in comment/close reason
 )
-MERGED = "merged"  # 被 Architect 的 covers 吸收后合并关闭（merged-into 机器行链主票）
-# provenance 标签（属性，不参与资格判定）：这条提案是谁产的
+MERGED = "merged"  # Merged by Architect's covers; a merged-into machine-readable line links the parent issue
+# provenance labels (attribute, not involved in qualification): who produced this proposal
 FROM_TRIAGE = "from-triage"
 FROM_ARCHITECT = "from-architect"
 FROM_DIVERGENT = "from-divergent"
 OBSERVATION_GAP = "observation-gap"
 
-# ---- 旧工作流标签（Spec-0025/0028 写侧已退役；保留常量供读侧映射旧数据，见 plane()）----
-NEEDS_TRIAGE = "needs-triage"  # 旧：用户 sim 新产、待 triage → 映射 report
-TRIAGED = "triaged"  # 旧：triage 完成、dev 可领 → 映射 ready
-REJECTED = "rejected"  # 旧：triage 驳回关闭 → 终态
-NEEDS_INFO = "needs-info"  # 旧：信息不足关闭 → 终态
-RFC_LABEL = "RFC"  # 旧：结构综合提案、dev 可领 → 映射 ready
-SUPERSEDED = "superseded"  # 旧：被 RFC 取代 → 终态
-DIVERGENT = "divergent"  # 旧：产品候选不可领 → 映射 proposal
-GATE_DROPPED = "gate-dropped"  # 旧：gate 丢弃关闭 → 终态
+# ---- Legacy workflow labels (Spec-0025/0028 write-side retired; constants retained for read-side mapping legacy data, see plane()) ----
+NEEDS_TRIAGE = "needs-triage"  # Legacy: new user-simulation report awaiting triage → maps to report
+TRIAGED = "triaged"  # Legacy: triage complete and claimable by a developer → maps to ready
+REJECTED = "rejected"  # Legacy: triage rejected and closed → terminal
+NEEDS_INFO = "needs-info"  # Old: insufficient info closed → terminal state
+RFC_LABEL = "RFC"  # Legacy: structural proposal, claimable by a developer → maps to ready
+SUPERSEDED = "superseded"  # Old: superseded by RFC → terminal state
+DIVERGENT = "divergent"  # Old: product candidate not claimable → mapped to proposal
+GATE_DROPPED = "gate-dropped"  # Old: gate dropped closed → terminal state
 
 
 def round_label(round_no: int) -> str:
-    """轮号标签：`round-<N>`。用户 issue 盖它，供增量 triage / 观测曲线按轮计数。"""
+    """Return `round-<N>` for user-created issues, incremental triage, and per-round observation curves."""
     return f"round-{int(round_no)}"
 
 
-# ---- 标签 → 语义投影（平台层单一真源，供 web / metrics / dev / 前端共用）----
-# issue 的 kind / 轮号 / triage 状态 / 优先级 全部只由标签决定；这里集中做投影，避免各处各写一份。
+# ---- Label → semantic projection (platform-layer single source of truth for web / metrics / dev / frontend) ----
+# Issue kind / round / triage status / priority determined entirely by labels; centralized projection here to avoid duplication elsewhere.
 
 _ROUND_RE = re.compile(r"^round-(\d+)$")
 
 
 def issue_kind(labels: list[str]) -> str:
-    """标签 → issue kind：RFC 优先（凌驾 type），否则取首个 USER_KINDS 命中；都无则 'bug'（暂定兜底）。"""
+    """Infer issue kind from labels: RFC overrides type; otherwise use the first USER_KINDS match, or 'bug' as a provisional fallback."""
     ls = list(labels or [])
     if RFC_LABEL in ls:
         return "rfc"
@@ -79,7 +84,7 @@ def issue_kind(labels: list[str]) -> str:
 
 
 def round_of(labels: list[str]) -> int | None:
-    """标签 → 轮号（`round-N` 的 N）；无则 None。"""
+    """Return the round number N from a `round-N` label, or None if absent."""
     for x in labels or []:
         m = _ROUND_RE.match(str(x))
         if m:
@@ -127,14 +132,14 @@ def filter_architect_round(items, *, round_no: int | None):
 
 
 def priority_of(labels: list[str]) -> str | None:
-    """标签 → 优先级（P0-P3）；无则 None。多个并存取最高（PRIORITIES 已按高→低）。"""
+    """Return the highest P0-P3 priority present, or None; PRIORITIES is ordered from highest to lowest."""
     present = [p for p in PRIORITIES if p in (labels or [])]
     return present[0] if present else None
 
 
 def triage_status(labels: list[str]) -> str | None:
-    """标签 → triage 状态（单值）：越决定性者胜——驳回/待补/gate 丢弃(终态关闭) > superseded >
-    divergent(候选不可领) > triaged(可执行) > needs-triage(待处理)；都无则 None。"""
+    """Label → triage status (single value): most decisive wins — rejected/needs-info/gate-dropped(terminal close) > superseded >
+    divergent(candidate not claimable) > triaged(executable) > needs-triage(pending); none → None."""
     ls = list(labels or [])
     for s in (REJECTED, NEEDS_INFO, GATE_DROPPED, SUPERSEDED, DIVERGENT, TRIAGED, NEEDS_TRIAGE):
         if s in ls:
@@ -142,22 +147,24 @@ def triage_status(labels: list[str]) -> str | None:
     return None
 
 
-# ---- 三平面投影（Spec-0029/T1：资格判定的单一真源）----
+# ---- Three-plane projection (Spec-0029/T1: single source of truth for qualification) ----
 
-# 终态标签（新老并集）：命中即不在任何平面。
+# Terminal labels (new and old combined): hitting any excludes from all planes.
 _TERMINAL_LABELS = frozenset({DECLINED, MERGED, REJECTED, NEEDS_INFO, GATE_DROPPED, SUPERSEDED})
 
 
 def plane(labels: list[str]) -> str | None:
-    """标签 → 所在平面（report/proposal/ready 三值）；终态或无平面标签返回 None。
+    """Map labels to report/proposal/ready, or None when no plane applies.
 
-    新平面标签优先（写侧新数据只产它们）；旧数据经读侧映射：needs-triage→report、
-    triaged|RFC→ready、divergent→proposal；终态（新老）先于旧映射判定（对齐旧 triage_status
-    的「越决定性者胜」——旧 triaged+superseded 组合是终态、不是 ready）。
+    New plane labels take precedence; legacy labels map as follows:
+    needs-triage→report, triaged|RFC→ready, divergent→proposal. Terminal labels, both new and old,
+    are checked before legacy mapping. This preserves triage_status's precedence: a legacy
+    triaged+superseded issue is terminal rather than ready.
 
-    Spec-0032/T3：`openagents`（Owner 准入的交付面交接令牌）与 `ready`（vigil 盖的执行面令牌）
-    同属 READY 平面——准入一落地即计入工作队列，vigil 随后盖 ready 幂等无感（metrics funnel /
-    背压告警 / 前端分组随本投影自动正确）。
+    Spec-0032/T3: `openagents` (Owner's delivery handoff token after admission) and `ready`
+    (the execution token applied by vigil) both map to the READY plane. Admission places an issue
+    in the work queue; vigil's later idempotent ready update does not affect the projected plane.
+    Metrics, backpressure alerts, and frontend grouping all use this projection.
     """
     ls = set(labels or [])
     if READY in ls or OPENAGENTS in ls:
@@ -178,39 +185,42 @@ def plane(labels: list[str]) -> str | None:
 
 
 def is_ready(*, labels: list[str], state: str) -> bool:
-    """dev 可领判定（唯一白名单）：open 且在 ready 平面。新增任何流程标签都默认不可领（fail-closed）。"""
+    """Allow developers to claim only open issues in the ready plane; new workflow labels default to unclaimable (fail-closed)."""
     return state == "open" and plane(labels) == READY
 
 
 def is_backlog_by_labels(labels: list[str]) -> bool:
-    """仅按标签判是否属「可执行 backlog」类 = 在 ready 平面（经 plane 投影，新旧标签统一口径）。
-    不看开/关状态——供观测曲线按事件累计（关闭事件自会抵消）。"""
+    """Check whether labels place an issue in the executable backlog: the ready plane.
+
+    plane() applies the same rules to new and legacy labels. Open/closed state is ignored here
+    because event-based observation curves account for closure with a cancelling event.
+    """
     return plane(labels) == READY
 
 
 def is_executable_backlog(*, labels: list[str], state: str) -> bool:
-    """某时刻是否算可执行 backlog：open 且在 ready 平面（dev 可领 / 曲线当前计数口径）。"""
+    """Count an issue in the current executable backlog only when it is open and in the ready plane, so developers can claim it."""
     return is_ready(labels=labels, state=state)
 
 
 def provenance_of(labels: list[str]) -> str | None:
-    """标签 → 提案来源（from-triage/from-architect/from-divergent）；无则 None。"""
+    """Label → proposal source (from-triage/from-architect/from-divergent); none → None."""
     for p in (FROM_TRIAGE, FROM_ARCHITECT, FROM_DIVERGENT):
         if p in (labels or []):
             return p
     return None
 
 
-# ---- covers / merged-into 机器行（单一真源解析；covers 是 Architect 的吸收决定）----
+# ---- covers / merged-into machine-readable lines; one parser for Architect coverage and parent-issue links. ----
 
-# covers 行（提案 body 里的覆盖声明，创建时写、之后不改写）：`covers: #5 #6`，多条取最后一条。
+# covers line (coverage declaration in proposal body, written at creation, not updated after): `covers: #5 #6`; multiple takes last.
 _COVERS_LINE_RE = re.compile(r"^covers:((?:\s*#\d+)+)\s*$", re.MULTILINE)
-# merged-into 行（被合并票的 comment / close reason）：`merged-into: #7`，多条取最后一条。
+# merged-into line (in comment / close reason of merged ticket): `merged-into: #7`; multiple takes last.
 _MERGED_INTO_RE = re.compile(r"^merged-into:\s*#(\d+)\s*$", re.MULTILINE)
 
 
 def parse_covers_line(body: str) -> list[int]:
-    """body → covers 行声明的票号列表（无该行返回空；多条取最后一条）。"""
+    """Return issue numbers from the last covers line in body, or an empty list if none exists."""
     last: str | None = None
     for m in _COVERS_LINE_RE.finditer(body or ""):
         last = m.group(1)
@@ -220,13 +230,13 @@ def parse_covers_line(body: str) -> list[int]:
 
 
 def format_covers_line(numbers: list[int]) -> str:
-    """票号列表 → covers 机器行。空列表返回空串（不写行）。"""
+    """Format issue numbers as a covers machine-readable line; return an empty string for an empty list."""
     nums = [int(n) for n in numbers or []]
     return f"covers: {' '.join(f'#{n}' for n in nums)}" if nums else ""
 
 
 def parse_merged_into(text: str) -> int | None:
-    """comment/close reason 文本 → merged-into 指向的主票号；无则 None（多条取最后一条）。"""
+    """Return the parent issue number from the last merged-into line in comment/close reason text, or None if absent."""
     last: int | None = None
     for m in _MERGED_INTO_RE.finditer(text or ""):
         last = int(m.group(1))
@@ -234,13 +244,16 @@ def parse_merged_into(text: str) -> int | None:
 
 
 def format_merged_into(number: int) -> str:
-    """主票号 → merged-into 机器行。"""
+    """Format a parent issue number as a merged-into machine-readable line."""
     return f"merged-into: #{int(number)}"
 
 
 @dataclass(frozen=True)
 class Field:
-    """一个字段的声明：机器 key + 展示 label + 归属区（user/triage）+ 是否必填。"""
+    """Declare a canonical wire key, an independent English display label, and validation rules.
+
+    Tool schemas and parsers use key; label is presentation only.
+    """
 
     key: str
     label: str
@@ -248,47 +261,47 @@ class Field:
     required: bool = True
 
 
-# 每 kind 的字段声明；元组顺序即 render 顺序。Spec-0027/T1：只保留「规范化产物」字段（triage/RFC
-# agent 填的定位字段）——用户报的 issue body 是自由文本（真实用户不填模板），不再声明 USER 段模板。
-# 全部字段归 TRIAGE（section 维度随本次收敛已退化为单一值，保留仅为 validate/render 向后兼容）。
+# Per-kind field declarations, in render order. Spec-0027/T1 retains only normalized output fields populated by triage/RFC
+# agents after investigation. User reports remain free text: users do not fill templates, so no USER section is declared.
+# All fields belong to TRIAGE. The section argument remains only for validate/render backward compatibility.
 SCHEMAS: dict[str, tuple[Field, ...]] = {
     "bug": (
-        Field("root_cause", "根因区域", TRIAGE),
-        Field("boundary", "边界", TRIAGE),
-        Field("acceptance", "验收", TRIAGE),
+        Field("root_cause", "Root cause", TRIAGE),
+        Field("boundary", "Boundary", TRIAGE),
+        Field("acceptance", "Acceptance criteria", TRIAGE),
     ),
     "feature": (
-        Field("boundary", "边界", TRIAGE),
-        Field("deliverable", "交付物", TRIAGE),
-        Field("acceptance", "验收", TRIAGE),
+        Field("boundary", "Boundary", TRIAGE),
+        Field("deliverable", "Deliverable", TRIAGE),
+        Field("acceptance", "Acceptance criteria", TRIAGE),
     ),
-    # chore/document 起步字段精简（harness 进化场景里少见，先占位、可扩）。
+    # chore/document: Streamline startup fields (rare in harness evolution scenarios, placeholder for now, extensible).
     "chore": (
-        Field("boundary", "边界", TRIAGE, required=False),
-        Field("acceptance", "验收", TRIAGE),
+        Field("boundary", "Boundary", TRIAGE, required=False),
+        Field("acceptance", "Acceptance criteria", TRIAGE),
     ),
-    "document": (Field("acceptance", "验收", TRIAGE, required=False),),
-    # RFC：结构性综合提案（architect agent 产），字段独立、由 agent 填。
+    "document": (Field("acceptance", "Acceptance criteria", TRIAGE, required=False),),
+    # RFC: Structural comprehensive proposal (produced by architect agent), fields independent and populated by agent.
     "rfc": (
-        Field("problem", "问题", TRIAGE),
-        Field("root_cause", "根因", TRIAGE),
-        Field("related", "涉及 issue", TRIAGE),
-        Field("direction", "方向", TRIAGE),
-        Field("acceptance", "验收", TRIAGE),
+        Field("problem", "Problem", TRIAGE),
+        Field("root_cause", "Root cause", TRIAGE),
+        Field("related", "Related issues", TRIAGE),
+        Field("direction", "Direction", TRIAGE),
+        Field("acceptance", "Acceptance criteria", TRIAGE),
     ),
 }
 
-# 用户 sim 侧可产的 kind（RFC 由 architect agent 产、不由用户提）。
+# kind values producible on user sim side (RFC produced by architect agent, not by user).
 USER_KINDS = ("bug", "feature", "chore", "document")
 
 
 def kinds() -> tuple[str, ...]:
-    """全部已声明 kind。"""
+    """All declared kinds."""
     return tuple(SCHEMAS)
 
 
 def fields_of(*, kind: str, section: str | None = None) -> tuple[Field, ...]:
-    """取某 kind 的字段（section 限定只取某区，None 取全部，保持声明顺序）；未知 kind 返回空。"""
+    """Get fields for a given kind (section limits to a specific area, None gets all, preserving declaration order); returns empty for unknown kind."""
     schema = SCHEMAS.get(kind)
     if schema is None:
         return ()
@@ -298,19 +311,19 @@ def fields_of(*, kind: str, section: str | None = None) -> tuple[Field, ...]:
 
 
 def output_contract_schema() -> dict:
-    """Spec-0025：triage agent 输出的 JSON Schema——供 response_format=json_schema 约束解码，让
-    **本 schema 成为 agent 输出契约的单一真源**（不再靠系统提示手抄 + 解析边界打补丁认漂）。
+    """Spec-0025: JSON Schema output by triage agent—constrains decoding via response_format=json_schema, making
+    **this schema the single source of truth for agent output contracts** (no more manual copying in system prompts + patching parse boundaries).
 
-    强制：顶层键只允许 issue/disposition/kind/priority/fields/of/reason（additionalProperties=false，
-    杜绝 triage_decision/平铺 root_cause/summary 这类自创字段）；disposition ∈ 四种、kind ∈ USER_KINDS、
-    priority ∈ P0-P3（enum 约束，"high" 这类吐不出来）；fields 的键 = 各 kind TRIAGE 字段的并集。
-    per-kind 必填与合法性仍由 driver 的 validate 二次把关（json_schema 只锁结构，不表达 kind 条件必填）。
+    Enforcement: top-level keys restricted to issue/disposition/kind/priority/fields/of/reason (additionalProperties=false,
+    preventing custom fields like triage_decision/flat root_cause/summary); disposition ∈ four values, kind ∈ USER_KINDS,
+    priority ∈ P0-P3 (enum constraint, cannot emit "high"); keys in fields = union of TRIAGE fields across all kinds.
+    Per-kind required fields and validity still validated by driver's validate pass (json_schema only locks structure, not kind-conditional requirements).
     """
-    triage_labels: list[str] = []
+    triage_keys: list[str] = []
     for k in USER_KINDS:
         for f in fields_of(kind=k, section=TRIAGE):
-            if f.label not in triage_labels:
-                triage_labels.append(f.label)
+            if f.key not in triage_keys:
+                triage_keys.append(f.key)
     item = {
         "type": "object",
         "properties": {
@@ -323,7 +336,7 @@ def output_contract_schema() -> dict:
             "priority": {"type": "string", "enum": list(PRIORITIES)},
             "fields": {
                 "type": "object",
-                "properties": {lbl: {"type": "string"} for lbl in triage_labels},
+                "properties": {key: {"type": "string"} for key in triage_keys},
                 "additionalProperties": False,
             },
             "of": {"type": "integer"},
@@ -341,13 +354,23 @@ def output_contract_schema() -> dict:
 
 
 def validate(*, kind: str, fields: dict, section: str | None = None) -> list[str]:
-    """校验：未知 kind / 缺必填 / 空值。section 限定只查某区（None 查全部）。返回错误列表（空=通过）。
+    """Validate canonical machine keys, string values, and required fields for a kind.
 
-    分区校验支持"两端各填各的"：T2 用户侧 validate(section='user')，T3 triage 侧 validate(section='triage')。
+    section restricts validation to one section; None checks all sections. Separate validation lets
+    T2 validate user fields with validate(section='user') and T3 validate triage fields with
+    validate(section='triage').
     """
     if kind not in SCHEMAS:
-        return [f"未知 issue kind: {kind!r}（须属 {tuple(SCHEMAS)}）"]
+        return [f"Unknown issue kind: {kind!r} (must be one of {tuple(SCHEMAS)})"]
+    if not isinstance(fields, dict):
+        return ["Fields must be an object keyed by canonical machine names"]
     errors: list[str] = []
+    allowed = {f.key for f in SCHEMAS[kind]}
+    for key, value in fields.items():
+        if key not in allowed:
+            errors.append(f"Unknown field {key!r} for kind {kind!r}")
+        elif not isinstance(value, str):
+            errors.append(f"Field {key!r} must be a string")
     for f in SCHEMAS[kind]:
         if section is not None and f.section != section:
             continue
@@ -355,23 +378,23 @@ def validate(*, kind: str, fields: dict, section: str | None = None) -> list[str
             continue
         val = fields.get(f.key)
         if val is None or (isinstance(val, str) and not val.strip()):
-            errors.append(f"缺必填字段 {f.key}（{f.label}，{f.section} 区）")
+            errors.append(f"Missing required field {f.key} ({f.label}, section {f.section})")
     return errors
 
 
-# 未填字段的渲染占位（T2 建 issue 时 triage 区尚空 → 占位；triage 补后再 render 覆盖）。
-_PLACEHOLDER = "_（待补）_"
+# Rendering placeholder for unfilled fields (T2 creates issue with empty triage section → placeholder; triage fills it later and render overwrites).
+_PLACEHOLDER = "_(to be filled)_"
 
 
 def render(*, kind: str, fields: dict, section: str | None = None) -> str:
-    """按 schema 声明顺序渲染 `### <label>\\n\\n<value>` 分节 markdown（单一布局）。
+    """Render `### <label>\\n\\n<value>` sectioned markdown per schema declaration order (single layout).
 
-    section 限定只渲染某区：T2 body = render(section='user')；T3 triage 补充 = render(section='triage')。
-    缺的字段渲染占位符（不报错——用户填得潦草时留白待 triage）。未知 kind 抛 ValueError。
+    section limits rendering to a specific area: T2 body = render(section='user'); T3 triage supplement = render(section='triage').
+    Missing fields render as placeholders (no error—leave blank for triage when user data is rough). Unknown kind raises ValueError.
     """
     schema = SCHEMAS.get(kind)
     if schema is None:
-        raise ValueError(f"未知 issue kind: {kind!r}（须属 {tuple(SCHEMAS)}）")
+        raise ValueError(f"Unknown issue kind: {kind!r} (must be one of {tuple(SCHEMAS)})")
     parts: list[str] = []
     for f in schema:
         if section is not None and f.section != section:

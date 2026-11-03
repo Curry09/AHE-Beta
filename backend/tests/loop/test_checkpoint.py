@@ -1,4 +1,4 @@
-"""spec-0004/T1：checkpoint save/load 自包含与原子性单测。"""
+"""spec-0004/T1: checkpoint save/load self-contained and atomic unit tests."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ def test_save_load_round_trip(tmp_path) -> None:
 
 
 def test_load_validates_self_contained(tmp_path) -> None:
-    state = _make_state_dir(tmp_path, complete=False)  # 缺 run_state.json
+    state = _make_state_dir(tmp_path, complete=False)  # Missing run_state.json
     artifact = save_checkpoint(state, tmp_path / "ckpt.tar.gz")
     with pytest.raises(ValueError):
         load_checkpoint(artifact, tmp_path / "restored")

@@ -10,8 +10,8 @@ description: >-
 
   The parameters are schema-validated at call time; invalid values (unknown
   decision, self-invented keys) are rejected and you must retry.
-# Spec-0029/T6：input_schema 是 agent_contract.admission_input_schema() 的生成副本（受 drift-guard
-# 测试守护：test_owner.py 断言二者深度相等）。改契约改 agent_contract 后需重生成此块。
+# Spec-0029/T6: input_schema is a generated copy of agent_contract.admission_input_schema() (protected by drift-guard
+# tests: test_owner.py asserts deep equality). Regenerate this block after changing the contract in agent_contract.
 input_schema:
   type: object
   properties:

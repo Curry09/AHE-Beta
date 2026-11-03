@@ -1,9 +1,8 @@
-"""用户侧最小链路的公共数据结构（spec-0001/T1）。
+"""Common data structures for the minimal user-side pipeline (spec-0001/T1).
 
-全部为纯数据 dataclass，无行为，可双向 dict 序列化（to_dict / from_dict）。
-体感与 Session 落本地 data/sessions/（T6）；issue 不落本地，经 IssueTracker 提交至 Gitea，
-本地只持 IssueRef 回执（T5）。Session.sim_trace 可选承载 god-view（决策时间线+心路）。
-轻量不变量在 __post_init__ 断言，不引入外部校验器。
+All are pure-data dataclasses with no behavior, supporting bidirectional dict serialization (to_dict / from_dict).
+User experience data and Session are persisted locally under data/sessions/ (T6); issues are not persisted locally, but are submitted to Gitea via IssueTracker, with only an IssueRef receipt kept locally (T5). Session.sim_trace optionally carries the god-view (decision timeline + inner monologue).
+Lightweight invariants are asserted in __post_init__, without introducing external validators.
 """
 
 from __future__ import annotations
@@ -14,15 +13,15 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-# 合法的对话角色集合（Transcript 每轮 role 必属其一）。
+# Set of valid conversation roles (the role of each turn in a Transcript must be one of these).
 _ROLES = ("user", "harness")
-# 合法的 issue 状态集合（与 Gitea state 语义对齐）。
+# Set of valid issue statuses (semantically aligned with the Gitea state).
 ISSUE_STATES = ("open", "closed")
 
 
 @dataclass
 class Persona:
-    """用户画像（给定输入）：身份/水平/领域/目标/说话风格。来源归后续 distill spec。"""
+    """User profile (given input): identity/level/domain/goals/speaking style. Provenance is deferred to a later distill spec."""
 
     identity: str
     level: str
@@ -52,13 +51,13 @@ class Persona:
 
 @dataclass
 class WorkspaceSpec:
-    """种子工作区规格：经可插拔 SeedSource（按 kind 分派）落地一个隔离工作区目录。
+    """Seed workspace spec: materialize an isolated workspace directory through a pluggable SeedSource (dispatched by kind).
 
-    spec-0009/T1：`kind` 选择供给实现（缺省 `local-fixture`，= 0008 行为）；`params` 为
-    source 专属入参的通用载体（如 empty 源的 doc/doc_name），使新增源不必扩 WorkspaceSpec。
-    `fixture` 为 local-fixture 源使用的 backend/seed_workspaces/<fixture>/ 目录名；
-    `setup` 为命令钩子；由 spec-0009/T3 的 `ensure_deps` 在 materialize 后执行（约定建
-    per-workspace `.venv` + pip 装入依赖）。与 benchmark held-out 红线无关——工作区不含 gold 测试。
+    spec-0009/T1: `kind` selects the provider implementation (default `local-fixture`, matching 0008 behavior); `params`
+    carries source-specific inputs (such as doc/doc_name for the empty source), so new sources do not require extending WorkspaceSpec.
+    `fixture` is the backend/seed_workspaces/<fixture>/ directory name used by the local-fixture source;
+    `setup` is a command hook run by spec-0009/T3's `ensure_deps` after materialize (by convention, create
+    a per-workspace `.venv` and install dependencies with pip). Separate from the benchmark held-out boundary: the workspace contains no gold tests.
     """
 
     fixture: str = ""
@@ -67,7 +66,7 @@ class WorkspaceSpec:
     setup: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        # 默认 kind/空 params 不落键，保持 0008 既有序列化形状（向后兼容）。
+        # Default kind/empty params are not serialized to disk, preserving the existing line 0008 serialization shape (backward compatible).
         d: dict[str, Any] = {"fixture": self.fixture, "setup": list(self.setup)}
         if self.kind != "local-fixture":
             d["kind"] = self.kind
@@ -87,17 +86,17 @@ class WorkspaceSpec:
 
 @dataclass
 class SeedScenario:
-    """种子场景（给定输入）：一局会话的初始诉求/任务描述（非测试用例）。
+    """Seed scenario (given input): the initial request/task description for one session (not a test case).
 
-    workspace 可选：非空时携带一个基线项目工作区（spec-0008/T1），供内层 tool-using
-    用户 agent 在自有 sandbox 真执行核实；为 None 时退化为今天的纯文本场景。
+    workspace is optional: when non-null, carries a baseline project workspace (spec-0008/T1) for the inner tool-using
+    user agent to execute and verify in its own sandbox; when None, uses the existing text-only scenario.
     """
 
     description: str
     workspace: WorkspaceSpec | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        # workspace=None 时不落该键，保持既有纯文本场景的序列化形状不变（向后兼容）。
+        # When workspace=None, this key is not serialized, preserving the existing shape of pure-text scenarios (backward compatible).
         d: dict[str, Any] = {"description": self.description}
         if self.workspace is not None:
             d["workspace"] = self.workspace.to_dict()
@@ -114,11 +113,12 @@ class SeedScenario:
 
 @dataclass
 class Turn:
-    """对话一轮：role ∈ {user, harness} 与 content。Transcript 的组成单元。
+    """One turn of conversation: role ∈ {user, harness} with content. A constituent unit of Transcript.
 
-    steps：仅 harness 轮可选携带——该轮 harness 内层迭代的过程流（{kind,text} 序列，
-    assistant 发言 / 工具调用 / 结果）。content 是给用户看的最终答案；steps 是观测层展开时才看的
-    完整内层过程（persona 只吃 content，不吃 steps）。默认空，非空才进 to_dict（不改既有序列化形状）。
+    steps: optional, only for harness turns — the process flow of this harness turn's inner iterations ({kind, text} sequence,
+    assistant utterances / tool calls / results). content is the final answer shown to the user; steps is the complete inner
+    process visible only when observations are expanded (persona consumes content, not steps). Default empty; only included
+    in to_dict when non-empty (does not change existing serialization shape).
     """
 
     role: str
@@ -126,7 +126,7 @@ class Turn:
     steps: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        assert self.role in _ROLES, f"非法 role：{self.role!r}（须属 {_ROLES}）"
+        assert self.role in _ROLES, f"Invalid role: {self.role!r} (must be one of {_ROLES})"
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {"role": self.role, "content": self.content}
@@ -141,7 +141,7 @@ class Turn:
 
 @dataclass
 class Transcript:
-    """有序多轮对话记录（过程产物）。每轮 role ∈ {user, harness}，构造期校验。"""
+    """Ordered multi-turn conversation record (process artifact). Each turn has role ∈ {user, harness}, validated at construction."""
 
     turns: list[Turn] = field(default_factory=list)
 
@@ -155,14 +155,14 @@ class Transcript:
 
 @dataclass
 class FeelingScore:
-    """1–4 体感评分 + 理由（会话末产出，作训练信号）。越界即构造期失败。"""
+    """1–4 subjective rating + rationale (output at session end, used as training signal). Out-of-range causes construction failure."""
 
     score: int
     reason: str
 
     def __post_init__(self) -> None:
         assert type(self.score) is int and 1 <= self.score <= 4, (
-            f"体感分越界：{self.score}（须在 1..4）"
+            f"Experience score out of range: {self.score} (must be 1..4)"
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -226,10 +226,10 @@ def validate_feedback(value: Mapping[str, Any]) -> dict[str, Any]:
 
 @dataclass
 class PersonaCallTrace:
-    """用户 agent 单次 LLM 调用的原始痕迹（先全量落盘，后续再筛）。
+    """Raw trace of a single user agent LLM call (persisted in full first, filtered later).
 
-    system/user 保留完整原文，便于事后看 KV 复用（重复多 → 提示词未优化）。
-    raw = 模型原文；parsed = 解析后的合同 JSON；steps = Agentic 内层 tool 过程流。
+    system/user preserve the complete original text for post-hoc analysis of KV reuse (high repetition → prompt optimization needed).
+    raw = model original output; parsed = parsed contract JSON; steps = agentic inner tool process flow.
     """
 
     role: str
@@ -265,12 +265,12 @@ class PersonaCallTrace:
 
 @dataclass
 class SimTurn:
-    """sim 上帝视角一轮：对话片段 + 心路同条共置（对齐 user.sim.loop.TurnLog）。
+    """One turn from sim god-view: conversation fragment + reasoning co-located (aligned with user.sim.loop.TurnLog).
 
-    与 Transcript 不是 1:1——一条 SimTurn = 一次 persona 决策（含 waiting 心跳、silent 自观察），
-    message / harness_output 是该决策时刻的对话片段，perceive / verdict / action 是心路。
-    persona_trace：该决策触发的用户 agent LLM 原始调用（含 system/user，供 KV 复用分析）。
-    Spec-0024/T6：utterance_id / delivery / queued_behind / answers_* 做请求–回复显式配对。
+    Not 1:1 with Transcript — one SimTurn = one persona decision (including waiting heartbeat, silent self-observation);
+    message / harness_output are the conversation fragment at that decision moment, perceive / verdict / action are the reasoning.
+    persona_trace: the user agent LLM raw call triggered by this decision (including system/user for KV reuse analysis).
+    Spec-0024/T6: utterance_id / delivery / queued_behind / answers_* explicitly pair requests and replies.
     """
 
     turn: int
@@ -324,7 +324,7 @@ class SimTurn:
             d["harness_events"] = list(self.harness_events)
         if self.persona_trace:
             d["persona_trace"] = [c.to_dict() for c in self.persona_trace]
-        # Spec-0024/T6：缺省空串不落键，旧 JSON 兼容
+        # Spec-0024/T6: default empty string is not serialized, compatible with older JSON
         if self.utterance_id:
             d["utterance_id"] = self.utterance_id
         if self.delivery:
@@ -392,11 +392,11 @@ class SimTurn:
 
 @dataclass
 class SimTrace:
-    """一局会话的完整 god-view（SessionResult 可持久化投影）。
+    """Complete decision trace of one session (SessionResult persistent projection).
 
-    transcript 仍是对话投影（看板/聚合用）；sim_trace 是决策时间线权威源。
-    persona_tail：局末不挂在某一 Turn 上的调用（file_issue 正文 / 体感评分）。
-    旧 session 无此字段 → None。
+    transcript is still the conversation projection (for dashboards / aggregation); sim_trace is the authoritative decision timeline.
+    persona_tail: calls not attached to any turn at session end (file_issue body / subjective rating).
+    Old sessions lack this field → None.
     """
 
     persona_id: str
@@ -405,11 +405,11 @@ class SimTrace:
     signals: list[str] = field(default_factory=list)
     feeling_derived: FeelingScore | None = None
     persona_tail: list[PersonaCallTrace] = field(default_factory=list)
-    # valid | invalid。invalid 表示用户评估器自身协议/解析失败，不是 harness 任务失败。
+    # valid | invalid. invalid indicates the user evaluator's own protocol/parsing failure, not harness task failure.
     evaluation_status: str = "valid"
     evaluation_error: dict[str, Any] | None = None
-    # completed | protocol_repaired | protocol_unrecoverable；与 evaluation_status 分离，
-    # 旧 session 缺省为 completed。
+    # completed | protocol_repaired | protocol_unrecoverable; separate from evaluation_status,
+    # old sessions default to completed.
     interaction_status: str = "completed"
     # Raw protocol recovery evidence (malformed output, parser code, attempt number).
     protocol_events: list[dict[str, Any]] = field(default_factory=list)
@@ -478,7 +478,7 @@ class SimTrace:
 
 @dataclass
 class IssueDraft:
-    """用户 agent 产出的问题草稿（title/body/labels），一局 0..n 条。对齐 Gitea 建 issue 入参。"""
+    """Issue draft produced by user agent (title/body/labels), 0..n per session. Aligns with Gitea issue creation parameters."""
 
     title: str
     body: str
@@ -498,9 +498,9 @@ class IssueDraft:
 
 @dataclass
 class OpenIssue:
-    """从 tracker 读回的一条 issue（number/title/body/labels/state）。
+    """One issue read back from tracker (number/title/body/labels/state).
 
-    用于开发者侧领取 issue（spec-0003/T3）：IssueTracker 的写路径产 IssueRef，读路径(list_open_issues)产 OpenIssue。
+    Used by developer side to claim issues (spec-0003/T3): IssueTracker's write path produces IssueRef, read path (list_open_issues) produces OpenIssue.
     """
 
     number: int
@@ -531,7 +531,7 @@ class OpenIssue:
 
 @dataclass
 class IssueRef:
-    """issue 提交至 Gitea 后的回执（number/url/state）；本地只持回执，权威源在 Gitea。"""
+    """Receipt after issue submission to Gitea (number/url/state); locally stored as receipt only, authoritative source is Gitea."""
 
     number: int
     url: str
@@ -547,10 +547,10 @@ class IssueRef:
 
 @dataclass
 class Session:
-    """一局会话的完整封装：聚合 persona/scenario/transcript/feeling/issue_refs，自带 id 与时间。
+    """Complete encapsulation of one session: aggregates persona/scenario/transcript/feeling/issue_refs, with built-in id and timestamp.
 
-    session_id 与 created_at 缺省自动生成（T4 构造时不必显式传），to_dict/from_dict 保真。
-    sim_trace：可选 god-view（决策时间线）；缺省 None，旧 JSON 无该键兼容。
+    session_id and created_at default to auto-generation (need not be explicitly passed at T4 construction), to_dict/from_dict preserve fidelity.
+    sim_trace: optional god-view (decision timeline); default None, backward compatible with old JSON lacking this key.
     """
 
     persona: Persona

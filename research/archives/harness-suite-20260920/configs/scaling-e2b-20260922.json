@@ -10,11 +10,28 @@
   "provider": "e2b",
   "model_gateway": "boyue",
   "openrouter_fallback": false,
-  "owner": {"mode": "mechanical", "review": false},
-  "pm": {"enabled": true, "count_source": "profiles[N].pm"},
-  "designer": {"grouping": true, "batch_size": 6},
-  "delivery": {"invocation_wall_seconds": 3600, "idle_seconds": 300, "round_wait_seconds": 86400},
-  "task_timeout": {"fallback_seconds": 1800, "outer_grace_seconds": 600, "scope": "per_trial_not_whole_evolution"},
+  "owner": {
+    "mode": "mechanical",
+    "review": false
+  },
+  "pm": {
+    "enabled": true,
+    "count_source": "profiles[N].pm"
+  },
+  "designer": {
+    "grouping": true,
+    "batch_size": 6
+  },
+  "delivery": {
+    "invocation_wall_seconds": 3600,
+    "idle_seconds": 300,
+    "round_wait_seconds": 86400
+  },
+  "task_timeout": {
+    "fallback_seconds": 1800,
+    "outer_grace_seconds": 600,
+    "scope": "per_trial_not_whole_evolution"
+  },
   "timeouts": {
     "latency_isolated_timeout": {
       "enabled": true,
@@ -49,28 +66,81 @@
     "duplicate_run_prohibited": true
   },
   "resume_contract": {
-    "identity_fields": ["experiment_id", "run_id", "config_sha256", "controller_sha", "plan_hash"],
+    "identity_fields": [
+      "experiment_id",
+      "run_id",
+      "config_sha256",
+      "controller_sha",
+      "plan_hash"
+    ],
     "fresh_start_on_missing_sandbox": false,
     "recovery_mode": "reuse_recovery_identity_and_existing_gitea_repo"
   },
   "secrets": {
     "source": ".e2b/.boyue or injected environment",
-    "required": ["E2B_API_KEY", "BOYUE_API_KEY", "GITEA_TOKEN"],
+    "required": [
+      "E2B_API_KEY",
+      "BOYUE_API_KEY",
+      "GITEA_TOKEN"
+    ],
     "never_in_config": true
   },
-  "capacity": {"max_concurrent_experiments_per_controller": 1, "task_parallel_cap": "per_profile"},
+  "capacity": {
+    "max_concurrent_experiments_per_controller": 1,
+    "task_parallel_cap": "per_profile"
+  },
   "roster_policy": {
     "pm_env": "N_DIVERGENTS",
     "owner_mode": "mechanical",
     "basis": "historical_r3_anchor_N16_and_grouped_designer_policy",
-    "note": "每个 N 独立进程读取自己的 roster；不存在跨实验共享角色池。"
+    "note": "Each N independent process reads its own roster; there is no role pool shared across experiments."
   },
   "profiles": {
-    "1":  {"user": 1, "task_parallel": 1, "triager": 1, "designer": 1, "developer": 1, "owner": 0, "pm": 0},
-    "4":  {"user": 4, "task_parallel": 4, "triager": 2, "designer": 1, "developer": 2, "owner": 0, "pm": 1},
-    "8":  {"user": 8, "task_parallel": 8, "triager": 4, "designer": 1, "developer": 4, "owner": 0, "pm": 1},
-    "16": {"user": 16, "task_parallel": 16, "triager": 8, "designer": 1, "developer": 4, "owner": 0, "pm": 1},
-    "32": {"user": 32, "task_parallel": 32, "triager": 16, "designer": 2, "developer": 8, "owner": 0, "pm": 2}
+    "1": {
+      "user": 1,
+      "task_parallel": 1,
+      "triager": 1,
+      "designer": 1,
+      "developer": 1,
+      "owner": 0,
+      "pm": 0
+    },
+    "4": {
+      "user": 4,
+      "task_parallel": 4,
+      "triager": 2,
+      "designer": 1,
+      "developer": 2,
+      "owner": 0,
+      "pm": 1
+    },
+    "8": {
+      "user": 8,
+      "task_parallel": 8,
+      "triager": 4,
+      "designer": 1,
+      "developer": 4,
+      "owner": 0,
+      "pm": 1
+    },
+    "16": {
+      "user": 16,
+      "task_parallel": 16,
+      "triager": 8,
+      "designer": 1,
+      "developer": 4,
+      "owner": 0,
+      "pm": 1
+    },
+    "32": {
+      "user": 32,
+      "task_parallel": 32,
+      "triager": 16,
+      "designer": 2,
+      "developer": 8,
+      "owner": 0,
+      "pm": 2
+    }
   },
   "e2b": {
     "lifetime_seconds": 86400,
@@ -80,9 +150,21 @@
     "template_id": "9aaeq3ys1frj3uvgx9sz",
     "template_build_id": "9acb2556-768f-4a59-9bf4-7234ef331661",
     "resource_profiles": {
-      "interaction": {"cpu_count": 2, "memory_mb": 4096, "storage_mb": 10240},
-      "analysis": {"cpu_count": 2, "memory_mb": 4096, "storage_mb": 10240},
-      "developer": {"cpu_count": 4, "memory_mb": 8192, "storage_mb": 10240}
+      "interaction": {
+        "cpu_count": 2,
+        "memory_mb": 4096,
+        "storage_mb": 10240
+      },
+      "analysis": {
+        "cpu_count": 2,
+        "memory_mb": 4096,
+        "storage_mb": 10240
+      },
+      "developer": {
+        "cpu_count": 4,
+        "memory_mb": 8192,
+        "storage_mb": 10240
+      }
     },
     "effective_profile_by_n": {
       "1": "developer",
@@ -93,11 +175,25 @@
     },
     "resource_policy": "the physical trial sandbox uses the peak developer profile; phases are logical, not resizable"
   },
-  "gitea": {"location": "vps", "one_repository_per_experiment": true, "https_required_unless_explicit_opt_in": true},
-  "paths": {"runs": "runs/scaling-e2b-20260922", "bundles": "prepared/scaling-e2b-20260922"},
+  "gitea": {
+    "location": "vps",
+    "one_repository_per_experiment": true,
+    "https_required_unless_explicit_opt_in": true
+  },
+  "paths": {
+    "runs": "runs/scaling-e2b-20260922",
+    "bundles": "prepared/scaling-e2b-20260922"
+  },
   "launch_gate": {
     "receipt": "n{N}/receipt.json",
-    "requires": ["config_sha256", "bundle_sha256", "template_id", "template_build_id", "task_freezes", "canary_passed"],
+    "requires": [
+      "config_sha256",
+      "bundle_sha256",
+      "template_id",
+      "template_build_id",
+      "task_freezes",
+      "canary_passed"
+    ],
     "no_models_or_resources_during_dry_run": true,
     "preflight_all_selected_before_any_start": true,
     "status": "canary-pending",

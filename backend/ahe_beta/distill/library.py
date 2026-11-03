@@ -1,13 +1,19 @@
-"""PersonaLibrary（spec-0006/T1）：persona 卡库的最小读写 + 契约约束校验。
+"""PersonaLibrary (spec-0006/T1): minimal read/write and contract constraint validation for the
+    persona card library.
 
-一个库文件（JSON）承载多条「6 维行为卡」记录；卡 schema 的唯一公共契约见
-tools/persona-distill/card-schema.md。库本身是纯数据存取：
+A single library file (JSON) holds multiple "6-dimensional behavioral card" records; the only
+public contract for card schema is in tools/persona-distill/card-schema.md. The library itself is
+pure data access:
 
-- 读侧对未知键**前向兼容**（忽略不报错，原样保留），便于 schema 演化（Postel 法则）。
-- `validate_card` 是**独立的严格校验门**（采集/入库时显式调用、测试用），与存取的宽容解耦：
-  断言卡只含契约允许的顶层键（从而不含任何 benchmark/轨迹派生字段）、D5.area ∈ 受控词表。
+- Read side is **forward compatible with unknown keys** (ignores without error, preserves as-is),
+  enabling schema evolution (Postel's law).
+- `validate_card` is an **independent strict validation gate** (called explicitly at collection/
+  ingestion time, for tests), decoupled from the permissive access layer: asserts that cards
+  contain only contract-allowed top-level keys (thus no benchmark/trace-derived fields), and
+  D5.area ∈ controlled vocabulary.
 
-卡 → sim 维度的注入映射（grounded 覆盖派生）不在此处，归 0006/T2 card_to_persona。
+The card → sim dimension injection mapping (grounded coverage derivation) is not here; see
+0006/T2 card_to_persona.
 """
 
 from __future__ import annotations
@@ -15,7 +21,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-# card-schema.md「D5.area 受控词表」单一真源的代码副本（单 token）。
+# Code copy of the single source of truth for "D5.area controlled vocabulary" from card-schema.md (single token).
 D5_AREA_VOCAB: frozenset[str] = frozenset(
     {
         "web-backend",
@@ -35,8 +41,8 @@ D5_AREA_VOCAB: frozenset[str] = frozenset(
     }
 )
 
-# card-schema.md 卡记录允许的顶层键。白名单即「不含 benchmark/轨迹派生字段」的实现：
-# 任何非契约字段（如 benchmark 分数、轨迹特征）都会落在白名单外被 validate_card 拒。
+# Top-level keys allowed in card records per card-schema.md. Whitelist implements "no benchmark/trace-derived fields":
+# Any field outside the contract (e.g., benchmark scores, trace features) falls outside the whitelist and is rejected by validate_card.
 ALLOWED_CARD_KEYS: frozenset[str] = frozenset(
     {
         "id",
@@ -45,7 +51,7 @@ ALLOWED_CARD_KEYS: frozenset[str] = frozenset(
         "dimensions",
         "provenance",
         "behavioral_prediction",
-        # 被拒卡（未入库）记录：
+        # Record of rejected cards (not ingested):
         "reject_reason",
         "action",
     }
@@ -53,15 +59,16 @@ ALLOWED_CARD_KEYS: frozenset[str] = frozenset(
 
 
 def validate_card(record: dict) -> None:
-    """按 card-schema.md 校验一条卡记录；不符合则抛 ValueError。
+    """Validate a card record per card-schema.md; raise ValueError if non-conformant.
 
-    只做契约级的硬约束（白名单 + D5.area 受控词表），不替代抽取 skill 的真实性门。
+    Only enforce contract-level hard constraints (whitelist + D5.area controlled vocabulary),
+    not replace the real-world gate for extracting skill validity.
     """
     extra = set(record) - ALLOWED_CARD_KEYS
     if extra:
         raise ValueError(
-            f"卡记录含契约外字段 {sorted(extra)}（疑似 benchmark/轨迹派生字段）；"
-            f"允许的顶层键见 card-schema.md：{sorted(ALLOWED_CARD_KEYS)}"
+            f"Card record contains fields outside the contract {sorted(extra)} (possibly benchmark/trace-derived fields); "
+            f"See card-schema.md for allowed top-level keys: {sorted(ALLOWED_CARD_KEYS)}"
         )
     dims = record.get("dimensions")
     if isinstance(dims, dict):
@@ -70,34 +77,38 @@ def validate_card(record: dict) -> None:
             area = d5["area"]
             if area not in D5_AREA_VOCAB:
                 raise ValueError(
-                    f"D5.area={area!r} 不在受控词表内（须为单 token）；见 card-schema.md：{sorted(D5_AREA_VOCAB)}"
+                    f"D5.area={area!r} is outside the controlled vocabulary (must be a single token); see card-schema.md: {sorted(D5_AREA_VOCAB)}"
                 )
 
 
 class PersonaLibrary:
-    """单个 JSON 文件承载多条卡记录的最小库。单进程 MVP，不处理并发写竞态。"""
+    """Minimal library for a single JSON file hosting multiple card records. Single-process MVP;
+    does not handle concurrent write races."""
 
     def __init__(self, path: str | Path) -> None:
         self._path = Path(path)
 
     def load(self) -> list[dict]:
-        """读全库；文件不存在视为空库（合法初始态）。"""
+        """Read entire library; absent file is treated as an empty library (legitimate initial state)."""
         if not self._path.exists():
             return []
         data = json.loads(self._path.read_text(encoding="utf-8"))
         if not isinstance(data, list):
-            raise ValueError(f"persona 库文件 {self._path} 顶层应为卡记录数组")
+            raise ValueError(
+                f"Persona library file {self._path} must contain an array of card records"
+            )
         return data
 
     def get(self, persona_id: str) -> dict:
-        """按 id 取一条卡；不存在抛 KeyError。"""
+        """Get one card by id; raise KeyError if not found."""
         for record in self.load():
             if record.get("id") == persona_id:
                 return record
         raise KeyError(persona_id)
 
     def add(self, record: dict) -> None:
-        """追加一条卡记录并落盘（存取宽容；严格校验请显式调 validate_card）。"""
+        """Append one card record and persist (permissive access; for strict validation, call
+        validate_card explicitly)."""
         records = self.load()
         records.append(record)
         self._path.parent.mkdir(parents=True, exist_ok=True)

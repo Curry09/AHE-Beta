@@ -1,22 +1,22 @@
 """
 dimensions.py
-Persona 维度定义 + 取值枚举 + 派生函数。
+Persona dimension definitions + value enums + derivation functions.
 
-Spec-0037/T2: tempo 时间气质；过程卷入语义；D6Authz 标为会话策略（非卡库人轴）。
+Spec-0037/T2: tempo temporal temperament; process involvement semantics; D6Authz marked as session policy (not persona axis).
 
-人的真源（卡库可改）与会话派生分层：
-  A 能力底座: D1 评估能力, D2 领域&深度
-  B 验收:     D3 验收阈值            (可由 D1×D2 派生；卡 grounded 时覆盖)
-  C 相处方式: D4_1 委派粒度, D4_2 过程卷入, D4_3 质量失败策略, tempo 时间气质
-  D 自主期望: D5 自主性期望
-  E 会话策略: D6 授权尺度            (非卡库人轴；由自主性+任务风险半派生)
-  F 信任:     trust                  (可由 D1×D2 派生；卡 grounded 时覆盖)
+Persona source (card-editable) and session derivation hierarchy:
+  A Capability Foundation: D1 Assessment Capability, D2 Domain & Depth
+  B Acceptance:           D3 Acceptance Threshold            (derivable from D1×D2; overrides when grounded)
+  C Interaction Style:    D4_1 Delegation Granularity, D4_2 Process Involvement, D4_3 Quality Failure Strategy, tempo Temporal Temperament
+  D Autonomy Expectation: D5 Autonomy Expectation
+  E Session Policy:       D6 Authorization Scale            (not persona axis; semi-derived from autonomy + task risk)
+  F Trust:                trust                              (derivable from D1×D2; overrides when grounded)
 
-铁律:
-- persona 是静态系数（会话开始定死），不在循环中变化。
-- 质量失败策略 ⊥ 时间气质：较真但能等、随手接受但等两分钟就炸，都真实。
-- 维度 -> 文案 / 配置 是确定性映射（见 clauses.py），可复现、可 codegen。
-- 不把当前 harness UX（interrupt / queued / slash）焊进维度枚举。
+Iron Laws:
+- Persona is a static coefficient (frozen at session start), does not change in the loop.
+- Quality Failure Strategy ⊥ Temporal Temperament: rigorous but patient, or casual but explodes in two minutes—both real.
+- Dimension -> Copy / Configuration is deterministic mapping (see clauses.py), reproducible and code-generable.
+- Do not bake current harness UX (interrupt / queued / slash) into dimension enums.
 """
 
 from __future__ import annotations
@@ -26,15 +26,16 @@ from enum import StrEnum
 
 
 # --------------------------------------------------------------------------
-# A. 能力底座
+# A. Competence foundation
 # --------------------------------------------------------------------------
 class D1Eval(StrEnum):
-    """D1 评估能力 —— 决定感知带宽 + 判断上限。自由采样。"""
+    """D1 Assessment Capability — determines perceptual bandwidth + judgment ceiling. Free sampling."""
 
-    BLIND = "blind"  # 盲信: 几乎不核查
-    SHALLOW = "shallow"  # 浅层: 读报错、跑一次, 不写测试/不审 diff
-    COMPETENT = "competent"  # 胜任: 跑测试、读 diff, 能识破多数似是而非的 API
-    EXPERT = "expert"  # 专家: 系统性验证, 识破幻觉/边界/DST 类 bug
+    BLIND = "blind"  # Blind trust: hardly any verification
+    SHALLOW = "shallow"  # Shallow: read errors, run once, no test writing / no diff review
+    COMPETENT = "competent"  # Competent: run tests, read diff, can see through most specious APIs
+    # Expert: systematic verification, detect hallucinations / boundary / DST-class bugs
+    EXPERT = "expert"
 
 
 class D2Depth(StrEnum):
@@ -45,7 +46,7 @@ class D2Depth(StrEnum):
 
 @dataclass(frozen=True)
 class D2Domain:
-    """D2 领域&深度。自由采样。weak 集合内的领域, D1 有效带宽降一档。"""
+    """D2 Domain & Depth. Free sampling. Domains in weak set reduce D1 effective bandwidth by one notch."""
 
     stack: tuple[str, ...] = ("python",)
     depth: D2Depth = D2Depth.PROFICIENT
@@ -53,47 +54,47 @@ class D2Domain:
 
 
 # --------------------------------------------------------------------------
-# B. 验收 (派生)
+# B. Acceptance (derived)
 # --------------------------------------------------------------------------
 class D3Accept(StrEnum):
-    RUNS = "runs"  # 能跑就行
-    FUNCTIONAL = "functional"  # 功能正确(测过的常规用例)
-    IDIOMATIC = "idiomatic"  # 现代规范
-    RIGOROUS = "rigorous"  # 类型/边界严谨
+    RUNS = "runs"  # It runs
+    FUNCTIONAL = "functional"  # Functional correctness (tested common cases)
+    IDIOMATIC = "idiomatic"  # Modern standards
+    RIGOROUS = "rigorous"  # Type / boundary rigor
 
 
 # --------------------------------------------------------------------------
-# C. 相处方式 (自由采样)
+# C. Interaction style (free sampling)
 # --------------------------------------------------------------------------
 class D41Grain(StrEnum):
-    ONE_LINER = "one_liner"  # 甩一句
-    HALF_CONTEXT = "half_context"  # 半上下文
-    SPEC_LEVEL = "spec_level"  # 规范级(含信息供给)
+    ONE_LINER = "one_liner"  # Just tell me
+    HALF_CONTEXT = "half_context"  # Half context
+    SPEC_LEVEL = "spec_level"  # Standard-level (includes information supply)
 
 
 class D42Supervise(StrEnum):
-    """过程卷入（原名 supervision）：对「助手在干什么」需要多少可见感。
+    """Process Involvement (formerly supervision): How much visibility into "what the assistant is doing" is needed.
 
-    枚举字符串保留兼容旧测试/卡映射；语义是人的过程焦虑，不是产品按钮。
+    Enum strings kept for backward compatibility with legacy tests/card mappings; semantics reflect human process anxiety, not product UI.
     """
 
-    EVERY_STEP = "every_step"  # 高卷入: 过程不可见就不安
-    PHASE_CHECK = "phase_check"  # 中卷入: 关键节点要有把握
-    FIRE_FORGET = "fire_forget"  # 低卷入: 只要结果
+    EVERY_STEP = "every_step"  # High involvement: uneasy if process is not visible
+    PHASE_CHECK = "phase_check"  # Medium involvement: need confidence at key checkpoints
+    FIRE_FORGET = "fire_forget"  # Low involvement: result only
 
 
 class D43Correct(StrEnum):
-    """质量失败后的策略（只答「结果不对时怎么办」；不驱动等待耐心）。"""
+    """Strategy after quality failure (answers only "what to do if results are wrong"; does not drive patience for waiting)."""
 
-    FEEDBACK = "feedback"  # 给反馈让它改
-    HANDOVER = "handover"  # 接管自己写
-    RESEND = "resend"  # 重发请求
-    GIVE_UP = "give_up"  # 放弃
-    FILE_ISSUE = "file_issue"  # 上报结构化 issue
+    FEEDBACK = "feedback"  # Give feedback so it revises
+    HANDOVER = "handover"  # Take over and write myself
+    RESEND = "resend"  # Re-submit request
+    GIVE_UP = "give_up"  # Give up
+    FILE_ISSUE = "file_issue"  # Report structured issue
 
 
 class TimeTemperament(StrEnum):
-    """时间气质：对等待与空转的耐受（与质量失败策略正交）。"""
+    """Temporal Temperament: tolerance for waiting and idle time (orthogonal to quality failure strategy)."""
 
     PATIENT = "patient"
     STEADY = "steady"
@@ -101,7 +102,7 @@ class TimeTemperament(StrEnum):
 
 
 # --------------------------------------------------------------------------
-# D. 自主期望
+# D. Autonomy expectations
 # --------------------------------------------------------------------------
 class D5Autonomy(StrEnum):
     ADVISORY = "advisory"
@@ -110,32 +111,32 @@ class D5Autonomy(StrEnum):
 
 
 # --------------------------------------------------------------------------
-# E. 会话策略（非卡库人轴）
+# E. Session strategy (non-character axis)
 # --------------------------------------------------------------------------
 class D6Authz(StrEnum):
-    """授权尺度：会话/产品策略，由自主性期望半派生；不进卡库。"""
+    """Authorization Scale: session/product policy, semi-derived from autonomy expectation; not in card."""
 
-    READ_ONLY = "read_only"  # 只读
-    WRITE_NO_RUN = "write_no_run"  # 可写不可跑
-    FULL_AUTO = "full_auto"  # 全自动(可写可跑)
+    READ_ONLY = "read_only"  # Read-only
+    WRITE_NO_RUN = "write_no_run"  # Writable, Not Runnable
+    FULL_AUTO = "full_auto"  # Fully Automated (Writable and Runnable)
 
 
 # --------------------------------------------------------------------------
-# F. 信任
+# F. Trust
 # --------------------------------------------------------------------------
 class TrustStance(StrEnum):
-    BLIND = "blind"  # 盲信
-    BALANCED = "balanced"  # 平衡
-    SKEPTICAL = "skeptical"  # 怀疑
+    BLIND = "blind"  # Blind Trust
+    BALANCED = "balanced"  # Balanced
+    SKEPTICAL = "skeptical"  # Skeptical
 
 
 # --------------------------------------------------------------------------
-# Persona 聚合
+# Persona Aggregation
 # --------------------------------------------------------------------------
 @dataclass(frozen=True)
 class Persona:
     persona_id: str
-    # 自由采样（人轴）
+    # Free Sampling (Human Axis)
     d1: D1Eval
     d2: D2Domain
     d41: D41Grain
@@ -143,25 +144,25 @@ class Persona:
     d43: D43Correct
     d5: D5Autonomy
     tempo: TimeTemperament = TimeTemperament.STEADY
-    # 派生 / 半派生：默认 None 表示「未提供，待 finalize_persona 派生填齐」。
-    # 若调用方（如 0006/T2 注入层）显式给了 grounded 值，finalize 不再改写（fallback-only）。
+    # Derived / Semi-derived: Default None means "not provided, to be filled by finalize_persona".
+    # If the caller (e.g., 0006/T2 injection layer) explicitly provides a grounded value, finalize does not overwrite it (fallback-only).
     d3: D3Accept | None = None
     d6: D6Authz | None = None
     trust: TrustStance | None = None
 
 
 # --------------------------------------------------------------------------
-# 派生函数 (确定性)
+# Derivation Function (Deterministic)
 # --------------------------------------------------------------------------
 def derive_d3(d1: D1Eval, d2: D2Domain) -> D3Accept:
-    """验收阈值 = f(D1, D2)。能力越高 + 越资深 -> 阈值越严。"""
+    """Acceptance Threshold = f(D1, D2). Higher capability + more senior -> stricter threshold."""
     base = {
         D1Eval.BLIND: D3Accept.RUNS,
         D1Eval.SHALLOW: D3Accept.FUNCTIONAL,
         D1Eval.COMPETENT: D3Accept.IDIOMATIC,
         D1Eval.EXPERT: D3Accept.RIGOROUS,
     }[d1]
-    # 资深再抬一档, 新手再降一档(在枚举序内 clamp)
+    # Senior level bumped up one notch, beginner level bumped down one notch (clamped within enum range)
     order = [D3Accept.RUNS, D3Accept.FUNCTIONAL, D3Accept.IDIOMATIC, D3Accept.RIGOROUS]
     idx = order.index(base)
     if d2.depth == D2Depth.SENIOR:
@@ -172,7 +173,7 @@ def derive_d3(d1: D1Eval, d2: D2Domain) -> D3Accept:
 
 
 def derive_trust(d1: D1Eval, d2: D2Domain) -> TrustStance:
-    """信任初值 = f(D1, D2)。盲信能力 -> 盲信; 高能力 -> 平衡偏怀疑。"""
+    """Trust Initial Value = f(D1, D2). Blind trust in capability -> blind trust; high capability -> balanced skepticism."""
     if d1 == D1Eval.BLIND:
         return TrustStance.BLIND
     if d1 == D1Eval.EXPERT:
@@ -181,13 +182,13 @@ def derive_trust(d1: D1Eval, d2: D2Domain) -> TrustStance:
 
 
 def derive_d6(d5: D5Autonomy, task_risk: str = "low") -> D6Authz:
-    """授权尺度 半派生: 由自主性期望 + 任务风险共同决定（会话策略，非卡库）。"""
+    """Authorization Scale semi-derived: determined jointly by autonomy expectation + task risk (session policy, not card)."""
     base = {
         D5Autonomy.ADVISORY: D6Authz.READ_ONLY,
         D5Autonomy.COLLABORATIVE: D6Authz.WRITE_NO_RUN,
         D5Autonomy.AGENTIC: D6Authz.FULL_AUTO,
     }[d5]
-    # 高风险任务收紧一档
+    # High-risk tasks tightened by one notch
     if task_risk == "high":
         downgrade = {
             D6Authz.FULL_AUTO: D6Authz.WRITE_NO_RUN,
@@ -195,18 +196,19 @@ def derive_d6(d5: D5Autonomy, task_risk: str = "low") -> D6Authz:
             D6Authz.READ_ONLY: D6Authz.READ_ONLY,
         }
         base = downgrade[base]
-    # collaborative 在低风险下通常允许跑(贴合"会自己跑一下"的核查习惯)
+    # collaborative typically allowed to run under low risk (aligned with "verify by running it" habit)
     if d5 == D5Autonomy.COLLABORATIVE and task_risk == "low":
         base = D6Authz.FULL_AUTO
     return base
 
 
 def finalize_persona(p: Persona, task_risk: str = "low") -> Persona:
-    """填齐派生维度, 返回不可变的完整 persona。
+    """Fill derived dimensions and return an immutable complete persona.
 
-    fallback-only：只对未提供（None）的派生维度调用 derive_* 填齐；调用方已显式给的
-    grounded 值原样保留、不被改写。这样 0006/T2 注入层可让卡里 grounded 的验收(d3)/信任(trust)
-    覆盖派生——否则 expert×over-trust（Karpathy）会被模拟成 skeptical×rigorous 的反面。
+    Fallback-only: call derive_* only for unfilled (None) derived dimensions; grounded values explicitly
+    provided by the caller are preserved unchanged and not overwritten. This allows the 0006/T2 injection
+    layer to let grounded acceptance (d3) / trust (trust) in the card override derivation—otherwise
+    expert×over-trust (Karpathy) would be simulated as the opposite of skeptical×rigorous.
     """
     return Persona(
         persona_id=p.persona_id,

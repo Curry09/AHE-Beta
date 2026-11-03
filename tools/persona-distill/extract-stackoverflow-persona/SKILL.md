@@ -13,96 +13,91 @@ description: >-
   D4 trust, D6 autonomy, D7 time temperament) are NOT visible and default to
   injected priors. The authenticity gate is INVERTED vs a trace floor — messy
   newbie questions are authentic; over-polished AI-formatted questions from
-  competent askers are the ones to reject. Spec-0037/T5 spoke alignment
-  (D7 inject; on_offtrack ⊥ tempo).
-  rep≈1 accounts are suspect. Read the 「局限与缺陷」section before treating any
+  competent askers are the ones to reject.
+  rep≈1 accounts are suspect. Read the "Limitations and Defects" section before treating any
   single card's attitude axes as real.
 ---
 
 # Extract Stack Overflow Persona
 
-一个**薄抽取 skill（spoke）**：从 **Stack Overflow** 抽低文化度 / newcomer / blind 用户的 persona，
-填 `extract-github-persona`（读富足迹的 builder，expert-skewed，且在 trace-floor **拒**低文化度大多数）
-够不着的段。卡的 schema / 枚举 / D5 词表 / 注入分布 / 真实性裁决词表一律来自唯一公共契约
-[`../card-schema.md`](../card-schema.md)，本文件只写**「从 SO 求助帖这类**观测型**来源提取、可靠 ground
-哪几维」**这一来源特异性，不内嵌 schema，也不依赖任何其它 skill。
+A **thin extraction skill (spoke)**: extracts personas of low-literacy / newcomer / blind users from **Stack Overflow**,
+filling the segments that `extract-github-persona` (which reads builders with rich traces, is expert-skewed, and **rejects** the low-literacy majority at the trace-floor)
+cannot reach. The card schema / enums / D5 vocabulary / injection distribution / authenticity adjudication vocabulary all come from the sole public contract
+[`../card-schema.md`](../card-schema.md); this file covers only the source-specific aspects of **extracting from observational sources such as SO help-seeking posts and determining which dimensions can be reliably grounded**. It does not embed the schema or depend on any other skill.
 
-Stack Overflow 是「**自己解不了才来问**」的地方，故提问者人群**本身就是** blind / surface / newcomer
-段。本 skill 唯一职责：**填低文化度 + web/data-analysis 配额**，产出同一卡契约以并入一库。它与
-`extract-github-persona`（同为观测型，读富足迹 builder）、`extract-selfreport-persona`（自述型，读态度与等待气质）
-互补。
+Stack Overflow is a place where people **“ask only when they cannot solve it themselves”**, so the asker population **itself belongs to** the blind / surface / newcomer
+segments. This skill's sole responsibility is to **fill the low-literacy + web/data-analysis quotas**, producing cards under the same contract for inclusion in a single library. It complements
+`extract-github-persona` (also observational, reading builders with rich traces) and `extract-selfreport-persona` (self-reported, reading attitudes and disposition toward waiting).
 
-## 核心原则（相对 GitHub 观测型 spoke 的反转）
+## Core Principles (Reversal Relative to the GitHub Observational Spoke)
 
-1. **仅补位——本 skill 只出 `blind`/`surface`。** 瞄准低端 + GitHub 薄的域（web/frontend、data-analysis、
-   初学脚本）。`competent`/`expert` 提问者**出范围**：隔离（`action: out-of-scope, route to GitHub skill`），
-   **不要**当 `surface` 收。*卡住 ≠ 低文化度*——能干的 dev 卡在冷门 bug 仍是 competent。
-   **competent tells（任一成立即非 surface）**：给出精确 expected/actual、贴干净 MRE、对已知良基复现、
-   已自建 workaround、隔离出多个失败案例、问精确机制/边界问题。surface = 能描述问题但浅、复制粘贴导向、无根因推理。
-2. **无 trace floor（反转）。** GitHub 上低 trace → `insufficient_evidence`；这里**低 reputation / 单条卡住的
-   提问本身就是 persona 信号**——rep≈1 用户问真新手问题就是一张完整可入库的 `blind` 卡。
-3. **真实性门反转。** *凌乱的*新手问题是 **authentic**（真卡住的人就这样）；红旗是反面：rep≈1 / 全新账号
-   发**过度光洁、AI 格式化的问题**（模板分节、`id=` 围栏、深主题 ⊥ 低 rep）→ `suspect`/`contaminated`。
-4. **态度轴（D2/D4/D6/D7）默认 `injected`。** 求助者极少暴露验收线、信任模型或等待气质——inject 并标
-   `confidence: low`。SO 可靠 ground **D1、D5**（+ D3 delegation 弱观测）。
-5. **能力（D1）别超置信。** 单帖 + reputation **不足以** `blind@high`——rep 与问题质量是弱信号，
-   **D1 grounded 封顶 `confidence: medium`**（basis `observed`）。别把「rep=1 + 一段 traceback」当 high。
-6. **同一 schema，剥 PII。** 产出 card-schema.md 卡形状（D1–D7 + `authenticity` + `era` + `provenance`）；
-   每个 grounded 值需问题原话 + URL；丢弃 display name / 任何真实身份字段。
-7. **维度正交——永不从一维派生另一维、永不按档锁死注入维。** 与 card-schema.md 铁律 #3 同。
-   **尤其**：发完消失 → on_offtrack 可弱观测 `abandon`，但**禁止**因此锁死 `impatient`——D7 独立注入。
+1. **Filler only—the only outputs of this skill are `blind`/`surface`.** Target low-end + GitHub-thin domains (web/frontend, data-analysis,
+   beginner scripting). `competent`/`expert` questioners are **out of scope**: isolate them (`action: out-of-scope, route to GitHub skill`),
+   **do not** collect them as `surface`. *Being stuck ≠ low sophistication*—a capable dev stuck on an obscure bug is still competent.
+   **competent tells (any one qualifies as non-surface)**: gives precise expected/actual, posts a clean MRE, reproduces against a known-good baseline,
+   has built a workaround, isolates multiple failure cases, or asks a precise mechanism/boundary question. surface = can describe the problem but is shallow, copy-paste-oriented, and lacks root-cause reasoning.
+2. **No trace floor (reversed).** On GitHub, low trace → `insufficient_evidence`; here, **low reputation / a single stuck question
+   is itself a persona signal**—a user with rep≈1 asking a genuinely beginner question is a complete, database-eligible `blind` card.
+3. **Authenticity gate reversed.** A *messy* beginner question is **authentic** (people who are genuinely stuck write this way); the red flag is the opposite: a rep≈1 / brand-new account
+   posting an **overly polished, AI-formatted question** (template sections, `id=` fences, deep topic ⊥ with low rep) → `suspect`/`contaminated`.
+4. **Attitude axes (D2/D4/D6/D7) default to `injected`.** Help-seekers rarely expose acceptance criteria, trust models, or waiting temperament—inject them and mark
+   `confidence: low`. SO reliably grounds **D1, D5** (+ weak observation of D3 delegation).
+5. **Do not be overconfident about capability (D1).** A single post + reputation **is insufficient to** `blind@high`—rep and question quality are weak signals,
+   **D1 grounded is capped at `confidence: medium`** (basis `observed`). Do not treat “rep=1 + a traceback” as high.
+6. **Same schema, strip PII.** Produce the card shape from card-schema.md (D1–D7 + `authenticity` + `era` + `provenance`);
+   every grounded value requires the question’s original wording + URL; discard display name / any real-identity fields.
+7. **Dimensions are orthogonal—never derive one dimension from another, and never lock injected dimensions by tier.** Same as the iron rule #3 in card-schema.md.
+   **Especially**: disappearance after posting → on_offtrack may be weakly observable `abandon`, but it is **forbidden** to lock `impatient` because of this—D7 is independently injected.
 
-## SO 可靠 ground 哪几维（GitHub 观测型的镜像）
+## Which SO dimensions are reliably grounded (the mirror of GitHub’s observation-oriented approach)
 
-| Dim | SO 强度 | 从（问题）ground | basis / source |
+| Dim | SO strength | Ground from (question) | basis / source |
 |-----|---------|------------------|----------------|
-| **D1 evaluation_capability** | **强（低端）** | `owner.reputation` + 问题质量；**封顶 medium** | `grounded` / `observed` / **≤medium** |
-| **D5 domain** | **强**（area+stack） | `tags` → `area` + `stack`；`weak` 低端多 `injected` 或 `[]` | `grounded` / `observed` |
-| **D3 interaction_style** | delegation 弱观测 | 问题=委派写法；有评论跟进→过程卷入/质量失败弱观测，否则 inject | delegation 有文本→`observed`，其余多 `injected` |
-| **D2 acceptance_bar** | 无→`injected` | 至多从"接受第一个能跑的"弱推 | `injected` / `low` |
-| **D4 trust_model** | 无→`injected` | 从盲复制被采纳答案弱推 | `injected` / `low` |
-| **D6 autonomy_expectation** | 无→`injected` | 从措辞弱推（"就给我 X" = advisory；"帮我自动化" = agentic） | `injected` / `low` |
-| **D7 time_temperament** | 无→`injected` | 求助帖几乎无等待气质；**禁止**从「发完消失」派生 impatient | `injected` / `low` |
+| **D1 evaluation_capability** | **Strong (low-end)** | `owner.reputation` + question quality; **capped at medium** | `grounded` / `observed` / **≤medium** |
+| **D5 domain** | **Strong** (area+stack) | `tags` → `area` + `stack`; `weak` low-end cases are often `injected` or `[]` | `grounded` / `observed` |
+| **D3 interaction_style** | weak observation of delegation | Question = delegation wording; with comment follow-up, → process involvement/quality failure is weakly observable; otherwise inject | delegation has textual evidence →`observed`; the rest are mostly `injected` |
+| **D2 acceptance_bar** | no →`injected` | At most weakly inferred from “accept the first thing that runs” | `injected` / `low` |
+| **D4 trust_model** | no →`injected` | Weakly inferred from blind copying of an accepted answer | `injected` / `low` |
+| **D6 autonomy_expectation** | no →`injected` | Weakly inferred from wording (“just give me X” = advisory; “help me automate it” = agentic) | `injected` / `low` |
+| **D7 time_temperament** | no →`injected` | Help-seeking posts almost never expose waiting temperament; **do not** derive impatient from “disappeared after posting” | `injected` / `low` |
 
-`era` 取 `owner.creation_date`（约 2025-10 切分）；全新账号常见且欢迎——同填 blind 与 `post_vibe` 缺口。
-**injected 维不带 `basis`**——`basis` 只描述已 ground 值如何取证（此处 `observed`）。
+`era` takes `owner.creation_date` (approximately 2025-10 split); brand-new accounts are common and welcome—fill both blind and the `post_vibe` gap.
+**Injected dimensions carry no `basis`**—`basis` only describes how already-grounded values are evidenced (`observed` here).
 
-## 工作流
+## Workflow
 
 ```
 SO persona extraction progress:
-- [ ] 挑目标缺口（tier + domain）——可从某 recruitment profile 的 pools.stackoverflow tags
-      （见 ../extract-github-persona/recruitment/）
-- [ ] 找候选提问者（低 rep + 目标 tags / blind-phrase 搜索）
-- [ ] 拉提问者 profile（rep, creation_date, answers given, tags）——**记录 `reputation`**
-- [ ] 读问题 body（D1, D5 + era；delegation 弱观测）
-- [ ] Tier 门：若 D1 读作 competent/expert（见 competent tells）→ 隔离 out-of-scope，停
-- [ ] SO 真实性门（一致性 + AI-光洁检查；无 trace floor）
-- [ ] Map: D1(≤medium)/D5 grounded(observed)、delegation 有文本则 observed；
-      D2/D4/D6/D7 inject(low，不锁死；on_offtrack ⊥ D7)
-- [ ] 剥 PII，hash id，产出 card-schema.md 卡形状（须含 D7_time_temperament）
+- [ ] Select a target gap (tier + domain)—can use pools.stackoverflow tags from a given recruitment profile
+      (see ../extract-github-persona/recruitment/)
+- [ ] Find candidate askers (low rep + target tags / blind-phrase search)
+- [ ] Fetch the asker's profile (rep, creation_date, answers given, tags)—**record `reputation`**
+- [ ] Read the question body (D1, D5 + era; delegation is a weak observation)
+- [ ] Tier gate: if D1 reads as competent/expert (see competent tells) → isolate out-of-scope, stop
+- [ ] SO authenticity gate (consistency + AI-polish check; no trace floor)
+- [ ] Map: D1(≤medium)/D5 grounded(observed), delegation uses observed if text is present;
+      D2/D4/D6/D7 inject(low, do not lock it down; on_offtrack ⊥ D7)
+- [ ] Strip PII, hash id, produce the card-schema.md card structure (must include D7_time_temperament)
 ```
 
-Stack Exchange API、targeting 配方、门细则、注入、两个范例（入库 blind / 拒 AI 光洁）见
-[reference.md](reference.md)。枚举 / D5 词表 / 注入分布 / 卡形状 / 真实性门词表见
-[`../card-schema.md`](../card-schema.md)。
+The Stack Exchange API, targeting recipe, gate details, injection, and two examples (database entry blind / reject AI polish) are in
+[reference.md](reference.md). Enumeration / D5 vocabulary / injection distribution / card shape / authenticity-gate vocabulary are in
+[`../card-schema.md`](../card-schema.md).
 
-## 局限与缺陷（观测型方法的内容质量边界）
+## Limitations and Defects (Content Quality Boundaries of Observational Methods)
 
-SO 是**观测型**来源，须诚实记录其内容质量边界——单张卡的态度轴**不忠于真人的"态度"**：
+SO is an **observation-oriented** source; its content-quality boundaries must be recorded honestly—on a single card, the attitude axes are **not faithful to a real person’s “attitude”**:
 
-- **只有 D1（能力）× D5（领域/栈）由一手观测支撑（且 D1 仅 ≤medium）。** 态度/交互轴
-  **D2/D3/D4/D6/D7** 在一条求助帖里**是注入先验/外推**——SO 观测不到验收线、信任、自主、**等待气质**。
-- **来源偏差最强：SO 偏「卡住来问的人」。** 极易撞雷同刻板卡（每张都成 blind×vibe-dump×over-trust×impatient）。
-  故注入维必须逐卡真抽、批后查克隆（含 D7 ⊥ on_offtrack）。
-- **推断跨度过大不可靠。** 「发完消失」至多弱推 on_offtrack=`abandon`，**不得**锁死 D7=`impatient`。
-  态度与等待气质真人锚须来自 `extract-selfreport-persona`。
-- **使用边界：铺 D1×D5 覆盖网格的低端行。** **不要**拿它的 D2/D4/D6/D7 当真人锚。
+- **Only D1 (capability) × D5 (domain/stack) are supported by firsthand observation (and D1 is only ≤medium).** The attitude/interaction axes
+  **D2/D3/D4/D6/D7** in a help-seeking post **are injected priors/extrapolations**—SO cannot observe acceptance criteria, trust, autonomy, or **waiting temperament**.
+- **The strongest source bias: SO favors people who are stuck and come to ask.** It is extremely easy to hit the same stereotyped stuck-card pattern (every card becomes blind×vibe-dump×over-trust×impatient).
+  Therefore, injected dimensions must be genuinely sampled card by card, followed by a post-batch clone check (including D7 ⊥ on_offtrack).
+- **Inference spans that are too large are unreliable.** “Disappears after posting” supports at most a weak inference of on_offtrack=`abandon`; **do not** lock in D7=`impatient`.
+  Real-person anchors for attitude and waiting temperament must come from `extract-selfreport-persona`.
+- **Usage boundary: fill the low-end rows of the D1×D5 coverage grid.** **Do not** use its D2/D4/D6/D7 as real-person anchors.
 
-（此段与 card-schema.md「真实性优先」一致。）
+(This section is consistent with the “authenticity first” principle in card-schema.md.)
 
-## 完成时报告
+## Completion Report
 
-报告：填的缺口（tier + domain + era）、哪些维 grounded（`observed`）vs injected、真实性裁决。明确**拒绝**
-AI 光洁/不连贯问题；competent/expert 提问者路由回 GitHub。**切记**：本源的 D2/D4/D6/D7 为注入先验、
-D1 仅 ≤medium——报告里如实标注。
+Report: the gaps filled (tier + domain + era), which dimensions are grounded (`observed`) versus injected, and the authenticity ruling. Explicitly **reject** AI-polished/AI-incoherent issues; route competent/expert questioners back to GitHub. **Remember**: in the source, D2/D4/D6/D7 are injected priors, and D1 is only ≤medium—label this truthfully in the report.

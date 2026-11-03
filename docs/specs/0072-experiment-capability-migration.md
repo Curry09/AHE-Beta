@@ -1,12 +1,12 @@
 ---
 number: '0072'
-title: 统一入口的既有能力迁移与执行修复
+title: "Migration of existing capabilities and execution fixes for the unified entrypoint"
 issue: 0
 slug: experiment-capability-migration
-summary: 补齐既有配置、交互计划和看板接线，修复单轮就绪与交付认证，并验证两后端真实消费者。
+summary: "Complete existing configuration, interaction plans, and dashboard wiring; fix single-round readiness and delivery authentication; and verify real consumers on both backends."
 tasks:
 - id: T1
-  title: 配置与消费者环境、认证和 Owner 接线
+  title: "Configuration and consumer environments, authentication, and Owner wiring"
   status: done
   priority: P0
   tags: []
@@ -22,11 +22,10 @@ tasks:
   - backend/tests/test_experiment_config_v2.py
   - backend/tests/test_experiment_engine.py
   - backend/tests/test_experiment_lifecycle_v2.py
-  scope: 严格 schema、冻结默认值、两后端共用环境与预检认证
-  acceptance: 原配置可读，显式策略不被过滤，API key/Bearer/OAuth 名称独立，Owner llm 可启用，非法策略 check
-    阶段拒绝
+  scope: "Strict schema, frozen defaults, shared environments for both backends, and preflight authentication"
+  acceptance: "Original configurations remain readable, explicit policies are not filtered out, API key/Bearer/OAuth names are independent, Owner llm can be enabled, and invalid policies are rejected during check"
 - id: T2
-  title: 冻结显式计划和 direct 交互
+  title: "Freeze explicit plans and direct interactions"
   status: done
   priority: P1
   tags: []
@@ -41,11 +40,10 @@ tasks:
   - backend/tests/test_run_swebench_closed_loop.py
   - backend/tests/test_run_vigil.py
   - backend/tests/test_experiment_interactions.py
-  scope: 计划校验冻结、两控制器消费与 Docker 交付参数
-  acceptance: 单任务 AABB 可冻结并按计划运行，direct 与 simulated_user 被真实分派，idle timeout 透传给
-    Docker，修改原材料不改变已准备实验
+  scope: "Plan validation and freezing, consumption by both controllers, and Docker delivery parameters"
+  acceptance: "Single-task AABB can be frozen and executed according to plan, direct and simulated_user are actually dispatched, idle timeout is passed through to Docker, and modifying original materials does not change prepared experiments"
 - id: T3
-  title: 后端单轮就绪与非 root 交付执行
+  title: "Backend single-round readiness and non-root delivery execution"
   status: done
   priority: P0
   tags: []
@@ -60,11 +58,10 @@ tasks:
   - backend/tests/test_experiment_local_backend.py
   - backend/tests/test_experiment_e2b_backend.py
   - backend/tests/test_experiment_e2b_bootstrap.py
-  scope: 修复 local 单轮并显式隔离 E2B 管理与执行身份
-  acceptance: 单轮正常完成不等待 Vigil，多轮保留 owned readiness；controller/Claude 以非 root
-    运行且依赖、产物和 stop/collect 权限一致
+  scope: "Fix local single-round execution and explicitly isolate E2B management and execution identities"
+  acceptance: "Single rounds complete normally without waiting for Vigil, multiple rounds retain owned readiness; controller/Claude run as non-root with consistent dependencies, artifacts, and stop/collect permissions"
 - id: T4
-  title: 绑定 run 的观测看板入口
+  title: "Observation dashboard entrypoint bound to a run"
   status: done
   priority: P1
   tags: []
@@ -77,11 +74,10 @@ tasks:
   - backend/ahe_beta/web/api.py
   - backend/tests/test_experiment_dashboard.py
   - backend/tests/test_experiment_cli_v2.py
-  scope: 统一命令启动显式 run 观测，避免读取旧默认数据
-  acceptance: local 当前 sessions/live/usage/role_runs 正确绑定，E2B
-    已收集产物可看，未收集清晰报错，token 不进入收据和 API
+  scope: "Launch explicit run observation through the unified command, avoiding reads of old default data"
+  acceptance: "Current local sessions/live/usage/role_runs are correctly bound, collected E2B artifacts are viewable, uncollected artifacts produce clear errors, and tokens do not enter receipts or the API"
 - id: T5
-  title: 能力矩阵、示例和两后端集成验收
+  title: "Capability matrix, examples, and integration acceptance for both backends"
   status: done
   priority: P1
   tags: []
@@ -110,76 +106,76 @@ tasks:
   - examples/experiments/u1-local.json
   - examples/experiments/u1-e2b.json
   - examples/experiment.env.example
-  scope: 公开文档、真实消费者矩阵和在线证据边界
-  acceptance: schema→freeze→两后端→真实消费者回归通过，文档列明已迁/待迁范围，记录实际在线覆盖而非假称完整云交付
+  scope: "Public documentation, real consumer matrix, and online evidence boundaries"
+  acceptance: "schema→freeze→both backends→real consumer regression passes, documentation lists migrated/pending scope, and actual online coverage is recorded without falsely claiming complete cloud delivery"
 ---
 
-# 0072 · 统一入口的既有能力迁移与执行修复
+# 0072 · Migrating Existing Capabilities to the Unified Entry Point and Fixing Execution
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level overview in 9 rust-RFC sections. -->
 
 ## Summary
 
-补齐统一实验入口中可复用、已有真实消费者的能力：分组、USER/DEMAND 推理强度、延迟隔离计时、交付等待/协作/权限/idle 参数、告警阈值、direct 交互、显式逐轮计划与当前 run 看板。修复 local 单轮 Vigil readiness 和交付认证类型映射。用户已于 2026-10-03 授权根据能力审计实施；清理基线独立提交，不将本轮业务改动混入清理提交。
+Complete the reusable capabilities with existing real consumers in the unified experiment entry point: grouping, USER/DEMAND reasoning effort, latency-isolated timing, delivery wait/coordination/permission/idle parameters, alarm thresholds, direct interaction, explicit per-round plans, and a dashboard for the current run. Fix single-round local Vigil readiness and delivery authentication type mapping. On 2026-10-03, the user authorized implementation based on the capability audit; commit baseline cleanup separately, without mixing this round's functional changes into cleanup commits.
 
 ## Motivation
 
-旧启动器会导出实际开关，但统一 schema 2 没有对应字段，凭证白名单又过滤了这些设置；将历史启动器归档并不能完成能力迁移。单轮配置虽然合法，local 后端无条件等待未启动的 Vigil；delivery 将任意凭证变量名当作 Bearer，丢失显式 API key/OAuth 语义。旧 E2B 交付在非 root 下使用 bypassPermissions，新执行链改为 root 与 acceptEdits，此前五轮云实验无 issue/交付，未覆盖真实代码交付。数据迁至独立 run 后，live 看板仍读旧目录。
+The old launchers export actual switches, but unified schema 2 has no corresponding fields, and the credential allowlist filters these settings out; archiving historical launchers does not complete capability migration. Although single-round configurations are valid, the local backend unconditionally waits for Vigil, which has not been started; delivery treats arbitrary credential variable names as Bearer, losing explicit API key/OAuth semantics. Old E2B delivery used bypassPermissions as non-root, while the new execution chain switched to root and acceptEdits; the previous five-round cloud experiment had no issues/delivery and did not cover actual code delivery. After data moved to separate runs, the live dashboard still reads the old directory.
 
-本组修复有明确消费者的遗漏和执行错误；此前公开契约明确暂缓的多任务/N4/N8、历史 lineage 导入、工程 CI runner 生命周期、官方评分、seed 库/纯文本输入不在本组声称完成。Owner 模型评审已有完整链路，恢复 mechanical/llm 显式选择。
+This group fixes omissions with clear consumers and execution errors; multi-task/N4/N8, historical lineage imports, engineering CI runner lifecycles, official scoring, and seed libraries/plain-text input, explicitly deferred by the previous public contract, are not claimed as completed by this group. Owner model review already has a complete pipeline; restore explicit mechanical/llm selection.
 
 ## Guide-level explanation
 
-保留 schema_version=2，新增可选 policies，各字段默认值进入 prepare 的冻结配置；env 文件只存凭证/地址，宿主同名变量仍不隐式影响实验。
+Keep schema_version=2 and add optional policies, with defaults for all fields included in the frozen configuration produced by prepare; env files store only credentials/addresses, and same-named host variables still do not implicitly affect experiments.
 
-- policies.architect_grouping：false；models.user/demand.reasoning_effort：可选非空字符串。
-- policies.timing.latency_isolated：false；wall_guard_seconds：0（采用已有默认 600 秒宽限；总墙钟上限为角色预算加宽限）。
-- policies.delivery.timeout_seconds：86400；poll_seconds：15；coordination：soft/off/dependencies，默认 soft；permission_mode：bypassPermissions/acceptEdits/default，默认 bypassPermissions，执行交付的进程必须为非 root；idle_timeout_seconds：300，0 表示关闭。
-- policies.alarms.proposal_depth/ready_depth：20；roles.owner_mode：mechanical/llm，默认保持现有 mechanical。
-- models.delivery.auth_type：api-key/bearer/oauth，显式选择与 api_key_env 名称独立。未设置的旧 v2 配置按已有标准名称保留行为，新的示例显式使用 bearer；显式 OAuth 不再改成 Bearer。
-- task package 的 interaction：simulated_user/direct，默认 simulated_user；workload.interaction_plan 可给出每轮 [[persona_id,task_id]]，当前单任务仍每轮一个 session。缺省保持轮流 persona。
-- 增加 experiment dashboard RUN_ID 命令，为 local 运行或已 collect 的 E2B 产物绑定 sessions/live/usage/role_runs 和当前 Gitea，看板只启动观测服务。未收集云数据时明确提示 collect，不能读取历史默认目录冒充当前运行。
+- policies.architect_grouping: false; models.user/demand.reasoning_effort: optional nonempty string.
+- policies.timing.latency_isolated: false; wall_guard_seconds: 0 (uses the existing default grace period of 600 seconds; the total wall-clock limit is the role budget plus the grace period).
+- policies.delivery.timeout_seconds: 86400; poll_seconds: 15; coordination: soft/off/dependencies, default soft; permission_mode: bypassPermissions/acceptEdits/default, default bypassPermissions; the process executing delivery must be non-root; idle_timeout_seconds: 300, with 0 disabling it.
+- policies.alarms.proposal_depth/ready_depth: 20; roles.owner_mode: mechanical/llm, retaining the existing mechanical default.
+- models.delivery.auth_type: api-key/bearer/oauth; explicit selection is independent of the api_key_env name. Old v2 configurations without this setting retain behavior based on existing standard names; new examples explicitly use bearer; explicit OAuth is no longer changed to Bearer.
+- task package interaction: simulated_user/direct, default simulated_user; workload.interaction_plan can specify [[persona_id,task_id]] for each round; the current single-task mode still has one session per round. By default, continue rotating personas.
+- Add the experiment dashboard RUN_ID command to bind sessions/live/usage/role_runs and the current Gitea for local runs or collected E2B artifacts; the dashboard starts only observation services. When cloud data has not been collected, explicitly prompt for collect; do not read historical default directories and present them as the current run.
 
-check --offline 在任何 provider 操作前拒绝非法配置/计划；prepare 固定默认值、计划和来源哈希；修改宿主 env、原始计划或配置不能改变已冻结 run。
+check --offline rejects invalid configurations/plans before any provider operation; prepare freezes defaults, plans, and source hashes; modifying the host env, original plan, or configuration cannot change a frozen run.
 
 ## Reference-level explanation
 
-### 配置与消费者
+### Configuration and consumers
 
-在严格 JSON schema 中添加 policies，角色推理参数、auth_type、owner_mode 和 task interaction/plan。配置加载规范化新增默认值；模型认证 helper 分离源变量名和导出的协议变量；保持读取旧 manifest 的执行默认值，不能改写旧 manifest/hash。公共 API key、Bearer、OAuth 三种分支各只导出一种凭证，模型预检使用同一认证决策。
+Add policies, role reasoning parameters, auth_type, owner_mode, and task interaction/plan to the strict JSON schema. Configuration loading normalizes the new defaults; the model authentication helper separates source variable names from exported protocol variables; retain execution defaults when reading old manifests, without rewriting old manifests/hashes. Each of the three public API key, Bearer, and OAuth branches exports only one credential, and model preflight uses the same authentication decision.
 
-build_controller_environment 从冻结配置导出 ARCHITECT_GROUPING、USER/DEMAND_LLM_REASONING_EFFORT、AHE_BETA_LATENCY_ISOLATED_TIMEOUT、AHE_BETA_LATENCY_WALL_GUARD_SECONDS、ROUND_DELIVERY_TIMEOUT_SEC/POLL_SEC、VIGIL_COORDINATION、OPENAGENTS_PERMISSION_MODE、OPENAGENTS_CLAUDE_IDLE_TIMEOUT、PROPOSAL/READY_DEPTH_ALARM、N_OWNERS。Docker 交付必须额外透传 idle timeout；禁止从凭证字典补运行策略。告警阈值必须为正整数，ordinary/SWE 共用实际背压检查；延迟墙钟保护保持旧消费者的“角色预算加宽限”语义，0 采用默认 600 秒。
+build_controller_environment exports ARCHITECT_GROUPING, USER/DEMAND_LLM_REASONING_EFFORT, AHE_BETA_LATENCY_ISOLATED_TIMEOUT, AHE_BETA_LATENCY_WALL_GUARD_SECONDS, ROUND_DELIVERY_TIMEOUT_SEC/POLL_SEC, VIGIL_COORDINATION, OPENAGENTS_PERMISSION_MODE, OPENAGENTS_CLAUDE_IDLE_TIMEOUT, PROPOSAL/READY_DEPTH_ALARM, and N_OWNERS from the frozen configuration. Docker delivery must additionally pass through the idle timeout; runtime policies must not be populated from the credential dictionary. Alarm thresholds must be positive integers, and ordinary/SWE share the actual backpressure checks; latency wall-clock protection retains the old consumer's semantics of “role budget plus grace period,” with 0 using the default 600 seconds.
 
-计划统一校验轮数、每轮会话数、persona 是否选中、task 是否匹配与重复；规范化计划注册为冻结 material，并实际被 ordinary/SWE 消费。task interaction 写入实际 workspace，使用现有 mixed dispatcher 保留两种会话行为及恢复加载。
+Uniformly validate plans for round count, session count per round, whether personas are selected, whether tasks match, and duplicates; register the normalized plan as frozen material and ensure ordinary/SWE actually consume it. Write task interaction into the actual workspace, using the existing mixed dispatcher to preserve both session behaviors and loading on recovery.
 
-local launch 仅多轮等待 Vigil；single-user controller 完成不因缺少交付进程失败。E2B 保留 root 管理资源，启动前将该 run 的目录明确交给非 root user，bootstrap 中可执行依赖向该用户可读/可执行；实际 controller/OpenAgents 子进程以 user 执行。inspect/stop/collect/destroy 仍由 root 执行且保留资源身份校验。local 的交付进程也不得因挂载 role_runs 而直接用 root 执行 Claude。
+local launch waits for Vigil only for multiple rounds; single-user controller completion does not fail because a delivery process is absent. E2B retains root for resource management, explicitly hands the run's directories over to the non-root user before startup, and makes executable dependencies in bootstrap readable/executable by that user; actual controller/OpenAgents subprocesses run as user. inspect/stop/collect/destroy still run as root and retain resource identity validation. Local delivery processes must also not execute Claude directly as root merely because role_runs is mounted.
 
-看板通过 runtime 加载验证当前 manifest/materials，再按 run 路径构造显式 create_app 输入与 tracker；UI 不接触 token。E2B 绑定已收集的本地产物并明确来源，不把本地 API 当云端实时数据。服务期间再次 collect，读取数据与 runmeta 的快照时间/一致性/终态必须同步；替换中间态或校验失败返回不可用，不能显示新数据旧时间。
+The dashboard uses runtime loading to validate the current manifest/materials, then constructs explicit create_app inputs and a tracker from run paths; the UI does not access tokens. E2B binds collected local artifacts and clearly identifies their source, without treating the local API as real-time cloud data. If collect runs again while the service is running, the snapshot time/consistency/terminal state of the data being read and runmeta must stay synchronized; an intermediate replacement state or validation failure returns unavailable, and must not display new data with an old timestamp.
 
-### DAG 与文件分配
+### DAG and file allocation
 
-T1 配置/环境/认证基础、T2 计划/交互、T3 后端执行、T4 看板各自实现确定的字段契约，文件互斥，可协同实现；全部完成后进入 T5 集成矩阵与文档。frontmatter 是文件分配与验收的权威数据。
+T1 configuration/environment/authentication foundations, T2 plans/interaction, T3 backend execution, and T4 dashboard each implement defined field contracts, with mutually exclusive file assignments, and can be implemented collaboratively; once all are complete, proceed to T5 integration matrix and documentation. frontmatter is the authoritative data for file allocation and acceptance.
 
-e2e 脚本：backend/scripts/e2e-spec-0072-capability-migration.sh。必须覆盖配置到冻结 material 到 local/E2B 环境到真实消费者的链路；新增有意义的回归测试，不用只断言 schema 存在替代行为验收。
+e2e script: backend/scripts/e2e-spec-0072-capability-migration.sh. It must cover the chain from configuration to frozen material to local/E2B environment to actual consumers; add meaningful regression tests rather than substituting assertions that the schema exists for behavioral acceptance.
 
 ## Drawbacks
 
-配置字段增加，需要完整默认值和两语文档，延迟隔离并不能取消基础设施风险。direct 复用现有行为，并不等于多任务入口已完成。非 root 执行须检查依赖目录和 run 写权限；离线 argv/所有权测试不能证明云端模型交付可用。
+More configuration fields require complete defaults and bilingual documentation, and latency isolation cannot eliminate infrastructure risks. direct reuses existing behavior and does not mean the multi-task entry point is complete. Non-root execution requires checking dependency directories and run write permissions; offline argv/ownership tests cannot prove that cloud model delivery works.
 
 ## Rationale and alternatives
 
-拒绝恢复任意宿主 env 透传：无法冻结来源和确定性，也会再次泄露私人模型配置。拒绝恢复旧 runner wrapper：绕行旧配置不能让两后端获得一致能力。选择有类型、可冻结的公开字段，并直接接入已有消费者。认证类型单列，变量名称仅寻找值；只有未指定字段的旧 v2 保留已知名称默认，以免改变已冻结实验。
+Reject restoring arbitrary host env passthrough: it cannot freeze provenance and determinism, and would leak private model configurations again. Reject restoring the old runner wrapper: bypassing through old configuration cannot provide consistent capabilities across both backends. Choose typed, freezable public fields and connect them directly to existing consumers. Authentication type is a separate field, and variable names only locate values; only old v2 configurations without the field retain known-name defaults, to avoid changing frozen experiments.
 
-权限与运行身份一起处理，不向 root Claude 进程盲目设置 bypassPermissions。默认 bypass 用于已有隔离容器/沙箱的无人值守交付，保留显式 acceptEdits/default 供用户选择。
+Handle permissions and runtime identity together, without blindly setting bypassPermissions on root Claude processes. The bypass default supports unattended delivery in existing isolated containers/sandboxes, while retaining explicit acceptEdits/default for users to select.
 
 ## Prior art
 
-旧 ordinary/SWE、auditable/mixed 以及 N1/scaling 实际运行路径分别提供策略导出与消费者。现有 grouped_architect、agent_runtime、round_gate、Owner、mixed dispatcher 和 OpenAgents Claude backend 是本组复用的实现。能力审计日期 2026-10-03，包含单轮误判、凭证映射和 AABB 计划的离线复现，必要背景已在本组就地说明。
+The actual execution paths of old ordinary/SWE, auditable/mixed, and N1/scaling provide policy exports and consumers respectively. Existing grouped_architect, agent_runtime, round_gate, Owner, mixed dispatcher, and the OpenAgents Claude backend are the implementations reused by this group. The capability audit is dated 2026-10-03 and includes offline reproductions of single-round misclassification, credential mapping, and AABB plans; the necessary background is explained within this group.
 
 ## Unresolved questions
 
-无阻止本组实施的问题。云端非空交付必须单独记录实际验收；资源/服务不可用时记录具体限制，不能用空需求闭环或 mock 宣称在线交付通过。
+No questions block implementation of this group. Nonempty cloud delivery must have its actual acceptance recorded separately; when resources/services are unavailable, record specific limitations, and do not claim online delivery passed based on an empty-demand closed loop or mocks.
 
 ## Future possibilities
 
-另行完成多任务/N4/N8、历史 continuation/new-lineage、工程 CI、入口内官方评分和 seed 输入适配。能力矩阵分别标记已迁、明确退出、待迁，不能把待迁功能重新归类成不存在。
+Complete multi-task/N4/N8, historical continuation/new-lineage, engineering CI, official scoring within the entry point, and seed input adaptation separately. The capability matrix must distinguish migrated, explicitly retired, and pending migration; do not reclassify capabilities pending migration as nonexistent.

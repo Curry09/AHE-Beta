@@ -1,5 +1,5 @@
-# spec-0009/T3：依赖供给（ensure_deps 执行 setup）；Sandbox 只共享 cwd/ambient env。
-"""无网络单测——setup 用 mkdir/echo 等 stdlib-only 命令模拟「备环境」，不真跑 pip。"""
+# spec-0009/T3: dependency provisioning (ensure_deps executes setup); Sandbox shares only cwd/ambient env.
+"""Offline unit tests — setup uses stdlib-only commands like mkdir/echo to simulate "environment preparation", not actually running pip."""
 
 from __future__ import annotations
 
@@ -14,13 +14,13 @@ from ahe_beta.user.sim.sandbox import Sandbox
 
 
 def test_empty_setup_is_noop(tmp_path: Path) -> None:
-    """setup 为空 → 空操作、不建 .venv（既有 fixture/empty 场景零回归）。"""
-    ensure_deps(str(tmp_path), WorkspaceSpec(fixture="x"))  # setup 缺省 []
+    """Empty setup → no-op, no .venv created (existing fixture/empty scenarios have zero regression)."""
+    ensure_deps(str(tmp_path), WorkspaceSpec(fixture="x"))  # setup defaults to []
     assert not (tmp_path / ".venv").exists()
 
 
 def test_setup_runs_commands_in_workspace_cwd(tmp_path: Path) -> None:
-    """setup 逐条在 workspace_dir 为 cwd 执行（模拟建 .venv 目录 + 落 marker）。"""
+    """setup commands execute sequentially with workspace_dir as cwd (simulating .venv directory creation + marker deposition)."""
     spec = WorkspaceSpec(fixture="x", setup=["mkdir -p .venv/bin", "echo ok > marker.txt"])
     ensure_deps(str(tmp_path), spec)
     assert (tmp_path / ".venv" / "bin").is_dir()
@@ -28,20 +28,20 @@ def test_setup_runs_commands_in_workspace_cwd(tmp_path: Path) -> None:
 
 
 def test_setup_failure_raises_with_diagnostics(tmp_path: Path) -> None:
-    """某命令非零退出 → SetupError，消息含该命令与 stderr。"""
+    """Non-zero exit of any command → SetupError, message includes that command and stderr."""
     spec = WorkspaceSpec(fixture="x", setup=["echo boom 1>&2; exit 3"])
     with pytest.raises(SetupError) as ei:
         ensure_deps(str(tmp_path), spec)
     msg = str(ei.value)
-    assert "exit 3" in msg  # 附出错命令
-    assert "boom" in msg  # 附 stderr
+    assert "exit 3" in msg  # Include the failed command
+    assert "boom" in msg  # Include stderr
 
 
 def test_setup_idempotent_reentry(tmp_path: Path) -> None:
-    """幂等命令（mkdir -p）重复调不报错——为跨局重入留门。"""
+    """Idempotent commands (mkdir -p) do not error on repeated invocation — allowing for cross-session re-entry."""
     spec = WorkspaceSpec(fixture="x", setup=["mkdir -p .venv/bin"])
     ensure_deps(str(tmp_path), spec)
-    ensure_deps(str(tmp_path), spec)  # 不抛
+    ensure_deps(str(tmp_path), spec)  # Do not raise
     assert (tmp_path / ".venv" / "bin").is_dir()
 
 
@@ -49,7 +49,7 @@ def test_setup_idempotent_reentry(tmp_path: Path) -> None:
 def test_sandbox_does_not_inject_venv_when_present(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ambient_venv: str | None
 ) -> None:
-    """工作区含 .venv/bin 也不自动改 VIRTUAL_ENV/PATH；环境选择需显式命令。"""
+    """Workspace containing .venv/bin does not automatically modify VIRTUAL_ENV/PATH; environment selection requires explicit commands."""
     # uv run / activated shells supply VIRTUAL_ENV; inheritance is part of the contract.
     if ambient_venv is None:
         monkeypatch.delenv("VIRTUAL_ENV", raising=False)
@@ -72,7 +72,7 @@ def test_sandbox_does_not_inject_venv_when_present(
 
 
 def test_sandbox_no_venv_does_not_inject(tmp_path: Path) -> None:
-    """无 .venv → 不注入（_env 返回 None，退化为继承宿主 ambient）。"""
+    """No .venv → do not inject (env returns None, degrading to inherited ambient)."""
     sb = Sandbox(workspace=str(tmp_path))
     assert sb._env() is None
     bindir = str((tmp_path / ".venv" / "bin").resolve())

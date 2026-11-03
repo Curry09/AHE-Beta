@@ -13,12 +13,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]  # frozen backend source
 DATA = ROOT / "data"
-# dev/architect 的 sandbox 工作目录 = harness 仓。把它下沉到一个**只含它自己**的独立父目录
-# （data/harness_sandbox/harness_repo），使 trace 目录（data/sessions 体感+会话、data/harness_runs
-# harness 运行副本）不再是它的 `../` 同级——`../sessions/*.json`、`../harness_runs/**` 这类相对路径
-# 直接够不着。堵住「dev/architect 回看任务轨迹 → 把该任务专属产物（某库 API/某类文件/预期输出）带进
-# harness」的过拟合泄漏（与提交边界闸同源之患；见 agent_defs/architect/systemprompt.md 硬禁区）。
-# 注：bash 仍可走绝对路径，但相对导航（ls ..）已看不到 trace，堵住了唯一的现实发现路径。
+# dev/architect's sandbox working directory = harness repo. Sink it into an independent parent directory
+# (data/harness_sandbox/harness_repo) containing only itself, so trace directories (data/sessions for context+sessions, data/harness_runs
+# harness run copies) are no longer at its `../` peer level—— relative paths like `../sessions/*.json`, `../harness_runs/**`
+# cannot reach them directly. Block the overfitting leak where "dev/architect reviews task trajectory → brings task-specific artifacts (repo API/file types/expected output)
+# into harness" (same source as the submission boundary gate issue; see agent_defs/architect/systemprompt.md hard-forbidden section).
+# Note: bash can still use absolute paths, but relative navigation (ls ..) cannot see trace, blocking the only realistic discovery path.
 _SANDBOX_ROOT = DATA / "harness_sandbox"
 HARNESS_REPO = _SANDBOX_ROOT / "harness_repo"
 GITEA_ENV_FILE: Path | None = None  # assigned by explicit frozen context
@@ -53,7 +53,7 @@ def _git(repo: Path, *args: str) -> None:
 
 
 def _gitea_remote_url(gitea: dict[str, str]) -> str:
-    """构造带 token 的 Gitea git 远程地址：http://OWNER:TOKEN@host/OWNER/REPO.git。"""
+    """Construct a Gitea git remote URL with token: http://OWNER:TOKEN@host/OWNER/REPO.git."""
     from urllib.parse import urlparse, urlunparse
 
     u = urlparse(gitea["GITEA_URL"])
@@ -62,20 +62,20 @@ def _gitea_remote_url(gitea: dict[str, str]) -> str:
 
 
 def _isolate_git_credentials() -> None:
-    """进程级 git 凭证隔离（Spec-0021/T2）：dev agent 逃逸后不得推到 GitHub。
+    """Process-level git credential isolation (Spec-0021/T2): escaped dev agent must not push to GitHub.
 
-    实测逃逸链：dev agent 用 python heredoc 隧道绕过 workspace-jail 的路径扫描、`os.chdir` 到编排仓
-    并 `git push`。凭证泄漏有**多条静默信道**，单关一条不够：
-    - **ssh 传输**（GitHub `git@…`）：`GIT_SSH_COMMAND=false` 让 ssh 调用失败。
-    - **终端交互提示**：`GIT_TERMINAL_PROMPT=0`。
-    - **askpass 静默信道**：`GIT_ASKPASS`/`SSH_ASKPASS` 指向一个能直接吐凭证的程序（实测 VS Code +
-      WSL 环境注入 `GIT_ASKPASS`，git 走 HTTPS 时静默拿到 GitHub token——`GIT_TERMINAL_PROMPT=0`
-      **管不到它**）。连同 VS Code 的 `VSCODE_GIT_ASKPASS_*`/IPC 一并清除。
-    - **credential.helper 静默信道**：store/manager/keychain 也会静默交出凭证。用空值经 GIT_CONFIG_*
-      注入重置 helper 列表（追加而非覆盖既有注入）——git ≥2.31 支持。
+    Tested escape chain: dev agent uses python heredoc tunnel to bypass workspace-jail path scanning, `os.chdir` into the orchestration repo
+    and `git push`. Credential leaks have **multiple silent channels**; blocking one channel is insufficient:
+    - **ssh transport** (GitHub `git@…`): set `GIT_SSH_COMMAND=false` to fail ssh calls.
+    - **terminal interactive prompt**: `GIT_TERMINAL_PROMPT=0`.
+    - **askpass silent channel**: `GIT_ASKPASS`/`SSH_ASKPASS` point to a program that can directly emit credentials (tested: VS Code +
+      WSL environment injects `GIT_ASKPASS`; when git uses HTTPS, it silently obtains GitHub token—— `GIT_TERMINAL_PROMPT=0`
+      **cannot control it**). Also clear VS Code's `VSCODE_GIT_ASKPASS_*`/IPC.
+    - **credential.helper silent channel**: store/manager/keychain also silently return credentials. Reset the helper list via empty value injected through GIT_CONFIG_*
+      (append, not overwrite existing injections)—— git ≥2.31 supports this.
 
-    对合法流程无影响：dev/harness 推 Gitea 走 `http://OWNER:TOKEN@host/…`（凭证在 URL，不经
-    askpass/helper），本地无传输 git 操作也不涉及凭证。`GIT_SSH_COMMAND` 用 setdefault 留运维覆盖余地。
+    No impact on legitimate workflows: dev/harness pushes to Gitea via `http://OWNER:TOKEN@host/…` (credentials in URL, not through
+    askpass/helper); local non-transport git operations also do not involve credentials. `GIT_SSH_COMMAND` uses setdefault to leave room for ops override.
     """
     os.environ.setdefault("GIT_SSH_COMMAND", "false")
     os.environ["GIT_TERMINAL_PROMPT"] = "0"
@@ -99,7 +99,7 @@ def _isolate_git_credentials() -> None:
 
 
 def _set_gitea_remote(repo: Path, gitea: dict[str, str]) -> None:
-    """仅给本地 harness 仓配好 Gitea origin（带 token）。推送由开发者 agent 用 git 工具自己做，不在此 push。"""
+    """Configure only the local harness repo with Gitea origin (with token). Pushing is performed by the developer agent using the git tool itself, not here."""
     url = _gitea_remote_url(gitea)
     remotes = subprocess.run(
         ["git", "-C", str(repo), "remote"], capture_output=True, text=True
@@ -111,7 +111,7 @@ def _set_gitea_remote(repo: Path, gitea: dict[str, str]) -> None:
 
 
 def _seed_harness_repo() -> Path:
-    """从 harness_template 种一个本地 git 仓：仅 main（Spec-0007/T4：纯 trunk，不再建 release）。"""
+    """Plant a local git repo from harness_template: main branch only (Spec-0007/T4: pure trunk, no longer create release branches)."""
     if HARNESS_REPO.exists():
         shutil.rmtree(HARNESS_REPO)
     HARNESS_REPO.mkdir(parents=True)
@@ -119,12 +119,12 @@ def _seed_harness_repo() -> Path:
     if archive_raw:
         archive = Path(archive_raw).expanduser().resolve()
         if not archive.is_file():
-            raise SystemExit(f"冻结 Harness archive 不存在：{archive}")
+            raise SystemExit(f"Frozen Harness archive does not exist: {archive}")
         try:
             with tarfile.open(archive, "r:gz") as bundle:
                 bundle.extractall(HARNESS_REPO, filter="data")
         except (tarfile.TarError, OSError) as exc:
-            raise SystemExit(f"冻结 Harness archive 解包失败：{archive}: {exc}") from exc
+            raise SystemExit(f"Failed to unpack frozen Harness archive: {archive}: {exc}") from exc
     else:
         template = ROOT / "harness_template"
         for item in template.iterdir():
@@ -141,9 +141,9 @@ def _seed_harness_repo() -> Path:
     if inherited_path:
         _seed_inherited_tree(input_path=Path(inherited_path))
         return HARNESS_REPO
-    # 清掉模板复制带来的字节码缓存、写 .gitignore，让 v0 seed 只含 harness 制品。
-    # Spec-0032/T5：.openagents/ 是 vigil 的本地运行态（队列 db/claims/配置），随 rmtree 每 run 归零，
-    # 且永不入库。
+    # Clear bytecode cache from template copy, write .gitignore, so v0 seed contains only harness artifacts.
+    # Spec-0032/T5: .openagents/ is vigil's local runtime state (queue db/claims/config), resets to zero with rmtree per run,
+    # and is never committed.
     from ahe_beta.guards.harness_boundary import install_pre_commit  # noqa: PLC0415
 
     for pyc in HARNESS_REPO.rglob("__pycache__"):
@@ -153,18 +153,18 @@ def _seed_harness_repo() -> Path:
     )
     _git(HARNESS_REPO, "add", ".")
     _git(HARNESS_REPO, "commit", "-m", "seed: harness v0")
-    # 提交边界硬闸：装 pre-commit 钩子。容器围堵后改为拒绝清单（密钥 / .openagents），不再用顶层
-    # 白名单锁死产品形状（docs/specs、结构性演进要放行）。git worktree 共享 hooks。
-    # 钩子装在 seed 提交之后。服务端兜底见 smoke.yml 的边界检查步（--no-verify 也绕不开）。
+    # Submission boundary hard gate: install pre-commit hook. After container containment, switch to rejection list (secrets / .openagents),
+    # no longer use top-level whitelist locking down product shape (docs/specs, structural evolution should be allowed). git worktree shares hooks.
+    # Hook installed after seed commit. Server-side fallback via boundary check step in smoke.yml (--no-verify cannot bypass it).
     install_pre_commit(HARNESS_REPO)
     return HARNESS_REPO
 
 
 def _remote_tag_refs(ls_output: str) -> list[str]:
-    """`git ls-remote --tags` 输出 → 可删除的真 tag ref 列表。
+    """`git ls-remote --tags` output → list of deletable true tag refs.
 
-    Spec-0032 实证修复#2：附注 tag 会输出两行——`refs/tags/v1` 与 peeled 行 `refs/tags/v1^{}`；
-    后者是解引用展示、不是真 ref，`push origin :refs/tags/v1^{}` 会以 128 崩掉复位流程，须跳过。
+    Spec-0032 empirical fix #2: annotated tags output two lines—`refs/tags/v1` and peeled line `refs/tags/v1^{}`;
+    the latter is a dereference display, not a true ref. `push origin :refs/tags/v1^{}` crashes with code 128 and breaks the reset flow; must skip.
     """
     refs: list[str] = []
     for line in ls_output.splitlines():
@@ -175,55 +175,55 @@ def _remote_tag_refs(ls_output: str) -> list[str]:
 
 
 def _reset_to_initial(repo: Path, tracker) -> None:
-    """跑测试前复位到最初状态：Gitea harness 仓回 v0 + 关闭遗留 issue + 清空看板数据。
+    """Reset to initial state before running tests: Gitea harness repo back to v0 + close stale issues + clear board data.
 
-    - Gitea: 强推本地 v0 seed 到 origin/main、删除所有远端 vK tag —— harness 回到 v0 起点
-      (dev agent 在同一本地仓工作、push 同一 origin，故此处强推与其后续推进 fast-forward 兼容)。
-    - issue: 关闭所有遗留 open issue (issue 编号/历史无法经 API 抹除，仅复位 open 集)。
-    - 看板: 清空 data/live/ 投影。Spec-0049/T4：不得删除 role_runs（含其中 sessions）；
-      会话已迁入 ROLE_RUNS_DIR/sessions，也不再按共享 DATA/sessions/*.json 抹盘。
+    - Gitea: force-push local v0 seed to origin/main, delete all remote vK tags — harness returns to v0 baseline
+      (dev agent works in the same local repo, pushes to the same origin, so force-push here is compatible with subsequent fast-forward pushes).
+    - issue: close all stale open issues (issue numbers/history cannot be erased via API, only the open set is reset).
+    - board: clear data/live/ projection. Spec-0049/T4: must not delete role_runs (including their sessions);
+      sessions have migrated to ROLE_RUNS_DIR/sessions and no longer follow shared DATA/sessions/*.json for erasure.
     """
-    _git(repo, "push", "-f", "origin", "main")  # 远端 main 覆盖回 v0 seed
+    _git(repo, "push", "-f", "origin", "main")  # Override remote main back to v0 seed
     ls = subprocess.run(
         ["git", "-C", str(repo), "ls-remote", "--tags", "origin"],
         capture_output=True,
         text=True,
     ).stdout
     for ref in _remote_tag_refs(ls):
-        _git(repo, "push", "origin", f":{ref}")  # 删远端 tag（legacy vK 清扫）
+        _git(repo, "push", "origin", f":{ref}")  # Delete remote tags (legacy vK cleanup)
     for issue in tracker.list_open_issues():
         try:
             tracker.set_state(issue.number, "closed", "reset to initial before clean run")
-        except Exception:  # noqa: BLE001  关 issue 失败不阻塞复位
+        except Exception:  # noqa: BLE001  issue close failure does not block reset
             pass
-    from ahe_beta.loop.live import clear_live  # noqa: PLC0415  与 main() 同风格延迟导入
+    from ahe_beta.loop.live import clear_live  # noqa: PLC0415  same deferred import style as main()
 
     clear_live(data_dir=DATA)
 
 
-# Spec-0032/T5：交付面 stages 定稿（写进 harness 仓 .openagents/openagents.yml 的单一出处）。
-# Spec-0040/T1：rfc 从 skip 改为 agent——solve 先 drafter 落 docs/specs，再 implement
-# （spec CLI 在 vigil 镜像内，不进 harness 仓）。triage=skip：准入已由 Owner 完成；
-# ci 缺省 skip、经 VIGIL_CI_STAGE=agent 开启——vigil 判定表「零 check=永等 CI」，须先验证
-# act_runner 真在跑再开 ci 闸，否则全部票卡到看门狗；e2e=skip 二期；
-# review/merge=agent：工程质量闸全自动（review 在，不触 OpenAgents「不许零闸」守卫）。
+# Spec-0032/T5: delivery surface stages finalized (single source of truth written to harness repo .openagents/openagents.yml).
+# Spec-0040/T1: rfc changed from skip to agent—solve first has drafter land docs/specs, then implement
+# (spec CLI runs in vigil image, not in harness repo). triage=skip: admission already completed by Owner;
+# ci defaults to skip, enabled via VIGIL_CI_STAGE=agent—vigil decision table "zero check=perpetual CI wait", must verify first
+# act_runner truly running before opening ci gate, otherwise all tickets block at the watchdog; e2e=skip in phase 2;
+# review/merge=agent: engineering quality gates fully automated (review present, does not trigger OpenAgents "zero-gate forbidden" guard).
 _VIGIL_STAGES: dict[str, str] = {
     "triage": "skip",
     "rfc": "agent",
     "conflict": "agent",
-    "ci": "skip",  # write_openagents_config 按 VIGIL_CI_STAGE 覆盖
+    "ci": "skip",  # write_openagents_config overrides per VIGIL_CI_STAGE
     "e2e": "skip",
     "review": "agent",
     "merge": "agent",
 }
-# vigil 轮询间隔（秒）：比 OpenAgents 默认 60s 更紧凑——本地 Gitea 无速率压力，缩短准入→领活时延。
+# vigil poll interval (seconds): tighter than OpenAgents default 60s—local Gitea has no rate pressure, reducing admission-to-pickup latency.
 _VIGIL_INTERVAL = 30
 
 
 def install_role_runs(*, data_root: Path) -> Path:
     """Nail AHE_BETA_RUN_ID / ROLE_RUNS_DIR / usage path for this process.
 
-    Spec-0049/T4：一次闭环进程一份切片；看板 data/sessions 只是指向当前 sessions 的别名。
+    Spec-0049/T4: one closed-loop process gets one slice; board data/sessions is merely an alias pointing to current sessions.
     """
     run_id = os.environ.get("AHE_BETA_RUN_ID", "").strip() or uuid.uuid4().hex
     os.environ["AHE_BETA_RUN_ID"] = run_id
@@ -241,7 +241,7 @@ def experiment_run_mode() -> str:
     """Return the explicit lifecycle mode used by recoverable experiment runs."""
     mode = os.environ.get("AHE_BETA_RUN_MODE", "fresh").strip().lower() or "fresh"
     if mode not in {"fresh", "resume", "replay"}:
-        raise SystemExit(f"AHE_BETA_RUN_MODE 必须为 fresh、resume 或 replay：{mode!r}")
+        raise SystemExit(f"AHE_BETA_RUN_MODE must be fresh, resume, or replay: {mode!r}")
     return mode
 
 
@@ -263,7 +263,9 @@ def load_recovery_store(*, mode: str):
     if not root_raw:
         missing.append("AHE_BETA_RECOVERY_ROOT")
     if missing:
-        raise SystemExit("恢复身份环境变量不完整：" + ", ".join(missing))
+        raise SystemExit(
+            "Recovery identity environment variables are incomplete: " + ", ".join(missing)
+        )
     from ahe_beta.loop.recovery import RecoveryIdentity, RecoveryStore  # noqa: PLC0415
 
     identity = RecoveryIdentity(**values)
@@ -276,7 +278,7 @@ def load_recovery_store(*, mode: str):
 def existing_harness_repo() -> Path:
     """Return the preserved harness repo required by resume without mutating it."""
     if not (HARNESS_REPO / ".git").is_dir():
-        raise SystemExit(f"resume 缺少已初始化 harness 仓：{HARNESS_REPO}")
+        raise SystemExit(f"resume requires an initialized harness repository: {HARNESS_REPO}")
     return HARNESS_REPO
 
 
@@ -304,7 +306,7 @@ def current_role_runs_dir() -> Path | None:
 
 
 def apply_experiment_context(*, ctx: object) -> None:
-    """Spec-0047/T4：用 ExperimentContext 覆盖单例 DATA/HARNESS/vigil 资源名。"""
+    """Spec-0047/T4: use ExperimentContext to override singleton DATA/HARNESS/vigil resource names."""
     global \
         DATA, \
         HARNESS_REPO, \
@@ -327,14 +329,14 @@ def apply_experiment_context(*, ctx: object) -> None:
 
 
 def write_openagents_config(*, repo: Path, gitea: dict[str, str]) -> Path:
-    """把交付面声明式配置写进 harness 仓 `.openagents/openagents.yml`（Spec-0032/T5）。
+    """Write delivery surface declarative config to harness repo `.openagents/openagents.yml` (Spec-0032/T5).
 
-    forge=gitea + 连接四元组（token 本体不落盘，只声明 token_env=GITEA_TOKEN，由 vigil 子进程
-    env 提供）；stages 见 _VIGIL_STAGES；labels=[openagents]（Owner 准入的交接令牌 = vigil 发现标签）。
+    forge=gitea + connection tuple (token itself not persisted to disk, only token_env=GITEA_TOKEN declared, provided by vigil subprocess
+    env); stages from _VIGIL_STAGES; labels=[openagents] (Owner admission handoff token = label vigil discovers).
     """
     config_dir = repo / ".openagents"
     config_dir.mkdir(parents=True, exist_ok=True)
-    # Spec-0032/T6：ci 闸随基建就位切换——act_runner 验证在跑后置 VIGIL_CI_STAGE=agent 开启。
+    # Spec-0032/T6: ci gate switches when infrastructure is ready—set VIGIL_CI_STAGE=agent after act_runner verification is running.
     effective = dict(_VIGIL_STAGES)
     ci_stage = os.environ.get("VIGIL_CI_STAGE", "").strip().lower()
     if ci_stage in ("agent", "human", "skip"):
@@ -344,7 +346,7 @@ def write_openagents_config(*, repo: Path, gitea: dict[str, str]) -> Path:
         raise ValueError("VIGIL_COORDINATION must be soft, off, or dependencies")
     stages = "\n".join(f"  {stage}: {owner}" for stage, owner in effective.items())
     text = (
-        "# 由 ordinary controller 每次 run 生成（Spec-0032/T5），勿手工编辑——改 ordinary controller 的定稿常量。\n"
+        "# Generated by the ordinary controller for each run (Spec-0032/T5); edit its canonical constants instead of this file.\n"
         "version: 1\n"
         "forge: gitea\n"
         "execution_evidence:\n"
@@ -368,28 +370,30 @@ def write_openagents_config(*, repo: Path, gitea: dict[str, str]) -> Path:
 
 
 def ensure_openagents_cli() -> None:
-    """交付面 CLI 预检（subprocess 模式）：`openagents` 必须在 PATH。"""
+    """Delivery surface CLI pre-check (subprocess mode): `openagents` must be in PATH."""
     if shutil.which("openagents") is None:
         raise SystemExit(
-            "PATH 上找不到 `openagents`（交付面 CLI）——"
-            "uv tool install --from <OpenAgents 仓>@<含 forge/Gitea driver 的版本> openagents"
+            "Cannot find `openagents` on PATH (delivery CLI); "
+            "uv tool install --from <OpenAgents-repo>@<revision-with-forge/Gitea-driver> openagents"
         )
 
 
-# Spec-0033/T2：交付面运行形态。container（缺省）= 围堵盒：零宿主挂载自 clone、internal 网络 +
-# egress 代理 allowlist；subprocess = 宿主直跑，无任何围堵，仅限人盯着日志的一次性联调。
+# Spec-0033/T2: delivery surface execution mode. container (default) = sandbox: zero host mounts from clone, internal network +
+# egress proxy allowlist; subprocess = host-direct run, no sandbox, only for ad-hoc debugging with human monitoring logs.
 _VIGIL_IMAGE = os.environ.get("AHE_BETA_VIGIL_IMAGE", "").strip() or "ahe-beta-vigil:latest"
 _VIGIL_CONTAINER = os.environ.get("AHE_BETA_VIGIL_CONTAINER", "").strip() or "ahe-beta-vigil"
-_VIGIL_NETWORK = "ahe-beta-vigil-net"  # deploy/gitea compose 里的 internal 网络（按名引用）
-_VIGIL_PROXY_URL = "http://egress-proxy:3128"  # 盒内唯一外网通道（allowlist 见 egress-proxy.conf）
-_VIGIL_CONFIG_STAGING = DATA / "vigil_config"  # 容器模式的配置 staging（只读挂载进 /config）
-# claude 凭证三选一（Spec-0033）：API key / 网关 Bearer token（配 ANTHROPIC_BASE_URL，须为
-# Anthropic 协议端点，且网关域要加进 egress-proxy.conf 白名单）/ 订阅长效 token（claude setup-token）。
+# internal network in deploy/gitea compose (referenced by name)
+_VIGIL_NETWORK = "ahe-beta-vigil-net"
+_VIGIL_PROXY_URL = "http://egress-proxy:3128"  # only external network channel in the box (allowlist in egress-proxy.conf)
+# config staging for container mode (read-only mounted to /config)
+_VIGIL_CONFIG_STAGING = DATA / "vigil_config"
+# claude credential one of three (Spec-0033): API key / gateway Bearer token (with ANTHROPIC_BASE_URL, must be
+# Anthropic protocol endpoint, and gateway domain added to egress-proxy.conf allowlist) / subscription long-lived token (claude setup-token).
 _CLAUDE_CRED_ENVS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN")
-# claude 非凭证配置 env（存在才透传进容器）：base_url（自建/第三方 Anthropic 协议网关）+ 模型覆盖。
-# 接非官方网关（如 OpenAI 兼容网关的 Anthropic 端点）时，模型名不是 claude-* 而是网关自己的 model id，
-# 必须经 ANTHROPIC_MODEL 覆盖；claude 有一档"小/快模型"轻调用（缺省 haiku），网关无此模型时也要用
-# ANTHROPIC_SMALL_FAST_MODEL 指到同一个，否则那档调用会 404。
+# claude non-credential config env (passed to container only if present): base_url (self-hosted/third-party Anthropic protocol gateway) + model override.
+# When connecting to unofficial gateways (e.g., Anthropic endpoint on OpenAI-compatible gateway), model name is not claude-* but the gateway's own model id;
+# must be overridden via ANTHROPIC_MODEL; claude has a "small/fast model" tier for lightweight calls (default haiku), must override if gateway lacks this model
+# ANTHROPIC_SMALL_FAST_MODEL must point to the same one; otherwise that call will 404.
 _CLAUDE_CONFIG_ENVS = (
     "ANTHROPIC_BASE_URL",
     "ANTHROPIC_MODEL",
@@ -421,10 +425,9 @@ _HARNESS_LLM_SUFFIXES = ("MODEL", "BASE_URL", "API_KEY")
 
 
 class VigilHandle:
-    """交付面运行句柄：mode + 托管进程（subprocess=vigil 本体；container=docker logs 跟随器）+ 日志句柄。
+    """Delivery-plane runtime handle: mode + managed process (subprocess=vigil itself; container=docker logs follower) + log handle.
 
-    keep_alive：需求面收尾是否拆掉 vigil。Spec-0050/T4：缺省拆；显式 VIGIL_KEEP_ALIVE=1 或
-    卡死时 handle.keep_alive=True 才留盒。
+    keep_alive: whether the demand-side cleanup should tear down vigil. Spec-0050/T4: default teardown; only if explicitly VIGIL_KEEP_ALIVE=1 or handle.keep_alive=True on deadlock do we keep the container.
     """
 
     def __init__(
@@ -437,25 +440,24 @@ class VigilHandle:
 
 
 def vigil_mode() -> str:
-    """VIGIL_MODE 解析：container（缺省）/ subprocess（显式 opt-in）；其余值 fail-loud。"""
+    """Parse VIGIL_MODE: container (default) / subprocess (explicit opt-in); other values fail-loud."""
     raw = os.environ.get("VIGIL_MODE", "").strip().lower() or "container"
     if raw not in ("container", "subprocess"):
-        raise SystemExit(f"VIGIL_MODE 非法：{raw!r}（可选 container / subprocess）")
+        raise SystemExit(f"Invalid VIGIL_MODE: {raw!r} (choose container / subprocess)")
     return raw
 
 
 def vigil_keep_alive() -> bool:
     """Return whether vigil should survive the demand-side finally.
 
-    Spec-0050/T4：缺省拆盒（非末轮已等交付封口）。仅显式 1/true/yes/on 才常驻调试。
-    卡死路径由调用方把 handle.keep_alive 置 True，不走本函数。
+    Spec-0050/T4: default teardown (not the final round pending delivery closure). Only explicit 1/true/yes/on enables persistent debugging. Deadlock paths are handled by the caller setting handle.keep_alive to True; this function is not called.
     """
     raw = os.environ.get("VIGIL_KEEP_ALIVE", "").strip().lower()
     return raw in ("1", "true", "yes", "on")
 
 
 def _vigil_internal_gitea_url() -> str:
-    """容器视角的 Gitea 地址（同网络服务名）；宿主 .env 的 localhost 地址仅编排面自用。"""
+    """Gitea address from container perspective (same service name); localhost address in host .env is for orchestration layer only."""
     return os.environ.get("VIGIL_GITEA_INTERNAL_URL", "").strip() or "http://gitea:3000"
 
 
@@ -514,10 +516,10 @@ def _prepare_vigil_evidence(*, gitea: dict[str, str], mode: str) -> dict | None:
 
 
 def _ensure_vigil_container_prereqs() -> None:
-    """container 模式预检（fail-loud）：docker 可用 + 镜像已构建 + claude 凭证就位。"""
+    """Pre-flight check for container mode (fail-loud): docker available + image built + claude credentials in place."""
     if shutil.which("docker") is None:
         raise SystemExit(
-            "PATH 上找不到 docker（VIGIL_MODE=container 需要；或 VIGIL_MODE=subprocess 联调）"
+            "Cannot find docker on PATH (required for VIGIL_MODE=container; use VIGIL_MODE=subprocess for debugging)"
         )
     running, existing_run, _experiment = _container_state(name=_VIGIL_CONTAINER)
     run_id = os.environ.get("AHE_BETA_RUN_ID", "").strip()
@@ -527,23 +529,21 @@ def _ensure_vigil_container_prereqs() -> None:
         )
         if inspect.returncode != 0:
             raise SystemExit(
-                f"缺 vigil 镜像 {_VIGIL_IMAGE}——先构建：backend/deploy/vigil/build.sh "
-                "<OpenAgents 仓路径> <NexAU 仓路径>"
+                f"Missing vigil image {_VIGIL_IMAGE}; build it first: backend/deploy/vigil/build.sh "
+                "<OpenAgents-repo-path> <NexAU-repo-path>"
             )
     if not any(os.environ.get(key, "").strip() for key in _CLAUDE_CRED_ENVS):
         raise SystemExit(
-            "缺 claude 凭证：设 ANTHROPIC_API_KEY（API 计费）/ ANTHROPIC_AUTH_TOKEN（网关 Bearer，"
-            "配 ANTHROPIC_BASE_URL，网关域需加进 egress-proxy.conf 白名单）/ CLAUDE_CODE_OAUTH_TOKEN"
-            "（订阅计费，宿主 `claude setup-token` 生成）之一（Spec-0033）"
+            "Missing Claude credentials: set ANTHROPIC_API_KEY (API billing) / ANTHROPIC_AUTH_TOKEN (gateway Bearer; "
+            "configure ANTHROPIC_BASE_URL and allow the gateway domain in egress-proxy.conf) / CLAUDE_CODE_OAUTH_TOKEN"
+            " (subscription billing; generate with host `claude setup-token`) (Spec-0033)"
         )
 
 
 def start_vigil(*, repo: Path, parallel: int, gitea: dict[str, str], log_path: Path) -> VigilHandle:
-    """按 VIGIL_MODE 起交付面（含各模式预检与配置落盘），返回句柄供 finally stop_vigil 收尾。
+    """Start the delivery-plane according to VIGIL_MODE (including mode-specific pre-flight checks and config persistence), returning handle for finally block cleanup via stop_vigil.
 
-    container（缺省）：配置写 staging 只读挂载进盒，harness 仓由容器 entrypoint 自 clone（零宿主
-    挂载——两面唯一媒介是 Gitea，宿主仓与交付面脱钩）；凭证只经容器 env。subprocess：既有行为
-    （配置写进宿主仓、Popen 直跑），无围堵、带醒目告警。
+    container (default): config written to staging read-only mount into container; harness repo cloned by container entrypoint (zero host mounts—the only bidirectional medium between sides is Gitea, host repo and delivery-plane are decoupled); credentials only via container env. subprocess: existing behavior (config written to host repo, direct Popen), no isolation, with prominent warnings.
     """
     mode = vigil_mode()
     keep_alive = vigil_keep_alive()
@@ -552,11 +552,13 @@ def start_vigil(*, repo: Path, parallel: int, gitea: dict[str, str], log_path: P
         if os.environ.get("AHE_BETA_EXECUTION_BACKEND") == "e2b" and os.environ.get(
             "AHE_BETA_SANDBOX_ID"
         ):
-            print("[vigil] E2B sandbox 内 subprocess；隔离边界为整场 sandbox，各角色共享其文件系统")
+            print(
+                "[vigil] subprocess inside E2B sandbox; the sandbox is the isolation boundary, and all roles share its filesystem"
+            )
         else:
             print(
-                "[vigil] ⚠ subprocess 模式无围堵（嵌套 agent 可读宿主全文件系统、出网无限制）——"
-                "仅限盯屏联调，长跑闭环用 container 模式（Spec-0033）"
+                "[vigil] ⚠ subprocess mode is uncontained (nested agents can read the host filesystem and use unrestricted networking); "
+                "use only for supervised debugging; use container mode for long-running evolution loops (Spec-0033)"
             )
         ensure_openagents_cli()
         observation_runtime = _prepare_vigil_evidence(gitea=gitea, mode=mode)
@@ -572,7 +574,7 @@ def start_vigil(*, repo: Path, parallel: int, gitea: dict[str, str], log_path: P
     _ensure_vigil_container_prereqs()
     observation_runtime = _prepare_vigil_evidence(gitea=gitea, mode=mode)
     staging = _VIGIL_CONFIG_STAGING
-    # 同一份配置、两个可达性域的唯一分叉点：容器内 base_url 用内网服务名地址。
+    # Unique fork point between same config and two reachability domains: container-side base_url uses internal service name address.
     write_openagents_config(
         repo=staging, gitea={**gitea, "GITEA_URL": _vigil_gitea_url(gitea=gitea)}
     )
@@ -607,11 +609,11 @@ def _start_vigil_subprocess(
     keep_alive: bool,
     observation_runtime: dict | None,
 ) -> VigilHandle:
-    """宿主直跑：`openagents vigil --parallel K`（cwd=harness 仓，日志落 log_path）。
+    """Direct host execution: `openagents vigil --parallel K` (cwd=harness repo, logs to log_path).
 
-    GITEA_TOKEN 只经子进程 env 传递（配置文件不落 token）。level-triggered：票何时出现何时接。
+    GITEA_TOKEN only passed via subprocess env (token does not persist in config file). Level-triggered: receive ticket whenever it appears.
     """
-    log_handle = open(log_path, "a", encoding="utf-8")  # noqa: SIM115  生命周期随 vigil 进程，stop 时关闭
+    log_handle = open(log_path, "a", encoding="utf-8")  # noqa: SIM115  lifecycle tied to vigil process; closed on stop
     env = {
         **os.environ,
         **_openagents_identity_env(),
@@ -665,8 +667,8 @@ def _container_state(*, name: str) -> tuple[bool, str, str]:
 
 
 def _attach_container_logs(*, log_path: Path, keep_alive: bool) -> VigilHandle:
-    """把 `docker logs -f` 接到 log_path；不负责 docker run（新建与复用共用）。"""
-    log_handle = open(log_path, "a", encoding="utf-8")  # noqa: SIM115  生命周期随跟随器，stop 时关闭
+    """Wire `docker logs -f` to log_path; not responsible for docker run (both new creation and reuse use the same path)."""
+    log_handle = open(log_path, "a", encoding="utf-8")  # noqa: SIM115  lifecycle tied to follower; closed on stop
     logs = subprocess.Popen(
         ["docker", "logs", "-f", _VIGIL_CONTAINER], stdout=log_handle, stderr=subprocess.STDOUT
     )
@@ -682,28 +684,29 @@ def _start_vigil_container(
     keep_alive: bool,
     observation_runtime: dict | None,
 ) -> VigilHandle:
-    """围堵盒：docker run -d --rm 起 vigil 容器，日志经 `docker logs -f` 跟随进 log_path。
+    """Hardened container: start vigil container with `docker run -d --rm`, follow logs via `docker logs -f` into log_path.
 
-    挂载面只有两处只读：staging 配置（/config）与 entrypoint 脚本；凭证（Gitea token / claude
-    凭证）只经容器 env 注入（宿主侧 docker inspect 可见——宿主本就是信任边界内侧）。clone 地址
-    与代理均为盒内网络名（vigil-net internal，直连外网物理不通）。
+    Mounts are read-only in two places only: staging config (/config) and entrypoint script; credentials (Gitea token / claude credentials) injected only via container env (visible via `docker inspect` on host side—the host is already inside the trust boundary). Clone address and proxy are container internal network names (vigil-net internal; direct outbound connection to public internet is physically disabled).
 
-    容器已在跑（需求面上一轮 keep-alive 留下的）→ 只挂日志跟随器，不 docker run（同名会撞车）。
-    Spec-0049/T4：keep-alive 且 AHE_BETA_RUN_ID 变化则拆旧盒重建，避免 delivery 挂错 run。
+    Container already running (left behind by previous demand-side keep-alive) → attach log follower only, no docker run (same name would collide). Spec-0049/T4: if keep-alive and AHE_BETA_RUN_ID changes, tear down old container and rebuild to avoid delivery hanging on wrong run.
     """
     run_id = os.environ.get("AHE_BETA_RUN_ID", "").strip()
     running, existing_run, experiment_id = _container_state(name=_VIGIL_CONTAINER)
     ours = os.environ.get("AHE_BETA_EXPERIMENT_ID", "").strip()
     if running and experiment_id and experiment_id != ours:
         raise SystemExit(
-            f"拒绝 attach 实验 {experiment_id} 的 vigil 容器 {_VIGIL_CONTAINER}；"
-            "请用 backend/scripts/experiment.py"
+            f"Refusing to attach to experiment {experiment_id}'s vigil container {_VIGIL_CONTAINER}; "
+            "use backend/scripts/experiment.py"
         )
     if running and (not run_id or existing_run == run_id):
-        print(f"[vigil] 容器 {_VIGIL_CONTAINER} 已在跑，复用（不 docker run）")
+        print(
+            f"[vigil] Container {_VIGIL_CONTAINER} is already running; reusing it without docker run"
+        )
         return _attach_container_logs(log_path=log_path, keep_alive=keep_alive)
     if running:
-        print(f"[vigil] 容器 {_VIGIL_CONTAINER} run_id 已变（{existing_run}→{run_id}），重建")
+        print(
+            f"[vigil] Container {_VIGIL_CONTAINER} run_id changed ({existing_run}→{run_id}); rebuilding"
+        )
         subprocess.run(["docker", "rm", "-f", _VIGIL_CONTAINER], capture_output=True, text=True)
     repo_url = _gitea_remote_url({**gitea, "GITEA_URL": _vigil_gitea_url(gitea=gitea)})
     args = [
@@ -722,9 +725,9 @@ def _start_vigil_container(
         "-e", f"http_proxy={_VIGIL_PROXY_URL}",
         "-e", "NO_PROXY=gitea,localhost,127.0.0.1",
         "-e", "no_proxy=gitea,localhost,127.0.0.1",
-        # 容器即 jail（实证修复）：claude 缺省 acceptEdits 只放行文件编辑，headless 下 git commit/push
-        # 被拒 → deliver 卡死挂 needs-human。盒内用 bypassPermissions（围堵由容器承担，见 spec-0033
-        # §Guide）；宿主同名 env 可覆盖。注意 claude 拒绝 root 下 bypass——镜像以非 root 用户 vigil 跑。
+        # Container is a jail (proven by empirical fixes): claude by default acceptEdits only permits file edits; under headless, git commit/push
+        # are rejected → deliver hangs on needs-human. Inside container use bypassPermissions (isolation managed by container; see spec-0033
+        # §Guide); host-side env of same name can override. Note: claude refuses bypass under root—the image runs vigil as non-root user.
         "-e",
         (
             "OPENAGENTS_PERMISSION_MODE="
@@ -788,7 +791,7 @@ def _start_vigil_container(
     args += [image, "bash", "/entrypoint.sh"]
     started = subprocess.run(args, capture_output=True, text=True)
     if started.returncode != 0:
-        raise SystemExit(f"vigil 容器启动失败：{started.stderr.strip()[:300]}")
+        raise SystemExit(f"Failed to start vigil container: {started.stderr.strip()[:300]}")
     return _attach_container_logs(log_path=log_path, keep_alive=keep_alive)
 
 
@@ -828,13 +831,13 @@ def _check_backpressure(*, tracker, round_no: int) -> None:
     r_depth = sum(1 for issue in open_issues if plane(issue.labels) == READY)
     if p_depth > proposal_alarm:
         print(
-            f"[背压告警] 第 {round_no} 轮末 proposal 深度 {p_depth} > {proposal_alarm}："
-            "准入太严或生成太滥，请人工介入（调 hold 口径 / 减生成器）。"
+            f"[backpressure warning] End of round {round_no}: proposal depth {p_depth} > {proposal_alarm}: "
+            "Admission may be too strict or generation excessive; manual intervention required (adjust hold criteria / reduce generators)."
         )
     if r_depth > ready_alarm:
         print(
-            f"[背压告警] 第 {round_no} 轮末 ready 深度 {r_depth} > {ready_alarm}："
-            "dev 消化不动（积压不降=退化信号），请人工介入（加 dev / 收紧准入）。"
+            f"[backpressure warning] End of round {round_no}: ready depth {r_depth} > {ready_alarm}: "
+            "Developers cannot keep up (a non-decreasing backlog signals degradation); manual intervention required (add developers / tighten admission)."
         )
 
 
@@ -862,7 +865,7 @@ def _on_round_end(k: int, sha: str, *, tracker, round_shas: list[str]) -> None:
 
 
 def _stop_managed_proc(*, proc: subprocess.Popen) -> None:
-    """停托管进程（container=日志跟随器；subprocess=vigil 本体）。超时则 kill。"""
+    """Stop managed process (container=log follower; subprocess=vigil itself). Kill on timeout."""
     proc.terminate()
     try:
         proc.wait(timeout=10)
@@ -927,7 +930,7 @@ def _stop_vigil_model_processes(*, vigil_pid: int, proc_root: Path) -> None:
 def stop_vigil(handle: VigilHandle) -> None:
     """Stop the delivery-plane process according to keep_alive.
 
-    Spec-0040/T1：keep_alive 时 container 只拆日志跟随器、不 docker rm；subprocess 不杀 vigil 本体。
+    Spec-0040/T1: when keep_alive, container only tears down log follower, no docker rm; subprocess does not kill vigil process itself.
     """
     try:
         if handle.keep_alive:
@@ -944,7 +947,7 @@ def stop_vigil(handle: VigilHandle) -> None:
     finally:
         try:
             handle.log_handle.close()  # type: ignore[attr-defined]
-        except Exception:  # noqa: BLE001  关日志失败不影响收尾
+        except Exception:  # noqa: BLE001  log close failure does not affect cleanup
             pass
 
 

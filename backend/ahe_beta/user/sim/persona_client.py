@@ -1,11 +1,11 @@
 """
 persona_client.py
-主观线: 调 LLM 扮 persona, 返回 OUTPUT CONTRACT 的 JSON。
+Main thread: invoke LLM to play persona, return JSON of OUTPUT CONTRACT.
 
-两种后端:
-- ApiPersonaClient: 真实 API(OpenAI / Anthropic 兼容)。需要 SDK + key。
-- ScriptedPersonaClient: 离线脚本后端, 无 key 也能跑通整条 loop(用于 demo/CI)。
-  它按 SHALLOW persona 的能力档产出符合预期的判断, 演示框架编排而非真实推理。
+Two backends:
+- ApiPersonaClient: real API (OpenAI / Anthropic compatible). Requires SDK + key.
+- ScriptedPersonaClient: offline script backend, can run through the entire loop without a key (for demo/CI).
+  It produces judgments aligned with SHALLOW persona capabilities, demonstrating framework orchestration rather than true reasoning.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from ahe_beta.usage import monotonic_ms, provider_wait_scope, record_usage
 PERSONA_MAX_CONTEXT_TOKENS = 256000
 PERSONA_MAX_OUTPUT_TOKENS = 32768
 
-try:  # 对齐 NexAU: 读 repo 根 .env (USER_LLM_BASE_URL / USER_LLM_API_KEY / USER_LLM_MODEL)
+try:  # Align with NexAU: read repo root .env (USER_LLM_BASE_URL / USER_LLM_API_KEY / USER_LLM_MODEL)
     from dotenv import load_dotenv
 
     load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -35,7 +35,7 @@ class PersonaClient(Protocol):
 
 
 class PersonaProtocolError(RuntimeError):
-    """Spec-0048/T2: persona 输出语法可解析、但不满足当前阶段契约。"""
+    """Spec-0048/T2: persona output is syntactically parseable but does not satisfy the current-phase contract."""
 
     def __init__(self, stage: str, code: str, *, attempts: int = 1) -> None:
         self.stage = stage
@@ -78,7 +78,7 @@ def _push_call_trace(
     parsed: dict,
     steps: list | None,
 ) -> None:
-    """把一次 LLM 调用原文挂到 client._call_traces，供 loop drain 后落盘。"""
+    """Attach the raw text of one LLM call to client._call_traces for writing to disk after loop drain."""
     buf = getattr(client, "_call_traces", None)
     if buf is None:
         buf = []
@@ -96,7 +96,7 @@ def _push_call_trace(
 
 
 def drain_call_traces(client: object) -> list[dict]:
-    """取出并清空 client 上累积的原始调用痕迹；无采集能力则空列表。"""
+    """Extract and clear the accumulated raw call traces on the client; returns empty list if tracing is not available."""
     buf = getattr(client, "_call_traces", None)
     if not isinstance(buf, list):
         return []
@@ -118,18 +118,18 @@ def drain_protocol_events(client: object) -> list[dict]:
 
 
 # --------------------------------------------------------------------------
-# 真实 API 后端 (NexAU 网关, OpenAI 兼容)
+# Actual API backend (NexAU gateway, OpenAI compatible)
 # --------------------------------------------------------------------------
 class ApiPersonaClient:
-    """接 NexAU 的 OpenAI 兼容网关。针对 Nex-N2-Pro 这类 reasoning 模型做了加固:
-    - enable_thinking=False 抑制 CoT 泄漏 (网关拒绝则回退);
-    - content 为空时用同一 32768-token 预算重试，不越过单次上限;
-    - 容错 JSON 解析 (剥 code fence / 抽取首个 {...}), 解析失败也不崩 loop。"""
+    """Connect to NexAU's OpenAI-compatible gateway. Hardened for reasoning models such as Nex-N2-Pro:
+    - enable_thinking=False suppresses CoT leakage (fall back if gateway rejects);
+    - when content is empty, retry using the same 32768-token budget without exceeding the single-call limit;
+    - fault-tolerant JSON parsing (strip code fences / extract the first {...}); parsing failure does not crash the loop."""
 
     def __init__(self, model: str | None = None, temperature: float = 0.8):
-        from openai import OpenAI  # 延迟导入
+        from openai import OpenAI  # Lazy import
 
-        # 分角色配置：用户 agent 独立用 USER_LLM_*（无公共回落；显式传参最高优先）。
+        # Per-role config: user agent independently uses USER_LLM_* (no shared fallback; explicit parameters take highest priority).
         base_url = os.getenv("USER_LLM_BASE_URL")
         api_key = os.getenv("USER_LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -143,7 +143,8 @@ class ApiPersonaClient:
         self.client = OpenAI(**kwargs)
 
     def _create(self, messages: list[dict], max_tokens: int):
-        """带退避重试 (429 / 瞬时网关错误)。每轮先试 enable_thinking=False, 失败再裸试。"""
+        """Backoff retry (429 / transient gateway errors). Each attempt first tries enable_thinking=False; if rejected,
+        retry without that option."""
         estimated_tokens = _estimate_context_tokens(messages)
         # Spec-0084/T2: consume the checked operator threshold, without dynamic compression.
         limit = int(os.getenv("USER_LLM_MAX_CONTEXT_TOKENS", str(PERSONA_MAX_CONTEXT_TOKENS)))
@@ -192,7 +193,7 @@ class ApiPersonaClient:
                     error=e,
                 )
                 started = monotonic_ms()
-                try:  # flag 可能被网关拒 -> 裸试一次
+                try:  # Flag may be rejected by gateway -> try once without it
                     with provider_wait_scope():
                         retry_request = {
                             "model": self.model,
@@ -226,8 +227,8 @@ class ApiPersonaClient:
 
     @staticmethod
     def _text(resp) -> str:
-        # 只取正式回答 content; 绝不回落 reasoning_content —— 那是隐藏思维链(CoT)而非答案,
-        # 当成答案会把 "We need respond as user..." 这类推理过程当成 message 泄漏出去。
+        # Only take formal answer content; never fall back to reasoning_content — that is hidden reasoning chain (CoT), not the answer.
+        # Treating it as the answer would leak reasoning steps like "We need respond as user..." as message output.
         return (resp.choices[0].message.content or "").strip()
 
     def respond(self, system: str, user: str) -> dict:
@@ -241,7 +242,7 @@ class ApiPersonaClient:
         # legacy probes at two calls for backwards compatibility with old fixtures.
         max_attempts = 2 if stage == "legacy" else 3
         for attempt in range(max_attempts):
-            # 推理模型隐藏 CoT 先吃 token；persona 与其他角色统一单次 32768。
+            # Reasoning models hide CoT and consume tokens first; persona and other roles unified at 32768 per turn.
             last_text = self._text(self._create(messages, PERSONA_MAX_OUTPUT_TOKENS))
             last_obj = _parse_json(last_text)
             steps.append({"kind": "assistant", "text": last_text})
@@ -297,18 +298,20 @@ class ApiPersonaClient:
         return events
 
     def complete(self, messages: list[dict], max_tokens: int = PERSONA_MAX_OUTPUT_TOKENS) -> str:
-        """通用补全：给定 messages 直接返回文本（供 0008/T4 内层 tool-calling 循环复用网关）。"""
+        """Generic completion: given messages, return text directly (for reuse in the 0008/T4 inner tool-calling loop
+        via the gateway)."""
         text = self._text(self._create(messages, max_tokens))
         if not text:
             text = self._text(self._create(messages, max_tokens))
         return text
 
     def classify_action(self, system: str, ret: dict, space: list[str]) -> str:
-        """方案 B：action=='free' 时的模型自评归类。
+        """Option B: model self-assessment classification when action=='free'.
 
-        让**同一个 persona 模型**在自己刚写的自由产出上，从当前合法动作集里挑最贴合本意的一个
-        id（而非框架用关键词硬猜）。返回落在 space 内的 id；解析失败/越界则回 'free'，交由
-        resolve 的安全兜底(classify_free_action)处理，绝不擅自投影到终止动作。
+        Let the **same persona model** classify its own free output by picking the most fitting id from the
+        current set of legal actions (rather than having the framework guess with keywords). Return an id
+        that falls within the space; on parse failure or out-of-bounds, return 'free', delegating to the
+        safety fallback (classify_free_action) in resolve, never substituting a terminating action itself.
         """
         prompt = (
             "You previously chose action:'free'. Now map your own intent to EXACTLY ONE "
@@ -329,18 +332,21 @@ class ApiPersonaClient:
 
 
 # --------------------------------------------------------------------------
-# 离线脚本后端 (无 key 跑通用)
+# Offline script backend (runs universally without key)
 # --------------------------------------------------------------------------
 class ScriptedPersonaClient:
     """
-    离线脚本后端: 读 system prompt 里的能力档(D1)与验收档(D3), 据此分叉判断。
-    这是对真实 LLM 的粗略替身, 目的在演示框架编排 + 能力分叉, 不是真实推理。
+    Offline script backend: read capability profile (D1) and acceptance profile (D3) from the system prompt,
+    then fork the decision accordingly. This is a coarse substitute for a real LLM, intended to demonstrate
+    framework orchestration + capability forking, not actual reasoning.
 
-    能力分叉的关键:
-    - SHALLOW/BLIND: 看得懂运行报错, 但看不穿'合理命名'的幻觉 API; 不构造 DST 边界;
-      拿到'能跑'的交付物即在 FUNCTIONAL 阈值下接受 -> 漏掉 DST 逃逸 bug。
-    - COMPETENT/EXPERT: 能识破幻觉 API; 会构造 DST 边界; dt.replace 这种 naive 实现
-      过不了 RIGOROUS 阈值 -> 持续要求证据 / 反馈, 直至耐心耗尽 -> file_issue/give_up。
+    Behavior by capability:
+    - SHALLOW/BLIND: can understand runtime errors but cannot see through hallucinated APIs with plausible names;
+      does not construct DST edge cases; accepts deliverables that "work" at the FUNCTIONAL threshold -> misses DST
+      escape bugs.
+    - COMPETENT/EXPERT: can debunk hallucinated APIs; constructs DST edge cases; naive implementations like
+      dt.replace fail the RIGOROUS threshold -> continuously demand evidence / feedback until patience runs out
+      -> file_issue/give_up.
     """
 
     def respond(self, system: str, user: str) -> dict:
@@ -356,12 +362,13 @@ class ScriptedPersonaClient:
         return ret
 
     def _respond_body(self, system: str, user: str) -> dict:
-        if "<file_issue>" in user:  # 专门一轮: 以本人口吻写自包含 issue
+        if "<file_issue>" in user:  # Dedicated turn: write self-contained issue in first person
             return self._compose_issue()
-        if "<rate_experience>" in user:  # 会话末自评: 按末态情绪给 1–4 + 理由
+        # Self-assessment at session end: rate 1–4 based on final sentiment + reason
+        if "<rate_experience>" in user:
             return self._rate(user)
 
-        # 主 loop 同构分层：先算整轮决定，再按标签切片（避免三跳各算各的）。
+        # Match the main loop stages: compute the turn decision once, then select the requested stage by label.
         if (
             "<main_judge>" in user
             or "<main_rejudge>" in user
@@ -447,7 +454,7 @@ class ScriptedPersonaClient:
         )
         exhausted = "patience=exhausted" in mood
 
-        # 开局: 无 harness 输出 -> 发任务
+        # Start: no harness output -> dispatch task
         if ho in ("(empty)", ""):
             out = {
                 "perceive": "Nothing from the harness yet; starting the task.",
@@ -461,7 +468,7 @@ class ScriptedPersonaClient:
                 out["task_load"] = "normal"
             return out
 
-        # 耐心耗尽 -> 终止: 高容错走 file_issue, 否则 give_up
+        # Patience exhausted -> terminate: high tolerance takes file_issue, otherwise give_up
         if exhausted:
             if "file_issue" in space:
                 return {
@@ -480,7 +487,7 @@ class ScriptedPersonaClient:
                     "message": "I'll stop here, this isn't working.",
                 }
 
-        # 真实运行报错穿透带宽 -> 所有能力档都看得懂
+        # Real execution errors tunnel through bandwidth -> all capability tiers can understand
         if "traceback" in ho or "attributeerror" in ho:
             perceive = "It crashed: the API it called doesn't exist. " + (
                 "This assistant is hallucinating pytz APIs — a systemic problem."
@@ -495,7 +502,7 @@ class ScriptedPersonaClient:
                 "with standard pytz and run the New York DST check again.",
             }
 
-        # 第一次只贴代码、未真跑 -> 倾向让 harness 给出运行证据。
+        # First time only posts code, hasn't actually run -> incline harness to provide execution proof.
         if "localize_safe" in ho or "done" in ho or "looks correct" in ho:
             if "send_message" in space:
                 return {
@@ -506,10 +513,10 @@ class ScriptedPersonaClient:
                     "message": "Please actually run it once, especially the NY DST boundary.",
                 }
 
-        # 交付物能跑、普通用例没报错。这里是能力分叉的核心:
+        # Deliverable runs, common cases have no errors. This is where capability branching is critical:
         if "+08:00" in ho or "no error" in ho or "passes" in ho or "works" in ho:
             if high_cap and rigorous:
-                # 高能力 + 严格阈值: 看出 dt.replace 没真正处理 DST, 不接受, 继续逼证据
+                # High capability + strict threshold: spot dt.replace not truly handling DST, reject, continue demanding proof
                 return {
                     "perceive": "It 'runs' but dt.replace(tzinfo=tz) does NOT handle "
                     "DST transitions correctly — the spring-forward case is wrong.",
@@ -519,8 +526,8 @@ class ScriptedPersonaClient:
                     "handle DST. Show me the 2024-03-10 02:30 America/New_York "
                     "case with pytz localize/normalize.",
                 }
-            # 低能力 + FUNCTIONAL 阈值: 能跑即满意 -> 漏掉 DST 逃逸 bug。是否能选 accept
-            # 是 act 阶段菜单的事；judge/intent 阶段没有 action_space 时也不能因此把满意判断降成 unsure。
+            # Low capability + FUNCTIONAL threshold: runs = satisfied -> miss DST escape bug. Whether to accept is an act-stage menu choice;
+            # judge/intent stage has no action_space, so we cannot lower satisfaction judgment to unsure for this reason.
             return {
                 "perceive": "It runs now and the normal case looks right. Good enough.",
                 "verdict": "satisfied",
@@ -528,7 +535,7 @@ class ScriptedPersonaClient:
                 "message": "Works now, thanks. Good enough for me.",
             }
 
-        # 兜底: 继续给反馈
+        # Fallback: continue giving feedback
         return {
             "perceive": "Still not convinced it's correct.",
             "verdict": "unsure",
@@ -538,7 +545,8 @@ class ScriptedPersonaClient:
 
     @staticmethod
     def _compose_issue() -> dict:
-        """离线脚本的自包含 issue：第一人称、口语化，不套工单腔（演示用，非真实推理）。"""
+        """Offline script self-contained issue: first-person, conversational tone, not in formal ticket-writing style
+        (for demonstration; not actual reasoning)."""
         return {
             "issue": "I just wanted this working in my project and proven, but it kept handing "
             "me code that doesn't actually hold up and never showed me real evidence it works. "
@@ -547,7 +555,7 @@ class ScriptedPersonaClient:
 
     @staticmethod
     def _rate(user: str) -> dict:
-        """离线脚本的会话末自评: 仅凭末态 <mood> 标签粗映射到 1–4。"""
+        """Offline script session-end self-assessment: coarse mapping from the final <mood> tag to 1–4."""
         mood = _extract(user, "mood").lower()
         if "patience=exhausted" in mood:
             return {"score": 1, "reason": "It kept failing and I ran out of patience."}
@@ -566,8 +574,8 @@ def _extract(user: str, tag: str) -> str:
     return seg
 
 
-# Spec-0048/T2: JSON 语法解析与阶段语义校验是两层边界。任意 dict 都不能再被当作
-# 当前 OUTPUT CONTRACT 的成功结果，尤其是 main_act 中的 {tool,args}。
+# Spec-0048/T2: JSON syntax parsing and phase-level semantics validation are two separate boundaries. No arbitrary dict can be treated as
+# Successful result of the current OUTPUT CONTRACT, especially {tool, args} in main_act.
 _STAGE_TAGS = (
     ("direct_review", "<direct_review>"),
     ("main_final_check", "<main_final_check>"),
@@ -625,7 +633,7 @@ def _validate_stage_output(
     *,
     tools_allowed: bool | None = None,
 ) -> str | None:
-    """返回机器可聚合的错误码；None 表示对象满足当前阶段契约。"""
+    """Return a machine-aggregatable error code; None indicates the object satisfies the current-phase contract."""
     from .actions import CATALOG, MessagePolicy
 
     if not isinstance(obj, dict) or obj.get("_parse_failed"):
@@ -694,8 +702,8 @@ def _validate_stage_output(
         allowed = _WAITING_ACTIONS if stage == "waiting_act" else _action_space_from_user(user)
         if action != "free" and action not in allowed:
             return "action_not_in_space"
-        # gap 是可选的动作元数据；缺省由 loop 解释为 False。只有模型显式给出时
-        # 才校验类型，避免与动作无关的字段把合法终止变成协议失败。
+        # gap is optional action metadata; the loop interprets it as False by default. Validation only
+        # occurs when the model explicitly provides it, avoiding fields unrelated to actions from turning a legal termination into a protocol failure.
         if "gap" in obj and not isinstance(obj.get("gap"), bool):
             return "invalid_gap"
         message = obj.get("message", "")
@@ -738,7 +746,7 @@ def _validate_stage_output(
         # An invalid/missing score must not erase a valid task observation.
         return None
 
-    # 未带阶段标签的旧探针/离线调用保持兼容，但仍保留原解析/空消息检查。
+    # Legacy probes/offline calls without phase labels remain compatible, but still retain original parsing/empty message checks.
     if obj.get("_parse_failed"):
         return "unparseable_json"
     if _emit_action_missing_message(obj):
@@ -779,23 +787,27 @@ def _contract_reminder(stage: str, code: str) -> str:
 
 
 def _emit_action_missing_message(obj: dict) -> bool:
-    """需要正文的动作缺少 message；终止动作的 optional message 不触发重试。"""
-    from .actions import CATALOG, MessagePolicy  # 局部导入避免任何潜在循环依赖
+    """An action requiring a body lacks a message; an optional message in a terminating action does not trigger retry."""
+    # Local imports avoid any potential circular dependencies.
+    from .actions import CATALOG, MessagePolicy
 
     action = obj.get("action") or ""
     msg_empty = not (obj.get("message") or "").strip()
-    if action == "free":  # free 也必须带 message 才能被归类
+    if action == "free":  # free must also carry a message to be classified.
         return msg_empty
     spec = CATALOG.get(action)
     return bool(spec and spec.message_policy is MessagePolicy.REQUIRED and msg_empty)
 
 
 def _dump_unparseable(*, first: str, second: str) -> None:
-    """把两次都解析失败的原始输出落到 backend/data/parse_failures.jsonl，供事后判「没 JSON 还是畸形」。
+    """Write raw output where both parses failed to backend/data/parse_failures.jsonl for later diagnosis of
+    "no JSON" vs. "malformed JSON".
 
-    纯可观测旁路：写盘失败绝不影响主流程；persona 仍抛 typed protocol error。
+    Pure observability side channel: write failure never affects the main flow; persona still raises typed
+    protocol error.
     """
-    if os.getenv("PYTEST_CURRENT_TEST"):  # 单测里别往真实 data/ 写脏数据（否则污染观测）
+    # Do not write dirty data to the real data/ directory in unit tests (otherwise it contaminates observations).
+    if os.getenv("PYTEST_CURRENT_TEST"):
         return
     try:
         import datetime
@@ -809,16 +821,18 @@ def _dump_unparseable(*, first: str, second: str) -> None:
         }
         with path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    except Exception:  # noqa: BLE001 观测旁路，坏了也不许拖垮 loop
+    except Exception:  # noqa: BLE001 observation bypass; must not break the loop even if it fails.
         pass
 
 
 def _iter_top_level_objects(s: str):
-    """扫描出所有**顶层**平衡的 {...} 片段，尊重字符串字面量与转义。
+    """Scan for all **top-level** balanced {...} fragments, respecting string literals and escapes.
 
-    旧实现用 find('{')→rfind('}') 一把抓，只要输出里有不止一处花括号（推理文字带 {}、
-    message 内含 {}、或多段 JSON）就抠出跨段非法片段 → 解析失败 → 静默空 message。
-    这里逐字符跟踪括号深度，只在**字符串外**计数括号，深度归零即得到一个完整对象。
+    The old implementation used find('{')→rfind('}') in one pass, which would grab illegal cross-segment
+    fragments whenever the output contained more than one pair of braces (reasoning text with {}, message with {},
+    or multiple JSON spans) -> parsing failed -> silent empty message. Here we track brace depth character by
+    character, counting braces only **outside strings**, and collect a complete object each time depth returns
+    to zero.
     """
     depth = 0
     start = -1
@@ -848,10 +862,12 @@ def _iter_top_level_objects(s: str):
 
 
 def _parse_json(text: str) -> dict:
-    """容错抽取 persona JSON；阶段语义与失败策略由上层 validator 决定。
+    """Fault-tolerant extraction of persona JSON; phase semantics and failure strategy are determined by the
+    upper-layer validator.
 
-    抓所有顶层 {...} 对象、取**最后一个**能解析成 dict 的（内层 tool-loop 里最终答案总在末尾；
-    前面的推理/工具示例即便带花括号也不干扰）。仍解析不出才退化空壳。
+    Grab all top-level {...} objects, take the **last one** that parses to a dict (the final answer in an
+    inner tool-loop always comes at the end; reasoning and tool examples before it do not interfere even if
+    they contain braces). Return an empty dict if parsing still fails.
     """
     if not text:
         return {
@@ -859,15 +875,15 @@ def _parse_json(text: str) -> dict:
             "verdict": "unsure",
             "action": "free",
             "message": "",
-            "_parse_failed": True,  # 供上层识别→触发「只回 JSON」重试；绝非模型真实意图
+            "_parse_failed": True,  # For upper layer to identify → trigger "return JSON only" retry; absolutely not the model's true intent.
         }
     s = text.strip()
-    if s.startswith("```"):  # 剥 ```json ... ``` 围栏
+    if s.startswith("```"):  # Strip ```json ... ``` fences.
         s = s.split("```", 2)[1] if s.count("```") >= 2 else s.strip("`")
         if s.lstrip().lower().startswith("json"):
             s = s.lstrip()[4:]
     parsed: dict | None = None
-    for chunk in _iter_top_level_objects(s):  # 顺序扫描，保留最后一个成功者
+    for chunk in _iter_top_level_objects(s):  # Sequential scan, retain the last successful one.
         try:
             obj = json.loads(chunk)
         except Exception:
@@ -876,28 +892,29 @@ def _parse_json(text: str) -> dict:
             parsed = obj
     if parsed is not None:
         return parsed
-    # 无法解析(截断/非 JSON)：返回仅供 validator 识别的空壳，绝不把原始文本灌进 message；
-    # 该对象不能作为真实动作，契约重试仍失败后会变成 PersonaProtocolError。
+    # Cannot parse (truncated/non-JSON): return an empty shell for validator identification only, never stuff raw text into message;
+    # this object cannot serve as a real action, and contract retry failure will eventually become PersonaProtocolError.
     return {
         "perceive": "(unparseable model output)",
         "verdict": "unsure",
         "action": "free",
         "message": "",
-        "_parse_failed": True,  # 供上层识别→触发「只回 JSON」重试；绝非模型真实意图
+        "_parse_failed": True,  # For upper layer to identify → trigger "return JSON only" retry; absolutely not the model's true intent.
     }
 
 
 # --------------------------------------------------------------------------
-# 内层 tool-using 后端 (spec-0008/T4)
+# Inner tool-using backend (spec-0008/T4).
 # --------------------------------------------------------------------------
 class AgenticPersonaClient:
-    """把单次「纯函数判断」respond() 换成有界 tool-calling 内层循环。
+    """Run respond() as a bounded tool-calling loop instead of a single tool-free judgment call.
 
-    控制反转只局部发生在这个接缝内：外层 run_session / 动作空间 / 状态机 / 终止全不变，
-    respond(system,user)->dict 协议也不变。会话级 persona+工作区由 sim_user 经 bind_session
-    注入；未绑定 / blind 无工具 / 特殊轮（file_issue·rate）时退化为一次主观判断（等价旧行为）。
+    This change is local: outer run_session / action space / state machine /
+    termination behavior and the respond(system, user) -> dict protocol remain unchanged. Session-level
+    persona and workspace are injected by sim_user via bind_session; when unbound / blind without tools / on
+    special rounds (file_issue, rate), it falls back to a single subjective judgment (equivalent to old behavior).
 
-    llm: 可调用 (messages: list[dict]) -> str。便于离线注入 FakeToolLLM。
+    llm: callable (messages: list[dict]) -> str. Allows offline injection of FakeToolLLM.
     """
 
     def __init__(
@@ -914,9 +931,10 @@ class AgenticPersonaClient:
         self.max_inner_steps = max_inner_steps
         self.timeout = timeout
         self._sandbox_factory = sandbox_factory or Sandbox
-        self._persona = None  # 会话级，bind_session 注入
+        self._persona = None  # Session-level, injected via bind_session.
         self._workspace_dir = None
-        self._issue_notes: list[str] = []  # 中途 report_issue tool 累积；drain 给 session
+        # Intermediate report_issue tool accumulates; drain to session.
+        self._issue_notes: list[str] = []
         self._protocol_events: list[dict] = []
 
     def bind_session(self, persona, workspace_dir) -> None:
@@ -926,7 +944,7 @@ class AgenticPersonaClient:
         self._issue_notes = []
 
     def drain_issue_notes(self) -> list[str]:
-        """取出并清空中途 report_issue 笔记（供 run_session / 观测）。"""
+        """Extract and clear mid-session report_issue notes (for run_session / observability)."""
         notes = list(self._issue_notes)
         self._issue_notes.clear()
         return notes
@@ -951,7 +969,7 @@ class AgenticPersonaClient:
         return events
 
     def _record_issue_note(self, *, body: str) -> dict:
-        """中途开单：写入会话缓冲，不终止对话。"""
+        """Mid-session issue filing: write to session buffer, does not terminate the conversation."""
         text = body.strip()
         if not text:
             return {"ok": False, "error": "body must be non-empty"}
@@ -964,7 +982,7 @@ class AgenticPersonaClient:
         }
 
     def _call_without_tools(self, system: str, user: str, stage: str) -> dict:
-        """Spec-0048/T2: 无工具阶段严格按阶段契约重试，绝不接纳 tool JSON。"""
+        """Spec-0048/T2: in the no-tools phase, retry strictly per phase contract, never accept tool JSON."""
         messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
         steps: list[dict] = []
         first_raw = ""
@@ -1126,7 +1144,7 @@ class AgenticPersonaClient:
         name = obj.get("tool")
         args = obj.get("args") or {}
         spec = tools_by_name.get(name)
-        if spec is None:  # 不在 D1 工具栈内 / 未知 -> 机制保底，不执行
+        if spec is None:  # Not in D1 toolchain / unknown → fallback mechanism, do not execute.
             return {"ok": False, "error": f"unknown or unavailable tool: {name!r}"}
         if not isinstance(args, dict):
             return {"ok": False, "error": "args must be an object"}
@@ -1136,7 +1154,7 @@ class AgenticPersonaClient:
             if spec.name == "run_shell":
                 args = {**args, "timeout": self.timeout}
             return spec.fn(sandbox, **args)
-        except Exception as e:  # noqa: BLE001 — 工具异常转结构化观察，不崩内层循环
+        except Exception as e:  # noqa: BLE001 — tool exceptions convert to structured observations, do not crash the inner loop.
             return {"ok": False, "error": f"bad tool call: {e}"}
 
     def respond(self, system: str, user: str) -> dict:
@@ -1146,8 +1164,8 @@ class AgenticPersonaClient:
         from .tools import review_tool_stack, tool_stack
 
         stage = _stage_from_user(user)
-        # intent / re-judge / re-intent / act / issue / rating 均为无工具 contract。即使 persona
-        # 本身有工具，也只用薄外层 system，避免 system 级 private-tool 协议与 act 菜单冲突。
+        # intent / re-judge / re-intent / act / issue / rating are all tool-free contracts. Even if persona
+        # itself has tools, use only a thin outer system to avoid system-level private-tool protocol conflicts with act menu.
         opening_judge = stage == "main_judge" and _OPENING_TASK_MARKER in user
         if self._persona is None or not _stage_allows_tools(stage) or opening_judge:
             return self._call_without_tools(system, user, stage)
@@ -1161,7 +1179,7 @@ class AgenticPersonaClient:
         elif stage == "main_final_check":
             # Keep this one bounded evidence episode separate from report publication.
             tools = [tool for tool in tools if tool.name != "report_issue"]
-        if not tools:  # blind / final-check 无可用工具：由 loop 记录 unavailable 后强制 re-judge
+        if not tools:  # blind / final-check have no available tools: the loop records unavailable and forces re-judge.
             if stage == "main_final_check":
                 obj = {
                     "perceive": "I have no private tools available for this final check.",
@@ -1204,12 +1222,13 @@ class AgenticPersonaClient:
             else self.max_inner_steps
         )
         try:
-            # tool_budget 只计真正执行的工具；普通契约回答和一次格式修复不再偷占查验额度。
+            # tool_budget only counts truly executed tools; regular contract responses and one-time format fixes no longer consume verification quota.
             while tool_calls < tool_budget:
                 last_raw = self._llm(messages) or ""
                 last_obj = _parse_json(last_raw)
                 obj = last_obj
-                if isinstance(obj.get("tool"), str):  # 工具调用 -> 执行并回灌观察
+                # Tool invocation → execute and feed back observations.
+                if isinstance(obj.get("tool"), str):
                     tool_calls += 1
                     steps.append({"kind": "assistant", "text": last_raw})
                     name = str(obj.get("tool") or "")
@@ -1265,10 +1284,10 @@ class AgenticPersonaClient:
                     parsed=obj,
                     steps=steps,
                 )
-                return obj  # 最终结构化输出（contract）
+                return obj  # Final structured output (contract).
 
-            # 查验额度与结论额度分离：工具用满不是评估失败。保留完整 tool/result 对话，
-            # 再给两次明确禁用工具的结构化收口机会。
+            # Verification quota and conclusion quota are separate: exhausting tools is not evaluation failure. Preserve complete tool/result dialogue,
+            # then provide two more explicit opportunities to close with tools disabled.
             forced_prompt = (
                 f"<{stage}>\n"
                 f"You have used all {tool_budget} private tool calls. No more tools are available "
@@ -1328,7 +1347,7 @@ class AgenticPersonaClient:
             )
         except PersonaProtocolError:
             raise
-        except Exception as exc:  # noqa: BLE001 — 转 typed evaluator error，禁止未知异常伪造 action
+        except Exception as exc:  # noqa: BLE001 — convert to typed evaluator error, forbid unknown exceptions from forging action.
             _push_call_trace(
                 self,
                 system=inner_system,
@@ -1339,12 +1358,12 @@ class AgenticPersonaClient:
             )
             raise PersonaProtocolError(stage, f"internal_error:{type(exc).__name__}") from exc
         finally:
-            sandbox.cleanup()  # 仅清自建 tempdir；外部工作区不动
+            sandbox.cleanup()  # Only clean up self-created tempdir; do not touch external workspace.
 
 
 def make_client() -> PersonaClient:
-    """有 NexAU 网关 (USER_LLM_BASE_URL+USER_LLM_API_KEY) 或 OPENAI_API_KEY 用真实 API,
-    否则回落离线脚本后端。"""
+    """If a NexAU gateway (USER_LLM_BASE_URL + USER_LLM_API_KEY) or OPENAI_API_KEY is available, use the real API;
+    otherwise fall back to the offline script backend."""
     if (os.getenv("USER_LLM_BASE_URL") and os.getenv("USER_LLM_API_KEY")) or os.getenv(
         "OPENAI_API_KEY"
     ):

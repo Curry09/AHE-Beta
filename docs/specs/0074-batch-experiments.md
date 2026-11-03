@@ -1,12 +1,12 @@
 ---
 number: '0074'
-title: 统一入口的批量实验管理
+title: "Batch experiment management through a unified entry point"
 issue: 0
 slug: batch-experiments
-summary: 用显式配置列表冻结批次成员，按真实运行状态限流并复用单 run 的检查、启动、收集与停止恢复。
+summary: "Freeze batch members with an explicit configuration list, limit concurrency according to actual runtime state, and reuse the single-run checks, startup, collection, and stop/recovery."
 tasks:
 - id: T1
-  title: 批次输入与冻结成员账本
+  title: "Batch inputs and the frozen-member ledger"
   status: done
   priority: P1
   tags: []
@@ -19,11 +19,11 @@ tasks:
   - backend/ahe_beta/experiment/schemas/batch-v1.json
   - backend/tests/test_experiment_batch_config.py
   - backend/tests/test_experiment_batch_store.py
-  scope: 严格校验批次列表并冻结配置身份，分离不可变intent/manifest与可变receipt，独立entry根与prepare中断恢复。
+  scope: "Strictly validate the batch list and freeze configuration identity, separate immutable intent/manifest from mutable receipts, and support independent entry roots and prepare interruption recovery."
   acceptance: 
-    无provider检查与恶意字段/路径/类型拒绝，原子发布和hash篡改拒绝，唯一子manifest恢复，不复制凭证或重建已有run。
+    "Provider-free checks and rejection of malicious fields/paths/types, atomic publication and hash-tampering rejection, recovery through the unique child manifest, without copying credentials or reconstructing an existing run."
 - id: T2
-  title: 复用单run的批次调度与恢复
+  title: "Reuse single-run batch scheduling and recovery"
   status: done
   priority: P1
   tags: []
@@ -34,12 +34,11 @@ tasks:
   files:
   - backend/ahe_beta/experiment/batch.py
   - backend/tests/test_experiment_batch.py
-  scope: 有限并发前台监督，持久launch 
-    lease，先reconcile再dispatch，终态collect及stop/resume、UNKNOWN/LOST与失败阻塞。
+  scope: "Limited-concurrency foreground supervision, persistent launch lease, reconcile before dispatch, terminal-state collect and stop/resume, UNKNOWN/LOST handling, and failure blocking."
   acceptance: 
-    run返回不释放名额；UNKNOWN/collection失败保留lease；停止后接回相同run；崩溃启动意图不重复prepare/provision；失败阻止pending但继续观察已运行成员。
+    "Returning from run does not release a slot; UNKNOWN/collection failure retains the lease; after stopping, reconnect to the same run; a crashed startup intent must not repeat prepare/provision; failure blocks pending members but continues observing members already running."
 - id: T3
-  title: 统一CLI批次子命令与仓库契约
+  title: "Unified CLI batch subcommands and repository contract"
   status: done
   priority: P1
   tags: []
@@ -52,11 +51,10 @@ tasks:
   - backend/tests/test_experiment_cli_v2.py
   - backend/scripts/check_experiment_repository.py
   - backend/tests/test_experiment_repository.py
-  scope: 接线batch 
-    check/prepare/run/status/stop/resume/collect，保持单run入口和参数语义，扩展公开仓库检查。
-  acceptance: CLI JSON/退出码与凭证路径准确，旧命令不回归；仅一次公共入口；四个run示例与两个batch示例可检查。
+  scope: "Wire up batch check/prepare/run/status/stop/resume/collect, preserve the single-run entry point and parameter semantics, and extend public repository checks."
+  acceptance: "CLI JSON/exit codes and credential paths are accurate, old commands do not regress; only one public entry point; four run examples and two batch examples are checkable."
 - id: T4
-  title: 批次示例与双语教程
+  title: "Batch examples and bilingual tutorials"
   status: done
   priority: P1
   tags: []
@@ -76,10 +74,10 @@ tasks:
   - docs/tutorials/batch-experiment.md
   - docs/tutorials/batch-experiment.zh-CN.md
   - backend/tests/test_experiment_batch_examples.py
-  scope: 维护两后端配置列表及一致的中文英文操作教程，说明费用/并发/仓限、前台监督和资源保留。
-  acceptance: 材料引用真实有效，示例无私人路径/密钥，语言命令一致，明确N1/N4示例原本轮次不同及容量unknown不是证明配额足够。
+  scope: "Maintain configuration lists for both backends and consistent Chinese and English operational tutorials covering cost/concurrency/quota limits, foreground supervision, and resource retention."
+  acceptance: "Material references are real and valid, examples contain no private paths/secrets, language and commands are consistent, and it is explicit that the N1/N4 examples use different original round counts and that unknown capacity is not proof that the quota is sufficient."
 - id: T5
-  title: 批次闭环故障恢复验收
+  title: "Batch end-to-end failure-recovery acceptance"
   status: done
   priority: P1
   tags: []
@@ -92,28 +90,28 @@ tasks:
   files:
   - backend/tests/test_experiment_batch_e2e.py
   - backend/scripts/e2e-spec-0074-batch-experiments.sh
-  scope: 运行真实批次store/scheduler与单run接线，在provider/model边界替身验收中断、非空交付、收集和恢复，记录真实覆盖。
+  scope: "Run the real batch store/scheduler and single-run integration, and use provider/model boundary substitutes to accept-test interruption, non-empty delivery, collection, and recovery, recording actual coverage."
   acceptance: 
-    至少两run实际完成terminalcollect，UNKNOWN占槽、quota失败、崩溃恢复与重复调用不重复run/仓；离线替身与live证据明确区分。
+    "At least two runs must actually complete terminal collect; UNKNOWN occupies a slot, quota failure, crash recovery, and repeated calls must not repeat runs/repositories; offline substitutes and live evidence must be clearly distinguished."
 ---
 
-# 0074 · 统一入口的批量实验管理
+# 0074 · Batch Experiment Management Through a Unified Entry Point
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level, nine-section rust-RFC overview. -->
 
 ## Summary
 
-为统一 `experiment` CLI 增加一个批次层：用户显式列出若干现有 schema2 配置，先检查并冻结全部成员，再按有限并发启动；批次持久记录成员 run ID，持续核对单 run 的真实状态，终态收集后汇总。停止与恢复沿用原 run 的材料、仓库、checkpoint 和 backend，既不增加 controller，也不恢复历史 launcher。首版不提供参数矩阵、历史追加轮或官方评分。
+Add a batch layer to the unified `experiment` CLI: users explicitly list several existing schema2 configurations, check and freeze all members first, then launch them with bounded concurrency. The batch persistently records member run IDs, continuously reconciles the actual state of each run, and aggregates results after terminal collection. Stop and resume reuse the original run's materials, repository, checkpoint, and backend, without adding a controller or restoring the historical launcher. The first version does not provide parameter matrices, additional historical rounds, or official scoring.
 
 ## Motivation
 
-当前单 run 已统一 local/E2B 的材料、凭证、控制器和生命周期，但执行 N1/N4/N8 对照还需要重复命令并人工维护 run ID。历史 scaling 脚本有选择集合、启动 gate 和 executor 封装，却绑定旧目录、模型 env 和旧云资源；其正式启动还限制每次一个 N。直接恢复该脚本会再次形成第二套入口。
+Individual runs already unify materials, credentials, controllers, and lifecycle across local/E2B, but executing N1/N4/N8 comparisons still requires repeated commands and manual run ID tracking. Historical scaling scripts provide selection sets, launch gates, and executor wrappers, but are tied to old directories, model env settings, and old cloud resources; their formal launch path also permits only one N at a time. Restoring those scripts directly would create a second entry point again.
 
-更关键的是，`runtime.run_v2` 返回的是启动确认，不是实验完成。用线程池调用它并以函数返回释放并发名额，会把“最多同时运行两项”变成“每次同时启动两项、最后全部活跃”。批次必须持有运行租约并根据 provider/controller 的真实状态释放，同时在进程退出后能够重建相同调度决定。
+More critically, `runtime.run_v2` returns launch acknowledgment, not experiment completion. Calling it through a thread pool and releasing concurrency slots when the function returns would turn “at most two running simultaneously” into “launch two at a time, with all of them eventually active.” A batch must hold execution leases and release them based on actual provider/controller state, and must be able to reconstruct the same scheduling decisions after the process exits.
 
 ## Guide-level explanation
 
-用户准备 `examples/batches/u1-u4-local.json` 或对应 E2B 示例，首版公开格式如下：
+Users prepare `examples/batches/u1-u4-local.json` or the corresponding E2B example. The public format for the first version is as follows:
 
 ```json
 {
@@ -127,7 +125,7 @@ tasks:
 }
 ```
 
-路径相对批次文件解析；`id` 是安全且唯一的路径段。`schema_version`、`max_parallel_runs` 只接受正整数，不接受 bool。列表不能为空，拒绝未知字段。首版同批必须选择同一 backend；不同 backend 用不同 batch，避免一个 max_parallel 值掩盖不同 provider 配额。每个 entry 是完整现有配置，不允许局部覆盖、共享可写目录或任意 executor 命令。凭证只用现有 `--secrets-file`/显式注入环境，不写进批次 manifest、receipt 或日志。
+Paths are resolved relative to the batch file; `id` is a safe, unique path segment. `schema_version` and `max_parallel_runs` accept only positive integers, not bool. The list must not be empty, and unknown fields are rejected. In the first version, all members of a batch must select the same backend; use separate batches for different backends so that a single max_parallel value does not obscure different provider quotas. Each entry is a complete existing configuration; partial overrides, shared writable directories, and arbitrary executor commands are not allowed. Credentials use only existing `--secrets-file`/explicitly injected environment variables and must not be written to the batch manifest, receipt, or logs.
 
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py batch check --config examples/batches/u1-u4-local.json --offline
@@ -140,71 +138,71 @@ uv run --locked --extra experiments python backend/scripts/experiment.py batch r
 uv run --locked --extra experiments python backend/scripts/experiment.py batch collect "$BATCH_ID"
 ```
 
-`check --offline` 逐项调用真实离线材料检查，不加载凭证、不获取 Git、不造最终 digest；在线检查逐项复用普通 check，不额外调用模型。`prepare` 顺序冻结并准备全部成员，全部成功才让 batch 可启动。`run` 是前台批次监督循环，启动子实验后继续等待并汇报状态；不要把“成员 started”说成“整个 batch 完成”。Ctrl+C 停止批次监督和后续排队启动，已启动子 run 保留运行；它不会把 Ctrl+C 偷换成 cloud stop。要停止全部子 run 使用 `batch stop`。
+`check --offline` invokes real offline material checks for each entry, without loading credentials, fetching Git, or fabricating a final digest; online checks reuse the ordinary check for each entry without additional model calls. `prepare` sequentially freezes and prepares all members, and the batch becomes launchable only after all succeed. `run` is a foreground batch supervision loop that continues waiting and reporting status after launching child experiments; do not describe “members started” as “the entire batch completed.” Ctrl+C stops batch supervision and subsequent queued launches, while already started child runs remain running; it must not silently turn Ctrl+C into cloud stop. Use `batch stop` to stop all child runs.
 
-`resume` 接回原批次成员：已有活动 run 只 attach；STOPPED 用现有 resume；未开始的 PREPARED 才 fresh run。失败或 LOST 不自动创建替代实验。`collect` 对已开始且可访问成员复用单 run collect，报告每项 COMPLETE/PARTIAL/error，不把部分收集误报全批完成。首版不提供自动 destroy 或删除仓库；用户依据 status 输出的单 run 命令显式清理。批次暂停不会释放 E2B 分配资源。
+`resume` reconnects to the original batch members: attach only to existing active runs; use existing resume for STOPPED runs; perform a fresh run only for PREPARED members that have not started. Failures or LOST do not automatically create replacement experiments. `collect` reuses single-run collect for started, accessible members and reports COMPLETE/PARTIAL/error for each, without misreporting partial collection as completion of the entire batch. The first version provides no automatic destroy or repository deletion; users explicitly clean up using the single-run commands shown by status. Pausing a batch does not release allocated E2B resources.
 
 ## Reference-level explanation
 
-### 持久材料与所有权
+### Persistent Materials and Ownership
 
-批次目录为同一 runs root 下 `.batches/<batch_id>/`，不能与普通 run ID 混淆。目录拒绝 symlink、越界 ID 和 moved identity。包含不可变 `intent.json`（prepare 前保存已解析配置、成员顺序、统一 backend、输入摘要与创建时间）、全部成员冻结后一次原子发布的不可变 `manifest.json`（追加每项最终 config/material identity 的最终快照）、可变 `runtime.json`、追加 `journal.jsonl`，以及 `children/<entry_id>/<run_id>/` 独立单 run root。intent 与最终 manifest 各自只发布一次，不能把 prepare 期间变化的 material hash 反复写进所谓不可变 manifest。intent 已存在而最终 manifest 未发布时，run 明确拒绝，resume 只恢复 prepare 阶段。单 run manifest、resources、checkpoint 仍由原 runtime 写入；批次不改它们的冻结 identity。
+The batch directory is `.batches/<batch_id>/` under the same runs root and must not be confused with an ordinary run ID. The directory rejects symlinks, out-of-bounds IDs, and moved identity. It contains immutable `intent.json` (saving resolved configurations, member order, the shared backend, input digests, and creation time before prepare), immutable `manifest.json` published atomically once after all members are frozen (adding a final snapshot of each item's final config/material identity), mutable `runtime.json`, append-only `journal.jsonl`, and `children/<entry_id>/<run_id>/` independent single-run roots. The intent and final manifest are each published only once; material hashes that change during prepare must not be repeatedly written into a supposedly immutable manifest. When the intent exists but the final manifest has not been published, run explicitly refuses, and resume only resumes the prepare phase. Single-run manifests, resources, and checkpoints are still written by the original runtime; the batch does not change their frozen identity.
 
-批次 preparation 先写每项 prepare intent。一个 entry 使用专属 children root；当前 prepare API 没有预分配 run ID 接口，所以恢复时只在该 entry 的受控 root 中核对唯一完整 manifest，不对所有全局目录做时间猜测。完整 manifest 与预期 canonical config/material source 匹配后登记实际 run ID，再继续准备。0 个完整 manifest 且只有 `.preparing-*` 表示原子发布之前中断；应清楚报告未冻结并在明确 prepare retry 中重试。多个完整 manifest、身份不同或已存在不完整 prepared run 均 BLOCKED；首版不静默选一个、删除目录或重做材料。`prepare` 再次执行不能覆盖已冻结 batch，恢复 prepare 使用 `batch resume` 对 prepare-only 状态的分支；环境准备失败的既有子 run 在首版报告 BLOCKED_PREPARATION，指向单 run 日志与人工处理，不伪装支持不存在的原材料重建 API。
+Batch preparation first writes a prepare intent for each entry. Each entry uses a dedicated children root; the current prepare API has no interface for preallocating run IDs, so recovery checks for a unique complete manifest only within that entry's controlled root, without making time-based guesses across all global directories. Once the complete manifest matches the expected canonical config/material source, register the actual run ID and continue preparation. Zero complete manifests with only `.preparing-*` indicates interruption before atomic publication; clearly report that freezing has not completed and retry through an explicit prepare retry. Multiple complete manifests, mismatched identity, or an existing incomplete prepared run are all BLOCKED; the first version must not silently select one, delete directories, or rebuild materials. Running `prepare` again must not overwrite a frozen batch; preparation recovery uses the prepare-only state branch of `batch resume`. Existing child runs whose environment preparation failed are reported as BLOCKED_PREPARATION in the first version, pointing to single-run logs and manual handling, without pretending to support a nonexistent API for rebuilding the original materials.
 
-可变 receipt 至少保存 batch revision、批次暂停/监督状态、entry ID、唯一 run ID、child manifest/config/material摘要、launch intent/attempt、最近已观察三轴状态（experiment/resource/collection）、observation 和时间、active lease、collection receipt 引用、错误分类。错误信息应复用现有 credential redaction，不能转存原始带密钥异常。checkpoint、SessionStore 和单 run journal 始终是单 run 执行事实源，批次 receipt 是调度记录，不是另一个实验完成账本。
+The mutable receipt must save at least the batch revision, batch pause/supervision state, entry ID, unique run ID, child manifest/config/material digests, launch intent/attempt, most recently observed three-axis state (experiment/resource/collection), observation and time, active lease, collection receipt reference, and error classification. Error messages must reuse existing credential redaction and must not store raw exceptions containing secrets. Checkpoints, SessionStore, and the single-run journal always remain the sources of truth for single-run execution; the batch receipt is a scheduling record, not another experiment completion ledger.
 
-### 并发与调度
+### Concurrency and Scheduling
 
-单 batch 使用进程级文件锁保证只有一个 scheduler；atomic write + revision/intent 保证崩溃可恢复。观察与单 run 操作使用现有 run locks。批次控制锁不能在整个云请求或整轮实验上长期占用，以便 status/stop 提交可见控制意图。状态更新采用短临界区；scheduler 在动作前后核对暂停意图。
+A batch uses a process-level file lock to ensure there is only one scheduler; atomic write + revision/intent ensure crash recovery. Observations and single-run operations use existing run locks. The batch control lock must not be held for an entire cloud request or experiment round, so that status/stop can submit visible control intents. State updates use short critical sections; the scheduler checks pause intent before and after actions.
 
-一次占用名额从选择某个 PREPARED entry、持久写 launch intent 开始，覆盖 provisioning、preflight、启动、活动运行、STOPPING、无法确认的状态和终态 collect。普通排队的 PREPARED 不占名额。prepare 本身顺序执行且不启动资源，因此不会绕过活动上限。`run_v2` 返回、收到 exit code 或某条 progress 文本，均不是释放依据。
+A slot becomes occupied when a PREPARED entry is selected and its launch intent is durably written, covering provisioning, preflight, launch, active execution, STOPPING, unconfirmed states, and terminal collection. Ordinary queued PREPARED entries do not occupy slots. Prepare itself runs sequentially and does not start resources, so it cannot bypass the active limit. `run_v2` returning, receipt of an exit code, or a progress message are not grounds for releasing a slot.
 
-恢复 scheduler 时先观察所有有 launch intent 的成员并重建租约，再启动 pending；不能先使用旧 receipt 中的空闲数。`UNKNOWN`、`OPERATION_IN_PROGRESS`、无法判断启动是否产生资源的失败仍持名额；不因超时、网络错误或“最后见过 FAILED”释放。直到权威 observation 确认 controller 已停/退出，并完成终态收集，才释放运行名额。确认准备失败且没有任何 provision intent 的 entry 无 active lease，但会阻止整个 batch 开始。LOST 作为基础设施终态单独报告，不允许 fresh 替换；若 provider 明确证实资源消失可释放 active lease，未取得 COMPLETE 的终态收集仍保留失败原因及旧产物，batch 不可能成功。
+When recovering the scheduler, first observe all members with launch intents and reconstruct leases before launching pending members; do not first use the free-slot count in the old receipt. `UNKNOWN`, `OPERATION_IN_PROGRESS`, and failures where it is unclear whether launch created resources continue to hold slots; do not release them because of timeouts, network errors, or “last seen FAILED.” Release an execution slot only after an authoritative observation confirms that the controller has stopped/exited and terminal collection is complete. An entry confirmed to have failed preparation with no provision intent has no active lease, but prevents the entire batch from starting. Report LOST separately as an infrastructure terminal state, without allowing fresh replacements; if the provider explicitly confirms that the resource has disappeared, the active lease may be released, but terminal collection that has not reached COMPLETE must retain the failure reason and old artifacts, and the batch cannot succeed.
 
-终态 `COMPLETED` 必须来自单 run 封口判定。`FAILED`/`STOPPED` 也应尝试 collect，只有 COMPLETE 才完成该终态收集步骤；收集 PARTIAL/失败时 BLOCKED_COLLECTION 保留租约并停止后续启动，允许显式 `batch collect` 重试。为了首版保守，遇到一个成员 FAILED/LOST 后停止启动剩余 pending；已经运行的成员继续观察和收集，不自动 kill，也不自动重跑失败成员。batch 成功仅当所有成员实验 COMPLETED 且 collection COMPLETE；普通 STOPPED 是暂停，不是失败或成功。
+Terminal `COMPLETED` must come from the single-run sealing determination. `FAILED`/`STOPPED` must also attempt collect, and only COMPLETE completes that terminal collection step; when collection is PARTIAL/fails, BLOCKED_COLLECTION retains the lease and stops subsequent launches, allowing explicit `batch collect` retries. For a conservative first version, stop launching remaining pending members after any member becomes FAILED/LOST; continue observing and collecting already running members, without automatically killing them or rerunning failed members. A batch succeeds only when all member experiments are COMPLETED and collection is COMPLETE; ordinary STOPPED means paused, not failure or success.
 
-`max_parallel_runs` 约束本 batch 活跃执行/不确定租约，不是总云资源数，也不是整个账号全局并发。独立运行、另一个 batch 和别人的资源不归此上限管理。公开 status 同时列 active/pending、已分配但停止/完成后仍保留的资源，以及配置的每 run 用户并发；不能把二者相乘描述成严格模型调用上限。
+`max_parallel_runs` constrains this batch's active execution/uncertain leases, not the total number of cloud resources or global concurrency across the account. Independent runs, other batches, and other people's resources are outside this limit. Public status lists active/pending members, resources that remain allocated after stopping/completion, and configured per-run user concurrency; do not multiply the two and describe the result as a strict model-call limit.
 
-### 配额与操作
+### Quotas and Operations
 
-首版在线 preflight 在任何 start 前检查所有配置、凭证及可验证 provider 权限。已知 Gitea repository quota 不足就拒绝批次启动，提示本批次需要的新增仓库数；Gitea API 不保证公开剩余名额，无法证明时明确容量 UNKNOWN，不伪造 availability。实际建仓或 E2B capacity error 使用原失败分类、保留 intent/已创建资源、阻止后续 pending。每个新单 run 通常要独立仓库；destroy compute 不删除 Gitea 仓，因此顺序执行仍可能耗尽五仓上限。不得通过共享仓库、覆盖旧仓或自动删仓规避限制。
+In the first version, online preflight checks all configurations, credentials, and verifiable provider permissions before any start. If the Gitea repository quota is known to be insufficient, reject batch launch and report the number of new repositories this batch requires; the Gitea API does not guarantee that remaining quota is exposed, so explicitly report capacity as UNKNOWN when it cannot be established, without fabricating availability. Actual repository creation or E2B capacity errors use the original failure classifications, preserve intents/created resources, and block subsequent pending members. Each new single run generally needs its own repository; destroying compute does not delete the Gitea repository, so even sequential execution can exhaust the five-repository limit. Do not bypass limits by sharing repositories, overwriting old repositories, or automatically deleting repositories.
 
-停止 batch 先持久 PAUSING、停止 dispatch，然后逐项调用现有 stop，仅对已经开始的 run 操作。STOPPING/UNKNOWN 不立即变 PAUSED；确认停止后保存 PAUSED。resume 校验 batch 与全部子材料摘要，不改变模型/任务/计划；如果凭证变化只接受现有 runtime 支持的认证输入，不跨账号接管旧仓。status 保留历史状态与最新 observation，遇 provider unknown 不推断 sealed/collected。collect 必须核对当前 generation/nonce 和已有 terminal receipt，避免旧快照冒充最新完成。
+Stopping a batch first persists PAUSING and stops dispatch, then calls existing stop for each member, operating only on runs that have already started. STOPPING/UNKNOWN does not immediately become PAUSED; save PAUSED after stop is confirmed. Resume validates the batch and all child material digests without changing the model/task/plan; if credentials change, accept only authentication inputs supported by the existing runtime, without taking over old repositories across accounts. Status retains historical state and the latest observation, and does not infer sealed/collected when the provider is unknown. Collect must verify the current generation/nonce and existing terminal receipt to prevent old snapshots from posing as the latest completion.
 
-### Task DAG 与互斥文件所有权
+### Task DAG and Exclusive File Ownership
 
-| Task | depends-on | 独占 files | scope / acceptance |
+| Task | depends-on | Exclusive files | scope / acceptance |
 | --- | --- | --- | --- |
-| T1 批次输入、冻结身份与 receipt | 无 | `backend/ahe_beta/experiment/batch_config.py`; `backend/ahe_beta/experiment/schemas/batch-v1.json`; `backend/ahe_beta/experiment/batch_store.py`; `backend/tests/test_experiment_batch_config.py`; `backend/tests/test_experiment_batch_store.py` | 严格公开字段、独立 entry root、无凭证 manifest、atomic revision/locking、篡改和越界拒绝、prepare intent恢复；不加载provider或运行模型。 |
-| T2 生命周期 scheduler | T1 | `backend/ahe_beta/experiment/batch.py`; `backend/tests/test_experiment_batch.py` | 只调用现有runtime API；真 active lease上限，启动返回不释放；中断前后不重复建仓/run；UNKNOWN/LOST/collection失败/stop-resume和quota分类。若接口审计证明必须扩展runtime，正式spec需将`runtime.py`及其相应test一并归此Task，不能平行抢写。 |
-| T3 统一 CLI 接线与仓库契约 | T1 | `backend/ahe_beta/experiment/cli.py`; `backend/tests/test_experiment_cli_v2.py`; `backend/scripts/check_experiment_repository.py`; `backend/tests/test_experiment_repository.py` | batch子命令解析、--runs-dir/--secrets-file对齐、已有单run命令不变、JSON输出退出码、未collect/unknown不能宣称完成。 |
-| T4 公开示例与双语文档 | T1 | `examples/batches/u1-u4-local.json`; `examples/batches/u1-u4-e2b.json`; `README.md`; `README.zh-CN.md`; `docs/QUICKSTART.md`; `docs/QUICKSTART.zh-CN.md`; `docs/CONFIGURATION.md`; `docs/CONFIGURATION.zh-CN.md`; `docs/tutorials/batch-experiment.md`; `docs/tutorials/batch-experiment.zh-CN.md`; `backend/tests/test_experiment_batch_examples.py` | 两backend同计划、真配置路径/credential refs、中英文命令一致；明确并发/费用/仓限/retain资源与 Ctrl+C/stop差异，无私人路径。 |
-| T5 故障恢复闭环与验证报告 | T2、T3、T4 | `backend/tests/test_experiment_batch_e2e.py`; `backend/scripts/e2e-spec-0074-batch-experiments.sh` | 真实batch store/scheduler接实际single-run runtime，provider/model边界替身；非空交付至少一项，两run完整terminalcollect；crash/restart、UNKNOWN占槽、quota、重复操作；真实local/E2B可用时再记录实际provider证据，不能将mock当live。 |
+| T1 Batch input, frozen identity, and receipt | None | `backend/ahe_beta/experiment/batch_config.py`; `backend/ahe_beta/experiment/schemas/batch-v1.json`; `backend/ahe_beta/experiment/batch_store.py`; `backend/tests/test_experiment_batch_config.py`; `backend/tests/test_experiment_batch_store.py` | Strict public fields, independent entry roots, credential-free manifests, atomic revision/locking, rejection of tampering and out-of-bounds access, prepare intent recovery; no provider loading or model execution. |
+| T2 Lifecycle scheduler | T1 | `backend/ahe_beta/experiment/batch.py`; `backend/tests/test_experiment_batch.py` | Call only existing runtime APIs; enforce a real active lease limit, without releasing on launch return; no duplicate repository/run creation across interruptions; UNKNOWN/LOST/collection failure/stop-resume and quota classification. If an interface audit proves that runtime extensions are necessary, the formal spec must assign `runtime.py` and its corresponding tests to this Task as well, without competing parallel edits. |
+| T3 Unified CLI wiring and repository contracts | T1 | `backend/ahe_beta/experiment/cli.py`; `backend/tests/test_experiment_cli_v2.py`; `backend/scripts/check_experiment_repository.py`; `backend/tests/test_experiment_repository.py` | batch subcommand parsing, --runs-dir/--secrets-file alignment, existing single-run commands unchanged, JSON output and exit codes, no claims of completion when uncollected/unknown. |
+| T4 Public examples and bilingual documentation | T1 | `examples/batches/u1-u4-local.json`; `examples/batches/u1-u4-e2b.json`; `README.md`; `README.zh-CN.md`; `docs/QUICKSTART.md`; `docs/QUICKSTART.zh-CN.md`; `docs/CONFIGURATION.md`; `docs/CONFIGURATION.zh-CN.md`; `docs/tutorials/batch-experiment.md`; `docs/tutorials/batch-experiment.zh-CN.md`; `backend/tests/test_experiment_batch_examples.py` | Same plan for both backends, real configuration paths/credential refs, consistent Chinese and English commands; clearly explain concurrency/cost/repository limits/retained resources and the difference between Ctrl+C and stop, with no private paths. |
+| T5 End-to-end failure recovery and verification report | T2, T3, T4 | `backend/tests/test_experiment_batch_e2e.py`; `backend/scripts/e2e-spec-0074-batch-experiments.sh` | Real batch store/scheduler connected to the actual single-run runtime, with test doubles at provider/model boundaries; at least one nonempty delivery item, complete terminal collection for two runs; crash/restart, UNKNOWN occupying a slot, quotas, repeated operations; record actual provider evidence when real local/E2B is available, without presenting mocks as live execution. |
 
-共五个 Task，DAG：T1→T2→T5，另有 T1→T3→T5、T1→T4→T5。T2 公共 Python 接口已固定，T3 可独立完成 CLI 接线；T5 必须同时等待调度、CLI 与文档完成。本组已通过 spec 工具建立正式组和所有权表，e2e 固定为 `backend/scripts/e2e-spec-0074-batch-experiments.sh`。
+There are five Tasks in total, with DAG: T1→T2→T5, plus T1→T3→T5 and T1→T4→T5. T2's public Python interface is fixed, so T3 can complete CLI wiring independently; T5 must wait for scheduling, CLI, and documentation to finish. This group has established a formal group and ownership table through the spec tool, with e2e fixed as `backend/scripts/e2e-spec-0074-batch-experiments.sh`.
 
 ## Drawbacks
 
-增加一层持久调度与控制状态，必须与单 run 三轴状态一致。UNKNOWN 保守占槽、collection失败阻塞会降低吞吐，但否则无法证明并发约束与终态证据。首版不自动销毁计算，用户必须处理保留资源与仓库配额；顺序批次也会增加总费用。准备全部成员可能先花构建时间，再发现某个成员冻结失败。批次不能让不可用的Docker、缺失云配额或失去的旧沙箱自动变可用。
+Adding a persistent scheduling and control state layer requires consistency with the three-axis state of each individual run. Conservatively reserving slots for UNKNOWN and blocking on collection failures will reduce throughput, but otherwise concurrency constraints and terminal-state evidence cannot be proven. The first version does not automatically destroy compute resources; users must handle retained resources and repository quotas. Sequential batches also increase total costs. Preparing all members may incur build time before discovering that one member failed to freeze. Batches cannot automatically make unavailable Docker, missing cloud quota, or lost old sandboxes available.
 
 ## Rationale and alternatives
 
-选择显式配置列表、同backend批次、默认并发1，是因为当前schema2已经描述全部模型/角色/任务/用户材料，薄包装不应再定义实验核心。scheduler调用Python runtime，避免shell子进程复制认证、把输出文字当状态或遗漏providerintent。
+An explicit configuration list, batches using the same backend, and a default concurrency of 1 were chosen because the current schema2 already describes all models, roles, tasks, and user materials; a thin wrapper should not redefine the experiment core. The scheduler calls the Python runtime to avoid duplicating authentication in shell subprocesses, treating output text as state, or omitting provider intent.
 
-备选一是文档给shell for循环：实现容易，但缺持久成员映射、停止恢复、真实active上限与collectiongate。备选二是直接复活历史scaling runner：有准备清单可借鉴，却绑定历史材料和旧executor，会再次形成双入口。备选三是加入参数矩阵、跨backend资源调度和自动quota扩容：需求面过大，不能与最小批次一组可靠完成。备选四是run返回即结束worker：不成立，因为当前run返回后实验仍在远端执行。
+Alternative one is to document a shell for loop: easy to implement, but lacking persistent member mappings, stop and resume support, a true active limit, and a collection gate. Alternative two is to directly revive the historical scaling runner: its preparation checklist is useful, but it is tied to historical materials and the old executor, which would again create two entry points. Alternative three is to add parameter matrices, cross-backend resource scheduling, and automatic quota expansion: the scope is too broad to complete reliably in the same group as minimal batching. Alternative four is to end the worker as soon as run returns: this is invalid because the experiment is still executing remotely after the current run returns.
 
 ## Prior art
 
-仓内活跃单run实现：`experiment/runtime.py` 的check/prepare/run/status/stop/collect/destroy，manifest run locks、atomic runtime/journal，以及既有monitor的terminalcollection。新组复用这些事实源，不重写backend或controller。
+The active single-run implementation in the repository: check/prepare/run/status/stop/collect/destroy in `experiment/runtime.py`, manifest run locks, atomic runtime/journal, and terminal collection in the existing monitor. The new group reuses these sources of truth without rewriting the backend or controller.
 
-归档scaling runner提供历史plan、all-selectedgate和executor封装思路，但正式start/resume原本要求单N，且属于固定历史源码，不能直接import调用。维护的hbench有独立batchtrialledger，可参考对terminal/invalid的区分，不能混作演化experimentledger。官方评分、历史continuation仍另组；历史角色replay能重映射报告，却停止在OpenAgents之前，不等于batchresume。
+The archived scaling runner provides historical plan, all-selected gate, and executor encapsulation ideas, but its formal start/resume originally required a single N, and it belongs to fixed historical source code that cannot be imported and called directly. The maintained hbench has an independent batch trial ledger whose distinction between terminal/invalid can serve as a reference; it must not be conflated with the evolution experiment ledger. Official grading and historical continuation remain separate groups; historical role replay can remap reports, but stops before OpenAgents and is not equivalent to batch resume.
 
 ## Unresolved questions
 
-本组采用保守首版政策：同backend、默认并发1、遇失败停止pending、UNKNOWN占槽、终态collect后释放、无自动destroy、无自动重跑。用户已确认优先实施批量实验管理；上述边界作为本组确定的首版合同，若修改需同步状态转移和验收。批次准备中已冻结但环境prepare失败的修复API当前不存在，因此首版清晰阻塞而不许诺自动修复；若用户需要可靠自动重新构建环境，应作为正式组明确的小接口扩展纳入T2。
+This group adopts conservative first-version policies: the same backend, default concurrency of 1, stopping pending members on failure, UNKNOWN occupying a slot, releasing slots after terminal-state collection, no automatic destroy, and no automatic reruns. The user has confirmed that batch experiment management takes priority; these boundaries are the agreed first-version contract for this group, and any changes require corresponding updates to state transitions and acceptance criteria. There is currently no repair API for members that have been frozen during batch preparation but whose environment preparation failed, so the first version blocks explicitly without promising automatic repair. If users need reliable automatic environment rebuilds, this should be included in T2 as a small, clearly defined interface extension in the formal group.
 
 ## Future possibilities
 
-在批次身份与恢复验证稳定后，再提供配置矩阵编译、重复seed/重复trial、跨batch账号级资源池、显式after-collect销毁策略与预算停止。封存Harness SHA官方评分和历史产物continuation分别建立独立契约；它们可以成为批次成员的未来新类型，但不挤进当前只含schema2 experiment配置的首版。公开批次看板可随后复用已存在的run观察API，而不是本组新增并行前端。
+Once batch identity and resume verification are stable, provide configuration matrix compilation, repeated seeds/repeated trials, cross-batch account-level resource pools, explicit after-collect destruction policies, and budget-based stopping. Official grading with a pinned Harness SHA and continuation from historical artifacts will each establish independent contracts; they can become new batch member types in the future, but will not be squeezed into the current first version, which contains only schema2 experiment configurations. A public batch dashboard can subsequently reuse the existing run observation API rather than adding a parallel frontend in this group.
 

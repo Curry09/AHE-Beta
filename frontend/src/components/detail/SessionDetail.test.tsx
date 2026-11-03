@@ -27,7 +27,7 @@ describe("Spec-0073/T5 session attribution", () => {
   it("shows frozen task, persona, session, round and Harness when result is unavailable", () => {
     result.session = null;
     const html = detail();
-    for (const text of ["orders", "user-b", "session-b", "task-content-b", "harness-round-two", "direct", "第 2 轮"]) {
+    for (const text of ["orders", "user-b", "session-b", "task-content-b", "harness-round-two", "direct", "Round 2"]) {
       expect(html).toContain(text);
     }
   });
@@ -55,8 +55,8 @@ describe("Spec-0073/T5 session attribution", () => {
       history={[{ item, index: 0 }]} showDone selection={null} onSelect={() => {}} />);
     expect(html).toContain("orders · user-a");
     expect(html).toContain("orders · user-b");
-    expect(html).toContain("会话 session-a");
-    expect(html).toContain("会话 session-b");
+    expect(html).toContain("session session-a");
+    expect(html).toContain("session session-b");
     expect(html).toContain('title="harness-round-two"');
   });
   it("renders legacy sessions without inventing task provenance", () => {
@@ -82,10 +82,10 @@ describe("Spec-0084/T1 missing experience", () => {
       },
     };
     const html = renderToStaticMarkup(<SessionDetailView item={{ ...item, score: 3 }} onBack={() => {}} onSelect={() => {}} />);
-    expect(html).toContain("体感缺测（unavailable）");
+    expect(html).toContain("Experience data missing (unavailable)");
     expect(html).toContain("gateway unavailable");
-    expect(html).toContain("来源：terminal_review");
-    expect(html).not.toContain("体感 3");
+    expect(html).toContain("Source: terminal_review");
+    expect(html).not.toContain("Experience 3");
     expect(html).not.toContain("3 / 4");
   });
 
@@ -94,7 +94,7 @@ describe("Spec-0084/T1 missing experience", () => {
       session_id: "session-b", created_at: "", persona: { identity: "user", level: "", domain: "", goal: "", speaking_style: "" },
       scenario: { description: "task" }, transcript: { turns: [] }, feeling: null, issue_refs: [],
     };
-    expect(detail()).toContain("未记录有效自评");
+    expect(detail()).toContain("No valid self-assessment recorded");
   });
 
   it("shows missing sample counts separately for each input condition", () => {
@@ -105,10 +105,10 @@ describe("Spec-0084/T1 missing experience", () => {
         possible: { rated: 1, missing: 1, invalid: 0, unavailable: 1 },
       },
     }} />);
-    expect(html).toContain("无后续输入");
-    expect(html).toContain("可后续输入");
-    expect(html).toContain("有效 1 · 未提供 0 · 无效 1 · 不可用 0");
-    expect(html).toContain("有效 1 · 未提供 1 · 无效 0 · 不可用 1");
+    expect(html).toContain("No follow-up input");
+    expect(html).toContain("Follow-up input available");
+    expect(html).toContain("Valid 1 · Not provided 0 · Invalid 1 · Unavailable 0");
+    expect(html).toContain("Valid 1 · Not provided 1 · Invalid 0 · Unavailable 1");
     expect(html).not.toContain("NaN");
   });
 });

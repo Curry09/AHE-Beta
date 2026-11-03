@@ -1,17 +1,16 @@
-# Spec-0029/T2：agent 公共运行时——「跑一个 nexau agent + 读它的 submit 产物」的单一实现。
-"""四个 driver（triage / architect / divergent / owner）此前各抄一份的公共逻辑收拢于此：
+# Spec-0029/T2: Agent common runtime — single implementation for "run a nexau agent + read its submit artifact."
+"""Common logic previously duplicated across four drivers (triage / architect / divergent / owner) is consolidated here:
 
-- `run_with_timeout`：daemon 线程跑 call + 超时兜底；用 `contextvars.copy_context()` 把主线程
-  context（含 bind_session_store 注入的 SessionStore）带进 worker 线程——新起线程默认空 context，
-  否则 agent 在 worker 线程里调 get_session_timeline 会报「session store not bound」（线上实测过）。
-- `run_agent_def`：加载 agent 定义并跑一轮——逐调用绑定 sandbox work_dir（绝对路径，防 cwd 漂移）、
-  AgentConfig.from_yaml、StepTracer（看板过程流）、bind_session_store、超时；返回 agent.run 的
-  返回值（submit stop-tool 的回显 JSON；非 str 时 dumps 兜底）。
-- `read_submit`：从 agent.run 返回值取 submit 载荷数组——有界逐层 json.loads（兼容 nexau 可能
-  再编码一层）直到 dict、取 key；未调 submit / 解析失败返回 None（调用方 no-op 兜底）。
-- `norm_label`：label 归一（去空白比较），容忍 LLM 的空格差异。
+- `run_with_timeout`: daemon thread runs call + timeout fallback; uses `contextvars.copy_context()` to carry main thread
+  context (containing SessionStore injected via bind_session_store) into worker thread — new threads have empty context by default,
+  otherwise agent calling get_session_timeline in worker thread reports "session store not bound" (verified in production).
+- `run_agent_def`: load agent definition and run one round — bind sandbox work_dir (absolute path, prevent cwd drift) per call,
+  AgentConfig.from_yaml, StepTracer (for kanban process flow), bind_session_store, timeout; returns agent.run return value
+  (submit stop-tool echo JSON; falls back to dumps if not str).
+- `read_submit`: extract submit payload array from agent.run return value — bounded iterative json.loads (compatible with nexau
+  potentially encoding another layer) until dict, take key; if submit not called / parsing fails return None (caller no-op fallback).
 
-driver 由此瘦成「拼 prompt → run_agent_def → read_submit → 写 tracker」。
+Drivers thus become lean: "compose prompt → run_agent_def → read_submit → write tracker."
 """
 
 from __future__ import annotations
@@ -42,7 +41,7 @@ from ahe_beta.usage import (
 )
 from ahe_beta.user.session_store import SessionStore
 
-# 拆返回值再编码的最大层数：实测 nexau 会把返回再 JSON 编码一层（故 ≥2），留余量；有界防畸形输入打转。
+# Maximum nesting depth when unpacking and re-encoding return values: observed nexau re-encodes return as JSON once (thus ≥2), with margin reserved; bounded to prevent malformed input spinning.
 _UNWRAP_MAX_DEPTH = 4
 
 
@@ -77,7 +76,7 @@ def run_with_timeout(
     def target() -> None:
         try:
             box["out"] = ctx.run(call)
-        except Exception as exc:  # noqa: BLE001  透传给调用方
+        except Exception as exc:  # noqa: BLE001  pass through to caller
             box["err"] = exc
 
     t = threading.Thread(target=target, daemon=True)
@@ -88,7 +87,7 @@ def run_with_timeout(
             if cancel is not None:
                 cancel()
             raise AgentTimeout(
-                f"agent 超时 >{timeout}s", timeout_class="legacy_wall_timeout", timing={}
+                f"agent timeout >{timeout}s", timeout_class="legacy_wall_timeout", timing={}
             )
     else:
         accounting = current_time_accounting()
@@ -171,10 +170,10 @@ def run_agent_def(
     history: list[object] | None = None,
     on_history: Callable[[list[object]], None] | None = None,
 ) -> str:
-    """加载 agent_def_dir 的 nexau agent 定义、以 message 跑一轮，返回 agent.run 的返回值（str）。
+    """Load nexau agent definition from agent_def_dir and run one round with message, returning the return value of agent.run (str).
 
-    Spec-0049/T3：填好的 message 与产出 fail-open 写入 ROLE_RUNS_DIR/demand；
-    Spec-0055：可选 evidence 元数据同步落盘，便于离线边界回放。
+    Spec-0049/T3: filled message and output are fail-open written to ROLE_RUNS_DIR/demand;
+    Spec-0055: optional evidence metadata is synced to disk for offline boundary replay.
     """
 
     from ahe_beta.demand.source import current_harness_source
@@ -188,7 +187,7 @@ def run_agent_def(
         )
         evidence = {**(evidence or {}), "harness_source": {"ref": source.sha, "repo": str(repo)}}
     import nexau
-    from nexau import Agent, AgentConfig  # noqa: PLC0415  运行时依赖，懒加载
+    from nexau import Agent, AgentConfig  # noqa: PLC0415  runtime dependency, lazy load
 
     message += f"\nRead-only NexAU source root: {Path(nexau.__file__).resolve().parents[1]}."
 
@@ -202,7 +201,7 @@ def run_agent_def(
         cfg.llm_config.extra_params["reasoning_effort"] = reasoning_effort
     if max_iterations is not None:
         cfg.max_iterations = min(int(cfg.max_iterations or max_iterations), max_iterations)
-    from ahe_beta.loop.live_tracer import StepTracer  # noqa: PLC0415  依赖 nexau，懒加载
+    from ahe_beta.loop.live_tracer import StepTracer  # noqa: PLC0415  nexau dependency, lazy load
 
     run_metrics: dict[str, object] = {"tool_calls": 0}
 
@@ -257,7 +256,8 @@ def run_agent_def(
     fixed_conditions = format_execution_facts(facts)
     if fixed_conditions:
         message += (
-            "\n\n## 可信执行条件与安全验收摘要（不属于模型编写的提案正文）\n" + fixed_conditions
+            "\n\n## Trusted execution conditions and safe acceptance summary (outside the model-authored proposal body)\n"
+            + fixed_conditions
         )
         evidence = {
             **(evidence or {}),
@@ -391,12 +391,13 @@ def _structured_status(*, text: str) -> tuple[object, str]:
 
 
 def read_submit(text: str, key: str) -> list[dict] | None:
-    """agent.run 返回值 → submit 载荷数组（每项 dict）。
+    """agent.run return value → submit payload array (each item a dict).
 
-    正常路径：text 是 submit binding 回显的 `{"<key>": [...]}` JSON 串（nexau 已按 input_schema
-    强校验过结构）。兼容再编码一层（有界逐层 json.loads 直到得到 dict）。agent 从未调 submit
-    （撞 max_iterations 等）→ 返回的是别的文本/非合规 JSON → 返回 None，调用方本轮 no-op 兜底。
-    提交了但空数组 → 返回 []（合法的「本轮无产出」）。
+    Normal path: text is a `{"<key>": [...]}` JSON string echoed by submit binding (nexau has already
+    validated structure against input_schema). Compatible with re-encoding one layer (bounded successive
+    json.loads until a dict is obtained). Agent never called submit (hit max_iterations, etc.) → returned
+    text is something else / non-compliant JSON → return None; caller falls back to no-op for this round.
+    Submitted but empty array → return [] (valid "no output this round").
     """
     node: object = text
     for _ in range(_UNWRAP_MAX_DEPTH):
@@ -412,8 +413,3 @@ def read_submit(text: str, key: str) -> list[dict] | None:
     if not isinstance(raw, list):
         return None
     return [d for d in raw if isinstance(d, dict)]
-
-
-def norm_label(s: object) -> str:
-    """label 归一：去掉所有空白后比较——容忍 LLM 把「涉及 issue」写成「涉及issue」这类空格差异。"""
-    return "".join(str(s).split())

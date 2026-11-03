@@ -1,12 +1,12 @@
 ---
 number: "0034"
-title: 前端 Agent Company 大楼视图与用户心智轨迹
+title: "Frontend Agent Company building view and user mental trace"
 issue: 0
 slug: frontend-agent-company-building
-summary: 在现有列式观测看板之外补回 Agent Company 大楼视图：按用户/分诊/发散/设计/准入/交付面楼层展示 live/归档 agent，保留 SidePanel 详情与交付面 PR 面板；用户会话详情新增可折叠的 Judge/Intent/Act 心智轨迹，展示 sim_trace 而不改后端 API。
+summary: "Add an Agent Company building view alongside the existing column-based observation dashboard: display live/archived agents on floors for the user/triage/divergence/design/admission/delivery planes, retaining SidePanel details and the delivery-plane PR panel; add a collapsible Judge/Intent/Act mental trace to user session details, displaying sim_trace without changing the backend API."
 tasks:
   - id: T1
-    title: 写 0034 活快照
+    title: "Write the 0034 living snapshot"
     status: done
     priority: P1
     tags: []
@@ -15,10 +15,10 @@ tasks:
     parallel: false
     files:
       - docs/specs/0034-frontend-agent-company-building.md
-    scope: 写清前端 Agent Company 大楼视图与用户心智轨迹的活快照：不恢复旧小镇/不替换默认列式看板；大楼作为同一 App 的 view=building 模式；交付面替代旧 developer 当前执行心智；用户会话详情展示 sim_trace 的 Judge/Intent/Act。
-    acceptance: spec validate 通过；正文含 Summary/Motivation/Reference-level explanation/Rationale and alternatives；任务文件分配清楚；明确不触碰后端 API、不整体 cherry-pick 历史小镇提交。
+    scope: "Clearly document the living snapshot for the frontend Agent Company building view and user mental trace: do not restore the old town or replace the default column-based dashboard; implement the building as a view=building mode in the same App; use the delivery plane in place of the old developer's current-execution mental model; display Judge/Intent/Act from sim_trace in user session details."
+    acceptance: "spec validate passes; the body includes Summary/Motivation/Reference-level explanation/Rationale and alternatives; task file assignments are clear; explicitly state that the backend API is untouched and historical town commits are not cherry-picked wholesale."
   - id: T2
-    title: 大楼视图接入：BuildingView + 楼层工作区 + 顶栏切换
+    title: "Integrate the building view: BuildingView + floor workspaces + top bar toggle"
     status: done
     priority: P1
     tags: []
@@ -34,10 +34,10 @@ tasks:
       - frontend/src/components/building/FloorWorkspace.tsx
       - frontend/src/components/building/buildingModel.ts
       - frontend/src/types.ts
-    scope: 保留默认列式看板；新增 view=building URL 状态与 TopBar「看板/大楼」切换；接入历史 BuildingView 的 2.5D 公司楼体与楼层工作区；适配当前 AgentRole（user/triager/divergent/architect/owner/developer）与 roster；developer 楼层改语义为「交付面 · OpenAgents PR/main 推进」而非当前进程内 dev agent；在 types.ts 补充 ViewMode 与 SimTrace/SimTurn/PersonaCallTrace DTO，供大楼和 T4 消费。
-    acceptance: http://localhost:5173/?view=building 可打开大楼；默认 / 仍是列式看板；大楼楼层可切换；用户/分诊/发散/设计/准入/交付面都有楼层；无 running agent 时自动展示最近归档轮次；summary 模式也能点归档工位。
+    scope: "Retain the default column-based dashboard; add view=building URL state and a TopBar “Dashboard/Building” toggle; integrate the historical BuildingView's 2.5D company building and floor workspaces; adapt to the current AgentRole (user/triager/divergent/architect/owner/developer) and roster; change the developer floor's semantics to “Delivery plane · OpenAgents PR/main progression” rather than the current in-process dev agent; add ViewMode and SimTrace/SimTurn/PersonaCallTrace DTOs to types.ts for consumption by the building and T4."
+    acceptance: "http://localhost:5173/?view=building opens the building; the default / remains the column-based dashboard; building floors can be switched; user/triage/divergence/design/admission/delivery planes all have floors; when no agent is running, automatically display the most recently archived round; archived workstations remain clickable in summary mode."
   - id: T3
-    title: 大楼样式与角色色：发散/准入可读性修复
+    title: "Building styles and role colors: fix divergence/admission readability"
     status: done
     priority: P1
     tags: []
@@ -47,10 +47,10 @@ tasks:
     parallel: false
     files:
       - frontend/src/styles.css
-    scope: 追加公司大楼视图样式与用户心智轨迹样式；补齐 --role-divergent 在浅/深主题的 token，补 divergent/owner 的 role-dot/card/tower/floor-workspace 配色；给楼层 SVG 文案增加描边，避免发散楼层深色背景与文字重合；mind-trace 样式支持每 turn 折叠、阶段内折叠与私有核实折叠；保持现有 .app/.board/.column/SidePanel 样式不被破坏。
-    acceptance: 大楼样式无 CSS minify 警告；发散楼层不再黑底重合；owner/交付面楼层有可读配色；窄屏仍可滚动；默认列式看板样式不回退。
+    scope: "Append styles for the company building view and user mental trace; add the missing --role-divergent tokens for light/dark themes and divergent/owner role-dot/card/tower/floor-workspace colors; add outlines to floor SVG text to prevent text from blending into the divergence floor's dark background; mind-trace styles support per-turn collapsing, collapsing within stages, and collapsing private verification; preserve the existing .app/.board/.column/SidePanel styles."
+    acceptance: "Building styles produce no CSS minify warnings; the divergence floor no longer blends into the dark background; owner/delivery-plane floors have readable colors; narrow screens remain scrollable; the default column-based dashboard styles do not regress."
   - id: T4
-    title: 用户心智轨迹：SessionDetail 展示 sim_trace 三阶段
+    title: "User mental trace: display the three sim_trace stages in SessionDetail"
     status: done
     priority: P1
     tags: []
@@ -61,91 +61,91 @@ tasks:
     parallel: false
     files:
       - frontend/src/components/detail/SessionDetail.tsx
-    scope: 为 SessionDetail 增加可折叠「用户心智轨迹」区块，读取 T2 在类型层补充的 sim_trace DTO，并复用 T3 提供的 mind-trace 样式；每个 turn 默认一行 summary（turn/phase/verdict/intent 截断/action），展开后按 Judge / Intent / Act 三段展示 parsed.perceive / parsed.intent / parsed.action+message+gap；私有工具步骤通过 ProcessStream 单独折叠；完整对话排在心智轨迹之前。
-    acceptance: 有 sim_trace 的 session 显示用户心智轨迹；无 sim_trace 的旧 session 不显示且不报错；默认折叠不撑爆详情页；展开后能看 Judge/Intent/Act；私有核实步骤可展开；TypeScript build 通过。
+    scope: "Add a collapsible “User mental trace” section to SessionDetail, reading the sim_trace DTO added to the type layer by T2 and reusing the mind-trace styles provided by T3; each turn defaults to a one-line summary (turn/phase/verdict/truncated intent/action), expanding into Judge / Intent / Act sections displaying parsed.perceive / parsed.intent / parsed.action+message+gap; private tool steps are separately collapsible through ProcessStream; place the full conversation before the mental trace."
+    acceptance: "Sessions with sim_trace display the user mental trace; older sessions without sim_trace neither display it nor produce errors; collapsed by default to avoid overwhelming the details page; expanding reveals Judge/Intent/Act; private verification steps can be expanded; TypeScript build passes."
 ---
 
-# 0034 · 前端 Agent Company 大楼视图与用户心智轨迹
+# 0034 · Frontend Agent Company Building View and User Mental Trace
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: the frontmatter contains structured source data (including the tasks DAG), and the body is the group-level nine-section rust-RFC overview. -->
 
 ## Summary
 
-本组把历史上被后续前端重构覆盖掉的「Agent Company 左侧大楼」观测形态以当前 API/类型重新接入，而不是整体恢复旧小镇或旧大楼提交。默认入口仍是当前列式看板；新增 `view=building` 模式，通过顶部「看板 / 大楼」切换进入 2.5D 公司大楼视图。大楼按需求面角色分层展示：用户、分诊、发散、设计、准入，以及对齐 spec-0032 的交付面（OpenAgents/PR/main 推进）。右侧仍复用现有 SidePanel，包括 Issues/Main 与交付面 PR 面板。
+This group reconnects the historically available “Agent Company building on the left” observation experience, which was overwritten by later frontend refactors, using the current API/types, rather than restoring the old town or old building commits wholesale. The default entry point remains the current column-based board; a new `view=building` mode enables entry into the 2.5D company building view through the top “Board / Building” switch. The building displays layers by requirement-facing role: User, Triage, Divergence, Design, Admission, and the delivery-facing layer aligned with spec-0032 (OpenAgents/PR/main progression). The right side continues to reuse the existing SidePanel, including the Issues/Main and delivery-facing PR panels.
 
-同时，本组在用户会话详情中新增简洁版「用户心智轨迹」：读取后端现有 `sim_trace`，每个 turn 默认一行摘要，展开后按 Judge / Intent / Act 三段展示用户内部判断、原始意图、动作收敛与私有核实过程。该改动不新增后端 API，不改变 session 存储结构。
+At the same time, this group adds a concise “User Mental Trace” to user session details: it reads the backend’s existing `sim_trace`, showing one summary line per turn by default, and expanding to display the user’s internal judgment, original intent, action convergence, and private verification process in three sections: Judge / Intent / Act. This change adds no backend API and does not change the session storage structure.
 
 ## Motivation
 
-当前远端前端是列式看板，信息密度高但缺少「公司/楼层」的空间隐喻；历史中曾有两个方向：小镇地图（`37b8960`）和公司大楼（`aca2569`/`b4e72b`）。用户明确要的是「左边一栋楼 / Agent Company」，不是斯坦福小镇地图。直接回滚旧提交不可取：旧实现只支持 `user/developer` 或旧角色集，会覆盖当前三平面 issue、Owner、divergent、交付面、commit/detail 等能力。
+The current remote frontend is a column-based board with high information density, but it lacks the spatial metaphor of a “company/floor.” Historically, there were two directions: a town map (`37b8960`) and a company building (`aca2569`/`b4e72b`). The user explicitly wants “a building on the left / Agent Company,” not a Stanford town map. Directly reverting old commits is inappropriate: the old implementation supports only `user/developer` or the old role set, and would overwrite the capabilities for current three-plane issues, Owner, divergent, the delivery surface, commit/detail, and related functionality.
 
-另一方面，当前用户详情只展示 transcript，难以解释用户为什么给低分、为什么开 issue、等待中到底想做什么。后端从 spec-0024 起已经落盘 `sim_trace`，包含每轮 `perceive/verdict/action/message/patience/trust/persona_trace`，无需新增接口即可前端展示。把心智轨迹作为详情解释层，能帮助观察用户模拟是否真实、是否被 prompt 引导坍塌，也能帮助后续设计师/人工判断 harness 的问题来自用户误解、harness 缺能力还是交互卡顿。
+Meanwhile, the current user details show only the transcript, making it difficult to explain why the user gave a low score, why they opened an issue, or what they actually want while waiting. Starting from spec-0024, the backend has already persisted `sim_trace`, including `perceive/verdict/action/message/patience/trust/persona_trace` for each round, so the frontend can display it without a new interface. Treating the mental trace as an explanatory layer in the details can help assess whether user simulation is realistic and whether it collapses under prompt guidance; it can also help subsequent designers or human reviewers determine whether a harness problem comes from user misunderstanding, insufficient harness capability, or interaction latency.
 
 ## Guide-level explanation
 
-用户仍然默认打开列式看板：
+Users still open the column-based board by default:
 
 ```text
 http://localhost:5173/
 ```
 
-新增大楼视图：
+New building view:
 
 ```text
 http://localhost:5173/?view=building
 ```
 
-页面顶部增加「看板 / 大楼」切换。大楼视图左侧是 2.5D 建筑，楼层从上到下按角色展示。点击楼层后，右侧楼层工作区展示该角色当前 live agent 或归档工位；点击工位继续复用现有 SidePanel 展示完整详情。无 running agent 时，大楼自动展示最近归档轮次，避免用户看见空楼；在「+ 已完成」全部轮次汇总下，楼层也会展示可点击的最近归档工位。
+The page header adds a “Board / Building” switch. The left side of the building view is a 2.5D building, with floors displayed from top to bottom by role. Clicking a floor displays that role’s current live agents or archived workstations in the floor workspace on the right; clicking a workstation continues to reuse the existing SidePanel to show complete details. When no agent is running, the building automatically displays the most recently archived round, so users do not see an empty building; under the “+ Completed” aggregate of all rounds, the floor also displays the most recently archived clickable workstation.
 
-用户会话详情的结构调整为：
+The user session detail structure becomes:
 
 ```text
 Persona
-场景
-体感评价
-完整对话
-用户心智轨迹
+Scenario
+User experience evaluation
+Complete dialogue
+User mental trajectory
 ```
 
-「用户心智轨迹」默认只显示每轮一行 summary；展开某一轮后显示：
+“User Mental Trace” displays only one summary line per round by default; expanding a round displays:
 
 ```text
-① Judge：perceive / verdict 或 waiting judgment
-② Intent：原始愿望
-③ Act：action / message / gap
-私有核实过程（如有）：tool / tool_result / tool_error
+① Judge: perceive / verdict or waiting judgment
+② Intent: original desire
+③ Act: action / message / gap
+Private verification process (if any): tool / tool_result / tool_error
 ```
 
 ## Reference-level explanation
 
-### 大楼视图数据模型
+### Building view data model
 
-`App.tsx` 在现有轮询基础上增加 `getConfig()`，读取 roster；保留 `getDelivery()` 交付面数据并传入 `SidePanel`。新增 `ViewMode = "dashboard" | "building"`，把 `view=building` 与 `floor=<role>` 写入 URL query，刷新不丢状态。
+`App.tsx` adds `getConfig()` to the existing polling, reading the roster; it retains the `getDelivery()` delivery-facing data and passes it to `SidePanel`. A new `ViewMode = "dashboard" | "building"` writes `view=building` and `floor=<role>` to the URL query, so refreshing does not lose state.
 
-大楼视图由 `BuildingView` 组合：
+The building view is composed by `BuildingView`:
 
 ```text
 BuildingView
-  ├─ BuildingTower       # SVG 2.5D 楼体，按角色楼层显示容量/在岗/归档数
-  └─ FloorWorkspace      # 当前楼层工位、归档工位、最近动态
-buildingModel.ts         # mode/floor models/日志摘要/历史归档选择
+  ├─ BuildingTower       # SVG 2.5D building, displaying capacity/on-duty/archived counts by role floor
+  └─ FloorWorkspace      # Current-floor workstations, archived workstations, recent activity
+buildingModel.ts         # mode/floor models/log summary/historical archive selection
 ```
 
-`resolveBuildingMode()` 的 live 判定以 `agent.running` 为准，而不是 `agents.length`。这解决了后端 `/api/agents` 可能保留 `running=false` 完成槽位时，大楼误判为 live 模式、用户归档工位不可点的问题。
+`resolveBuildingMode()` determines the live state using `agent.running` rather than `agents.length`. This resolves the case where the backend’s `/api/agents` may retain a completed `running=false` slot, causing the building to incorrectly treat it as live mode and making the user’s archived workstation unclickable.
 
-### 角色与交付面语义
+### Role and delivery-surface semantics
 
-大楼保留 `developer` role 作为兼容字段，但 UI 文案改为「交付面」：
+The building retains `developer` role as a compatibility field, but the UI wording changes to “Delivery”:
 
-- 楼层名：交付面。
-- subtitle：OpenAgents PR / main 推进。
-- 工作区 label：DELIVERY / OpenAgents / PR 流。
+- Floor name: Delivery.
+- subtitle: OpenAgents PR / main progression.
+- Workspace label: DELIVERY / OpenAgents / PR flow.
 
-原因是 spec-0032 已将开发者侧换轨为 OpenAgents vigil，当前执行进度应以 PR/needs-human/main merge 为核心，而不是进程内 developer agent。
+The reason is that spec-0032 has shifted the developer-side track to OpenAgents vigil. Current execution progress should therefore center on PR/needs-human/main merge, rather than an in-process developer agent.
 
-### 用户心智轨迹
+### User mental trace
 
-前端类型新增：
+The frontend adds these types:
 
 ```ts
 PersonaCallTrace
@@ -154,91 +154,91 @@ SimTrace
 SessionDetail.sim_trace?: SimTrace | null
 ```
 
-`SessionDetailView` 的 `MindTrace` 组件按 `SimTurn.persona_trace[].role` 查找：
+The `MindTrace` component of `SessionDetailView` searches by `SimTurn.persona_trace[].role`:
 
-- main 阶段：`main_judge` / `main_intent` / `main_act`
-- waiting 阶段：`waiting_judge` / `waiting_intent` / `waiting_act`
+- main phase: `main_judge` / `main_intent` / `main_act`
+- waiting phase: `waiting_judge` / `waiting_intent` / `waiting_act`
 
-summary 只显示稳定字段：turn、phase、verdict/judgment、intent 截断、action。展开后按三段展示 parsed 内容；如果 parsed 缺失则用 `turn.perceive` / `turn.action` / `turn.message` 兜底。私有核实步骤来自 `persona_trace[].steps`，用现有 `ProcessStream` 渲染，避免新建过程流组件。
+The summary displays only stable fields: turn, phase, verdict/judgment, truncated intent, and action. When expanded, it displays parsed content in three sections; if parsed content is missing, it falls back to `turn.perceive` / `turn.action` / `turn.message`. Private verification steps come from `persona_trace[].steps` and are rendered using the existing `ProcessStream`, avoiding the creation of a new process-stream component.
 
 ### DAG / file allocation
 
 ```mermaid
 graph LR
-  T1[T1 写 spec]
-  T2[T2 大楼视图接入]
-  T3[T3 大楼样式与角色色]
-  T4[T4 用户心智轨迹]
+  T1[T1 Write spec]
+  T2[T2 Integrate building view]
+  T3[T3 Building styles and role colors]
+  T4[T4 User mental trajectory]
   T1 --> T2
   T2 --> T3
   T1 --> T4
 ```
 
-| Task | 职责 | files |
+| Task | Responsibility | files |
 |------|------|-------|
-| T1 | 写 0034 活快照 | `docs/specs/0034-frontend-agent-company-building.md` |
-| T2 | 接入 BuildingView、TopBar 切换、App URL 状态、当前角色/交付面语义 | `App.tsx`, `TopBar.tsx`, `BuildingView.tsx`, `components/building/*`, `types.ts` |
-| T3 | 大楼 CSS、发散/owner 颜色、楼层文字可读性 | `styles.css` |
-| T4 | SessionDetail 心智轨迹 | `SessionDetail.tsx` |
+| T1 | Write the 0034 active snapshot | `docs/specs/0034-frontend-agent-company-building.md` |
+| T2 | Integrate BuildingView, TopBar switch, App URL state, and current role/delivery-surface semantics | `App.tsx`, `TopBar.tsx`, `BuildingView.tsx`, `components/building/*`, `types.ts` |
+| T3 | Building CSS, divergent/owner colors, and floor-text legibility | `styles.css` |
+| T4 | SessionDetail mental trace | `SessionDetail.tsx` |
 
-注：按 spec 规范，组内 Task 文件保持互斥。`types.ts` 中的 `SimTrace` DTO 归 T2，`styles.css` 中的大楼与心智轨迹样式归 T3；T4 仅消费这些契约，在 `SessionDetail.tsx` 中组合展示。
+Note: According to the spec conventions, task files within the group remain mutually exclusive. The `SimTrace` DTO in `types.ts` belongs to T2, while the building and mental-trace styles in `styles.css` belong to T3; T4 only consumes these contracts and composes the display in `SessionDetail.tsx`.
 
-### 验证路径
+### Verification path
 
 ```bash
 cd frontend
 npm run build
 ```
 
-手动验收：
+Manual acceptance:
 
-- `http://localhost:5173/` 默认列式看板不变。
-- `http://localhost:5173/?view=building` 展示 Agent HQ 大楼。
-- 顶部可切换「看板 / 大楼」。
-- 发散楼层颜色清晰，不与文字重合。
-- 无 running agent 时自动展示最近归档轮次，归档工位可点击。
-- 用户 session 详情先展示完整对话，再展示可折叠用户心智轨迹。
-- 有 `sim_trace` 时能展开 Judge / Intent / Act；无 `sim_trace` 时不显示该块且不报错。
+- `http://localhost:5173/` The default column-based board remains unchanged.
+- `http://localhost:5173/?view=building` displays the Agent HQ building.
+- The top allows switching between “Board / Building.”
+- The divergent floor color is clear and does not overlap the text.
+- When no agent is running, the most recently archived round is displayed automatically, and the archived workstation is clickable.
+- User session details first display the complete conversation, followed by a collapsible user mental trace.
+- When `sim_trace` is present, Judge / Intent / Act can be expanded; when `sim_trace` is absent, the block is not displayed and no error is raised.
 
 ## Drawbacks
 
-- 大楼视图与列式看板共存会增加前端维护面。
-- 当前心智轨迹仍是简洁版，主要展示 parsed 字段和私有步骤数；尚未做高级过滤、搜索、时间轴对齐。
-- 大楼样式从历史版本迁移，CSS 较多且仍在全局 `styles.css` 中；未来可再抽成命名空间文件。
-- `developer` 在类型层仍是 role 名，但 UI 语义已转为交付面，存在轻微命名不一致。
+- Supporting both the building view and the column-based board increases the frontend maintenance surface.
+- The current mental trace is still a concise version, primarily displaying parsed fields and the number of private steps; advanced filtering, search, and timeline alignment have not yet been implemented.
+- The building styles were migrated from a historical version, so there is substantial CSS that remains in the global `styles.css`; it can be extracted into a namespaced file later.
+- `developer` remains named role at the type level, while its UI semantics have changed to Delivery, creating a minor naming inconsistency.
 
 ## Rationale and alternatives
 
-### 为什么不恢复小镇
+### Why not restore the town
 
-用户要的是左边一栋楼的 Agent Company，而不是 `37b8960` 的小镇地图。小镇实现还依赖旧 `user/developer` 双角色模型，直接恢复会破坏当前三平面/Owner/OpenAgents 交付面能力。
+The user wants an Agent Company building on the left, not the town map in `37b8960`. The town implementation also depends on the old `user/developer` two-role model; restoring it directly would damage the current three-plane/Owner/OpenAgents delivery-surface capabilities.
 
-### 为什么不替换默认看板
+### Why not replace the default board
 
-列式看板仍然是信息密度最高、调试最稳定的视图。大楼视图更适合演示和空间化理解，应作为 `view=building` 可选视图，而不是替换默认入口。
+The column-based board remains the most information-dense and stable view for debugging. The building view is better suited to demonstrations and spatial understanding, so it should be an optional view under `view=building` rather than replace the default entry point.
 
-### 为什么不改后端 API
+### Why not change the backend API
 
-后端已经提供大楼所需的数据：`/api/agents`、`/api/history`、`/api/config`、`/api/overview`、`/api/delivery`、`/api/sessions/{id}`。用户心智轨迹已在 session `sim_trace` 中，无需新增接口。
+The backend already provides the data required by the building: `/api/agents`, `/api/history`, `/api/config`, `/api/overview`, `/api/delivery`, and `/api/sessions/{id}`. The user mental trace is already present in session `sim_trace`, so no new interface is needed.
 
 ## Prior art
 
-- 0011：AgentBoard 卡通页，说明过 agent 活动需要更直观的身份与状态表达。
-- 0026：前端观测看板重构，建立设计 token、浅/深主题、角色房间与 persona 展示。
-- 0029：三平面 issue 流与 Owner 房间。
-- 0032：开发者侧换轨 OpenAgents，前端新增交付面 PR 观测；本组把大楼 developer 楼层语义同步为交付面。
-- 历史提交 `aca2569` / `b4e72b`：公司大楼视图原型。
+- 0011: AgentBoard cartoon page, which established that agent activity needs more intuitive identity and state expression.
+- 0026: Frontend observation-board refactor, which established design tokens, light/dark themes, role rooms, and persona displays.
+- 0029: Three-plane issue flow and Owner room.
+- 0032: Developer-side shift to OpenAgents, with frontend delivery-surface PR observation added; this group synchronizes the building’s developer-floor semantics to Delivery.
+- Historical commits `aca2569` / `b4e72b`: company building view prototypes.
 
 ## Unresolved questions
 
-- 是否把大楼 CSS 从 `styles.css` 抽成独立文件并命名空间化。
-- 是否将 `developer` role 在前端类型层重命名为 `delivery`，或继续兼容后端历史字段。
-- 用户心智轨迹是否需要高级交互：按阶段过滤、搜索、只看 gap / stuck / private tools。
-- 是否在 live user 详情中也展示 partial mind trace，而不仅是归档 session 详情。
+- Whether to extract the building CSS from `styles.css` into a separate namespaced file.
+- Whether to rename `developer` role to `delivery` at the frontend type level, or continue supporting the backend’s historical field.
+- Whether the user mental trace needs advanced interaction: filtering by phase, search, or showing only gap / stuck / private tools.
+- Whether to also display a partial mind trace in live user details, rather than only in archived session details.
 
 ## Future possibilities
 
-- 在大楼中为交付面楼层直接嵌入 PR/needs-human 状态，而不只依赖 SidePanel。
-- 将用户心智轨迹与完整对话做左右联动：点击 transcript turn 自动展开对应 mind turn。
-- 在用户楼层工位卡上显示最新 intent/action 摘要。
-- 将 waiting history 人话化后，在心智轨迹中区分「等待决策」与「主 loop 决策」。
+- Embed PR/needs-human status directly into the Delivery floor in the building, rather than relying only on the SidePanel.
+- Link the user mental trace and the complete conversation bidirectionally: clicking a transcript turn automatically expands the corresponding mind turn.
+- Display the latest intent/action summary on the workstation card in the user floor.
+- Humanize waiting history and distinguish “waiting for a decision” from “main loop decision” in the mental trace.

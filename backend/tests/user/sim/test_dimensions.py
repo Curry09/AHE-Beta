@@ -1,4 +1,4 @@
-"""spec-0005/T1 + Spec-0037/T2：Persona 9 维派生与文案查表（含 tempo / 过程卷入）。"""
+"""spec-0005/T1 + Spec-0037/T2: Persona 9-dimensional derivation and copy table lookup (including tempo/process involvement)."""
 
 from __future__ import annotations
 
@@ -43,12 +43,12 @@ def test_finalize_is_complete_and_reproducible() -> None:
     raw = _raw(D1Eval.EXPERT, D2Depth.SENIOR)
     a = finalize_persona(raw)
     b = finalize_persona(raw)
-    assert a == b  # 确定性: 同输入同输出
+    assert a == b  # Deterministic: same input yields same output
     assert a.d3 is D3Accept.RIGOROUS and a.trust is TrustStance.SKEPTICAL
 
 
 def test_finalize_is_fallback_only_preserves_grounded() -> None:
-    # 调用方显式给了 grounded 的 d3/trust（与 derive 出来的相反）：finalize 不得改写。
+    # Caller explicitly provided grounded d3/trust (opposite of derived): finalize must not overwrite.
     raw = Persona(
         persona_id="P-grounded",
         d1=D1Eval.EXPERT,  # derive_trust(EXPERT) = SKEPTICAL
@@ -59,21 +59,21 @@ def test_finalize_is_fallback_only_preserves_grounded() -> None:
         d5=D5Autonomy.COLLABORATIVE,
         d3=D3Accept.RUNS,  # grounded: ship-fast
         trust=TrustStance.BLIND,  # grounded: over-trust
-        # d6 留 None -> 仍由 finalize 派生
+        # d6 left as None → still derived by finalize
     )
     out = finalize_persona(raw)
-    assert out.d3 is D3Accept.RUNS  # 未被 derive_d3 改写成 RIGOROUS
-    assert out.trust is TrustStance.BLIND  # 未被 derive_trust 改写成 SKEPTICAL
-    assert out.d6 is not None  # d6 未提供 -> 已派生填齐
+    assert out.d3 is D3Accept.RUNS  # Not overwritten by derive_d3 into RIGOROUS
+    assert out.trust is TrustStance.BLIND  # Not overwritten by derive_trust into SKEPTICAL
+    assert out.d6 is not None  # d6 not provided → derivation already filled in
     assert out.d6 is derive_d6(D5Autonomy.COLLABORATIVE, "low")
 
 
 def test_derive_d3_clamps_within_enum() -> None:
-    # senior 抬一档；EXPERT 已在最高档 -> clamp 不越界
+    # senior raises one level; EXPERT already at highest level → clamp does not exceed bounds
     assert derive_d3(D1Eval.EXPERT, D2Domain(depth=D2Depth.SENIOR)) is D3Accept.RIGOROUS
-    # novice 降一档；BLIND 已在最低档 -> clamp 不越界
+    # novice drops one tier; BLIND is already at minimum -> clamp does not exceed bounds
     assert derive_d3(D1Eval.BLIND, D2Domain(depth=D2Depth.NOVICE)) is D3Accept.RUNS
-    # 中间档可见抬/降
+    # middle tier allows raise/lower visibility
     assert derive_d3(D1Eval.SHALLOW, D2Domain(depth=D2Depth.SENIOR)) is D3Accept.IDIOMATIC
     assert derive_d3(D1Eval.COMPETENT, D2Domain(depth=D2Depth.NOVICE)) is D3Accept.FUNCTIONAL
 
@@ -82,9 +82,9 @@ def test_derive_trust_and_d6() -> None:
     assert derive_trust(D1Eval.BLIND, D2Domain()) is TrustStance.BLIND
     assert derive_trust(D1Eval.EXPERT, D2Domain()) is TrustStance.SKEPTICAL
     assert derive_trust(D1Eval.SHALLOW, D2Domain()) is TrustStance.BALANCED
-    # collaborative + 低风险 放开可跑
+    # collaborative + low risk permits execution
     assert derive_d6(D5Autonomy.COLLABORATIVE, "low") is D6Authz.FULL_AUTO
-    # 高风险收紧一档: collaborative 基线 WRITE_NO_RUN 收紧到 READ_ONLY
+    # high risk tightens one tier: collaborative baseline WRITE_NO_RUN tightens to READ_ONLY
     assert derive_d6(D5Autonomy.COLLABORATIVE, "high") is D6Authz.READ_ONLY
     assert derive_d6(D5Autonomy.AGENTIC, "high") is D6Authz.WRITE_NO_RUN
     assert derive_d6(D5Autonomy.ADVISORY, "low") is D6Authz.READ_ONLY

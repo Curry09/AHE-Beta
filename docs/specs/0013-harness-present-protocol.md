@@ -1,12 +1,12 @@
 ---
 number: "0013"
-title: Harness 呈现与交互协议：拆信封 · 过程流分层 · 打断/心跳
+title: "Harness Presentation and Interaction Protocol: Envelope Unwrapping · Layered Process Streams · Interruption/Heartbeat"
 issue: 0
 slug: harness-present-protocol
-summary: 把 harness 的对用户呈现与内层过程彻底分层，并补齐慢会话的交互协议：拆 complete_task 信封；内层过程经 steps 只吐观测层；进行中可发 mid-flight {"progress":…} 活动条（stdout 可多行旁路，终态仍为一行含 reply）；control:interrupt 回 [interrupted]；launcher begin/poll/control 分片轮询不盲杀。落点 harness_template + harness/launcher。旁路放宽与 peek 续等见 0019。
+summary: "Fully separate user-facing harness presentation from internal processes, and complete the interaction protocol for slow sessions: unwrap complete_task envelopes; expose only the observation layer of internal processes through steps; emit mid-flight {\"progress\":…} activity strips while running (stdout may carry multiple side-channel lines, while the terminal state remains one line containing reply); control:interrupt returns [interrupted]; launcher begin/poll/control uses segmented polling without blindly killing processes. Implementation targets: harness_template + harness/launcher. See 0019 for relaxed side-channel handling and continued waiting with peek."
 tasks:
   - id: T1
-    title: 拆 complete_task 信封 + 过程流分层 + begin/poll/control 心跳协议
+    title: "Unwrap complete_task envelopes + layer process streams + begin/poll/control heartbeat protocol"
     status: pending
     priority: P1
     tags: []
@@ -21,10 +21,10 @@ tasks:
       - backend/ahe_beta/models.py
       - backend/tests/harness/test_template_entry.py
       - backend/tests/harness/test_launcher.py
-    scope: entry.py：stdin 逐行 JSON（message/control）；一轮内可先吐零或多行 {"progress":{kind,text}} 活动条（_emit_progress，与终态 reply 共用 _stdout_lock 防交错），终态一行 {"reply", "steps"?}。拆信封 _unwrap_reply；steps 只给观测；interrupt→[interrupted]。预算钮注释。launcher begin/poll/control：进程活着返回 pending；last_steps/last_progress 旁路（progress 接收与未知旁路放宽见 0019）。models/sim_user 落 steps。
-    acceptance: 终态 reply 非空且拆信封；进行中可发 progress 行且不替代 reply；steps 不入 reply；interrupt→[interrupted]；poll 存活 pending。单测覆盖信封、steps、打断；progress 发射与接收对齐 0019。
+    scope: "entry.py: line-delimited JSON on stdin (message/control); within a turn, first emit zero or more {\"progress\":{kind,text}} activity-strip lines (_emit_progress shares _stdout_lock with terminal reply to prevent interleaving), followed by one terminal {\"reply\", \"steps\"?} line. Unwrap envelopes with _unwrap_reply; steps provides observations only; interrupt→[interrupted]. Document budget controls in comments. launcher begin/poll/control: return pending while the process is alive; last_steps/last_progress side channels (see 0019 for progress reception and relaxed handling of unknown side channels). Record steps in models/sim_user."
+    acceptance: "Terminal reply is nonempty and unwrapped; progress lines may be emitted while running and do not replace reply; steps does not enter reply; interrupt→[interrupted]; poll returns pending while alive. Unit tests cover envelopes, steps, and interruption; align progress emission and reception with 0019."
   - id: T2
-    title: v0 种子自测 smoke + MANUAL 呈现契约
+    title: "v0 seed self-test smoke + MANUAL presentation contract"
     status: pending
     priority: P2
     tags: []
@@ -34,85 +34,85 @@ tasks:
     files:
       - backend/harness_template/tests/test_smoke.py
       - backend/harness_template/MANUAL.md
-    scope: tests/test_smoke.py 最小冒烟；MANUAL.md 记录呈现契约——终态一次 reply、等待中可见 activity strip（progress）、[interrupted]/超时语义、控制面；与 entry 一致。tests/ 只放 harness 本体测试（见 0015）。
-    acceptance: smoke 通过；MANUAL 含 activity strip / 终态 reply 分工，与 entry 行为一致。
+    scope: "Minimal smoke test in tests/test_smoke.py; MANUAL.md records the presentation contract—a single terminal reply, a visible activity strip (progress) while waiting, [interrupted]/timeout semantics, and the control plane—consistent with entry. tests/ contains only tests for the harness itself (see 0015)."
+    acceptance: "smoke passes; MANUAL describes the division of responsibilities between activity strip / terminal reply, consistent with entry behavior."
 ---
 
-# 0013 · Harness 呈现与交互协议：拆信封 · 过程流分层 · 打断/心跳
+# 0013 · Harness Presentation and Interaction Protocol: Envelope Unwrapping · Layered Process Streams · Interruption/Heartbeat
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level nine-section rust-RFC overview. -->
 
 ## Summary
 
-规范 harness 作为「可启动程序 + 黑盒对话契约」对用户的呈现与交互协议：
+Standardize the user-facing presentation and interaction protocol of the harness as a “launchable program + black-box conversation contract”:
 
-1. **拆信封**——`complete_task` 信封剥到 `output.result`，用户只看最终答案；
-2. **过程流分层**——内层 `steps` 只吐观测层，persona 只吃 `reply`；
-3. **进行中活动条**——一轮内可先发零或多行 `{"progress":{kind,text}}`（与终态 reply 共用 stdout 锁），终态仍为一行含 `reply`；
-4. **打断/分片轮询**——`control:interrupt` → `[interrupted]`；launcher `begin/poll/control` 对活进程返回 pending、不盲杀。
+1. **Envelope unwrapping**—strip the `complete_task` envelope down to `output.result`, so the user sees only the final answer;
+2. **Layered process streams**—internal `steps` exposes only the observation layer, and the persona consumes only `reply`;
+3. **In-flight activity strip**—a turn may first emit zero or more `{"progress":{kind,text}}` lines (sharing the stdout lock with terminal reply), while the terminal state remains one line containing `reply`;
+4. **Interruption/segmented polling**—`control:interrupt` → `[interrupted]`; launcher `begin/poll/control` returns pending for a live process without blindly killing it.
 
-旁路键放宽与 peek 续等见 **0019**。落点 `harness_template/` + `harness/launcher.py`。
+See **0019** for relaxed side-channel keys and continued waiting with peek. Implementation targets: `harness_template/` + `harness/launcher.py`.
 
 ## Motivation
 
-harness 是黑盒对话契约：stdin 收消息、stdout 回复。需要根治信封泄漏、过程流污染体感、慢会话无协议；并让等待中有可见活动条，供 0012 心跳决策。
+The harness is a black-box conversation contract: receive messages on stdin and reply on stdout. Envelope leakage, process streams contaminating the user experience, and the lack of a protocol for slow sessions must be addressed at the root; waiting must also expose a visible activity strip for 0012 heartbeat decisions.
 
 ## Guide-level explanation
 
-- **协议帧。** stdin：`{"message"}` / `{"control"}`。stdout：进行中可多行 `progress`；终态一行 `{"reply", "steps"?}`。
-- **reply 给人看**；`steps` 观测旁路；`progress` 是活状态不是终答（MANUAL activity strip）。
-- **打断** → `[interrupted]`，保留会话。
-- **长任务不盲杀**：`poll` 活进程 → pending。
-- **预算钮可见**（`_RUN_RETRIES` / `max_iterations`）；harness 不设整轮墙钟上限。
+- **Protocol frames.** stdin: `{"message"}` / `{"control"}`. stdout: multiple `progress` lines may appear while running; one terminal `{"reply", "steps"?}` line.
+- **reply is for people**; `steps` is an observation side channel; `progress` is live status, not the final answer (MANUAL activity strip).
+- **Interruption** → `[interrupted]`, preserving the session.
+- **Do not blindly kill long tasks**: `poll` with a live process → pending.
+- **Visible budget controls** (`_RUN_RETRIES` / `max_iterations`); the harness imposes no wall-clock limit on an entire turn.
 
 ## Reference-level explanation
 
-### 代码锚点
+### Code anchors
 
-- `harness_template/entry.py`：`_emit_progress`、`_stdout_lock`、拆信封、interrupt、tracer→steps。
-- `harness/launcher.py`：`begin`/`poll`/`control`、`last_steps`/`last_progress`（接收放宽见 0019）。
-- `MANUAL.md`：activity strip + 终态 reply 分工。
+- `harness_template/entry.py`: `_emit_progress`, `_stdout_lock`, envelope unwrapping, interrupt, tracer→steps.
+- `harness/launcher.py`: `begin`/`poll`/`control`, `last_steps`/`last_progress` (see 0019 for relaxed reception).
+- `MANUAL.md`: division of responsibilities between activity strip + terminal reply.
 
-### 契约表
+### Contract table
 
-| 关注点 | 本组契约 |
+| Concern | Contract for this group |
 |---|---|
-| 收尾 | 拆到 `output.result` |
-| 内层过程 | `steps` 只观测 |
-| 进行中 | 多行 `progress`，不替代 reply |
-| 慢会话 | begin/poll/control，活进程 pending |
-| 打断 | `[interrupted]` |
+| Completion | Unwrap down to `output.result` |
+| Internal process | `steps` is observation-only |
+| In flight | Multiple `progress` lines, without replacing reply |
+| Slow sessions | begin/poll/control, pending for live processes |
+| Interruption | `[interrupted]` |
 
 ### DAG
 
 ```mermaid
 graph LR
-  T1[T1 协议与拆分]
+  T1[T1 Protocol and decomposition]
   T2[T2 smoke + MANUAL]
 ```
 
-### 接缝
+### Interfaces
 
-0012 消费 progress/poll；0019 放宽未知旁路与 peek；0014 改对外行为须同步 MANUAL。
+0012 consumes progress/poll; 0019 relaxes unknown side channels and peek; 0014 requires MANUAL to be synchronized when external behavior changes.
 
 ## Drawbacks
 
-信封拆解启发式；progress 与 steps 可能重复信息；打断依赖 nexau `force_stop` 检查点。
+Envelope unwrapping is heuristic; progress and steps may duplicate information; interruption depends on nexau `force_stop` checkpoints.
 
 ## Rationale and alternatives
 
-- 墙钟盲杀会误杀合法长任务。
-- 把 progress 拼进 reply 会污染体感。
-- 未知旁路接收归 0019，本组负责种子发射契约。
+- Blind wall-clock kills can terminate legitimate long tasks.
+- Appending progress to reply would contaminate the user experience.
+- Reception of unknown side channels belongs to 0019; this group owns the seed emission contract.
 
 ## Prior art
 
-CLAUDE.md 黑盒契约；stdio JSONL；长任务 poll/heartbeat。
+CLAUDE.md black-box contract; stdio JSONL; long-task poll/heartbeat.
 
 ## Unresolved questions
 
-超时是否种子内建「部分结果」？progress 粒度与截断？
+Should the seed provide built-in “partial results” on timeout? What progress granularity and truncation should be used?
 
 ## Future possibilities
 
-种子「超时即回进行中」；观测层按 progress/steps 重建时间线。
+Seed behavior that “returns in-flight status on timeout”; reconstruct timelines from progress/steps in the observation layer.

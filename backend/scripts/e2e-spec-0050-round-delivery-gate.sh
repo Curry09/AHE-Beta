@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Spec-0050/T5：轮次封口 e2e——无密钥、不启真 vigil。
+# Spec-0050/T5: round-sealing e2e — no keys, no real vigil started.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

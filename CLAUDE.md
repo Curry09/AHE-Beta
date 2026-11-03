@@ -1,154 +1,174 @@
-本地每次都要pull一下远端仓库再开始做事。
+Pull updates from the remote repository before starting local work.
 
-## 项目设计
+## Project Design
 
-### 底座
-1. 新实验由统一 local/E2B 生命周期运行；`harbor` 仅在独立 held-out 评估适配器与历史研究中使用。
-2. `nexau` 作为 agent 实现，同时兼容 claude code / codex 接入。
+### Foundation
 
-### 项目文档
-用户入口见 README.md；新实验统一入口为 backend/scripts/experiment.py（schema_version=2），本地 Docker + localhost Gitea 与 E2B + Gitea.com 共用材料和生命周期。QuickStart、配置和 U1 教程提供英中版本。公开 `examples/experiments/` 只放可校验的 v2 定义；支持冻结任务列表、同任务多用户与 ordinary/SWE 混合计划；U1/U4 公开示例涵盖两后端。带当前 continuation export 的完整归档可通过同入口继承到新 run 追加轮次，双语教程见 docs/tutorials/experiment-continuation.md / .zh-CN.md。历史记录从 research/ 索引访问，在对应冻结版本的独立 checkout 复现；tools/dev/ 是诊断与回放工具，不是实验入口。凭证模板统一为 examples/experiment.env.example。当前架构见 docs/ARCHITECTURE.md；设计契约见 docs/specs/。
+1. New experiments use the unified local/E2B lifecycle. `harbor` is used only by independent held-out evaluation adapters and historical research.
+2. Agents are implemented with `nexau`; Claude Code and Codex integrations are also supported.
 
-Spec-0081 的 examples/experiments/u8-mixed-e2b.json、u8-direct-e2b.json、u16-mixed-e2b.json、u32-mixed-e2b.json 使用原32任务集的前8/前16/全32项，实验仍是schema 2，容器任务包是schema 3。四组从当前builtin seed跑六轮，R1–R5反馈交付、R6只试用；模拟/direct为6/2、0/8、12/4、25/7，Triager为4/4/8/16，Architect/Divergent各1，mechanical Owner、grouping=false，用户与Developer并发分别4，E2B4CPU/8192MiB，逐轮官方评分默认关闭。原persona直接复用，独立画像数5/5/8/15；interaction_plan逐轮在所选子集内整体轮转1，不能截取轮转后的32项。U8对照仅六个interaction覆盖与派生名称/身份不同，其他条件深比较一致。模型公开ID为用户/Harness的glm-5.3-flash、需求/交付的glm-5.3；User/builtin Harness/需求角色的初始输出额度为32768，Claude Code交付由其客户端控制输出；不注入128k预算或内网endpoint。任务材料由examples/tasks/evolution32/manifest.json和各task.json绑定公开镜像digest、输入hash及配方；不从完成态补造初态。双语教程见docs/tutorials/evolution32.md/.zh-CN.md，批次为examples/batches/evolution-four-e2b.json。材料、真实环境工具检查、两轮模型链路、正式四组六轮必须分开记录。
+### Project Documentation
 
-单run启动后云内supervisor/controller独立运行，本机另起后台collector；collector只负责状态/收集/成功终态清理，当前无E2B租期刷新。86400秒是创建租期，不是无限生命周期；CLI resume要求原VM仍running，paused需显式provider恢复，expired/deleted是LOST，不能悄悄换机称无损续跑。batch用前台监督器而非每个成员的detached monitor。模型limits是静态容量声明，reserved_output_tokens不改实际max_tokens；User/Harness输入阈值可覆盖，需求角色当前仍用固定YAML阈值，不能把静态检查描述成所有角色的动态token保证。
+Start with README.md. The unified entry for new experiments is backend/scripts/experiment.py (`schema_version=2`). Local Docker + localhost Gitea and E2B + Gitea.com share materials and lifecycle management. QuickStart, configuration, and the U1 tutorial have English and Chinese editions. Public `examples/experiments/` contains only validatable v2 definitions, including frozen task lists, multiple users on the same task, and mixed ordinary/SWE plans. Public U1/U4 examples cover both backends. A complete archive with the current continuation export can be inherited into a new run to add rounds through the same entry; see docs/tutorials/experiment-continuation.md and its Chinese edition. Historical records are indexed under research/ and reproduced in a separate checkout of their frozen revision. tools/dev/ contains diagnostics and replay tools, not experiment entry points. The shared credential template is examples/experiment.env.example. See docs/ARCHITECTURE.md for the current architecture and docs/specs/ for design contracts.
 
-完整实验列表通过同入口的 batch check/prepare/run/status/stop/resume/collect 管理，成员仍沿用单 run 身份与冻结配置。实验后的会话客观验收统一使用 grade RUN_ID --plan PATH；SWE、Terminal、TUA、NL2Repo 与 custom 都按独立计划分发，旧 dataset 参数已退役。两后端均完整 collect 后在本机 Docker 评分，--offline 只校验输入。direct 与 simulated 共用产物采集，新会话原子保存完整 patch、产物与 receipt；旧冻结 controller 的 hash-only 预测及缺失产物不补造。Spec-0081 提供 container source、受管服务收尾和原测量采集；特定任务的官方 grader 是否支持仍由独立 plan/adapter 合同判断。事后评分写独立 evaluation attempt，不改 Session、manifest、checkpoint、seal 或 archive，也不把评分报告回填演化。evaluation.official_grading 继续 false；这些用户任务成绩与独立 held-out Harness 泛化评估分开。双语教程见 docs/tutorials/post-run-grading.md / .zh-CN.md。
+The Spec-0081 examples examples/experiments/u8-mixed-e2b.json, u8-direct-e2b.json, u16-mixed-e2b.json, and u32-mixed-e2b.json use the first 8, first 16, or all 32 tasks from the original task set. Experiments remain schema 2; container task packages use schema 3. All four groups start from the current builtin seed and run six rounds: R1–R5 include feedback and delivery; R6 is usage only. Simulated/direct counts are 6/2, 0/8, 12/4, and 25/7; Triager counts are 4/4/8/16; Architect and Divergent each have 1 instance. Owner is mechanical, grouping=false, user and Developer concurrency are each 4, E2B resources are 4 CPU/8192 MiB, and per-round official grading is disabled by default. Original personas are reused, with 5/5/8/15 distinct profiles. Each round, interaction_plan rotates the selected subset as a whole by 1; do not rotate all 32 tasks and then truncate. The U8 comparison differs only in six interaction overrides and the derived names/identities; all other conditions must match by deep comparison. Public model IDs are glm-5.3-flash for User/Harness and glm-5.3 for demand/delivery. The initial output allowance for User/builtin Harness/demand roles is 32768; the Claude Code client controls delivery output. Do not inject a 128k allowance or an internal endpoint. examples/tasks/evolution32/manifest.json and each task.json bind public image digests, input hashes, and recipes; never reconstruct initial states from completed work. See docs/tutorials/evolution32.md and its Chinese edition; the batch is examples/batches/evolution-four-e2b.json. Record materials, real environment/tool checks, the two-round model pipeline, and the four full six-round experiments separately.
 
-Spec-0084 增加显式可选的 evaluation.session_grading：每轮用户产物封存后、反馈处理前，由独立 assessment-worker 使用私有 plan 和 Docker 评分，末轮也执行。仅固定字段的签名安全摘要进入需求和交付；隐藏断言、标准答案与原始 verifier 日志始终留在外部评分端。此路径与事后 grade 共用评分实现，缺 worker 等待、基础设施故障不记 0、任务失败不淘汰或回滚候选。参与演化的任务及其反馈不能再当作 held-out 结果。配置和真实验收边界见 docs/tutorials/evolution-feedback.zh-CN.md；当前可复现检查见 docs/VERIFICATION.zh-CN.md。
+After a single run starts, its cloud supervisor/controller runs independently, with a separate background collector on the management host. The collector handles status, collection, and successful-terminal cleanup only; it currently does not refresh E2B leases. 86400 seconds is the creation lease, not an unlimited lifetime. CLI resume requires the original VM to remain running; paused VMs require explicit provider recovery, and expired/deleted VMs are LOST. Do not silently replace a VM and call it lossless recovery. A batch uses a foreground supervisor rather than a detached monitor per member. Model limits are static capacity declarations; reserved_output_tokens does not change actual max_tokens. User/Harness input thresholds can be overridden; demand roles currently use fixed YAML thresholds. Do not describe static checks as dynamic token guarantees for every role.
 
-双模式反馈独立记录任务判断、体验评分、问题归因和改进机会；缺测保持空值，accept不代替任务通过，成功允许零Issue。交互中的模拟用户按persona访问实时工作区，competent/expert可自行写测试、运行命令及按协作风格改代码，main_final_check仍限四次工具调用并经过重新判断。只有终态评阅前才停止Actor及写进程、冻结产物，终态Reviewer只读快照；用户操作保留sim_trace，最终协作产物通过不自动等于Harness独立通过。报告计划与发布收据支持恢复且不重复Actor/Reviewer。执行合同从首次目标贯穿所有角色：Direct不依赖第二条用户输入；任务总期限不会被控制消息续租，已声明的7200秒预算不被内部1800秒兜底截断。模型容量按显式配置预检，未知容量不猜测；确定性上下文超限不重复相同外层调用。这些边界不预先实现上下文压缩或新的早停策略。
+Manage experiment lists through batch check/prepare/run/status/stop/resume/collect under the same entry. Members retain single-run identities and frozen configurations. Post-run objective session grading uses grade RUN_ID --plan PATH; SWE, Terminal, TUA, NL2Repo, and custom tasks are dispatched by independent plans. The old dataset argument is retired. For both backends, complete collect before grading in local Docker; --offline only validates inputs. Direct and simulated sessions share artifact collection. New sessions atomically save complete patches, artifacts, and receipts; do not fabricate missing artifacts or full predictions for frozen controllers that saved hashes only. Spec-0081 provides container sources, managed-service finalization, and original measurement collection. Official grader support for a task remains governed by its independent plan/adapter contract. Post-run grading writes an independent evaluation attempt without modifying Session, manifest, checkpoint, seal, or archive, and never feeds grading reports back into evolution. evaluation.official_grading remains false. These user-task results are separate from independent held-out Harness generalization evaluation. See docs/tutorials/post-run-grading.md and its Chinese edition.
 
-旧 seed 卡库与自有文本通过统一入口的 task import-seeds LIBRARY --output DIR [--seed ID ...] / task from-text --instruction PATH --id ID --output DIR --not-in-benchmark 转为 ordinary v1 包；两者支持 --interaction direct|simulated_user 和父级 --json。转换不联网、不读模型/provider 凭证、不执行 setup。JSON 结果提供绝对 task_packages 数组，应移除旧 workload.kind/task_package/interaction_plan 后接入 workload.task_packages；tasks.json 仅为输出目录相对路径索引，不是新的运行入口。无 repo 使用带初始 README 的 scratch，不携带答案。oracle、env.test_cmd、gates、provenance 不复制到包或 sidecar；旧 setup 不自动锁依赖，旧镜像、外部服务不自动复现。公开 examples/seed-inputs/ 仅放明确非 benchmark 的小型合成卡与用户指令；历史七卡留在研究归档。双语教程见 docs/tutorials/seed-task-import.md / .zh-CN.md，实验仍走 check/prepare/run。seed 转换与归档 continuation 是两个输入功能；转换和离线检查不证明真实双 provider 实验或任务通过，当前可复现检查见 docs/VERIFICATION.zh-CN.md。
+Spec-0084 adds explicitly optional evaluation.session_grading. After each round's user artifacts are sealed and before feedback processing, an independent assessment-worker grades them with a private plan and Docker; this also runs in the final round. Only signed safe summaries with fixed fields enter demand and delivery. Hidden assertions, reference answers, and raw verifier logs remain with the external grader. This path shares the post-run grade implementation. Wait for missing workers; infrastructure failures are not scored 0; task failures do not eliminate or roll back candidates. Tasks and feedback used for evolution cannot also be claimed as held-out results. Configuration and real acceptance boundaries are documented in docs/tutorials/evolution-feedback.md; current reproducible checks are in docs/VERIFICATION.md.
 
-local + localhost 的工程 CI 由 runtime.local.ci_enabled=true 可选开启，默认关闭，不改旧冻结 run；E2B CI 不支持。runner_image、ci_job_image 可选且只在开启时允许，必须带显式版本或摘要，不能用 :latest；默认镜像及实际 image ID 按 run 固定；内部 docker:27.5.1-dind daemon 配方也固定实际 image ID。冻结 Harness 需有 ubuntu-latest PR 工作流；后端核验专属 runner 身份并通过真实 PR checkout/Python smoke 后才发就绪收据，context 仅接受匹配的已核验收据以设置 OpenAgents ci:agent，失败不降级 skip。status/collect 保存 CI 就绪与当前 main/PR SHA 状态，不沿用旧 head 绿灯。每个 run 独占自己的 privileged Docker daemon、job 存储及工具缓存，runner 通过内部 DOCKER_HOST 连接，不挂宿主 Docker socket、不发布 daemon 宿主端口；job 的 host 网络属于私有 daemon 的网络命名空间。stop 处理所属 runner/job 并停止 daemon，保留恢复数据；resume 复用 daemon/存储/注册并重验；destroy 移除有所有权证据的执行资源与 CI job 存储，明确保留 Gitea 和 runner 私密注册卷；注册凭据不进入普通归档。此配置用于可信 Harness 工程代码，不提供恶意代码隔离；CI 不调模型、不跑 benchmark，与事后 SWE grade 和 Harness 留出评估分开。双语教程见 docs/tutorials/local-engineering-ci.md / .zh-CN.md；当前可复现检查见 docs/VERIFICATION.zh-CN.md；人工红绿对照不能称作模型自动修复。
+Dual-mode feedback separately records task judgments, experience scores, issue attribution, and improvement opportunities. Missing observations remain null; accept does not mean task success, and successful sessions may produce zero Issues. During interaction, simulated users access the live workspace according to their persona. Competent/expert users may write tests, run commands, and modify code according to their collaboration style. main_final_check remains limited to four tool calls followed by a fresh judgment. Stop the Actor and writing processes and freeze artifacts only before terminal review; the terminal Reviewer reads a snapshot. Preserve user operations in sim_trace. Passing the final collaborative artifact does not automatically mean the Harness passed independently. Report plans and publication receipts support recovery without repeating the Actor/Reviewer. Execution contracts carry the initial objective through every role: Direct must not depend on a second user message; control messages do not renew the overall deadline; a declared 7200-second budget must not be truncated by an internal 1800-second fallback. Preflight model capacity from explicit configuration, without guessing unknown capacity; deterministic context overflow must not repeat an identical outer call. These boundaries do not preimplement context compression or a new early-stop strategy.
 
-### 当前归档追加
-当前归档 continuation 使用 harness.source=continuation、workload.source=parent 和 archive/sha256 三项来源声明创建新 run，不修改父配置后 resume。父末轮配对、材料、persona 和完整会话按冻结 hash 继承，count 只表示新增用户轮。先以独立 checkpoints/continuation-bootstrap 恢复域处理父反馈并交付，再运行本次 1..N 用户轮；两阶段共用 loop/feedback_pipeline，最后新增轮运行用户及已配置的独立验收，不再生成需求或交付。父会话不进入子 SessionStore 索引或新增指标，报告通过 source namespace/issue map 进入新仓，observations 保留原身份并重新授予访问。父 commit 与子 seed commit SHA 不同，但按 inventory 精确构造同一 tree；collector 不用工作树 HEAD 猜最终代码。当前 export/schema 和 source validator 是唯一契约，不增旧格式 adapter、转调脚本或第二套监督器。子 collect 可再次继承，逻辑轮号累计，grade/batch 仍用本地轮号；当前可复现检查见 docs/VERIFICATION.zh-CN.md，不能以零准入或离线合同测试冒充真实代码交付。
+Convert old seed-card libraries and operator text to ordinary v1 packages through task import-seeds LIBRARY --output DIR [--seed ID ...] or task from-text --instruction PATH --id ID --output DIR --not-in-benchmark. Both support --interaction direct|simulated_user and the parent --json flag. Conversion makes no network calls, reads no model/provider credentials, and runs no setup. JSON output provides an absolute task_packages array: remove old workload.kind/task_package/interaction_plan fields before setting workload.task_packages. tasks.json is only an output-directory-relative index, not a new runtime entry. Inputs without a repo use scratch with an initial README, without answers. Do not copy oracle, env.test_cmd, gates, or provenance into the package or a sidecar. Old setup commands do not automatically lock dependencies; old images and external services are not automatically reproduced. Public examples/seed-inputs/ contains only small synthetic cards and user instructions explicitly outside benchmarks; the historical seven cards remain in the research archive. See docs/tutorials/seed-task-import.md and its Chinese edition; experiments still use check/prepare/run. Seed conversion and archive continuation are separate input features. Conversion and offline validation do not prove a real experiment on both providers or task success; see docs/VERIFICATION.md for current reproducible checks.
 
-### 要解决的问题
-直接对轨迹做自进化，会把轨迹的特征带进 harness，只能针对具体问题做局部修改，难以产生结构性改进。根本原因是它直接以 benchmark 分数为优化目标，这会导致过拟合。
+Engineering CI for local + localhost is opt-in through runtime.local.ci_enabled=true, disabled by default, and does not change old frozen runs. E2B CI is unsupported. runner_image and ci_job_image are optional and allowed only when CI is enabled; require explicit versions or digests, never :latest. Pin default images and actual image IDs per run; also pin the actual image ID of the internal docker:27.5.1-dind daemon recipe. The frozen Harness must contain an ubuntu-latest PR workflow. The backend verifies the dedicated runner identity and a real PR checkout/Python smoke before issuing a readiness receipt. context accepts only a matching verified receipt to set OpenAgents ci:agent; failure must not downgrade to skip. status/collect preserve CI readiness and the current main/PR SHA state, never reusing a green result for an older head. Each run owns a privileged Docker daemon, job storage, and tool cache. The runner connects through internal DOCKER_HOST, without mounting the host Docker socket or exposing a daemon host port; a job's host network belongs to the private daemon's network namespace. stop handles owned runners/jobs and stops the daemon while retaining recovery data. resume reuses the daemon/storage/registration and revalidates them. destroy removes execution resources and CI job storage only with ownership evidence, explicitly preserving Gitea and private runner-registration volumes. Registration credentials never enter ordinary archives. This configuration is for trusted Harness engineering code, not hostile-code isolation. CI calls no models and runs no benchmarks; it is separate from post-run SWE grade and held-out Harness evaluation. See docs/tutorials/local-engineering-ci.md and its Chinese edition, and docs/VERIFICATION.md for reproducible checks. Manual red/green comparisons are not evidence of automatic model repair.
 
-### 核心思路：训练信号与测试分离
-- 演化反馈来自使用过程中的任务判断、体验、归因和改进机会；显式开启逐轮验收时另附独立安全摘要，在"模拟真实使用"的分布上优化。
-- 测试用各类 benchmark，held-out，只在事后验证体感驱动的进化是否带来真实能力提升。
-- 留出评估的任务与结果不进入演化；已作为使用任务并提供反馈的材料不能再宣称 held-out。开发者 agent 可以做较大改动，泛化效果由独立评估判定。
+### Current Archive Continuation
 
-### 方法：模拟"用户使用 → 开发者迭代"的闭环
+Create a new run using harness.source=continuation, workload.source=parent, and archive/sha256 provenance declarations. Do not edit the parent configuration and resume it. Inherit the parent's final-round pairings, materials, personas, and full sessions by frozen hashes; count means additional user rounds only. First handle parent feedback and delivery in the separate checkpoints/continuation-bootstrap recovery domain, then run this experiment's 1..N user rounds. Both stages share loop/feedback_pipeline. The final added round runs users and configured independent grading, without further demand or delivery. Parent sessions do not enter the child SessionStore index or new metrics. Reports enter the new repository through a source namespace/issue map; observations retain their identities and receive access grants again. Parent commit and child seed commit SHAs differ, but inventory reconstructs exactly the same tree. The collector must not infer final code from the working tree HEAD. The current export/schema and source validator are the sole contract; add no old-format adapter, forwarding script, or second supervisor. A child collect can be inherited again; logical round numbers accumulate, while grade/batch continue to use local round numbers. See docs/VERIFICATION.md for current checks. Zero admissions or offline contract tests are not evidence of real code delivery.
 
-- **蒸馏模块**：从真实使用数据（CC/codex/nexau 的真实日志、issue tracker、社区反馈）蒸馏出 persona 库和种子场景库。persona 来自真实数据，不依据 benchmark 构造，以此保证体感信号的真实性，并避免训练目标和测试目标互相污染。
+### Problem
 
-- **a｜用户侧**：按 persona 和任务的 direct/simulated_user 条件使用 harness，保存真实轨迹、执行合同与四轴反馈。体验使用共同的 1–4 量表，缺测保持空值；Issue 来自冻结报告计划，可以为零。独立验收与 Reviewer 判断分别记录，不用是否提 bug 代替任务完成。
+Evolving directly from trajectories imports their specific features into the Harness, encouraging local fixes to individual failures rather than structural improvements. Optimizing benchmark scores directly creates overfitting.
 
-  SWE-bench 场景按 spec-0051 使用**每会话一个临时容器**：从同一 runnable seed image 启动，persona 的 `read_file`/`run_shell` 与 harness 均只操作容器内 repo，不把 repo `docker cp` 到宿主。harness 不设 240 秒整轮超时，慢请求由 90 秒 persona 心跳决定续等或打断；仅真实崩溃/基础设施绝对上限 fail-closed。会话仍保留主观体感与接受决定，但技术通过只认随后由官方 SWE-bench harness 在新鲜 instance 容器产生的客观结果；会话及最小审计事件保留在 session JSON，客观结果与接受关系写入独立评分报告；显式开启逐轮验收时，仅签名安全摘要进入后续反馈。
+### Core Idea: Separate Training Signals from Testing
 
-- **b｜开发者侧（交付面，spec-0032 现行）**：由 OpenAgents vigil（独立 CLI 常驻进程）承担。spec-0063 默认 coordination=soft，失败回普通队列；VIGIL_COORDINATION=off 可关闭前置。需求面 Owner 准入的票带 `openagents` 交接令牌，vigil 发现后走「盖 ready → 有界轻量前置（共享机制/软排序，不自动落 blocked_by）→ worktree/分支 → RFC/architecture → draft PR → 实现 → conflict/配置启用的 CI/e2e/review 闸 → 合并进 main」。CI/评审是**工程质量闸**（harness 仓结构冒烟，绝不跑 benchmark），与已去掉的体感门禁维度不同；体验和逐轮验收不作候选淘汰门；独立 held-out 评估不进入演化。坏改动在 PR 处被打回、不落 main。
+- Evolution feedback comes from task judgments, experience, attribution, and improvement opportunities during use. Explicitly enabled per-round grading adds independent safe summaries. Optimize over a distribution of simulated real usage.
+- Keep benchmarks held out; use them afterward to test whether experience-driven evolution improves actual capability.
+- Held-out tasks and results never enter evolution. Materials already used as usage tasks with feedback cannot be called held out. Developer agents may make substantial changes; independent evaluation determines generalization.
 
-- **c｜闭环（spec-0050/0062/0084）**：非末轮在 Owner 准入后**等待本轮准入票终态**（合进 main 或明确卡死）才开下一轮用户。末轮仍运行用户及已配置的独立验收，不再提案、不再交付。第 N+1 轮体感相对第 N 轮归因于第 N 轮已封口产物。一张票 `automation-failed`、历史 `needs-human` 或超时则实验停在该轮，闭票不覆盖失败。同一轮内用户与多票交付仍可并行。
+### Method: Simulate the User Usage → Developer Iteration Loop
 
-### 约束
-1. held-out benchmark 不参与训练或发版门禁；已用于逐轮反馈的任务与留出评估明确分开。
-2. persona 来自真实数据，不依据 benchmark 或轨迹构造。
-3. 体感与 benchmark 只作观测；交付按配置启用工程质量闸，不以体感分数决定合并。
+- **Distillation**: distill persona and seed-scenario libraries from real usage data: CC/Codex/NexAU logs, issue trackers, and community feedback. Derive personas from real data, not benchmarks, to ground experience signals and prevent training/test contamination.
+- **a | User side**: use the Harness under each persona and the task's direct/simulated_user condition. Preserve actual trajectories, execution contracts, and four-axis feedback. Experience uses a shared 1–4 scale, with missing observations null. Issues come from frozen report plans and may be absent. Record independent grading and Reviewer judgments separately; filing a bug is not a substitute for determining task completion.
 
-### 观测指标
-记录 issue 数量随时间的曲线，用于判断新 issue 的产生和已有 issue 的解决是否平衡：issue 长期不下降说明 harness 在退化；issue 过早归零说明 persona 多样性不足、探索停止。
+  SWE-bench scenarios use **one temporary container per session** under spec-0051, started from the same runnable seed image. Persona `read_file`/`run_shell` and the Harness operate only on the in-container repo; never `docker cp` it to the host. There is no 240-second whole-turn Harness timeout. A 90-second persona heartbeat decides whether to keep waiting or interrupt slow requests. Only actual crashes/infrastructure hard limits fail closed. Sessions retain subjective experience and acceptance decisions, but technical success requires objective results from the official SWE-bench harness in a fresh instance container afterward. Keep sessions and minimal audit events in session JSON, and objective results and acceptance relationships in independent grading reports. When per-round grading is explicitly enabled, only signed safe summaries enter subsequent feedback.
 
-### 待定项
-1. 已统一 1–4 体验量表在不同 persona 与任务分布上的校准研究。
-2. 真实数据盘点（确认蒸馏模块的输入）。
-3. 体感观测的样本量与回归分析口径（单点比较 vs 分布比较）。
+- **b | Developer side (delivery, current spec-0032)**: OpenAgents vigil runs as an independent persistent CLI process. Under spec-0063, coordination=soft by default; failures return to the ordinary queue. VIGIL_COORDINATION=off disables the prerequisite step. Owner-admitted issues carry the `openagents` handoff token. vigil discovers them and follows: apply ready → bounded lightweight prerequisites (shared mechanisms/soft ordering, without automatically setting blocked_by) → worktree/branch → RFC/architecture → draft PR → implementation → conflict/configured CI/e2e/review gates → merge to main. CI/review are **engineering quality gates**, using Harness-repository structure smoke tests and never benchmarks. They differ from the removed experience-based admission gate. Experience and per-round grading do not eliminate candidates, and held-out evaluation never enters evolution. PR gates reject bad changes before they reach main.
 
-## 当前架构
+- **c | Closed loop (spec-0050/0062/0084)**: after Owner admission in a nonfinal round, **wait for this round's admitted issues to reach terminal states**: merged to main or explicitly blocked. Only then start the next user round. The final round still runs users and configured independent grading, without proposals or delivery. Attribute round N+1's experience relative to N to round N's sealed artifact. Any automation-failed issue, historical needs-human state, or timeout stops the experiment in that round; closing an issue does not erase failure. User sessions and delivery of multiple issues may still run concurrently within their respective round stages.
 
-### 运行时：需求面 nexau + 交付面 OpenAgents（spec-0032）
-需求面角色为「同一 nexau 运行时 + 不同 agent 定义（prompt+工具）」，固定角色定义置于 `agent_defs/`：
-- **用户 agent**：扮演用户，多轮使用 harness，产出体感与 issue（report 平面）。
-- **triager / architect / divergent**：生成器，产不可领 proposal（spec-0029 三平面）。
-- **双轨（spec-0060）**：PM 独立到 Owner；Triage 经 Architect 到 Owner。Architect 的 proposal/ready 输入排除 PM，证据授权只来自筛选后的可见提案；两路线仅在 Owner 汇合。
-- **Owner / Delivery Router**：默认 admit 并打 `openagents` 令牌；用 `delivery_overlaps` 协调双轨共享工作，双方仍独立交接与验收，交付侧决定实现复用。仅保留历史精确去重兼容，不选择实现层、不压缩独立能力与验收目标。
+### Constraints
 
-交付面 = OpenAgents vigil：以独立 CLI 接入（不 vendor 不 import），coding 后端为 claude CLI；对 Gitea 经其 forge/Gitea driver（OpenAgents spec-0074）。两面只通过 issue 标签（openagents/ready）与 main SHA 交互。运行形态（spec-0033）：**容器围堵为缺省**——vigil 跑在专用容器（deploy/vigil 镜像，容器内自 clone harness 仓、零宿主挂载），网络只挂 internal vigil-net、外网经 egress 代理 allowlist（仅 Anthropic API），claude 凭证（ANTHROPIC_API_KEY 或 CLAUDE_CODE_OAUTH_TOKEN）与 Gitea token 只经容器 env；`VIGIL_MODE=subprocess` 只适用于盯屏宿主联调，或经统一入口验证身份的 E2B 整实验沙箱；后者的交付 worker 使用沙箱内进程；Spec-0081 的容器型用户任务另按 attempt 创建独立 Docker 容器/服务网络，不能将交付进程与任务环境混为一谈。
+1. Held-out benchmarks never participate in training or release gates. Keep per-round feedback tasks separate from held-out evaluation.
+2. Personas come from real data, not benchmarks or trajectories.
+3. Experience and benchmark scores are observations. Delivery uses configured engineering quality gates; experience scores do not determine merges.
 
-> 无体感门禁角色；体验及逐轮验收可供后续轮次纠错，不自动淘汰或回退候选。独立 held-out 评估不进入演化。
+### Observation Metrics
 
-独立 held-out 评测使用 `evaluation.yaml` 和 `python -m evaluation`，支持 Harbor Index 任务、direct 与 simulated_user，以及冻结 Harness 或原生 Agent。环境集中在 evaluation/environments/，Harness 接入集中在 evaluation/harness/，Index 专用辅助集中在 evaluation/benchmarks/harbor_index/。安装与运行见 evaluation/README.zh-CN.md；后台会话产物评分 backend/ahe_beta/evaluation/ 保持独立。
+Track issue counts over time to assess the balance between new reports and resolved issues. A persistently nondecreasing count suggests Harness degradation; reaching zero too early suggests insufficient persona diversity and stopped exploration.
 
-### 被进化对象：harness 作为可启动程序
-harness 不建模为单个 agent 定义，而是「可启动程序 + 黑盒对话契约」：启动后接收用户消息、返回回复；内部为 1 个或 N 个 nexau、如何编排，由其自身入口脚本决定（支持多 agent harness）。
-- 用户侧仅通过 `HarnessInterface`(send/reset/close) 与之交互，不感知内部结构。
-- harness 自带入口 `entry`，自行依赖 nexau，不复用本仓 `nexau_runtime`，保持独立（后续可替换为 CC/codex）。
-- harness 源码为**独立 git 仓，托管于 Gitea**：主干 main + 交付面的 per-issue 分支/PR（vigil 管理），merge commit 即观测锚点（vK tag 体系已退役）。`harness_template/` 为 v0 种子（含 `.gitea/workflows/smoke.yml` 结构冒烟 CI），用于初始化该仓。
+### Open Questions
 
-### 状态去向
-- **issue/PR → Gitea**：用户 agent 经 `IssueTracker` 接口提交，由 Gitea 负责发号/状态/标签/comment；交付面 vigil 按 `openagents`→`ready` 标签接手，PR 也落同一 Gitea 仓（看板经 /api/delivery 观测）。
-- **体感 + session → 本地**：写入 `data/sessions/`，作为体感曲线与回归基线的数据源。
+1. Calibrate the shared 1–4 experience scale across persona and task distributions.
+2. Inventory real data sources for distillation.
+3. Define sample sizes and regression analysis for experience observations: single-point versus distribution comparisons.
 
-### 闭环
-`loop/orchestrator` 跑需求面：每轮先用户（测当时 `origin/main` 快照）→ 已配置的独立验收 → 非末轮才生成两拍 + Owner 准入 + 等待本轮 admitted 票关闭且无 `automation-failed`/`needs-human` → 再解析 sealed SHA。末轮运行用户及已配置的独立验收，不再需求或交付。卡死抛 `RoundDeliveryBlocked`，不开下一轮。交付面 vigil 仍是常驻执行器，但不再与下一轮用户叠跑；普通 `TOTAL_ROUNDS=1` 不启 vigil；continuation 初始化按统一 delivery_required 语义启用交付，即使只追加一个用户轮。`loop/metrics` 记录 issue 曲线与三平面漏斗。一次实验的可还原切片在 `backend/data/role_runs/<run_id>/`（spec-0049），`_reset_to_initial` 不得删除。新实验和已有 v2 实验管理只使用 `backend/scripts/experiment.py`（spec-0069/0071）。新 workload contract 1 由监督器启动 `ahe_beta.experiment.controllers.unified`；旧 schema-2 module/script run 从原 archive 配方执行；不创建转调旧入口的兼容脚本。已准备 v2 run 必须继续使用其冻结源码，不更换身份、哈希或 controller。
+## Current Architecture
 
-### 目录结构
-前后端分目录（参考 MiroFish）：后端全在 `backend/`，`frontend/` 提供只读观测看板，项目级文档/工具与配置留根。
+### Runtime: NexAU Demand and OpenAgents Delivery (spec-0032)
+
+Demand roles share one NexAU runtime with different agent definitions (prompts + tools) under `agent_defs/`:
+
+- **User agent**: plays a user, interacts with the Harness over multiple turns, and produces experience feedback and issues in the report plane.
+- **triager / architect / divergent**: generators producing unclaimable proposals (the three planes in spec-0029).
+- **Dual paths (spec-0060)**: PM goes independently to Owner; Triage goes through Architect to Owner. Architect's proposal/ready inputs exclude PM. Evidence grants derive only from filtered visible proposals. The paths meet only at Owner.
+- **Owner / Delivery Router**: admits by default and applies `openagents`. delivery_overlaps coordinates shared work between the paths while preserving separate handoffs and acceptance; delivery decides implementation reuse. Only historical exact-deduplication compatibility remains. Owner does not choose implementation layers or collapse independent capabilities and acceptance goals.
+
+Delivery is OpenAgents vigil, integrated as an independent CLI rather than vendored or imported, with the claude CLI coding backend. Gitea access uses its forge/Gitea driver (OpenAgents spec-0074). The two sides communicate only through issue labels (openagents/ready) and main SHA. Under spec-0033, **container containment is the default**: vigil runs in a dedicated deploy/vigil image, clones the Harness repository inside the container, and has no host mounts. It joins only the internal vigil-net; external access goes through an egress allowlist proxy for the Anthropic API. Claude credentials (ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN) and the Gitea token enter only through container environment variables. `VIGIL_MODE=subprocess` is for supervised host debugging or a whole-experiment E2B sandbox whose identity was verified by the unified entry. E2B delivery workers are in-sandbox processes. Spec-0081 container user tasks separately create Docker containers/service networks per attempt; do not confuse delivery processes with task environments.
+
+> There is no experience-based gatekeeper role. Experience and per-round grading may inform corrections in later rounds, but do not automatically eliminate or roll back candidates. Held-out evaluation never enters evolution.
+
+Independent held-out evaluation uses `evaluation.yaml` and `python -m evaluation`, supporting Harbor Index tasks, direct and simulated_user modes, and frozen Harnesses or native Agents. Environments live under evaluation/environments/, Harness integration under evaluation/harness/, and Index-specific helpers under evaluation/benchmarks/harbor_index/. See evaluation/README.md for installation and use. Backend session-artifact grading under backend/ahe_beta/evaluation/ remains independent.
+
+### Evolution Target: Harness as a Launchable Program
+
+Model the Harness as a launchable program with a black-box conversation contract, not as a single agent definition. It receives user messages and returns replies. Its own entry script determines whether it uses one or N NexAU agents and how they are orchestrated, allowing multi-agent Harnesses.
+
+- The user side interacts only through `HarnessInterface` (send/reset/close), without knowing the internal structure.
+- Each Harness supplies an `entry` and depends on NexAU independently of this repository's nexau_runtime; it may later be replaced by CC/Codex.
+- Harness source is an **independent Git repository hosted in Gitea**, with main and per-issue delivery branches/PRs managed by vigil. Merge commits are observation anchors; the vK tag scheme is retired. `harness_template/` is the v0 seed, including `.gitea/workflows/smoke.yml` structural smoke CI, used to initialize that repository.
+
+### State Storage
+
+- **Issues/PRs → Gitea**: user agents submit through IssueTracker; Gitea owns numbering, states, labels, and comments. vigil takes over through openagents→ready, with PRs in the same repository and dashboard observation through /api/delivery.
+- **Experience + sessions → local storage**: data/sessions/ supplies experience curves and regression baselines.
+
+### Closed Loop
+
+loop/orchestrator runs demand processing. Each round runs users against the current origin/main snapshot, then configured independent grading. Only nonfinal rounds run the two demand stages, Owner admission, and a wait for this round's admitted issues to close without automation-failed/needs-human, before resolving the sealed SHA. The final round runs users and configured independent grading only. A blocked round raises RoundDeliveryBlocked and does not advance. vigil remains a persistent executor but does not overlap with the next user round. An ordinary TOTAL_ROUNDS=1 run does not start vigil. Continuation bootstrap uses shared delivery_required semantics, including when adding only one user round. loop/metrics records issue curves and the three-plane funnel. Reconstructable experiment slices are stored in backend/data/role_runs/<run_id>/ (spec-0049); _reset_to_initial must not delete them. Manage new and existing v2 experiments only through backend/scripts/experiment.py (spec-0069/0071). For new workload contract 1, the supervisor launches ahe_beta.experiment.controllers.unified. Old schema-2 module/script runs use their original archive recipes; do not add compatibility scripts forwarding to old entries. Prepared v2 runs must continue with frozen source; never replace their identities, hashes, or controllers.
+
+### Directory Layout
+
+Backend and frontend are separate, following MiroFish. All backend code is under backend/; frontend/ provides the read-only dashboard. Project documentation, tools, and configuration stay at the root.
+
+```text
+backend/                 # Orchestration backend
+  ahe_beta/              # Framework package
+    experiment/          # v2 config, material freezing, local/E2B lifecycle and supervisor
+      controllers/       # unified.py + feedback.py + runtime.py: shared assembly, not public entry points
+    models.py            # Shared data structures
+    nexau_runtime.py     # Shared role adapter: load and run one agent definition
+    harness/             # Black-box interface and versioned Harness entry launcher
+    user/                # user_agent, sim/WorkspaceRuntime, local fixtures, per-session Docker, session_store
+    evaluation/          # Shared artifact collection, independent grading contracts, benchmark/custom adapters
+    tracker/             # IssueTracker, Gitea/PR observation and fake tracker
+    demand/              # Triage, Architect, PM, Owner and shared demand processing
+    guards/              # workspace_jail + repo_guard + harness_boundary; no built-in developer role
+    loop/                # Orchestrator, metrics, checkpoint, run state and runner
+    web/                 # Read-only FastAPI dashboard: /api/overview, /api/delivery, /api/sessions
+  tests/                 # Backend tests; root pyproject also includes evaluation/tests
+  agent_defs/            # NexAU definitions: user_agent/, triage_agent/, architect/, divergent_pm/, owner/
+  harness_template/      # v0 seed program: entry.py, agents/, params.yaml, smoke workflow
+  deploy/gitea/          # Gitea + act_runner + egress proxy + dual networks and bootstrap
+  deploy/vigil/          # Container containment: Dockerfile, self-cloning entrypoint and build script
+  scripts/               # Unified experiment entry, offline demo, exports, CI and build checks
+frontend/                # React + Vite + TS read-only observation dashboard
+docs/specs/             # Project-level spec-driven-development source
+examples/                # Current experiment definitions, task packages, persona library, credential template
+evaluation/              # python -m evaluation; shared harbor/harness/environments and benchmark sources
+research/                # Historical archives, frozen revisions, path/hash inventory
+tools/dev/               # Maintained probes, audits, replay and delivery verification
+tools/spec-driven-development/ # Vendored Spec CLI
+.experiments/            # Ignored experiment identities, frozen inputs and outputs
+backend/data/            # Ignored runtime artifacts: sessions/ and harness_runs/
 ```
-backend/                 # 后端（编排框架）
-  ahe_beta/         # 包（编排框架本体）
-    experiment/          # v2 配置、材料冻结、local/E2B 生命周期与监督器
-      controllers/       # unified.py + feedback.py + runtime.py：统一装配与共享设施，不是公开入口
-    models.py            # 共享数据结构（两侧共用）
-    nexau_runtime.py     # 单一 nexau 适配：加载一份 agent 定义并跑（角色共用）
-    harness/             # interface.py(黑盒对话契约) + launcher.py(取某版 harness 跑其 entry)
-    user/                # user_agent + sim/WorkspaceRuntime（本地 fixture / 每会话 Docker）+ session_store
-    evaluation/          # 共用产物采集、独立评分合同、benchmark/custom adapters 与接受关系
-    tracker/             # base.py(IssueTracker接口) + gitea.py(含 PR 观测读路径) + fake.py
-    demand/              # Triage / Architect / PM / Owner 及共享需求处理
-    guards/              # workspace_jail + repo_guard + harness_boundary；不含内置开发角色
-    loop/                # orchestrator.py + metrics.py + checkpoint.py + run_state.py + runner.py
-    web/                 # 只读观测看板 FastAPI（/api/overview /api/delivery /api/sessions ...）
-  tests/                 # 后端测试；根 pyproject 同时包含 evaluation/tests
-  agent_defs/            # 需求面角色 nexau 定义（数据）：user_agent/ triage_agent/ architect/ divergent_pm/ owner/
-  harness_template/      # v0 harness 种子（独立程序）：entry.py + agents/ + params.yaml + .gitea/workflows/smoke.yml
-  deploy/gitea/          # 基建：docker-compose.yml(Gitea+act_runner+egress-proxy+双网络) + bootstrap.sh
-  deploy/vigil/          # 交付面围堵盒（spec-0033）：Dockerfile + entrypoint.sh(自 clone) + build.sh
-  scripts/               # 唯一实验入口、offline demo、导出、CI 与构建检查
-frontend/                # 前端：React+Vite+TS 只读观测看板（消费 backend web API）
-docs/specs/              # 设计 specs（spec-driven-development 源，项目级）
-examples/                # 当前实验定义、任务包、persona 主库和唯一凭证模板
-evaluation/              # python -m evaluation：独立 Harbor 评测，harbor/harness/environments 共用，benchmarks 为任务来源
-research/                # 历史归档、冻结版本和路径/哈希 inventory
-tools/dev/               # 当前维护的探针、审计、回放与交付验证
-tools/spec-driven-development/ # vendored spec CLI
-.experiments/            # 忽略的实验身份、冻结输入与运行产物
-backend/data/            # 运行产物(.gitignore)：sessions/ harness_runs/
-```
-根目录配置：`pyproject.toml`（管 backend 子树）、`.github/`、`.gitignore`、`.commitlintrc.yml`、`CLAUDE.md`。
 
-### spec 路线
-- **spec-0001 用户侧**：models、HarnessInterface+Fake、UserAgent、IssueTracker 接口+Fake、本地 SessionStore、run_session。可独立测（不依赖真 Gitea/harness）。
-- **spec-0002 Gitea 接入与基建**：docker(sqlite)+token+标签方案、GiteaTracker、harness 仓初始化。
-- **spec-0003 开发者侧与闭环（初版，已被 0005/0007 取代）**：harness launcher、developer_agent、test_agent（体感门禁）、release（合并+tag）、orchestrator+metrics。
-- **spec-0004 Harbor 运行与可恢复 checkpoint**：所有 agent 在单沙盒一波跑（方案 A，整条 run = 1 个 harbor task），每轮边界吐增量 checkpoint artifact、喂回即从断点幂等续跑；checkpoint 维护用户侧/开发者侧/编排中间态。harbor 只包外层 rollout 生命周期，逐轮真人对话仍走 spec-0001 自立协议。
-- **spec-0005 / spec-0007 纯 trunk 开发者侧（已被 0032 取代）**：开发者侧改为带 git 工具的 nexau agent 直推 main，去掉 fix 分支/merge/release/体感门禁；体感退化为观测、benchmark held-out。闭环回灌简化为「main 最新 SHA」纯观测游标（此语义沿用至今）。
-- **spec-0032 开发者侧换轨 OpenAgents（现行）**：需求面/交付面二分——Owner 准入打 `openagents` 交接令牌，OpenAgents vigil（独立 CLI 常驻，forge/Gitea driver 见其 spec-0074）接管 ready→分支/PR→CI/评审→合并；nexau 直推 dev 退役，PR 门禁为工程质量闸（held-out 约束不变）。
-- **spec-0033 交付面容器化围堵（现行）**：vigil 关进专用容器（零宿主挂载、容器内自 clone——两面唯一媒介本就是 Gitea），internal 网络 + egress 代理 allowlist，落地 spec-0021/0022「无凭证+出口 allowlist」；观测游标改跟 origin/main（server-side merge 后本地 main 非真身）。
+Root configuration includes pyproject.toml (covering backend), .github/, .gitignore, .commitlintrc.yml, and CLAUDE.md.
 
-## 设计理念
-1. **奥卡姆剃刀**：如无必要，勿增实体。保证代码和架构的最小化、最简洁，先搭最小可用版本（MVP）再迭代。
-2. **模块解耦**：不同模块之间职责清晰、边界明确，互相解耦。
-3. **结构化管理**：文件分文件夹管理，展示出良好的层次结构。
-4. **证据驱动**：一切提到的概念、数据、结论都要有真实可查的来源，需实际查看来源内容并在对应位置给出引用，不臆造。
-5. **以成果为中心**：面向交付成果测试与验收，而非停留在代码细节。
-6. **以用户为中心**：在设计阶段，如果用户的需求有任何不明确的部分，都要向用户确认
+### Spec Roadmap
 
-## 技术栈
+- **spec-0001, user side**: models, HarnessInterface + Fake, UserAgent, IssueTracker + Fake, local SessionStore, and run_session; independently testable without real Gitea or a Harness.
+- **spec-0002, Gitea integration/infrastructure**: Docker/SQLite, tokens, labels, GiteaTracker, and Harness repository initialization.
+- **spec-0003, initial developer side/loop, superseded by 0005/0007**: Harness launcher, developer_agent, test_agent experience gate, merge/tag release, orchestrator, and metrics.
+- **spec-0004, Harbor execution and resumable checkpoints**: all agents run in one sandbox (plan A: an entire run is one Harbor task). Emit incremental checkpoints at round boundaries and resume idempotently from them. Preserve user/developer/orchestration intermediate state. Harbor wraps the outer rollout lifecycle; round-by-round conversations still use spec-0001's independent protocol.
+- **spec-0005 / spec-0007, trunk-only developer side, superseded by 0032**: a NexAU agent with Git tools pushes directly to main. Remove fix branches, merge/release stages, and experience gating. Experience becomes observational; benchmarks remain held out. The latest main SHA becomes the observation cursor, a meaning retained today.
+- **spec-0032, current OpenAgents delivery**: separate demand and delivery. Owner applies openagents; persistent vigil uses its forge/Gitea driver (OpenAgents spec-0074) for ready→branch/PR→CI/review→merge. Retire direct-push NexAU development. PR gates cover engineering quality; held-out constraints remain.
+- **spec-0033, current delivery containment**: dedicated container, no host mounts, self-cloning Harness source; Gitea is the sole medium between the two sides. Internal networking and an egress allowlist implement spec-0021/0022's no-credentials/allowlisted-egress boundaries. Observe origin/main, because local main does not represent a server-side merge.
+
+## Design Principles
+
+1. **Occam's razor**: add no entities without need. Keep code and architecture minimal; build an MVP and iterate.
+2. **Module separation**: give modules clear responsibilities and boundaries.
+3. **Structured organization**: organize files into directories with a clear hierarchy.
+4. **Evidence-driven work**: ground concepts, data, and conclusions in real, verifiable sources. Read the source and cite it where used; do not invent evidence.
+5. **Outcome-focused work**: test and accept deliverables rather than stopping at code details.
+6. **User-focused design**: confirm unclear requirements with the user during design.
+
+## Technology Stack
+
 - Python
 
-## 代码规范
-- **提交信息**：遵循 Conventional Commits —— `<类型>(<范围>): <描述>`
-  - 类型：feat / fix / refactor / chore / docs / test / ci / style / perf / build / spec（spec 制品撰写/修订）
-- **代码检查**：Ruff（行宽 100）
-- **Git 钩子**：lefthook —— pre-commit（lint）+ commit-msg（commitlint）
-- **Git 推送**：首次推送分支用 `git push -u origin <branch>` 设置 upstream tracking
-- **自动提交**：每完成一处改动即 `git add` + `git commit` + `git push`，无需征求确认（用户已长期授权）。
-- **CI**：CI 不过就反复修复重推直到全绿。
-- **代码注释**：中英文皆可，不强制区分，以清晰表达为先。
-- **Python 函数参数**：禁止位置参数（`/` 语法）；private 函数（`_` 开头，不含 dunder）参数禁止默认值，调用方必须显式传参。
+## Code Conventions
+
+- **Commit messages**: Conventional Commits, `<type>(<scope>): <description>`.
+  - Types: feat / fix / refactor / chore / docs / test / ci / style / perf / build / spec (Spec authoring/revision).
+- **Code checks**: Ruff, line length 100.
+- **Git hooks**: lefthook, with pre-commit lint and commit-msg commitlint.
+- **Git pushes**: set upstream on the first push with `git push -u origin <branch>`.
+- **Automatic commits**: after each completed change, git add + git commit + git push without seeking confirmation, under the user's standing authorization. Explicit session instructions take precedence.
+- **CI**: fix and push repeatedly until all checks pass.
+- **Comments and docstrings**: write in English. Chinese editions and original source data follow their explicit preservation rules.
+- **Python parameters**: positional-only parameters (`/`) are prohibited. Private functions (names starting with `_`, excluding dunders) must not have default parameter values; callers supply all arguments explicitly.

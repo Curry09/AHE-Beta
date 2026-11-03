@@ -1,4 +1,4 @@
-"""GiteaTracker 观测读路径单测：全状态 issue / 单条 issue / 评论 / commit 详情（mock HTTP）。"""
+"""GiteaTracker read path unit test: full state issue / single issue / comments / commit details (mock HTTP)."""
 
 from __future__ import annotations
 
@@ -34,7 +34,9 @@ class _FakeSession:
         timeout: float | None = None,
         allow_redirects: bool = False,
     ) -> _Resp:
-        assert timeout is not None, "GiteaTracker 的请求必须带超时（防挂死闭环）"
+        assert timeout is not None, (
+            "GiteaTracker requests must include a timeout（Closed loop hang prevention）"
+        )
         assert allow_redirects is False
         self.calls.append((method, url))
         return self._handler(method, url, json)
@@ -48,8 +50,8 @@ def _tracker(handler) -> GiteaTracker:
 
 _ISSUE_RAW = {
     "number": 7,
-    "title": "harness 卡顿",
-    "body": "复现步骤……",
+    "title": "harness Lag",
+    "body": "Steps to reproduce……",
     "labels": [{"name": "bug"}, {"name": "design"}],
     "state": "closed",
     "created_at": "2026-07-01T10:00:00Z",
@@ -66,8 +68,8 @@ def test_list_issues_all_states_full_fields() -> None:
     (issue,) = _tracker(handler).list_issues()
     assert issue == {
         "number": 7,
-        "title": "harness 卡顿",
-        "body": "复现步骤……",
+        "title": "harness Lag",
+        "body": "Steps to reproduce……",
         "labels": ["bug", "design"],
         "state": "closed",
         "created_at": "2026-07-01T10:00:00Z",
@@ -84,7 +86,7 @@ def test_get_issue_and_comments() -> None:
                 [
                     {
                         "user": {"login": "developer"},
-                        "body": "已推进 main v2",
+                        "body": "Advanced main v2",
                         "created_at": "2026-07-02T09:00:00Z",
                     }
                 ],
@@ -94,11 +96,11 @@ def test_get_issue_and_comments() -> None:
         return _Resp(404, text="no route")
 
     t = _tracker(handler)
-    assert t.get_issue(number=7)["title"] == "harness 卡顿"
+    assert t.get_issue(number=7)["title"] == "harness Lag"
     (comment,) = t.list_comments(number=7)
     assert comment == {
         "author": "developer",
-        "body": "已推进 main v2",
+        "body": "Advanced main v2",
         "created_at": "2026-07-02T09:00:00Z",
     }
 
@@ -115,7 +117,7 @@ def test_get_commit_detail_merges_stats_files_diff_and_tags() -> None:
 
     def handler(method: str, url: str, json: Any) -> _Resp:
         if url.endswith(f"/git/commits/{sha}.diff"):
-            return _Resp(200, text="diff --git a/agents/main.md b/agents/main.md\n+新增一行")
+            return _Resp(200, text="diff --git a/agents/main.md b/agents/main.md\n+Add a row")
         if f"/git/commits/{sha}" in url:
             return _Resp(
                 200,
@@ -123,7 +125,7 @@ def test_get_commit_detail_merges_stats_files_diff_and_tags() -> None:
                     "sha": sha,
                     "html_url": f"http://gitea/o/r/commit/{sha}",
                     "commit": {
-                        "message": "fix: issue #7\n\n详细说明",
+                        "message": "fix: issue #7\n\nDetailed description",
                         "author": {"name": "developer", "date": "2026-07-02T08:00:00Z"},
                     },
                     "stats": {"additions": 3, "deletions": 1, "total": 4},
@@ -136,11 +138,13 @@ def test_get_commit_detail_merges_stats_files_diff_and_tags() -> None:
 
     detail = _tracker(handler).get_commit_detail(sha=sha)
     assert detail["short_sha"] == "a" * 7
-    assert detail["message"] == "fix: issue #7\n\n详细说明"  # 全文非首行
+    assert (
+        detail["message"] == "fix: issue #7\n\nDetailed description"
+    )  # Not in first line of full text
     assert detail["tags"] == ["v2"]
     assert detail["stats"] == {"additions": 3, "deletions": 1, "total": 4}
     assert detail["files"] == [{"filename": "agents/main.md", "status": "modified"}]
-    assert "+新增一行" in detail["diff"]
+    assert "+Add a row" in detail["diff"]
 
 
 def test_get_commit_detail_diff_failure_degrades_to_empty() -> None:
@@ -156,4 +160,5 @@ def test_get_commit_detail_diff_failure_degrades_to_empty() -> None:
         return _Resp(404, text="no route")
 
     detail = _tracker(handler).get_commit_detail(sha=sha)
-    assert detail["diff"] == "" and detail["message"] == "m"  # diff 降级不阻断主体
+    # Diff degradation does not block main body
+    assert detail["diff"] == "" and detail["message"] == "m"

@@ -1,12 +1,12 @@
 ---
 number: "0040"
-title: 交付面打开 RFC：drafter 落 docs/specs + 提交边界改拒绝清单
+title: "Enable RFC on the delivery side: drafter writes docs/specs + switch the commit boundary to a denylist"
 issue: 0
 slug: rfc-stage-and-commit-denylist
-summary: 把交付面 stages.rfc 从 skip 改为 agent，让 drafter 在 harness 仓落下施工规格；提交边界从顶层白名单改为拒绝清单（只拦密钥与 vigil 运行态），否则 RFC 写下的 docs/ 会被 smoke 打死。自定义 Anthropic 协议网关域名必须进 egress allowlist。OpenAgents 侧 implement 首轮优先跟 worktree 已有 specs（本仓只镜像描述）。
+summary: "Change stages.rfc on the delivery side from skip to agent so drafter writes implementation specifications in the harness repository; change the commit boundary from a top-level allowlist to a denylist (blocking only secrets and vigil runtime state), otherwise docs/ written by RFC will fail smoke. Custom Anthropic protocol gateway domains must be added to the egress allowlist. On the OpenAgents side, the first implement round prioritizes existing specs in the worktree (this repository only mirrors the description)."
 tasks:
   - id: T1
-    title: stages.rfc=agent 定稿 + vigil 缺省 keep-alive
+    title: "Finalize stages.rfc=agent + keep vigil alive by default"
     status: done
     priority: P1
     tags: []
@@ -17,10 +17,10 @@ tasks:
       - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/tests/test_run_vigil.py
       - backend/ahe_beta/experiment/controllers/swebench.py
-    scope: run.py 的 _VIGIL_STAGES 把 rfc 从 skip 改为 agent（drafter 先落 docs/specs，再 implement；spec CLI 在 vigil 镜像内，不进 harness 仓依赖）。打开 RFC 拉长 solve，需求面 TOTAL_ROUNDS 收尾时交付面往往还在跑：VIGIL_KEEP_ALIVE 缺省常驻，仅显式 0/false/no/off 才在需求面收尾拆 vigil。write_openagents_config 与单测断言 stages 定稿一致；swebench 闭环脚本随 start_vigil 同源 keep-alive。
-    acceptance: test_run_vigil 断言 yml stages.rfc=agent；VIGIL_KEEP_ALIVE 缺省 True、显式关闭才 docker rm / 杀 subprocess；容器复用已在跑实例不重复 docker run。pytest backend/tests/test_run_vigil.py 绿。
+    scope: "In run.py, _VIGIL_STAGES changes rfc from skip to agent (drafter first writes docs/specs, then implement runs; the spec CLI is in the vigil image and is not added to harness repository dependencies). Enabling RFC lengthens solve, so the delivery side is often still running when TOTAL_ROUNDS on the requirements side concludes: VIGIL_KEEP_ALIVE keeps vigil running by default, and vigil is torn down when the requirements side concludes only for an explicit 0/false/no/off. write_openagents_config and unit test assertions match the finalized stages; the swebench closed-loop script uses the same keep-alive logic as start_vigil."
+    acceptance: "test_run_vigil asserts yml stages.rfc=agent; VIGIL_KEEP_ALIVE defaults to True, and docker rm / subprocess termination occurs only when explicitly disabled; container reuse does not repeat docker run for an already running instance. pytest backend/tests/test_run_vigil.py passes."
   - id: T2
-    title: 提交边界从白名单改为拒绝清单
+    title: "Change the commit boundary from an allowlist to a denylist"
     status: done
     priority: P1
     tags: []
@@ -30,10 +30,10 @@ tasks:
     files:
       - backend/ahe_beta/guards/harness_boundary.py
       - backend/tests/guards/test_harness_boundary.py
-    scope: harness_boundary 不再用顶层白名单锁死产品形状。DENIED_TOP 只含 .openagents；另拒 .env / .env.*（.env.example 除外）。docs/specs、新目录、pyproject、README、.gitea 一律放行。钩子模板与 violations() 同源。容器围堵后过拟合信道（编排仓 / data/sessions）vigil 看不见，白名单已无必要。
-    acceptance: violations 对 docs/specs、pyproject.toml、新顶层目录返回空；对 .env、.env.local、.openagents/* 返回这些路径；.env.example 放行。装钩子的临时仓可 commit docs/specs，不可 commit .env。pytest backend/tests/guards/test_harness_boundary.py 绿。
+    scope: "harness_boundary no longer constrains the product's structure with a top-level allowlist. DENIED_TOP contains only .openagents; .env / .env.* are also denied (except .env.example). docs/specs, new directories, pyproject, README, and .gitea are all allowed. The hook template and violations() use the same source. With container containment, vigil cannot see the overfitting channels (the orchestration repository / data/sessions), so the allowlist is no longer necessary."
+    acceptance: "violations returns empty for docs/specs, pyproject.toml, and new top-level directories; for .env, .env.local, and .openagents/*, it returns those paths; .env.example is allowed. A temporary repository with the hook installed can commit docs/specs but cannot commit .env. pytest backend/tests/guards/test_harness_boundary.py passes."
   - id: T3
-    title: smoke 拒绝清单与种子 docs/specs 落点
+    title: "Smoke denylist and seed docs/specs location"
     status: done
     priority: P1
     tags: []
@@ -44,10 +44,10 @@ tasks:
     files:
       - backend/harness_template/.gitea/workflows/smoke.yml
       - backend/harness_template/docs/specs/README.md
-    scope: harness_template 的 smoke.yml 边界检查与 T2 拒绝清单同步（仓独立无法 import，改动须两处一起改）。pre-commit 可被 --no-verify 绕过，服务端 smoke 绕不开。种子仓带 docs/specs/README.md：说明 drafter 落点与 spec CLI 由 vigil 镜像提供、不进 harness 依赖。
-    acceptance: smoke 内联脚本拒绝 .openagents 与 .env/.env.*、放行 .env.example 与任意其它顶层路径（含 docs/）；README 写明 rfc:agent 落点且不把 spec CLI 列为 harness 依赖。与 T2 DENIED_TOP / .env 规则字面一致。
+    scope: "The boundary check in harness_template's smoke.yml is synchronized with the T2 denylist (the repository is independent and cannot import it, so changes must be made in both places together). pre-commit can be bypassed with --no-verify; server-side smoke cannot. The seed repository includes docs/specs/README.md: it explains the drafter output location and that the spec CLI is provided by the vigil image and is not added to harness dependencies."
+    acceptance: "The smoke inline script denies .openagents and .env/.env.*, and allows .env.example and all other top-level paths (including docs/); README documents the rfc:agent output location and does not list the spec CLI as a harness dependency. This matches the T2 DENIED_TOP / .env rules literally."
   - id: T4
-    title: 自定义 Anthropic 网关域进 egress allowlist
+    title: "Add custom Anthropic gateway domains to the egress allowlist"
     status: done
     priority: P1
     tags: []
@@ -56,10 +56,10 @@ tasks:
     parallel: false
     files:
       - backend/deploy/gitea/egress-proxy.conf
-    scope: 容器围堵下 vigil 出网只经 egress 代理。凡 ANTHROPIC_BASE_URL 指向非 anthropic.com / claude.ai 的 Anthropic 协议网关，其域名必须写入 allowed_egress，否则 rfc:agent 的 drafter/implementer 全部 403。本部署实例放行 .pjlab.org.cn；规则是「自定义网关域进 allowlist」，不是把某一家网关写进抽象需求。
-    acceptance: egress-proxy.conf 对自定义 ANTHROPIC_BASE_URL 有注释指引；当前实例含 .pjlab.org.cn；未在 allowlist 的域经代理被拒。改 conf 后需重启 egress-proxy 才生效（部署步骤，不另加脚本）。
+    scope: "Under container containment, vigil accesses the network only through the egress proxy. Whenever ANTHROPIC_BASE_URL points to an Anthropic protocol gateway outside anthropic.com / claude.ai, its domain must be added to allowed_egress; otherwise, all rfc:agent drafter/implementer requests receive 403. This deployment instance allows .pjlab.org.cn; the rule is “add custom gateway domains to the allowlist,” not to hard-code a particular gateway into the abstract requirements."
+    acceptance: "egress-proxy.conf includes commented guidance for custom ANTHROPIC_BASE_URL values; the current instance includes .pjlab.org.cn; domains outside the allowlist are denied through the proxy. After changing conf, restart egress-proxy for the change to take effect (a deployment step, with no additional script)."
   - id: T5
-    title: OpenAgents 镜像：implement 首轮优先 worktree specs
+    title: "OpenAgents mirror: prioritize worktree specs in the first implement round"
     status: done
     priority: P1
     tags: []
@@ -70,143 +70,143 @@ tasks:
     files:
       - OpenAgents/openagents/recipes/vigil.py
       - OpenAgents/openagents/agents/implementer.py
-    scope: 本任务在 OpenAgents 仓按其 spec 流程另立落地，此处为镜像描述，不把 OA 源码拷进本仓。契约：rfc:agent 且 worktree 已有 docs/specs 下对本 issue 的组时，implement 首轮 context 必须按 Task 实现并引用 Spec-NNNN，而不是只啃 issue 正文；无 spec 时仍按 issue 正文。本仓 pin 仍是镜像 ahe-beta-vigil:latest。
-    acceptance: OpenAgents 仓：rfc:agent + worktree 含对应 spec 时 _first_round_context_text / implementer 提示词要求跟 Task；rfc:skip 或无 docs/specs 时不空转找 Spec-NNNN。本仓不 vendor OA、不新增 import。
+    scope: "This task is implemented separately in the OpenAgents repository under its spec process; this is a mirrored description, and OA source code is not copied into this repository. Contract: when rfc:agent is set and the worktree already contains a group for this issue under docs/specs, the first implement round's context must require implementation according to the Task and reference Spec-NNNN, rather than relying only on the issue body; without a spec, continue using the issue body. This repository remains pinned to the ahe-beta-vigil:latest image."
+    acceptance: "OpenAgents repository: when rfc:agent is set and the worktree contains the corresponding spec, _first_round_context_text / implementer prompts require following the Task; with rfc:skip or no docs/specs, do not waste cycles searching for Spec-NNNN. This repository does not vendor OA or add imports."
 ---
 
-# 0040 · 交付面打开 RFC：drafter 落 docs/specs + 提交边界改拒绝清单
+# 0040 · Enable RFC on the delivery plane: drafter writes docs/specs + change the commit boundary to a denylist
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level rust-RFC overview in 9 sections. -->
 
 ## Summary
 
-交付面打开 RFC：`run.py` 写入 harness 仓 `.openagents/openagents.yml` 的 `stages.rfc` 从 `skip` 改为 `agent`。solve 先由 drafter 在 harness 仓 `docs/specs/` 落下施工规格（单文件组、Task DAG），再由 implementer 按 Task 改产品代码。`spec` CLI 由 vigil 容器镜像提供，不进入 harness 仓依赖、不把编排仓的 spec 制度焊进被进化对象。
+Enable RFC on the delivery plane: change `stages.rfc` in the harness repository's `.openagents/openagents.yml`, written by `run.py`, from `skip` to `agent`. During solve, the drafter first writes the implementation specification (single-file group, Task DAG) to `docs/specs/` in the harness repository, then the implementer changes product code by Task. The `spec` CLI is provided by the vigil container image; it does not become a harness repository dependency or embed the orchestration repository's spec process into the object being evolved.
 
-打开 RFC 的前置条件是提交边界改形状。原先 harness 提交闸是顶层白名单（只许 `entry.py` / `agents/` / `tests/` 等固定名字），`docs/` 与新目录一律拒绝。rfc:agent 写下 `docs/specs` 后，Gitea smoke 会在数秒内变红，PR 合并不了。围堵已升到 vigil 专用容器（零宿主挂载、容器内自 clone）之后，过拟合信道（编排仓源码、`data/sessions`、benchmark 任务目录）vigil 文件系统看不见；白名单锁死产品形状已无必要。边界改为拒绝清单：只拒 `.openagents/`（vigil 运行态）和真实密钥（`.env` / `.env.*`，`.env.example` 除外）。pre-commit 钩子与 smoke.yml 内联脚本必须同步；钩子可被 `--no-verify` 绕过，服务端 smoke 绕不开。
+Enabling RFC requires reshaping the commit boundary first. Previously, the harness commit gate used a top-level allowlist (allowing only fixed names such as `entry.py` / `agents/` / `tests/`), rejecting `docs/` and all new directories. After rfc:agent writes `docs/specs`, Gitea smoke turns red within seconds, preventing the PR from merging. Now that containment has moved to a dedicated vigil container (zero host mounts, cloning for itself inside the container), overfitting channels (orchestration repository source code, `data/sessions`, benchmark task directories) are invisible to the vigil filesystem; the allowlist no longer needs to lock down the product's structure. Change the boundary to a denylist: reject only `.openagents/` (vigil runtime state) and real secrets (`.env` / `.env.*`, except `.env.example`). The pre-commit hook and the inline script in smoke.yml must stay synchronized; the hook can be bypassed with `--no-verify`, but server-side smoke cannot.
 
-容器出网只经 egress 代理。凡 `ANTHROPIC_BASE_URL` 指向非官方 Anthropic 域的协议网关，其域名必须写入 `egress-proxy.conf` 的 `allowed_egress`，否则 drafter/implementer 全部失败。当前部署实例放行 `.pjlab.org.cn`；抽象需求是「自定义网关域进 allowlist」，不是把某一家网关写进制度。
+Container outbound traffic goes exclusively through the egress proxy. For any protocol gateway where `ANTHROPIC_BASE_URL` points to a nonofficial Anthropic domain, that domain must be included in `allowed_egress` in `egress-proxy.conf`, or both drafter and implementer will fail. The current deployment allows `.pjlab.org.cn`; the abstract requirement is “add custom gateway domains to the allowlist,” not to encode a particular gateway provider into the process.
 
-OpenAgents 侧契约（本仓镜像描述，不 vendor 其源码）：rfc:agent 且 worktree 已有对本 issue 的 `docs/specs` 组时，implement 首轮 context 必须按 Task 实现并引用 `Spec-NNNN`，而不是只啃 issue 正文；无 spec 时仍按 issue 正文。本仓 pin 仍是镜像 `ahe-beta-vigil:latest`。打开 RFC 拉长 solve，需求面 `TOTAL_ROUNDS` 收尾时交付面往往还在跑：`VIGIL_KEEP_ALIVE` 缺省常驻，仅显式关闭才在需求面收尾拆 vigil。
+OpenAgents-side contract (described by this repository's image, without vendoring its source): with rfc:agent, when the worktree already contains an `docs/specs` group for this issue, the initial implement context must require implementation by Task and references to `Spec-NNNN`, rather than relying solely on the issue body; without a spec, continue using the issue body. This repository remains pinned to image `ahe-beta-vigil:latest`. Enabling RFC lengthens solve, and the delivery plane is often still running when the demand plane finishes `TOTAL_ROUNDS`: `VIGIL_KEEP_ALIVE` keeps vigil running by default, and vigil is torn down at demand-plane completion only when this is explicitly disabled.
 
-本组不覆盖：harness 仓内具体产品改动（心跳、stall 文案等——那是被进化对象，held-out）；需求面编制/超时调参；OpenAgents 内部函数体实现细节。
+This group does not cover: specific product changes in the harness repository (heartbeat, stall wording, etc.—those belong to the object being evolved and are held-out); demand-plane configuration/timeout tuning; internal OpenAgents function implementations.
 
 ## Motivation
 
-换轨后的运行时是需求面 / 交付面二分。需求面（同一 nexau 运行时、不同 agent 定义）跑用户模拟，产出体感与 issue；Owner 是唯一准入点，admit 打 `openagents` 交接令牌。交付面是进程外的 OpenAgents vigil（独立 CLI，不 vendor 不 import），发现带令牌的票后走「盖 `ready` → curator 排依赖 → worktree/分支 → 实现 → 评审循环 → PR → conflict/CI/review 闸 → 合并进 main」。两面只通过 Gitea 标签与 main SHA 交互。CI/评审是工程质量闸（harness 仓结构冒烟，绝不跑 benchmark）；体感纯观测；benchmark 全程 held-out。观测锚点是 merge commit。
+After the transition, the runtime is split into a demand plane and a delivery plane. The demand plane (the same nexau runtime, with different agent definitions) runs user simulations and produces user experience observations and issues; Owner is the sole admission point, and admit applies the `openagents` handoff token. The delivery plane is out-of-process OpenAgents vigil (an independent CLI, neither vendored nor imported). After discovering an issue bearing the token, it follows “apply `ready` → curator orders dependencies → worktree/branch → implementation → review loop → PR → conflict/CI/review gates → merge into main.” The two planes interact only through Gitea labels and the main SHA. CI/review are engineering quality gates (structural smoke checks of the harness repository, never benchmark runs); user experience is purely observational; the benchmark remains held-out throughout. The observation anchor is the merge commit.
 
-交付面 stages 起步把 `rfc` 定为 `skip`，原因当时成立：harness 是被进化的独立仓，仓内没有 spec 工具链；给被进化对象加一套制度会增加负担，且 drafter 需要 `spec` CLI。换轨时的显式取舍是「先让 PR 门禁转起来，RFC 二期再评估」。
+The delivery-plane stages initially set `rfc` to `skip` for reasons that were valid at the time: harness is an independent repository being evolved, with no spec toolchain inside it; adding a process to the object being evolved would increase its burden, and drafter requires the `spec` CLI. The explicit tradeoff during the transition was “get the PR gates running first, then reassess RFC in phase two.”
 
-二期条件现已具备，且 `skip` 的成本已经实证：
+The conditions for phase two are now in place, and the cost of `skip` has been demonstrated:
 
-1. **spec CLI 不必进 harness 仓。** vigil 跑在专用容器里，镜像内已有 OpenAgents（含 `spec` CLI）。drafter 在容器工作目录（自 clone 的 harness 仓）落 `docs/specs/`，工具链留在镜像，被进化对象只多一个文档目录。
-2. **白名单与 RFC 互斥。** 提交边界原先用顶层白名单防「把某个 benchmark 任务焊进 harness」。容器围堵之后，vigil 零宿主挂载，编排仓与 session 数据不在其文件系统内，那条过拟合信道已经切断。白名单继续存在时，合法演进（`docs/specs`、新包目录、`pyproject.toml`、README）会在 smoke 上被打死。实证：打开 `rfc:agent` 后 drafter 写下 `docs/`，smoke 约 3 秒红，PR 无法合并——RFC 阶段等于空转。
-3. **implement 若不跟 spec，RFC 没有交付意义。** OpenAgents 缺省首轮 context 以 issue 正文为主。rfc:agent 之后 worktree 里已经有 Task 分解；若不把「按 Task 实现」提升为一等指令，drafter 的规格会被 implementer 忽略，回到「直接啃 issue」。
-4. **solve 变长，需求面不能拆 vigil。** drafter + implement 两拍明显长于 `rfc:skip` 时的单拍实现。需求面常 `TOTAL_ROUNDS=1` 先结束；若 `stop_vigil` 仍 `docker rm`，未完成的 RFC/PR 被杀掉。缺省 keep-alive 把交付面生命周期从需求面 round 解耦。
+1. **The spec CLI does not need to enter the harness repository.** vigil runs in a dedicated container whose image already contains OpenAgents (including the `spec` CLI). drafter writes `docs/specs/` in the container working directory (its own clone of the harness repository); the toolchain stays in the image, and the object being evolved gains only a documentation directory.
+2. **The allowlist and RFC are mutually exclusive.** The commit boundary originally used a top-level allowlist to prevent “embedding a particular benchmark task into harness.” After container containment, vigil has zero host mounts, and the orchestration repository and session data are absent from its filesystem, cutting off that overfitting channel. With the allowlist still in place, legitimate evolution (`docs/specs`, new package directories, `pyproject.toml`, README) gets blocked by smoke. Evidence: after enabling `rfc:agent`, drafter wrote `docs/`, smoke turned red in about 3 seconds, and the PR could not merge—the RFC stage was effectively running without producing results.
+3. **If implement does not follow the spec, RFC has no delivery value.** OpenAgents defaults to an initial context centered on the issue body. After rfc:agent, the worktree already contains a Task breakdown; unless “implement by Task” becomes a first-class instruction, the implementer will ignore the drafter's specification and revert to “working directly from the issue.”
+4. **solve becomes longer, so the demand plane must not tear down vigil.** The two beats of drafter + implement take noticeably longer than the single implementation beat with `rfc:skip`. The demand plane often finishes `TOTAL_ROUNDS=1` first; if `stop_vigil` still performs `docker rm`, unfinished RFCs/PRs are killed. Default keep-alive decouples the delivery-plane lifecycle from demand-plane rounds.
 
-因此本组同时改四件事：打开 RFC、改拒绝清单（钩子 + smoke 同步）、egress 放行自定义网关域、钉死 implement 首轮跟 spec 的跨仓契约。四者缺一，RFC 在闭环里都走不通。
+This group therefore changes four things together: enable RFC, switch to a denylist (synchronize hook + smoke), allow custom gateway domains through egress, and pin down the cross-repository contract requiring the initial implement context to follow the spec. Without any one of these, RFC cannot work in the closed loop.
 
-本组明确不写进 Task 的事实（避免把运行操作和被进化对象焊进编排仓设计）：harness 仓产品向 PR（心跳、stall、`[unverified]` 文案等）是进化结果，施工规格应落在 harness 仓自己的 `docs/specs/`；需求面 GLM overlay、用户 LLM 超时、`N_DIVERGENTS` 默认值、architect 超时是编制/运行调参。
+Facts explicitly excluded from this group's Tasks (to avoid embedding operational actions and the object being evolved into the orchestration repository's design): product PRs in the harness repository (heartbeat, stall, `[unverified]` wording, etc.) are evolution results, and their implementation specifications should live in the harness repository's own `docs/specs/`; the demand-plane GLM overlay, user LLM timeout, `N_DIVERGENTS` default, and architect timeout are configuration/runtime tuning.
 
 ## Guide-level explanation
 
-一次 Owner 准入之后，交付面按打开 RFC 的路径工作：
+After an Owner admission, the delivery plane follows the path with RFC enabled:
 
-1. vigil 发现带 `openagents` 的票，盖 `ready`，curator 排依赖，开 worktree/分支。
-2. **drafter**（`rfc:agent`）在 worktree 的 `docs/specs/` 落下 `NNNN-slug.md`（frontmatter Task + 组级总览）。不写产品实现。`spec` 命令来自容器 PATH，harness 仓 `docs/specs/README.md` 只说明落点。
-3. **implementer** 首轮读到的 context 优先是这些 Task：有对应 spec 就按 Task 改代码并引用 `Spec-NNNN`；没有（或某次临时 `rfc:skip`）才按 issue 正文。
-4. 提交时 pre-commit 钩子按拒绝清单检查：`docs/specs/0001-….md` 放行；`.env`、`.openagents/vigil-queue.db` 拒绝。即便有人 `--no-verify`，Gitea Actions 的 smoke 用同一份拒绝清单再拦一次。
-5. smoke 绿、review/merge 闸过，合进 main。需求面 c 步仍只读 `origin/main` SHA 作观测游标。
-6. 需求面这一轮已经结束也不拆 vigil 容器（缺省 keep-alive），交付面继续把票做完。
+1. vigil discovers an issue bearing `openagents`, applies `ready`, has curator order dependencies, and opens a worktree/branch.
+2. **drafter** (`rfc:agent`) writes `NNNN-slug.md` (frontmatter Tasks + group-level overview) to `docs/specs/` in the worktree. It does not write the product implementation. The `spec` command comes from the container PATH; the harness repository's `docs/specs/README.md` only documents the destination.
+3. The initial context read by **implementer** prioritizes these Tasks: when a corresponding spec exists, change code by Task and reference `Spec-NNNN`; use the issue body only when none exists (or for a temporary `rfc:skip` run).
+4. At commit time, the pre-commit hook checks the denylist: allow `docs/specs/0001-….md`; reject `.env` and `.openagents/vigil-queue.db`. Even if someone uses `--no-verify`, Gitea Actions smoke checks the same denylist again.
+5. Once smoke is green and the review/merge gates pass, merge into main. Demand-plane step c still reads only the `origin/main` SHA as its observation cursor.
+6. Even if this demand-plane round has finished, the vigil container is not torn down (default keep-alive); the delivery plane continues completing issues.
 
-开发者改提交边界时必须同时改两处：`backend/ahe_beta/guards/harness_boundary.py`（钩子生成源）和 `backend/harness_template/.gitea/workflows/smoke.yml`（服务端内联脚本，harness 仓独立、无法 import 编排包）。只改一处会在「钩子绿、CI 红」或「钩子红、CI 绿」上分叉。
+Developers changing the commit boundary must update two locations together: `backend/ahe_beta/guards/harness_boundary.py` (hook generation source) and `backend/harness_template/.gitea/workflows/smoke.yml` (server-side inline script; the harness repository is independent and cannot import the orchestration package). Changing only one creates a divergence of “hook green, CI red” or “hook red, CI green.”
 
-接非官方 Anthropic 协议网关时：把网关域名加进 `backend/deploy/gitea/egress-proxy.conf` 的 `allowed_egress` 并重启 egress-proxy，同时设置 `ANTHROPIC_BASE_URL`（及网关所需的模型名覆盖）。漏加域名时，打开 RFC 只表现为容器内 LLM 调用被代理 403，日志在 `data/vigil.log`。
+When connecting a nonofficial Anthropic protocol gateway: add the gateway domain to `allowed_egress` in `backend/deploy/gitea/egress-proxy.conf` and restart egress-proxy, while also setting `ANTHROPIC_BASE_URL` (and any model-name overrides required by the gateway). If the domain is omitted, enabling RFC manifests only as proxy 403 responses to in-container LLM calls; logs are in `data/vigil.log`.
 
 ## Reference-level explanation
 
-### 接缝与不变量（就地复述）
+### Interfaces and invariants (restated here)
 
-- **需求面 / 交付面二分不变。** Owner 唯一准入、交接令牌 `openagents`、vigil 盖 `ready`、观测游标跟 `origin/main`，本组不改。
-- **held-out 不变。** smoke 仍是结构冒烟（`compileall` + 关键制品在位 + 拒绝清单），不跑 benchmark、不调 LLM。RFC 文档是施工计划，不是测试信号。
-- **零代码耦合不变。** 本仓不 vendor、不 import OpenAgents。T5 的 `files` 列出 `OpenAgents/...` 路径，语义与换轨时相同：在 OpenAgents 仓按其 spec 另立落地，此处钉契约。本仓 pin = `ahe-beta-vigil:latest`（`backend/deploy/vigil/build.sh`）。
-- **spec CLI 的位置。** 在 vigil 镜像内，不进 harness `pyproject` / 种子依赖。harness 仓只拥有 `docs/specs/` 文本产物。
+- **The demand-plane / delivery-plane split remains unchanged.** Owner is the sole admission point, the handoff token is `openagents`, vigil applies `ready`, and the observation cursor follows `origin/main`; this group changes none of these.
+- **held-out remains unchanged.** smoke remains a structural smoke check (`compileall` + required artifacts present + denylist), running no benchmarks and making no LLM calls. RFC documents are implementation plans, not test signals.
+- **Zero code coupling remains unchanged.** This repository neither vendors nor imports OpenAgents. T5's `files` lists the `OpenAgents/...` path, with the same semantics as during the transition: implement separately in the OpenAgents repository under its spec process; pin down the contract here. This repository's pin = `ahe-beta-vigil:latest` (`backend/deploy/vigil/build.sh`).
+- **Location of the spec CLI.** Inside the vigil image, not in harness `pyproject` / seed dependencies. The harness repository owns only the `docs/specs/` text artifacts.
 
-### T1：`stages.rfc=agent` 与 vigil keep-alive
+### T1: `stages.rfc=agent` and vigil keep-alive
 
-`backend/ahe_beta/experiment/controllers/ordinary.py` 的 `_VIGIL_STAGES` 是写入 `.openagents/openagents.yml` 的单一出处（每次 run 生成，勿手改 yml）。定稿：
+`_VIGIL_STAGES` in `backend/ahe_beta/experiment/controllers/ordinary.py` is the single source for writing `.openagents/openagents.yml` (generated for each run; do not hand-edit yml). Final form:
 
 ```text
-triage: skip      # 准入已由 Owner 完成
-rfc: agent        # 本组：drafter 落 docs/specs，再 implement
+triage: skip      # Admission already completed by Owner
+rfc: agent        # This group: drafter writes to docs/specs, then implement
 conflict: agent
-ci: skip          # 仍经 VIGIL_CI_STAGE 覆盖；零 check=永等 CI，未验证 act_runner 前不开
+ci: skip          # Still overridden via VIGIL_CI_STAGE; zero checks = wait forever for CI, do not enable before validating act_runner
 e2e: skip
 review: agent
 merge: agent
 ```
 
-`rfc:skip` 起步时的注释（harness 无 spec 工具链、显式告警可接受）作废，改为「spec CLI 在镜像内」。
+The initial `rfc:skip` comment (harness has no spec toolchain, explicit warnings are acceptable) is obsolete; replace it with “the spec CLI is in the image.”
 
-`VIGIL_KEEP_ALIVE`：缺省常驻。仅环境变量显式 `0` / `false` / `no` / `off` 时，需求面 `finally` 才 `docker rm` / 杀 subprocess。keep-alive 时 `stop_vigil` 只拆日志跟随器（`docker logs -f`），不拆 vigil 容器；再次 `start_vigil` 复用已在跑实例，不重复 `docker run`。`backend/ahe_beta/experiment/controllers/swebench.py` 经同一 `start_vigil`，行为同源。
+`VIGIL_KEEP_ALIVE`: keep running by default. Only when the environment variable is explicitly `0` / `false` / `no` / `off` does demand-plane `finally` perform `docker rm` / kill the subprocess. With keep-alive, `stop_vigil` tears down only the log follower (`docker logs -f`), not the vigil container; another `start_vigil` reuses the running instance without repeating `docker run`. `backend/ahe_beta/experiment/controllers/swebench.py` goes through the same `start_vigil` and therefore shares its behavior.
 
-单测：`backend/tests/test_run_vigil.py` 断言 yml `stages.rfc == agent`、keep-alive 缺省/关闭、容器复用。
+Unit tests: `backend/tests/test_run_vigil.py` asserts yml `stages.rfc == agent`, keep-alive default/disabled behavior, and container reuse.
 
-### T2：拒绝清单
+### T2: Denylist
 
-`harness_boundary.violations(staged_paths)` 与生成的 pre-commit 钩子同源：
+`harness_boundary.violations(staged_paths)` and the generated pre-commit hook share the same source:
 
-- `DENIED_TOP = {".openagents"}`（精确匹配路径第一段）。
-- 任意路径分段等于 `.env` 或以 `.env.` 开头 → 拒绝；分段为 `.env.example` → 跳过该段判定。
-- `__pycache__` / `.pyc` 可忽略，既不越界也不该入库。
-- 其余顶层路径放行，包括但不限于：`docs/`、`src/`、`pyproject.toml`、`README.md`、`.gitea/`、任意新包名。
+- `DENIED_TOP = {".openagents"}` (exact match against the first path segment).
+- Any path segment equal to `.env` or starting with `.env.` → reject; a segment equal to `.env.example` → skip checking that segment.
+- `__pycache__` / `.pyc` can be ignored; they neither cross the boundary nor belong in the repository.
+- Allow all other top-level paths, including but not limited to: `docs/`, `src/`, `pyproject.toml`, `README.md`, `.gitea/`, and any new package name.
 
-不再维护「允许的顶层名字」集合。白名单防过拟合的职责已由容器文件系统边界承担。
+Stop maintaining a set of “allowed top-level names.” The container filesystem boundary now carries the allowlist's former responsibility for preventing overfitting.
 
-### T3：smoke 同步 + 种子落点
+### T3: Synchronize smoke + seed destination
 
-`backend/harness_template/.gitea/workflows/smoke.yml` 的「边界检查」步骤内联同一拒绝清单（仓独立、无法 `import ahe_beta`）。改 T2 必须改 T3，字面规则一致。smoke 其余步骤不变：`python3 -m compileall`、`entry.py` / `params.yaml` / `agents/` 在位。
+The “boundary check” step in `backend/harness_template/.gitea/workflows/smoke.yml` inlines the same denylist (the repository is independent and cannot `import ahe_beta`). Changes to T2 must also change T3, with identical literal rules. Other smoke steps remain unchanged: `python3 -m compileall`, and the presence of `entry.py` / `params.yaml` / `agents/`.
 
-种子增加 `backend/harness_template/docs/specs/README.md`：drafter 落点；spec CLI 由 vigil 镜像提供。初始化 harness 仓时该文件随模板进入 Gitea，避免 drafter 面对空目录无约定。
+Add `backend/harness_template/docs/specs/README.md` to the seed: the drafter destination; the spec CLI is provided by the vigil image. When initializing the harness repository, this file enters Gitea with the template so drafter does not face an empty directory with no conventions.
 
-### T4：egress 自定义网关域
+### T4: Custom gateway domains for egress
 
-`backend/deploy/gitea/egress-proxy.conf` 在既有 `.anthropic.com` / `.claude.ai` 之外，为当前实例增加 `.pjlab.org.cn`，并保留注释：自定义 `ANTHROPIC_BASE_URL` 必须把网关域名加入 `allowed_egress` 后重启代理。本组不把「使用哪一家网关」写成抽象需求；换网关只改 conf 与运行 env，不改 stages 或边界闸。
+In addition to the existing `.anthropic.com` / `.claude.ai`, `backend/deploy/gitea/egress-proxy.conf` adds `.pjlab.org.cn` for the current instance and retains a comment: a custom `ANTHROPIC_BASE_URL` requires adding the gateway domain to `allowed_egress` and then restarting the proxy. This group does not make “which gateway provider to use” an abstract requirement; switching gateways changes only conf and runtime env, not stages or boundary gates.
 
-### T5：OpenAgents 镜像契约
+### T5: OpenAgents image contract
 
-在 OpenAgents 仓（不在本仓实现）：
+In the OpenAgents repository (not implemented in this repository):
 
-- `openagents/recipes/vigil.py` 的 implement 首轮 context：若 worktree 已有 `docs/specs` 下对应本 issue 的组，指令为按 Task 实现并引用 `Spec-NNNN`；否则按 issue 正文与 Acceptance。禁止为「找需求」再打 Gitea API。
-- `openagents/agents/implementer.py` 提示词与上述一致：有 spec 跟 Task；`rfc:skip` 或无 `docs/specs` 时不空转寻找 spec。
+- Initial implement context in `openagents/recipes/vigil.py`: if the worktree already contains a group under `docs/specs` corresponding to this issue, instruct implementation by Task with references to `Spec-NNNN`; otherwise follow the issue body and Acceptance. Do not call the Gitea API again to “find requirements.”
+- The `openagents/agents/implementer.py` prompt follows the same rule: follow Tasks when a spec exists; with `rfc:skip` or no `docs/specs`, do not waste cycles looking for a spec.
 
-本仓验收是契约陈述 + 不出现对 OpenAgents 的 import/vendor。OA 仓内测试与其自己的 spec 流程走。
+Acceptance in this repository consists of the contract statement + absence of OpenAgents imports/vendoring. Tests within the OA repository follow its own spec process.
 
-### DAG / 文件分配
+### DAG / File allocation
 
 ```mermaid
 graph LR
   T1[T1 rfc=agent + keep-alive]
-  T2[T2 拒绝清单]
-  T3[T3 smoke 同步 + 种子 README]
-  T4[T4 egress 网关域]
-  T5[T5 OA 首轮跟 spec 镜像]
+  T2[T2 Denylist]
+  T3[T3 smoke sync + seed README]
+  T4[T4 egress gateway domain]
+  T5[T5 OA first round follows spec mirror]
   T1 --> T5
   T2 --> T3
 ```
 
-T1 / T2 / T4 无互依赖，可并行。T3 依赖 T2（先定拒绝清单再抄到 smoke）。T5 依赖 T1（yml 已是 `rfc:agent` 后，首轮跟 spec 才有交付意义）。同组 `files` 互不相交。
+T1 / T2 / T4 have no mutual dependencies and can run in parallel. T3 depends on T2 (define the denylist first, then copy it into smoke). T5 depends on T1 (following the spec in the initial context has delivery value only after yml is set to `rfc:agent`). `files` within the same group do not overlap.
 
-| Task | 本仓 files | 备注 |
+| Task | Files in this repository | Notes |
 |---|---|---|
-| T1 | `backend/ahe_beta/experiment/controllers/ordinary.py`、`backend/tests/test_run_vigil.py`、`backend/ahe_beta/experiment/controllers/swebench.py` | stages 单一出处 |
-| T2 | `backend/ahe_beta/guards/harness_boundary.py`、`backend/tests/guards/test_harness_boundary.py` | 钩子生成源 |
-| T3 | `backend/harness_template/.gitea/workflows/smoke.yml`、`backend/harness_template/docs/specs/README.md` | 与 T2 字面同步 |
-| T4 | `backend/deploy/gitea/egress-proxy.conf` | 部署实例域可换 |
-| T5 | `OpenAgents/openagents/recipes/vigil.py`、`OpenAgents/openagents/agents/implementer.py` | 镜像；OA 仓另立 |
+| T1 | `backend/ahe_beta/experiment/controllers/ordinary.py`、`backend/tests/test_run_vigil.py`、`backend/ahe_beta/experiment/controllers/swebench.py` | Single source for stages |
+| T2 | `backend/ahe_beta/guards/harness_boundary.py`、`backend/tests/guards/test_harness_boundary.py` | Hook generation source |
+| T3 | `backend/harness_template/.gitea/workflows/smoke.yml`、`backend/harness_template/docs/specs/README.md` | Keep text identical to T2 |
+| T4 | `backend/deploy/gitea/egress-proxy.conf` | Deployment instance domain is replaceable |
+| T5 | `OpenAgents/openagents/recipes/vigil.py`、`OpenAgents/openagents/agents/implementer.py` | Image; define separately in the OA repository |
 
-### 验证路径
+### Verification paths
 
-无新增 `scripts/*.sh` e2e。验收：
+No new `scripts/*.sh` e2e. Acceptance:
 
 ```text
 pytest backend/tests/test_run_vigil.py backend/tests/guards/test_harness_boundary.py
@@ -215,49 +215,49 @@ pytest backend/tests/test_run_vigil.py backend/tests/guards/test_harness_boundar
 ./tools/spec-driven-development/spec graph --package-root backend/ahe_beta
 ```
 
-闭环手工：Owner admit → vigil drafter 在 PR 中出现 `docs/specs/` → implement 按 Task 改产品 → smoke 绿（含 `docs/`）→ merge → c 步 `origin/main` 前进。需求面结束后 vigil 容器仍在。自定义网关：代理 allowlist 外的域 403，allowlist 内的域可达。
+Manual end-to-end verification: Owner admit → vigil drafter produces `docs/specs/` in the PR → implement modifies the product by Task → smoke passes (including `docs/`) → merge → `origin/main` advances in step c. The vigil container remains running after the demand side finishes. Custom gateway: the proxy returns 403 for domains outside the allowlist, and domains within the allowlist are reachable.
 
-实现时在改动处标注本组 Task 号（组号 + `/T*`）。
+During implementation, annotate changes with this group's Task number (group number + `/T*`).
 
 ## Drawbacks
 
-- **RFC 拉长交付时延与 token。** 每张 ready 票多一拍 drafter，solve 墙钟时间和 LLM 费用上升；无人值守下更容易撞到 vigil 看门狗。keep-alive 缓解「需求面先结束把票杀掉」，不降低单票成本。
-- **拒绝清单比白名单更松。** 容器看不见编排仓，但 implementer 仍可在 harness 仓内添加与当前产品无关的大目录（例如把第三方基准子集拷进来）。smoke 不跑 benchmark，拦不住「仓变胖」。这是用结构演进换过拟合防护的明确代价；若再出现焊基准的实证，应加定向拒绝（路径前缀），而不是恢复整表白名单。
-- **T2/T3 双份清单。** harness 仓不能 import 编排包，拒绝规则必须抄一份进 smoke。两处分叉只能靠评审与测试纪律；`--no-verify` 仍可能让坏密钥进 hook 前的本地历史，服务端能拦 PR，拦不住已 push 的 force 前状态。
-- **egress 实例域写进仓库。** `.pjlab.org.cn` 是当前部署的网关，换网关要改 conf 并重启代理。把实例域留在 conf 里比抽象成 env 生成器更短，但 conf 会随部署环境脏。
-- **跨仓镜像 Task。** T5 不在本仓实现，本仓 CI 不能证明 OA 提示词仍遵守契约；只能靠镜像 pin 与人工对照。这与换轨时 forge/Gitea driver 的切法相同。
+- **RFC increases delivery latency and token usage.** Each ready issue requires an additional drafter beat, increasing solve wall-clock time and LLM costs; unattended operation is more likely to hit the vigil watchdog. keep-alive mitigates “the demand side finishes first and kills the issue,” but does not reduce per-issue cost.
+- **A denylist is less restrictive than an allowlist.** The container cannot see the orchestration repository, but the implementer can still add large directories unrelated to the current product inside the harness repository (for example, copying in a subset of a third-party benchmark). smoke does not run benchmarks and cannot prevent “repository bloat.” This is the explicit cost of trading overfitting protection for structural evolution; if evidence of hardwiring benchmarks appears again, add targeted denials (path prefixes) rather than restoring the full allowlist.
+- **Duplicate lists in T2/T3.** The harness repository cannot import the orchestration package, so the deny rules must be copied into smoke. Divergence between the two copies can only be controlled through review and testing discipline; `--no-verify` may still allow bad keys into local history before the hook runs. The server can block PRs, but cannot block pre-force states that have already been pushed.
+- **The egress instance domain is committed to the repository.** `.pjlab.org.cn` is the current deployment's gateway; changing gateways requires editing the conf and restarting the proxy. Keeping the instance domain in the conf is shorter than abstracting it into an env generator, but the conf becomes deployment-specific.
+- **Cross-repository image Task.** T5 is not implemented in this repository, and this repository's CI cannot prove that OA prompts still follow the contract; verification relies on image pinning and manual comparison. This follows the same split as the forge/Gitea driver during the transition.
 
 ## Rationale and alternatives
 
-**打开 RFC，而不是继续 skip。** `rfc:skip` 让 implementer 直接啃 issue 正文，交付面只能做局部修补，难以把「施工计划」留在被进化对象里。打开 RFC 后规格随 PR 进 main，下一轮 implement 有可引用的 Task。代价是时延；本组接受，并用 keep-alive 避免时延转化成「票被编排进程杀掉」。
+**Enable RFC rather than continuing to skip it.** `rfc:skip` makes the implementer work directly from the issue body, leaving the delivery side limited to local fixes and making it difficult to retain the “construction plan” in the object being evolved. With RFC enabled, specifications enter main with the PR, giving the next implement round Tasks it can reference. The cost is latency; this group accepts it and uses keep-alive to prevent latency from turning into “the orchestration process killed the issue.”
 
-**拒绝清单，而不是放宽白名单。** 备选 A：在白名单里加 `docs/`（以及将来每一个新顶层名字）。这会把产品形状的每一次合法生长变成编排仓边界闸的修订，RFC 刚鼓励结构性改进，闸又把它登记成例外。备选 B：删除边界闸，只靠容器围堵。密钥和 `.openagents/` 运行态仍不该入库，服务端至少要拦这两类。拒绝清单是两者之间的最小闸。
+**Use a denylist rather than expanding the allowlist.** Alternative A: add `docs/` (and every new top-level name in the future) to the allowlist. This would turn every legitimate expansion of the product's structure into a revision of the orchestration repository's boundary gate: RFC encourages structural improvements, only for the gate to register them as exceptions. Alternative B: remove the boundary gate and rely solely on container containment. Secrets and `.openagents/` runtime state still must not be committed; the server must at least block these two categories. A denylist is the smallest gate between these alternatives.
 
-**spec CLI 留在镜像，而不是 vendoring 进 harness。** 备选：把 `spec` 工具链种子进 harness 仓，使 RFC 在无 vigil 的 clone 里也可跑。这会把编排/OA 制度焊进被进化对象，违反「harness 是独立可启动程序」。drafter 只在 vigil 容器里跑，CLI 放镜像即可。
+**Keep the spec CLI in the image rather than vendoring it into harness.** Alternative: seed the `spec` toolchain into the harness repository so RFC can also run in clones without vigil. This would hardwire the orchestration/OA process into the object being evolved, violating “harness is an independently runnable program.” The drafter only runs in the vigil container, so the CLI only needs to be in the image.
 
-**keep-alive 缺省开，而不是加长需求面等待。** 备选：需求面 `finally` 轮询直到 vigil 队列空再退出。那会把交付面故障（needs-human、CI 红循环）变成需求面死等，违背两面只通过 Gitea 交互、生命周期解耦。缺省常驻、显式关闭才拆，与「vigil 是常驻守夜人」一致。
+**Enable keep-alive by default rather than extending the demand side's wait.** Alternative: have the demand side poll `finally` until the vigil queue is empty before exiting. This would turn delivery-side failures (needs-human, repeated CI failures) into indefinite waits on the demand side, violating the principle that the two sides interact only through Gitea and have decoupled lifecycles. Remaining resident by default and tearing down only when explicitly disabled is consistent with “vigil is a resident night watchman.”
 
-**egress 写死当前网关域，而不是运行时从 `ANTHROPIC_BASE_URL` 生成 allowlist。** 动态生成会让容器能把任意域加进代理，削弱出口 allowlist。conf 由人改、人重启，保持「出网点是部署决策」。
+**Hardcode the current gateway domain in egress rather than generating the allowlist from `ANTHROPIC_BASE_URL` at runtime.** Dynamic generation would let the container add arbitrary domains to the proxy, weakening the egress allowlist. People edit the conf and restart the proxy, preserving the principle that “egress destinations are a deployment decision.”
 
-**implement 首轮跟 spec，而不是靠 prompt 自觉去「先读 docs/specs」。** 若不把已有 spec 写进首轮 context，implementer 会重复勘察 issue、忽略 drafter 产物。把优先级写进 `_first_round_context_text` 与 implementer 提示词，是契约而不是软约定。
+**Have the first implement round follow the spec rather than relying on the prompt to voluntarily “read docs/specs first.”** If existing specs are not included in the first-round context, the implementer will repeat issue investigation and ignore the drafter's output. Encoding the priority in `_first_round_context_text` and the implementer prompt makes it a contract rather than an informal convention.
 
 ## Prior art
 
-- 换轨组把 `rfc:skip` 标为二期未决（harness 当时无 spec 工具链）。本组关闭该未决：工具链在 vigil 镜像内，被进化对象只收文档。
-- 容器围堵组把 vigil 关进零宿主挂载的专用容器，出口经 egress allowlist。本组在该围堵之上打开 RFC，并说明白名单的过拟合假设已被文件系统边界取代。
-- OpenAgents 自身用 `docs/specs/` + `spec` CLI 驱动 RFC→实现；harness 仓复用同一文档形态，不复用编排仓的组号空间。
-- rust-lang/rfcs、以及本仓 spec-driven-development skill：施工规格先于实现；Task `files` 互斥。harness 仓内规格由 drafter 写，不由本组预置产品 RFC。
+- The transition group marked `rfc:skip` as unresolved for phase two (harness had no spec toolchain at the time). This group resolves it: the toolchain resides in the vigil image, and the object being evolved receives only documents.
+- The container containment group confined vigil to a dedicated container with no host mounts, with egress routed through an egress allowlist. This group enables RFC on top of that containment and explains that the filesystem boundary has replaced the allowlist's overfitting assumptions.
+- OpenAgents itself uses `docs/specs/` + the `spec` CLI to drive RFC→implementation; the harness repository reuses the same document format without reusing the orchestration repository's group-number namespace.
+- rust-lang/rfcs and this repository's spec-driven-development skill: construction specifications precede implementation; Task `files` are mutually exclusive. Specifications in the harness repository are written by the drafter; this group does not prepopulate product RFCs.
 
 ## Unresolved questions
 
-无。打开 RFC、拒绝清单与 smoke 同步、自定义网关域进 egress、implement 首轮优先 worktree specs、以及 vigil 缺省 keep-alive，均已在需求澄清中定稿。T2/T3 双份清单如何生成合一，不阻塞本组，见 Future。
+None. Enabling RFC, synchronizing the denylist and smoke, adding the custom gateway domain to egress, prioritizing worktree specs in the first implement round, and enabling vigil keep-alive by default were all finalized during requirements clarification. Unifying generation of the duplicate T2/T3 lists does not block this group; see Future.
 
 ## Future possibilities
 
-- 由 `harness_boundary` 生成 smoke 内联脚本（或 CI 跑与钩子同一份独立文件），消灭 T2/T3 手抄分叉。
-- 若实证出现「把基准子集拷进 harness」，对已知过拟合路径加定向拒绝前缀，仍不恢复整表白名单。
-- 观察 RFC 打开后的 needs-human / 看门狗率，再决定是否给 drafter 墙钟预算或缩小默认 spec 体积。
-- OpenAgents 仓将 T5 契约写成其自己的 spec 组并纳入镜像构建的回归；本仓继续只 pin 镜像。
-- egress allowlist 的实例域是否抽到未入库的 overlay，避免把部署网关写进主干 conf；需权衡「可审查的出网点」与「环境无关的仓库」。
+- Generate the smoke inline script from `harness_boundary` (or have CI run the same standalone file as the hook), eliminating divergence from manual copying in T2/T3.
+- If evidence emerges of “copying a benchmark subset into harness,” add targeted deny prefixes for known overfitting paths without restoring the full allowlist.
+- Observe needs-human / watchdog rates after enabling RFC, then decide whether to give the drafter a wall-clock budget or reduce the default spec size.
+- Have the OpenAgents repository encode the T5 contract in its own spec group and include it in image-build regression checks; this repository continues to pin only the image.
+- Consider moving the egress allowlist's instance domain into an uncommitted overlay to avoid committing the deployment gateway to the mainline conf; weigh “reviewable egress destinations” against “an environment-independent repository.”
 
 

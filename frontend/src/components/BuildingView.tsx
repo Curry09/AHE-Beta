@@ -90,7 +90,7 @@ export function BuildingView(props: {
   const factory = getOpenAgentsFactorySummary(props.issues, props.delivery);
 
   return (
-    <section className={`building-view mode-${mode}`} aria-label="2.5D 公司大楼可视化视图">
+    <section className={`building-view mode-${mode}`} aria-label="2.5D office building view">
       <div className="building-title">
         <div>
           <div className="building-kicker">Agent Company</div>
@@ -98,7 +98,7 @@ export function BuildingView(props: {
         </div>
         <p>
           <span className="building-mode-badge">
-            {fallbackRound != null ? "最近" : mode === "live" ? "当前" : mode === "replay" ? "复盘" : "汇总"}
+            {fallbackRound != null ? "Recent" : mode === "live" ? "Current" : mode === "replay" ? "Retrospective" : "Summary"}
           </span>
           {titleCopy(mode, props.round, fallbackRound)}
         </p>
@@ -106,7 +106,7 @@ export function BuildingView(props: {
 
       {!hasAnyData && (
         <div className="building-empty-state">
-          暂无 live agent 或历史归档。需要先跑一轮闭环，或打开“+ 已完成”并选择已有轮次。
+          No live agents or archived runs yet. Run one complete round, or enable “+ Completed” and select an existing round.
         </div>
       )}
 

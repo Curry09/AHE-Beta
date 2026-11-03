@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""基线探针：模拟 harness 场景 × 真实 persona 卡，观察当前设计下等待行为是否分化。
+"""Baseline probe: simulate harness scenario × real persona cards, observe whether wait behavior diverges under current design.
 
-不改 prompt / 不加维——只测「现状」。harness 为脚本桩（begin/poll/control），persona 走真 LLM。
+No prompt changes / no new dimensions—test "current state" only. Harness is script stub (begin/poll/control), persona uses real LLM.
 
-用法（仓根）：
+Usage (repo root):
   PYTHONPATH=backend .venv/bin/python -m tools.dev.probes.probe_persona_wait_matrix
   PYTHONPATH=backend .venv/bin/python -m tools.dev.probes.probe_persona_wait_matrix \\
       --personas sr-01-willison,sr-05-klabnik --scenarios ON-TRACK,BLACK-BOX
 
-凭证通过 --secrets-file 显式提供，或预先注入环境变量。
+Credentials provided explicitly via --secrets-file, or injected into environment beforehand.
 """
 
 from __future__ import annotations
@@ -45,21 +45,21 @@ Ctrl+C (interrupt) stops the current request.
 
 @dataclass
 class Scenario:
-    """一条模拟 harness 使用场景。"""
+    """One simulated harness usage scenario."""
 
     id: str
-    why: str  # 覆盖意图（典型 / 边界）
-    activities: list[list[str]]  # 每次 poll 可见的活动条；空列表 = 无可见性
-    reply: str = "done.\n\n## 验证证据\n3 passed"
-    never_reply: bool = False  # True → 一直 pending，直到用户放弃或心跳上限
-    status_slash: bool = True  # False → 手册无 /status（能力缺口 → 易 WAIT_GAP）
+    why: str  # Coverage intent (typical / boundary)
+    activities: list[list[str]]  # Activity visible per poll; empty list = no visibility
+    reply: str = "done.\n\n## Verification evidence\n3 passed"
+    never_reply: bool = False  # True → always pending until user abandons or heartbeat limit
+    status_slash: bool = True  # False → no /status in manual (capability gap → easy WAIT_GAP)
 
 
-# 场景目录：典型路径 + 边界。心跳次数由 activities 长度决定（never_reply 除外）。
+# Scenario directory: typical paths + boundaries. Heartbeat count determined by activities length (except never_reply).
 SCENARIOS: list[Scenario] = [
     Scenario(
         id="ON-TRACK",
-        why="典型：进度在涨且对题 → 应倾向续等",
+        why="Typical: progress is increasing and on task → should tend to keep waiting",
         activities=[
             ["🔧 read_file: billing/core.py"],
             [
@@ -75,7 +75,7 @@ SCENARIOS: list[Scenario] = [
     ),
     Scenario(
         id="OFF-TRACK",
-        why="典型：可见工作跑偏/危险 → 应倾向打断或放弃",
+        why="Typical: visible work is off track/dangerous → should tend to interrupt or abandon",
         activities=[
             ["🔧 run_shell: rm -rf /tmp/unrelated_cache"],
             [
@@ -92,12 +92,12 @@ SCENARIOS: list[Scenario] = [
     ),
     Scenario(
         id="BLACK-BOX",
-        why="边界：长时间零可见性 → 测干等 vs /status vs 弃坑",
+        why="Boundary: prolonged lack of visibility → test idle waiting vs /status vs abandoning",
         activities=[[], [], [], []],
     ),
     Scenario(
         id="STALE",
-        why="边界：条在动但内容重复（假忙）→ 有进度不耗心，看会否识破",
+        why="Boundary: moving indicator but repetitive content (false activity) → progress does not drain patience; test whether the user notices",
         activities=[
             ["🔧 run_shell: sleep 999"],
             ["🔧 run_shell: sleep 999"],
@@ -107,7 +107,7 @@ SCENARIOS: list[Scenario] = [
     ),
     Scenario(
         id="SILENCE-THEN-MOVE",
-        why="边界：先黑盒再突然有对题进度 → 测是否过早打断",
+        why="Boundary: no visibility followed by sudden on-task progress → test premature interruption",
         activities=[
             [],
             [],
@@ -120,7 +120,7 @@ SCENARIOS: list[Scenario] = [
     ),
     Scenario(
         id="NO-PEEK-MANUAL",
-        why="边界：手册无 /status，只有 interrupt → 想看进度易出 WAIT_GAP",
+        why="Boundary: manual has no /status, only interrupt → seeking progress may produce WAIT_GAP",
         activities=[
             ["🔧 read_file: billing/core.py"],
             ["🔧 read_file: billing/core.py", "🔧 run_shell: sleep 60"],
@@ -134,18 +134,18 @@ SCENARIOS: list[Scenario] = [
     ),
     Scenario(
         id="NEVER-FINISH",
-        why="边界：永不 reply → 耐心耗尽 / 心跳上限 / 主动放弃",
+        why="Boundary: never replies → patience exhaustion / heartbeat limit / explicit abandonment",
         activities=[["🔧 run_shell: compiling…"], ["🔧 run_shell: compiling…"]],
         never_reply=True,
     ),
 ]
 
-# 对照用户：尽量拉开 trust / D42 / D43 / D1（库内真实卡）
+# Reference users: maximize spread across trust / D42 / D43 / D1 (real cards in repo)
 DEFAULT_PERSONAS = ["sr-01-willison", "sr-02-ronacher", "sr-05-klabnik", "sr-06-julia-evans"]
 
 
 class MatrixHarness:
-    """脚本化心跳 harness：progress + emit_message(/status) / interrupt 终结。"""
+    """Scripted heartbeat harness: progress + emit_message(/status) / interrupt terminates."""
 
     def __init__(self, scenario: Scenario) -> None:
         self._scenario = scenario
@@ -230,7 +230,7 @@ class Row:
 
 
 def _parse_wait_head(perceive: str) -> tuple[str, str, str]:
-    """从 `[judgment|intent→action] note` 抽出三元组。"""
+    """Extract triplet from `[judgment|intent→action] note`."""
     if not perceive.startswith("[") or "]" not in perceive:
         return "?", "?", "?"
     head, _, _note = perceive[1:].partition("]")
@@ -257,7 +257,7 @@ def _run_one(persona, scenario: Scenario) -> Row:
             TASK,
             manual=harness.manual,
         )
-    except Exception as exc:  # noqa: BLE001 — 探针：单局失败不废整表
+    except Exception as exc:  # noqa: BLE001 — probe: one session failing does not invalidate the entire matrix
         return Row(
             persona_id=persona.persona_id,
             scenario_id=scenario.id,
@@ -313,7 +313,7 @@ def _print_row(row: Row) -> None:
 
 def _print_summary(rows: list[Row], persona_meta: dict[str, str]) -> None:
     print("\n" + "=" * 72)
-    print("SUMMARY（当前设计基线：等待 prompt 未显式注入 BLOCK-P）")
+    print("SUMMARY（Current design baseline: waiting prompt does not explicitly inject BLOCK-P）")
     print("=" * 72)
     hdr = (
         f"{'persona':<8} {'scenario':<18} {'end':<12} "
@@ -331,8 +331,8 @@ def _print_summary(rows: list[Row], persona_meta: dict[str, str]) -> None:
             f"{r.n_give_up_wait:>2} {r.n_gap:>3}  {persona_meta.get(r.persona_id, '')}"
         )
 
-    # 跨 persona 同场景：/status/interrupt 是否拉开
-    print("\n按场景看 persona 分化（/status / interrupt / keep）：")
+    # Cross-persona same scenario: /status/interrupt divergence observable
+    print("\nPersona differences by scenario（/status / interrupt / keep）：")
     by_sc: dict[str, list[Row]] = {}
     for r in rows:
         if not r.error:
@@ -350,12 +350,12 @@ def main() -> int:
     parser.add_argument(
         "--personas",
         default=",".join(DEFAULT_PERSONAS),
-        help="逗号分隔 persona id（默认对照集）",
+        help="Comma-separated persona IDs (default comparison set)",
     )
     parser.add_argument(
         "--scenarios",
         default=",".join(s.id for s in SCENARIOS),
-        help="逗号分隔场景 id",
+        help="Comma-separated scenario IDs",
     )
     add_persona_inputs(parser)
     add_inputs(parser)
@@ -377,11 +377,11 @@ def main() -> int:
             f"d1={p.d1.value} d42={p.d42.value} d43={p.d43.value} trust={p.trust.value}"
         )
     if not personas:
-        raise SystemExit(f"persona 库中未命中: {sorted(want_p)}")
+        raise SystemExit(f"Not found in persona library: {sorted(want_p)}")
 
     scenarios = [s for s in SCENARIOS if s.id in want_s]
     if not scenarios:
-        raise SystemExit(f"场景未命中: {sorted(want_s)}")
+        raise SystemExit(f"Scenarios not found: {sorted(want_s)}")
     if args.check_inputs:
         print(
             json.dumps(
@@ -397,10 +397,10 @@ def main() -> int:
     load_secrets(args.secrets_file)
     role_environment("USER")
 
-    print("\n场景目录：")
+    print("\nScenario catalog：")
     for s in scenarios:
         print(f"  - {s.id}: {s.why}")
-    print("\n用户对照：")
+    print("\nUser comparison：")
     for p in personas:
         print(f"  - {p.persona_id}: {persona_meta[p.persona_id]}")
 
@@ -421,7 +421,7 @@ def main() -> int:
         json.dumps([r.__dict__ for r in rows], ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    print(f"\n原始结果已写 {out}")
+    print(f"\nRaw results written to {out}")
     return 0
 
 

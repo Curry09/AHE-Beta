@@ -189,7 +189,7 @@ def test_setup_timeout_stops_background_descendants_before_reclaim(cloud_task):
     )
     spec.params["setup_script_sha256"] = hashlib.sha256(script.read_bytes()).hexdigest()
     spec.params["setup_timeout"] = 0.4
-    with pytest.raises(RuntimeError, match="超时"):
+    with pytest.raises(RuntimeError, match="timed out"):
         _provision(spec, "user-timeout", 1)
     saved = marker.read_text()
     time.sleep(0.15)

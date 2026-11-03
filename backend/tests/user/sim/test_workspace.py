@@ -1,8 +1,6 @@
-"""seed 工作区扩展与注入（spec-0008/T1）。
+"""Seed workspace extension and injection (spec-0008/T1).
 
-覆盖：materialize 落地可跑 + 隔离性；WorkspaceSpec/SeedScenario 序列化与向后兼容；
-sim_user 桥接的守卫式 bind_session（有/无 workspace、client 有/无 bind_session）。
-"""
+Coverage: materialize landing runnable + isolation; WorkspaceSpec/SeedScenario serialization and backward compatibility; sim_user bridge guarded bind_session (with/without workspace, client with/without bind_session)."""
 
 from __future__ import annotations
 
@@ -29,13 +27,13 @@ def test_materialize_creates_runnable_copy() -> None:
     assert root.is_dir()
     assert (root / "billing" / "core.py").is_file()
 
-    # 可被 python 直接执行（stdlib-only）
+    # Can be directly executed by Python (stdlib-only)
     run = subprocess.run(
         [sys.executable, "billing/core.py"], cwd=ws, capture_output=True, text=True
     )
     assert run.returncode == 0, run.stderr
 
-    # 可被 import 并调用基线里已有的小工具
+    # Can be imported and call small tools already in the baseline
     imp = subprocess.run(
         [sys.executable, "-c", "import billing.core as c; print(c.format_amount(1234))"],
         cwd=ws,
@@ -44,7 +42,7 @@ def test_materialize_creates_runnable_copy() -> None:
     )
     assert imp.returncode == 0, imp.stderr
     assert "12.34" in imp.stdout
-    # 基线故意不含解法实现（split_bill 是会话里要新增并核实的目标，不得预置）
+    # Baseline intentionally does not contain solution implementation (split_bill is the target to be added and verified in the session, must not be pre-provided)
     assert "def split_bill" not in (root / "billing" / "core.py").read_text()
 
 
@@ -57,29 +55,29 @@ def test_materialize_is_isolated() -> None:
 
 
 def test_materialize_delegates_to_provision() -> None:
-    # spec-0009/T1：materialize 退化为 SeedSource 注册表 provision 的兼容壳。
+    # spec-0009/T1: materialize degrades to a compatibility shim of SeedSource registry provision.
     from ahe_beta.user.sim.seed_source import provision
 
     spec = WorkspaceSpec(fixture="billing-split")
     m, p = materialize(spec), provision(spec)
-    assert m != p  # 各自独立隔离
+    assert m != p  # Each independently isolated
     assert (Path(m) / "billing" / "core.py").is_file()
     assert (Path(p) / "billing" / "core.py").is_file()
 
 
 # --------------------------------------------------------------------------
-# 序列化 / 向后兼容
+# Serialization / backward compatibility
 # --------------------------------------------------------------------------
 def test_workspace_spec_defaults_and_roundtrip() -> None:
     spec = WorkspaceSpec(fixture="billing-split")
-    assert spec.setup == []  # 默认空，本轮不执行
+    assert spec.setup == []  # Default empty, not executed this round
     assert WorkspaceSpec.from_dict(spec.to_dict()) == spec
 
 
 def test_seed_scenario_backward_compatible() -> None:
     s = SeedScenario(description="x")
     assert s.workspace is None
-    assert s.to_dict() == {"description": "x"}  # 旧场景序列化形状不变
+    assert s.to_dict() == {"description": "x"}  # Legacy scenario serialization shape unchanged
     assert SeedScenario.from_dict({"description": "x"}) == s
 
     s2 = SeedScenario(description="y", workspace=WorkspaceSpec(fixture="billing-split"))
@@ -87,7 +85,7 @@ def test_seed_scenario_backward_compatible() -> None:
 
 
 # --------------------------------------------------------------------------
-# sim_user 桥接：守卫式 bind_session
+# sim_user bridge: guarded bind_session
 # --------------------------------------------------------------------------
 def _model_persona(sp) -> Persona:
     return Persona(
@@ -96,7 +94,7 @@ def _model_persona(sp) -> Persona:
 
 
 class _RecordingClient:
-    """暴露 bind_session 的内层 client 替身，并能驱动 loop 跑完。"""
+    """Expose the inner client substitute of bind_session and be able to drive the loop to completion."""
 
     def __init__(self) -> None:
         self.bound: tuple | None = None
@@ -132,7 +130,8 @@ class _RecordingClient:
 
 def _make_fn(client, tmp_path, sp, mp):
     return make_sim_run_session_fn(
-        client_factory=lambda: client,  # Spec-0017/T2：工厂注入；本测试关心 bind，恒返同一实例即可
+        # Spec-0017/T2: factory injection; this test cares about bind, always returning the same instance is sufficient
+        client_factory=lambda: client,
         tracker=FakeTracker(),
         store=SessionStore(tmp_path),
         sim_personas={mp.identity: sp},
@@ -190,17 +189,18 @@ def test_bridge_no_error_when_client_lacks_bind(tmp_path) -> None:
 
     fn = _make_fn(_Plain(), tmp_path, sp, mp)
     scenario = SeedScenario(description="task", workspace=WorkspaceSpec(fixture="billing-split"))
-    session = fn(mp, scenario, ScriptedHarness())  # materialize 发生但无 bind，不应报错
+    # materialize occurs but no bind, should not error
+    session = fn(mp, scenario, ScriptedHarness())
     assert isinstance(session, Session)
 
 
-# Spec-0008/T1 v2：orchestrator 传入共享 workspace_dir 时，sim_user 复用它绑定、不再自行 materialize。
+# Spec-0008/T1 v2: when orchestrator passes shared workspace_dir, sim_user reuses it for binding, no longer materializes on its own.
 def test_bridge_uses_passed_workspace_dir_and_skips_materialize(tmp_path, monkeypatch) -> None:
     sp, client = expert(), _RecordingClient()
     mp = _model_persona(sp)
-    monkeypatch.setattr(  # 传入 workspace_dir 后绝不该再 materialize
+    monkeypatch.setattr(  # After workspace_dir is passed, should never materialize again
         "ahe_beta.loop.sim_user.materialize_workspace",
-        lambda spec: (_ for _ in ()).throw(AssertionError("不应 materialize")),
+        lambda spec: (_ for _ in ()).throw(AssertionError("Should not materialize")),
     )
     fn = _make_fn(client, tmp_path, sp, mp)
     scenario = SeedScenario(description="task", workspace=WorkspaceSpec(fixture="billing-split"))

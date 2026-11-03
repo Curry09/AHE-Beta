@@ -47,7 +47,7 @@ def sha256(path: Path) -> str:
 def selected(raw: str) -> list[int]:
     values = NS if raw == "all" else sorted({int(item) for item in raw.split(",") if item.strip()})
     if not values or any(value not in NS for value in values):
-        raise LaunchGateError(f"--n 只能是 {','.join(map(str, NS))} 或 all")
+        raise LaunchGateError(f"--n Can only be {','.join(map(str, NS))} Or all")
     return values
 
 
@@ -83,14 +83,14 @@ def validate_roles() -> list[str]:
     errors = []
     for name in ("harness", "user_simulator", "triager", "synthesizer", "developer", "owner"):
         if name not in roles:
-            errors.append(f"角色配置缺失：{name}")
+            errors.append(f"Role configuration missing：{name}")
     for name in ("harness", "user_simulator", "triager", "synthesizer", "developer", "pm"):
         role = roles.get(name) or {}
         for field in ("provider", "model", "protocol"):
             if not role.get(field):
-                errors.append(f"{name}.{field} 缺失")
+                errors.append(f"{name}.{field} Missing")
     if roles.get("owner", {}).get("llm") is not False:
-        errors.append("owner 必须是 mechanical / llm=false")
+        errors.append("owner Must be mechanical / llm=false")
     return errors
 
 
@@ -112,15 +112,15 @@ def gate(rows: list[dict]) -> list[str]:
     if str(e2b.get("template_build_id", "")).startswith("pending-"):
         errors.append("E2B template build is still pending")
     if mixed.get("status") != "launchable":
-        errors.append(f"mixed config status={mixed.get('status')!r}，不是 launchable")
+        errors.append(f"mixed config status={mixed.get('status')!r}，Is not launchable")
     if (mixed.get("execution") or {}).get("sandbox_provider") != "e2b":
         errors.append("mixed config sandbox_provider must be e2b for scaling-e2b")
     if assignment.get("status") != "frozen":
-        errors.append(f"task assignment status={assignment.get('status')!r}，不是 frozen")
+        errors.append(f"task assignment status={assignment.get('status')!r}，Is not frozen")
     for row in rows:
         profile = profiles.get(str(row["n"]))
         if not isinstance(profile, dict):
-            errors.append(f"N{row['n']} 缺 roster profile")
+            errors.append(f"N{row['n']} Missing roster profile")
         else:
             for field in (
                 "user",
@@ -132,7 +132,7 @@ def gate(rows: list[dict]) -> list[str]:
                 "pm",
             ):
                 if not isinstance(profile.get(field), int) or profile[field] < 0:
-                    errors.append(f"N{row['n']}.{field} 必须是非负整数")
+                    errors.append(f"N{row['n']}.{field} Must be a nonnegative integer")
             if profile.get("user") != row["task_count"]:
                 errors.append(
                     f"N{row['n']} user roster={profile.get('user')} != task_count={row['task_count']}"
@@ -151,9 +151,9 @@ def gate(rows: list[dict]) -> list[str]:
                     f"N{row['n']} runtime bundle incomplete：{', '.join(missing) or 'unknown'}"
                 )
         else:
-            errors.append(f"N{row['n']} 缺 bundle inventory：{inventory}")
+            errors.append(f"N{row['n']} Missing bundle inventory：{inventory}")
         if not receipt.is_file():
-            errors.append(f"N{row['n']} 缺 runtime receipt：{receipt}")
+            errors.append(f"N{row['n']} Missing runtime receipt：{receipt}")
         else:
             document = load(receipt)
             if document.get("status") != "ready":
@@ -178,7 +178,7 @@ def gate(rows: list[dict]) -> list[str]:
             ):
                 errors.append(f"N{row['n']} receipt E2B resource profile mismatch")
     if not launch.get("preflight_all_selected_before_any_start"):
-        errors.append("配置未开启 all-selected preflight gate")
+        errors.append("Not enabled in configuration all-selected preflight gate")
     return errors
 
 
@@ -260,11 +260,11 @@ def main() -> int:
     MIXED = Path(args.mixed_config).expanduser().resolve()
     ROLES = MIXED
     if args.start and args.resume:
-        parser.error("--start 与 --resume 不能同时使用")
+        parser.error("--start And --resume Cannot be used together")
     try:
         ns = selected(args.n)
         if (args.start or args.resume) and len(ns) != 1:
-            raise LaunchGateError("正式启动/恢复必须只选择一个 N；请在五个终端分别运行对应脚本")
+            raise LaunchGateError("Official launch/Select exactly one for recovery N；Run the corresponding scripts in five separate terminals")
         rows = plan(ns)
         if args.dry_run or not (args.check_launch or args.start or args.resume):
             print(json.dumps(redacted(rows), ensure_ascii=False, indent=2))
@@ -280,10 +280,10 @@ def main() -> int:
             )
             return 0
         if not args.executor:
-            raise LaunchGateError("--start/--resume 需要 --executor，不能默认替换成 N=1 runner")
+            raise LaunchGateError("--start/--resume Requires --executor，Cannot default to replacing with N=1 runner")
         command = shlex.split(args.executor)
         if not command:
-            raise LaunchGateError("--executor 不能为空")
+            raise LaunchGateError("--executor Cannot be empty")
         action_resume = bool(args.resume)
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(rows)) as pool:
             futures = [pool.submit(run_one, row, command, action_resume) for row in rows]

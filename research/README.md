@@ -5,7 +5,7 @@ in `examples/experiments/`. This directory contains frozen research records,
 configuration templates and former implementations. It is not another supported
 experiment entry point.
 
-[中文](README.zh-CN.md)
+[简体中文](README.zh-CN.md)
 
 The cleanup baseline is commit
 `6d213f6f1383f6aed89111ddc83a076ba3f93976`. [inventory.json](inventory.json)

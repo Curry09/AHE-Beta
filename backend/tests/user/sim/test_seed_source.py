@@ -1,7 +1,7 @@
-"""SeedSource 注册表 + local-fixture 实现（spec-0009/T1）。
+"""SeedSource registry + local-fixture implementation (spec-0009/T1).
 
-覆盖：自动发现注册、kind 分派与未知 kind 报错、local-fixture 可跑+隔离+缺 fixture 报错、
-WorkspaceSpec 的 kind/params 缺省与序列化向后兼容。
+Coverage: automatic discovery and registration, kind dispatch and error on unknown kind, local-fixture can run + isolate + error on missing fixture,
+WorkspaceSpec kind/params defaults and serialization backward compatible.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from ahe_beta.models import WorkspaceSpec
 
 
 def test_local_fixture_auto_registered() -> None:
-    # 不手动 import sources.local_fixture，仅 import seed_source 即应触发自动发现注册。
+    # Do not manually import sources.local_fixture; importing seed_source alone should trigger automatic discovery and registration.
     from ahe_beta.user.sim import seed_source
 
     assert "local-fixture" in seed_source.available_kinds()
@@ -32,7 +32,7 @@ def test_provision_dispatch_and_unknown_kind() -> None:
         seed_source.provision(WorkspaceSpec(kind="does-not-exist"))
     msg = str(ei.value)
     assert "does-not-exist" in msg
-    assert "local-fixture" in msg  # 错误消息列出已注册 kind
+    assert "local-fixture" in msg  # Error message lists registered kinds
 
 
 def test_local_fixture_runnable_and_isolated() -> None:
@@ -64,15 +64,15 @@ def test_workspace_spec_kind_params_defaults_and_roundtrip() -> None:
     spec = WorkspaceSpec(fixture="billing-split")
     assert spec.kind == "local-fixture"
     assert spec.params == {}
-    # 默认 kind/空 params 不落键，保持 0008 旧序列化形状。
+    # Default kind/empty params not included in keys, preserving old 0008 serialization shape.
     assert spec.to_dict() == {"fixture": "billing-split", "setup": []}
     assert WorkspaceSpec.from_dict(spec.to_dict()) == spec
 
-    # 旧 dict（无 kind/params）→ 缺省、行为不变。
+    # Old dict (no kind/params) → defaults, behavior unchanged.
     old = WorkspaceSpec.from_dict({"fixture": "billing-split"})
     assert old.kind == "local-fixture" and old.params == {}
 
-    # 带 kind/params 往返一致。
+    # With kind/params, round-trip consistency.
     e = WorkspaceSpec(kind="empty", params={"doc": "hi"})
     assert e.to_dict()["kind"] == "empty"
     assert e.to_dict()["params"] == {"doc": "hi"}

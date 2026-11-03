@@ -147,7 +147,7 @@ def test_missing_logs_do_not_invent_success_and_session_schema_is_not_required(t
     bundle(tmp_path / "observations", "s1")
     provider = ObservationProvider(store, allowed_session_ids=frozenset({"s1", "old-session"}))
     assert "s1" in provider.files and "old-session" in provider.unavailable
-    assert "原生日志不可用" in provider.prompt_index()
+    assert "Native logs unavailable" in provider.prompt_index()
 
 
 def test_broad_source_search_and_alias_cannot_bypass_file_scope(tmp_path):
@@ -221,11 +221,12 @@ def test_new_round_missing_bundle_does_not_reuse_previous_round(tmp_path):
         assert "error" in result
 
 
-def test_reference_chain_survives_body_clipping_and_legacy_raw_is_excluded():
+def test_reference_chain_survives_body_clipping_and_raw_report_is_excluded():
     issue = OpenIssue(
         1,
         "normalized problem",
-        "x" * 4000 + "\n会话：s1, s2\n## 原始用户报告（案例证据，非实现对象）\nsession_id: private",
+        "x" * 4000
+        + "\nsession_id: s1, s2\n## Original user report (case evidence, not an implementation target)\nsession_id: private",
     )
     assert evidence_session_ids([issue]) == {"s1", "s2"}
     assert "evidence_sessions=s1,s2" in format_proposal_view(issue)
@@ -253,17 +254,21 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(
     store.save(session("s3"))
     tracker = FakeTracker()
     a = tracker.create_issue(IssueDraft("one", "session_id: s1", ["proposal"]))
-    b = tracker.create_issue(IssueDraft("two", "会话：s2", ["proposal"]))
+    b = tracker.create_issue(IssueDraft("two", "session_id: s2", ["proposal"]))
     from ahe_beta.observations.grants import grant
 
     grant(store=store, issue=a.number, sessions={"s1"})
     grant(store=store, issue=b.number, sessions={"s2"})
     pm = tracker.create_issue(
         IssueDraft(
-            "PM_TITLE_SENTINEL", "PM_BODY_SENTINEL\n会话：s3", ["proposal", "from-divergent"]
+            "PM_TITLE_SENTINEL",
+            "PM_BODY_SENTINEL\nsession_id: s3",
+            ["proposal", "from-divergent"],
         )
     )
-    tracker.create_issue(IssueDraft("PM_READY_SENTINEL", "会话：s3", ["ready", "from-divergent"]))
+    tracker.create_issue(
+        IssueDraft("PM_READY_SENTINEL", "session_id: s3", ["ready", "from-divergent"])
+    )
     seen = []
 
     def pm_run(*args, **kwargs):
@@ -295,7 +300,7 @@ def test_drivers_scope_pm_independently_and_inherit_synthesis_references(
             marker not in args[1]
             for marker in ("PM_TITLE_SENTINEL", "PM_BODY_SENTINEL", "PM_READY_SENTINEL")
         )
-        assert "运行时行为聚合" not in args[1]
+        assert "Runtime behavior aggregation" not in args[1]
         if needs_recovery and len(architect_calls) == 1:
             return "unfinished investigation without submit"
         return json.dumps({"proposals": [product]})

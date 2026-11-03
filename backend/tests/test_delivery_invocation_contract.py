@@ -1,4 +1,4 @@
-# Spec-0049/T6：交付面调用 JSON 与 OpenAgents 写出契约。
+# Spec-0049/T6: Delivery layer call JSON and OpenAgents written contract.
 """Lock the v1 invocation schema shared with OpenAgents run_agent."""
 
 from __future__ import annotations

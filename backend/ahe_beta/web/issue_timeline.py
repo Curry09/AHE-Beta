@@ -1,7 +1,6 @@
-"""Spec-0039/T2：把 Gitea label timeline 折叠为可回放的 issue 状态与完整性异常。
+"""Spec-0039/T2: Collapse Gitea label timeline into replayable issue state and integrity anomalies.
 
-本模块无网络、无存储：当前状态只从 issue 当前 labels 投影；timeline 仅解释历史和提供 last-known，
-绝不反向回填当前真值。
+This module has no network or storage access: current state is projected only from current issue labels; timeline only explains history and provides last-known state, never back-fills current ground truth.
 """
 
 from __future__ import annotations
@@ -36,7 +35,7 @@ _NEEDS_HUMAN = "needs-human"
 
 
 def unavailable_timeline(*, reason: str = "tracker does not expose timeline") -> dict[str, Any]:
-    """详情 API 的稳定降级形状。"""
+    """Stable degradation shape for detail API."""
     return {
         "available": False,
         "reason": reason,
@@ -51,7 +50,7 @@ def unavailable_timeline(*, reason: str = "tracker does not expose timeline") ->
 
 
 def build_issue_timeline(*, issue: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, Any]:
-    """按服务端顺序重放 label events，生成迁移批次、当前/历史状态和确定性异常。"""
+    """Replay label events in server order to generate migration batches, current/historical state, and deterministic anomalies."""
     current_labels = frozenset(str(label) for label in issue.get("labels") or [])
     label_events = [
         event
@@ -111,14 +110,14 @@ def build_issue_timeline(*, issue: dict[str, Any], events: list[dict[str, Any]])
         anomalies.append(
             _anomaly(
                 code="incomplete-history",
-                message="timeline 未覆盖 issue 创建时的初始标签；历史回放可信度降低。",
+                message="The timeline does not cover the initial labels at issue creation; historical replay is less reliable.",
             )
         )
     if labels != current_labels:
         anomalies.append(
             _anomaly(
                 code="timeline-current-drift",
-                message="timeline 回放终值与当前 Gitea labels 不一致；当前状态仍以 issue 详情为准。",
+                message="The final replayed labels differ from current Gitea labels; issue details remain authoritative for the current state.",
             )
         )
 
@@ -136,7 +135,7 @@ def build_issue_timeline(*, issue: dict[str, Any], events: list[dict[str, Any]])
 
 
 def _batch_events(*, events: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
-    """只折叠连续、同时间、同 actor 的已知 label events；其它类型天然切断批次。"""
+    """Only collapse consecutive, simultaneous, same-actor label events; other types naturally break batches."""
     batches: list[list[dict[str, Any]]] = []
     current: list[dict[str, Any]] = []
     key: tuple[str, str] | None = None
@@ -209,7 +208,7 @@ def _transition_anomalies(
         out.append(
             _anomaly(
                 code="plane-drop-without-terminal",
-                message="open 工作流从有效平面坠为无平面，且同批没有终态标签。",
+                message="The open workflow lost its valid plane without a terminal label in the same batch.",
                 transition_id=transition_id,
                 dimensions=["plane"],
             )
@@ -228,7 +227,7 @@ def _transition_anomalies(
             out.append(
                 _anomaly(
                     code=code,
-                    message=f"既有 {dimension} 标签被移除且未替换。",
+                    message=f"The existing {dimension} label was removed without a replacement.",
                     transition_id=transition_id,
                     dimensions=[dimension],
                 )
@@ -237,7 +236,7 @@ def _transition_anomalies(
         out.append(
             _anomaly(
                 code="blocking-destroyed-metadata",
-                message="加入 needs-human 的同批操作清除了流程元数据。",
+                message="The batch that added needs-human also cleared workflow metadata.",
                 transition_id=transition_id,
                 dimensions=sorted(set(lost)),
                 severity="critical",
@@ -247,7 +246,7 @@ def _transition_anomalies(
         out.append(
             _anomaly(
                 code="exclusive-dimension-conflict",
-                message="同一状态含多个互斥维度标签。",
+                message="The same state contains multiple mutually exclusive dimension labels.",
                 transition_id=transition_id,
                 dimensions=after["conflicts"],
             )
@@ -278,18 +277,18 @@ def _transition_title(
     *, added: frozenset[str], removed: frozenset[str], anomalies: list[dict[str, Any]]
 ) -> str:
     if anomalies:
-        return "标签完整性异常"
+        return "Label integrity anomaly"
     if _NEEDS_HUMAN in added:
-        return "交付阻塞"
+        return "Delivery blocked"
     if any(label in added for label in _TERMINALS):
-        return "进入终态"
+        return "Entered terminal state"
     if PROPOSAL in added:
-        return "创建提案"
+        return "Proposal created"
     if READY in added:
-        return "进入 Ready"
+        return "Entered Ready"
     if OPENAGENTS in added or PROPOSAL in removed:
-        return "Owner 准入 / 交付交接"
-    return "标签更新"
+        return "Owner admission / delivery handoff"
+    return "Labels updated"
 
 
 def _history_starts_at_creation(

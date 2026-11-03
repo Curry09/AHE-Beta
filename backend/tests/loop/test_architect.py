@@ -1,7 +1,7 @@
-# Spec-0029/T4：architect 生成器单测（stub nexau agent + FakeTracker + 临时 SessionStore）。
-"""验证 architect 驱动器：产出落 proposal 平面 + from-architect（不可领）；
-covers 是 Architect 的吸收决定（过滤到 open report/proposal）；输入 = ready + 待准入提案索引 + 体感 + runtime；
-缺字段跳过；未调 submit no-op；drift-guard（submit_rfcs yaml == rfc_input_schema）。"""
+# Spec-0029/T4: architect generator unit test (stub nexau agent + FakeTracker + temporary SessionStore).
+"""Verify architect driver: output lands on proposal plane + from-architect (not claimable);
+covers is Architect's absorption decision (filtered to open report/proposal); input = ready + proposal index pending admission + user experience + runtime;
+skip missing fields; submit not called is no-op; drift-guard (submit_rfcs yaml == rfc_input_schema)."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ from ahe_beta.user.session_store import SessionStore
 
 
 class _StubArchitect(Architect):
-    """覆盖 _run_agent：不跑真 nexau，回放固定 submit 返回，并记录喂进的信号。"""
+    """Override _run_agent: do not run real nexau, replay fixed submit returns, and record the signals fed in."""
 
     def __init__(self, *args, canned: str, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -73,7 +73,9 @@ def test_valid_submit_does_not_trigger_recovery(tmp_path, monkeypatch, payload) 
 @pytest.mark.parametrize("recovered", [True, False])
 def test_missing_submit_has_one_recovery_with_same_inputs(tmp_path, monkeypatch, recovered) -> None:
     architect = _architect(tmp_path, FakeTracker(), _rfc_canned())
-    replies = iter(["分析尚未提交", _rfc_canned() if recovered else "仍未提交"])
+    replies = iter(
+        ["Analysis not yet submitted", _rfc_canned() if recovered else "Still not submitted"]
+    )
     calls = []
 
     def invoke(**kwargs):
@@ -94,7 +96,7 @@ def test_recovery_error_restores_normal_prompt(tmp_path, monkeypatch) -> None:
     def invoke(**kwargs):
         if architect._force_submit_prompt:
             raise RuntimeError("backend unavailable")
-        return "未调用提交工具"
+        return "Submission tool not called"
 
     monkeypatch.setattr(architect, "_run_agent", invoke)
     with pytest.raises(RuntimeError, match="backend unavailable"):
@@ -122,7 +124,7 @@ def _architect(
     recovery=None,
 ) -> _StubArchitect:
     # A synthesis fixture needs an actual cross-proposal set.
-    if '"proposals": []' not in canned and "散文" not in canned and canned:
+    if '"proposals": []' not in canned and "Prose" not in canned and canned:
         while (
             len(
                 [
@@ -133,10 +135,10 @@ def _architect(
             )
             < 2
         ):
-            _proposal(tracker, "辅助来源")
+            _proposal(tracker, "Supporting source")
     store = SessionStore(tmp_path / "sessions")
-    _seed_session(store, score=2, reason="等太久")
-    _seed_session(store, score=1, reason="超时两次颗粒无收")
+    _seed_session(store, score=2, reason="Waiting too long")
+    _seed_session(store, score=1, reason="Two timeouts with no results")
     return _StubArchitect(
         tracker,
         store,
@@ -170,12 +172,12 @@ def _architect_recovery(tmp_path: Path) -> RecoveryStore:
 def _synthesis_artifact() -> dict:
     return {
         "source_proposals": [1, 2],
-        "relationship": "两个提案是同一体验张力的阶段表现",
-        "common_tension": "长任务缺少可预期的反馈边界",
-        "structural_direction": "统一进展表达和中间交付机制",
-        "expected_leverage": "同时降低等待不确定性与失败返工",
+        "relationship": "The two proposals reflect stages of the same experience tension",
+        "common_tension": "Long tasks lack predictable feedback boundaries",
+        "structural_direction": "Unify progress reporting and intermediate delivery mechanisms",
+        "expected_leverage": "Reduce both uncertainty while waiting and rework after failure",
         "solution_level": "structural_mechanism",
-        "abstraction_rationale": "只描述跨提案共同机制",
+        "abstraction_rationale": "Describe only the mechanism shared across proposals",
     }
 
 
@@ -184,7 +186,7 @@ def _submit(proposals: list) -> str:
 
 
 def _rfc_canned(
-    covers: object = None, *, title: str = "结构：预算感知", fields: dict | None = None
+    covers: object = None, *, title: str = "Structure：Budget aware", fields: dict | None = None
 ) -> str:
     item: dict = {"title": title, **(fields if fields is not None else _synthesis_artifact())}
     if covers is not None:
@@ -199,7 +201,7 @@ def _proposal(tracker: FakeTracker, title: str) -> int:
 
 
 def test_submit_rfcs_yaml_matches_contract() -> None:
-    """drift-guard：submit_rfcs.tool.yaml 的 input_schema 与 rfc_input_schema() 深度相等。"""
+    """drift-guard: input_schema of submit_rfcs.tool.yaml is deeply equal to rfc_input_schema()."""
     import yaml
 
     from ahe_beta.demand.agent_contract import synthesis_input_schema
@@ -217,7 +219,7 @@ def test_submit_rfcs_yaml_matches_contract() -> None:
 
 def test_structural_proposal_lands_unclaimable(tmp_path) -> None:
     tracker = FakeTracker()
-    _proposal(tracker, "超时1")
+    _proposal(tracker, "timeout 1")
     architect = _architect(tmp_path, tracker, _rfc_canned())
 
     outcome = architect.propose_once()
@@ -225,10 +227,10 @@ def test_structural_proposal_lands_unclaimable(tmp_path) -> None:
     assert isinstance(outcome, SynthesisOutcome) and outcome.count == 1
     rfc = tracker.issue(outcome.proposal_numbers[0])
     assert sc.PROPOSAL in rfc["labels"] and sc.FROM_ARCHITECT in rfc["labels"]
-    assert sc.plane(rfc["labels"]) == sc.PROPOSAL  # 不可领，待 Owner 准入
+    assert sc.plane(rfc["labels"]) == sc.PROPOSAL  # Not claimable; awaiting Owner admission
     assert not sc.is_ready(labels=rfc["labels"], state="open")
-    assert "## 结构关系" in rfc["body"]
-    assert "## 结构方向" in rfc["body"]
+    assert "## Structural relationship" in rfc["body"]
+    assert "## Structural direction" in rfc["body"]
 
 
 def test_structural_proposal_carries_live_round_label(tmp_path) -> None:
@@ -249,11 +251,11 @@ def test_structural_proposal_does_not_guess_invalid_round(tmp_path) -> None:
 
 
 def test_inputs_are_ready_plus_proposal_index(tmp_path) -> None:
-    """输入 = ready 工作队列 + 待准入提案索引（report/终态不喂）。"""
+    """Input = ready work queue + pending admission proposal index (report/terminal states not fed)."""
     tracker = FakeTracker()
-    p = _proposal(tracker, "本轮新升提案")
+    p = _proposal(tracker, "Proposal newly promoted this round")
     r = tracker.create_issue(
-        IssueDraft(title="ready 项", body="x", labels=["bug", sc.READY])
+        IssueDraft(title="ready Items", body="x", labels=["bug", sc.READY])
     ).number
     tracker.create_issue(IssueDraft(title="raw report", body="x", labels=[sc.REPORT]))
     architect = _architect(tmp_path, tracker, _submit([]))
@@ -261,7 +263,8 @@ def test_inputs_are_ready_plus_proposal_index(tmp_path) -> None:
     assert [i.number for i in architect.seen_ready] == [r]
     assert [i.number for i in architect.seen_proposals] == [p]
     assert architect.seen_trend
-    assert architect.seen_runtime == ""  # 0059: 不再默认注入耦合旧制品字段的运行时聚合。
+    # 0059: No longer inject runtime aggregation by default with coupled legacy artifact fields.
+    assert architect.seen_runtime == ""
 
 
 def test_inputs_are_limited_to_the_active_round(tmp_path) -> None:
@@ -279,14 +282,14 @@ def test_inputs_are_limited_to_the_active_round(tmp_path) -> None:
 
 
 def test_covers_line_written_and_sources_are_merged(tmp_path) -> None:
-    """covers 落在 body，并由 Architect driver 合并关闭被吸收来源。"""
+    """covers resides in body, merged and closed by Architect driver when absorbed source is absorbed."""
     tracker = FakeTracker()
-    t1 = _proposal(tracker, "症状1")
-    t2 = _proposal(tracker, "症状2")
+    t1 = _proposal(tracker, "Symptom 1")
+    t2 = _proposal(tracker, "Symptom 2")
     outcome = _architect(tmp_path, tracker, _rfc_canned([t1, t2])).propose_once()
 
     body = tracker.issue(outcome.proposal_numbers[0])["body"]
-    assert f"covers: #{t1} #{t2}" in body  # 机器可读行
+    assert f"covers: #{t1} #{t2}" in body  # Machine-readable line
     assert outcome.merged_numbers == [t1, t2]
     assert outcome.failed_merges == {}
     for n in (t1, t2):
@@ -298,8 +301,8 @@ def test_covers_line_written_and_sources_are_merged(tmp_path) -> None:
 
 def test_sources_omitted_from_covers_stay_open(tmp_path) -> None:
     tracker = FakeTracker()
-    covered = _proposal(tracker, "被吸收")
-    independent = _proposal(tracker, "独立交付")
+    covered = _proposal(tracker, "Absorbed")
+    independent = _proposal(tracker, "Independent delivery")
     outcome = _architect(tmp_path, tracker, _rfc_canned([covered])).propose_once()
 
     assert outcome.merged_numbers == [covered]
@@ -314,7 +317,7 @@ def test_cover_merge_failure_isolated_and_reported(tmp_path) -> None:
             raise RuntimeError(f"cannot transition #{number}")
 
     tracker = BrokenTransitionTracker()
-    source = _proposal(tracker, "待吸收来源")
+    source = _proposal(tracker, "Source pending absorption")
     outcome = _architect(tmp_path, tracker, _rfc_canned([source])).propose_once()
 
     target = outcome.proposal_numbers[0]
@@ -325,9 +328,9 @@ def test_cover_merge_failure_isolated_and_reported(tmp_path) -> None:
 
 
 def test_covers_filtered_to_open_report_or_proposal(tmp_path) -> None:
-    """covers 指向 ready 项 / 不存在的号 → 静默剔除（合并只对 report/proposal 有意义）。"""
+    """covers points to ready item / non-existent number → silently removed (merge is meaningful only for report/proposal)."""
     tracker = FakeTracker()
-    ok = _proposal(tracker, "可覆盖提案")
+    ok = _proposal(tracker, "Proposals that can be covered")
     ready_n = tracker.create_issue(IssueDraft(title="ready", body="x", labels=[sc.READY])).number
     outcome = _architect(tmp_path, tracker, _rfc_canned([ok, ready_n, 999])).propose_once()
     body = tracker.issue(outcome.proposal_numbers[0])["body"]
@@ -347,19 +350,19 @@ def test_synthesis_renders_explicit_sources(tmp_path) -> None:
     fields = _synthesis_artifact()
     outcome = _architect(tmp_path, tracker, _rfc_canned(fields=fields)).propose_once()
     assert outcome.count == 1
-    assert "## 来源提案" in tracker.issue(outcome.proposal_numbers[0])["body"]
+    assert "## Source proposals" in tracker.issue(outcome.proposal_numbers[0])["body"]
 
 
 def test_incomplete_fields_skipped(tmp_path) -> None:
     tracker = FakeTracker()
-    canned = _submit([{"title": "半成品", "source_proposals": [1]}])
+    canned = _submit([{"title": "Half finished product", "source_proposals": [1]}])
     outcome = _architect(tmp_path, tracker, canned).propose_once()
     assert outcome.count == 0
 
 
 def test_empty_or_no_submit_yields_no_proposal(tmp_path) -> None:
     tracker = FakeTracker()
-    for canned in (_submit([]), "散文没调 submit", ""):
+    for canned in (_submit([]), "Prose not tuned submit", ""):
         outcome = _architect(tmp_path, tracker, canned).propose_once()
         assert outcome.count == 0
 
@@ -369,13 +372,13 @@ def test_synthesis_requires_cross_proposal_sources(tmp_path) -> None:
     outcome = _architect(
         tmp_path,
         tracker,
-        _submit([{"title": "单源", **{**_synthesis_artifact(), "source_proposals": [1]}}]),
+        _submit([{"title": "Single source", **{**_synthesis_artifact(), "source_proposals": [1]}}]),
     ).propose_once()
     assert outcome.count == 0
 
 
 def test_parse_covers_field_shapes() -> None:
-    """covers 宽进严出：去重、剔 bool/负数/字符串。"""
+    """covers permissive input, strict output: deduplicate, remove bool/negative/string."""
     assert _parse_covers([5, 5, 6, True, -1, 0, "8"]) == (5, 6)
     assert _parse_covers("nope") == ()
 

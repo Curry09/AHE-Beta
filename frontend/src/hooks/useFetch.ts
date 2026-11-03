@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-// 一次性取数（选中详情用，不轮询）：deps 变化即重取，卸载丢弃迟到结果。
+// One-time fetch for selected details (no polling): refetch when deps change; discard late results after unmount.
 export function useFetch<T>(fn: (() => Promise<T>) | null, deps: unknown[]): T | null {
   const [data, setData] = useState<T | null>(null);
   useEffect(() => {
@@ -12,7 +12,7 @@ export function useFetch<T>(fn: (() => Promise<T>) | null, deps: unknown[]): T |
           if (alive) setData(d);
         })
         .catch(() => {
-          // 详情取失败时留空态，由视图给降级文案
+          // Leave an empty state on detail fetch failures; the view supplies fallback text.
         });
     }
     return () => {

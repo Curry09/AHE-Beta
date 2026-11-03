@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import type { AgentRole, Commit, LogEntry, Selection, Turn } from "../../types";
 import { ProcessStream, Turns } from "../Stream";
 
-// dev/architect 的一段工作（live 槽位或归档快照），以及 live 用户 agent 的会话中间态：
-// 元信息 + 完整对话/过程流 + 最终报告，issue/tag 可交叉跳转。
+// A dev/architect work segment (live slot or archived snapshot), plus the intermediate session state of a live user agent:
+// metadata + full conversation/process stream + final report, with cross-navigation for issues/tags.
 export function AgentRunDetail(props: {
   role: AgentRole;
   label: string;
@@ -46,10 +46,10 @@ export function AgentRunDetail(props: {
   const tagCommit = tag ? commits.find((c) => c.tags.includes(tag)) : undefined;
 
   const rows: [string, ReactNode][] = [];
-  if (round != null && round > 0) rows.push(["轮次", `第 ${round} 轮`]);
-  rows.push(["状态", status]);
-  if (score != null) rows.push(["体感", <span className={`score s${score}`}>{score} / 4</span>]);
-  if (endReason) rows.push(["结束原因", endReason]);
+  if (round != null && round > 0) rows.push(["Round", `Round ${round}`]);
+  rows.push(["Status", status]);
+  if (score != null) rows.push(["Experience", <span className={`score s${score}`}>{score} / 4</span>]);
+  if (endReason) rows.push(["End reason", endReason]);
   if (issueNumber != null)
     rows.push([
       "issue",
@@ -68,10 +68,10 @@ export function AgentRunDetail(props: {
         <span className="chip tag">{tag}</span>
       ),
     ]);
-  if (committed !== undefined) rows.push(["main", committed ? "已推进" : "未推进"]);
+  if (committed !== undefined) rows.push(["main", committed ? "Main updated" : "Main unchanged"]);
   if (proposals && proposals.length > 0)
     rows.push([
-      "提案",
+      "Proposal",
       <span>
         {proposals.map((n) => (
           <button key={n} className="link" onClick={() => onSelect({ type: "issue", number: n })}>
@@ -85,7 +85,7 @@ export function AgentRunDetail(props: {
     <div className="detail">
       <div className="detail-head">
         <button className="back" onClick={onBack}>
-          ‹ 返回
+          ‹ Back
         </button>
         {running ? <span className="dot on" /> : <span className={`role-dot ${role}`} />}
         <span className="detail-title">{label}</span>
@@ -101,19 +101,19 @@ export function AgentRunDetail(props: {
         </dl>
         {turns.length > 0 && (
           <div className="block">
-            <div className="block-title">对话</div>
+            <div className="block-title">Conversation</div>
             <Turns turns={turns} />
           </div>
         )}
         {role !== "user" && (
           <div className="block">
-            <div className="block-title">工作过程</div>
+            <div className="block-title">Work process</div>
             <ProcessStream log={log} />
           </div>
         )}
         {detail && (
           <div className="block">
-            <div className="block-title">最终报告</div>
+            <div className="block-title">Final report</div>
             <div className="prose">{detail}</div>
           </div>
         )}

@@ -27,9 +27,9 @@ export interface OpenAgentsFactorySummary {
 }
 
 function countLabel(floor: FloorModel, mode: BuildingMode): string {
-  if (mode === "summary") return `${floor.history.length} 条归档`;
-  if (mode === "replay") return `${floor.history.length}/${floor.capacity} 归档`;
-  return `${floor.liveAgents.length}/${floor.capacity} 在岗`;
+  if (mode === "summary") return `${floor.history.length} archived entries`;
+  if (mode === "replay") return `${floor.history.length}/${floor.capacity} archived`;
+  return `${floor.liveAgents.length}/${floor.capacity} active`;
 }
 
 function points(points: [number, number][]): string {
@@ -55,8 +55,8 @@ function activateFactory(event: KeyboardEvent<SVGGElement>, onOpenAgents: () => 
 }
 
 function factoryStatus(summary: OpenAgentsFactorySummary): string {
-  if (summary.status === "loading") return "连接中…";
-  if (summary.status === "disconnected") return "观测不可用";
+  if (summary.status === "loading") return "Connecting…";
+  if (summary.status === "disconnected") return "Observability unavailable";
   if (summary.status === "blocked") return `needs-human ${summary.needsHuman ?? 0}`;
   return "connected";
 }
@@ -145,13 +145,13 @@ export function BuildingTower(props: {
   ]);
 
   return (
-    <div className="building-overview" aria-label="大楼总览">
+    <div className="building-overview" aria-label="Building overview">
       <div className="building-stage">
         <svg
           className="building-tower-svg"
           viewBox={`0 0 ${viewW} ${viewH}`}
           role="list"
-          aria-label="楼层列表"
+          aria-label="Floor list"
         >
           <defs>
             <pattern id="campus-grid" width="28" height="28" patternUnits="userSpaceOnUse">
@@ -194,7 +194,7 @@ export function BuildingTower(props: {
             className={`openagents-factory status-${factory.status}`}
             role="button"
             tabIndex={0}
-            aria-label={`进入 OpenAgents 交付面，${factoryStatus(factory)}`}
+            aria-label={`Open OpenAgents delivery, ${factoryStatus(factory)}`}
             onClick={onOpenAgents}
             onKeyDown={(event) => activateFactory(event, onOpenAgents)}
           >
@@ -239,7 +239,7 @@ export function BuildingTower(props: {
               {factoryStatus(factory)}
             </text>
             <text className="factory-enter" x={FACTORY_X + FACTORY_W - 18} y={FACTORY_Y + 94}>
-              进入 →
+              Enter →
             </text>
             <rect
               className="factory-hit"
@@ -289,7 +289,7 @@ export function BuildingTower(props: {
                 role="button"
                 tabIndex={0}
                 aria-pressed={selected}
-                aria-label={`展开 ${floor.floorNo}F ${floor.name} 工区，${countLabel(floor, mode)}`}
+                aria-label={`Expand ${floor.floorNo}F ${floor.name} Workspace, ${countLabel(floor, mode)}`}
                 onClick={() => onSelectFloor(floor.role)}
                 onKeyDown={(event) => activateFloor(event, floor.role, onSelectFloor)}
               >

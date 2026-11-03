@@ -13,15 +13,15 @@ description: >-
   structure rather than repeatedly shortening the evidence text:
   - accept: also give `kind` (bug/feature/chore/document), `priority` (P0-P3,
     a suggestion), `proposal_title` (a task-independent harness problem title),
-    `fields` (the kind's normalized fields, Chinese labels), and the factual
+    `fields` (the kind's canonical English machine keys), and the factual
     `artifact` required by the schema.
   - reject / needs_info: also give `reason`.
 
   The parameters are schema-validated at call time; invalid values (unknown
   field, non-P0-P3 priority, self-invented keys) are rejected and you must retry.
-# Spec-0029/T3：input_schema 是 agent_contract.dispositions_input_schema() 的生成副本（受 drift-guard
-# 测试守护：test_triage.py::test_submit_triage_yaml_matches_contract 断言二者深度相等）。三值
-# disposition（duplicate 退役、跨提案吸收归 Architect）。改字段改 SCHEMAS 后需重新生成此块，否则测试会红。
+# Spec-0029/T3: input_schema is a generated copy of agent_contract.dispositions_input_schema() (protected by drift-guard
+# tests: test_triage.py::test_submit_triage_yaml_matches_contract asserts deep equality). Three-valued
+# disposition (duplicate is retired; Architect handles cross-proposal absorption). Regenerate this block after changing fields in SCHEMAS or tests will fail.
 input_schema:
   type: object
   properties:
@@ -59,13 +59,13 @@ input_schema:
           fields:
             type: object
             properties:
-              根因区域:
+              root_cause:
                 type: string
-              边界:
+              boundary:
                 type: string
-              验收:
+              acceptance:
                 type: string
-              交付物:
+              deliverable:
                 type: string
             additionalProperties: false
           reason:
@@ -73,15 +73,33 @@ input_schema:
           artifact:
             type: object
             properties:
-              reported_problem: {type: string}
-              user_impact: {type: string}
-              scope_boundary: {type: string}
-              evidence: {type: array, items: {type: string}}
-              uncertainties: {type: array, items: {type: string}}
+              reported_problem:
+                type: string
+              user_impact:
+                type: string
+              scope_boundary:
+                type: string
+              evidence:
+                type: array
+                items:
+                  type: string
+              uncertainties:
+                type: array
+                items:
+                  type: string
               implementation_target:
                 type: string
-                enum: [harness, outside_harness, uncertain]
-            required: [reported_problem, user_impact, scope_boundary, evidence, uncertainties, implementation_target]
+                enum:
+                  - harness
+                  - outside_harness
+                  - uncertain
+            required:
+              - reported_problem
+              - user_impact
+              - scope_boundary
+              - evidence
+              - uncertainties
+              - implementation_target
             additionalProperties: false
         required:
           - issue

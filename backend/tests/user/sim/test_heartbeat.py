@@ -1,6 +1,6 @@
-"""心跳：开放 intent → act 收敛；内=send_message / 外=interrupt+give_up；act 自报 gap。
+"""Heartbeat: open intent → act convergence; inner=send_message / outer=interrupt+give_up; act self-reports gap.
 
-Spec-0037/T2: 耐心跟 tempo；过程卷入可加 stuck_extra；不把产品键焊进人轴。
+Spec-0037/T2: follow tempo patiently; process involvement may add stuck_extra; do not hardwire product keys into human axis.
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ def _persona(
 
 
 class HeartbeatHarness:
-    """write_message/poll/interrupt/shutdown —— 满足 _supports_heartbeat（Spec-0036）。"""
+    """write_message/poll/interrupt/shutdown — satisfy _supports_heartbeat (Spec-0036)."""
 
     def __init__(
         self,
@@ -81,7 +81,7 @@ class HeartbeatHarness:
         return self._inflight
 
     def write_message(self, message: str) -> None:
-        """统一写：首条记 begun，等待中再写记 emitted（测观测用，语义同一通道）。"""
+        """Unified write: first record begun, then record emitted while waiting (for observation testing, semantics same channel)."""
         if not self._inflight:
             self.begun.append(message)
             self._inflight = True
@@ -110,7 +110,7 @@ class HeartbeatHarness:
         return item
 
     def try_reply(self) -> str | None:
-        """非阻塞：脚本下一项若已是 reply，则取出（模拟 LLM 决策期间 reply 已进缓冲）。"""
+        """Non-blocking: if script's next item is already reply, extract it (simulate reply buffered during LLM decision period)."""
         if self._pi >= len(self._poll_script):
             return None
         if self._poll_script[self._pi][0] != "reply":
@@ -141,7 +141,7 @@ class HeartbeatHarness:
 
 
 class WaitStubClient:
-    """分队列：judge / intent / act；每心跳 3 次 respond（Spec-0023 three）。"""
+    """Separate queues: judge / intent / act; respond 3 times per heartbeat (Spec-0023 three)."""
 
     def __init__(
         self,
@@ -302,7 +302,7 @@ def test_three_mode_keep_waiting_logs_and_calls() -> None:
     assert "if the help text says so" not in intent_prompt
     assert "Read <harness_help>" not in intent_prompt
     assert any(t.harness_output == "done at last!" for t in res.turns)
-    # 主 decide 的 <history>：统一 [+Ns] 时间轴 + 心跳记忆
+    # Main decide's <history>: unified [+Ns] timeline + heartbeat memory
     main_prompts = [p for p in client.all_prompts if "<main_act>" in p and "accept" in p]
     assert any(
         "[+90s] waiting:" in p
@@ -317,7 +317,7 @@ def test_three_mode_keep_waiting_logs_and_calls() -> None:
 
 
 def test_structured_timeout_reply_ends_session_before_next_persona_turn() -> None:
-    """终局 reply 可见、可审计，但 timeout 后不能再判断一轮或写入已死 workspace。"""
+    """Final reply is visible and auditable, but after timeout cannot judge another round or write to dead workspace."""
     timeout_text = (
         "[timeout] harness request exceeded its execution limit; this session cannot continue."
     )
@@ -343,7 +343,7 @@ def test_structured_timeout_reply_ends_session_before_next_persona_turn() -> Non
 
 
 def test_open_intent_gap_comes_from_act_not_enum() -> None:
-    """想看进度却只能干等：act 自报 gap=true → WAIT_GAP；不再靠封闭 intent 枚举对表。"""
+    """Want to see progress but can only wait: act self-reports gap=true → WAIT_GAP; no longer rely on closed intent enumeration matching."""
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "done")])
     client = WaitStubClient(
         actions=["send_message", "accept"],
@@ -365,7 +365,7 @@ def test_open_intent_gap_comes_from_act_not_enum() -> None:
 
 
 def test_help_text_driven_send_message_no_gap() -> None:
-    """帮助文本写了 /status → send_message；若决策后仍无现成 reply，则 emit；否则见 abort 测试。"""
+    """Help text wrote /status → send_message; if still no ready reply after decision, then emit; otherwise see abort test."""
     harness = HeartbeatHarness(
         [("pending", 90.0), ("pending", 180.0), ("reply", "done")],
         help_text="# Help\nWhile waiting you may send `/status` as a normal message.\n",
@@ -399,7 +399,7 @@ def test_help_text_driven_send_message_no_gap() -> None:
     waiting = [t for t in res.turns if t.phase == "waiting"]
     assert any(t.action == "send_message" and t.message == "/status" for t in waiting)
     assert any(t.phase != "waiting" and t.harness_output == "done" for t in res.turns)
-    # Spec-0024/T6：插话 utterance 标 queued；随后 reply 的 answers 指向 begin 那条而非插话
+    # Spec-0024/T6: Mark interjection utterance as queued; subsequent reply's answers point to the begin utterance, not the interjection
     open_utt = next(t for t in res.turns if t.action == "send_message")
     assert open_utt.utterance_id == "u1" and open_utt.delivery == "open"
     queued = next(t for t in waiting if t.action == "send_message")
@@ -411,7 +411,7 @@ def test_help_text_driven_send_message_no_gap() -> None:
 
 
 def test_send_message_then_reply_triggers_main_not_nested_wait() -> None:
-    """插话成功 emit 后回 AwaitEvent；下一跳若已是 reply 则交主 loop（不再嵌套等待决策）。"""
+    """After interjection emitted successfully, return AwaitEvent; if next hop is already reply, pass to main loop (no nested decision wait)."""
     harness = HeartbeatHarness(
         [("pending", 60.0), ("pending", 120.0), ("reply", "all done")],
         help_text="# Help\n/btw <msg> is a side question while work continues.\n",
@@ -421,7 +421,7 @@ def test_send_message_then_reply_triggers_main_not_nested_wait() -> None:
         acts=[
             {"action": "send_message", "message": "/btw are you still on pytest?", "gap": False},
             {"action": "keep_waiting", "gap": False},
-            {"action": "interrupt", "gap": False},  # 不应被消费
+            {"action": "interrupt", "gap": False},  # Should not be consumed
         ],
         judging=[
             {"judgment": "unclear", "perceive": "want a peek"},
@@ -444,7 +444,8 @@ def test_send_message_then_reply_triggers_main_not_nested_wait() -> None:
     )
     assert harness.emitted == ["/btw are you still on pytest?"]
     assert harness.controls == []
-    assert len(client.act_prompts) == 2  # send_message + keep_waiting（后者被 reply 抢先 abort）
+    # send_message + keep_waiting (latter preempted by reply abort)
+    assert len(client.act_prompts) == 2
     assert any(t.action == "send_message" for t in res.turns if t.phase == "waiting")
     assert any(t.phase != "waiting" and t.harness_output == "all done" for t in res.turns)
     assert any(
@@ -453,7 +454,7 @@ def test_send_message_then_reply_triggers_main_not_nested_wait() -> None:
 
 
 def test_reply_ready_after_heartbeat_aborts_give_up() -> None:
-    """心跳 LLM 期间 reply 已进缓冲：动作前检出 → 不作废会话，交主 loop，并写入 history。"""
+    """During heartbeat LLM phase, reply already in buffer: check before action → do not invalidate session, pass to main loop, write to history."""
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "arrived while deciding")])
     client = WaitStubClient(
         actions=["send_message", "accept"],
@@ -463,7 +464,7 @@ def test_reply_ready_after_heartbeat_aborts_give_up() -> None:
         verdict="satisfied",
     )
     res = run_session(_persona(), client, harness, TASK, help_text=harness.help_text)
-    assert res.end_reason == "accepted"  # 未 abandon
+    assert res.end_reason == "accepted"  # Not abandoned
     assert harness.controls == []
     assert harness.emitted == []
     assert any(
@@ -486,7 +487,7 @@ def test_reply_ready_after_heartbeat_aborts_interrupt() -> None:
         verdict="satisfied",
     )
     res = run_session(_persona(), client, harness, TASK, help_text=harness.help_text)
-    assert harness.controls == []  # 未真正 interrupt
+    assert harness.controls == []  # Not truly interrupted
     assert any(
         t.phase != "waiting" and t.harness_output == "done without interrupt" for t in res.turns
     )
@@ -496,13 +497,13 @@ def test_reply_ready_after_heartbeat_aborts_interrupt() -> None:
 
 
 def test_keep_waiting_is_one_shot_reply_wakes_main() -> None:
-    """keep_waiting 也结束本次心跳；随后 reply 触发主 loop，不会连着再做一次等待决策。"""
+    """keep_waiting also ends this heartbeat; subsequent reply triggers main loop, will not do another wait-decision sequentially."""
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "done at last!")])
     client = WaitStubClient(
         actions=["send_message", "accept"],
         acts=[
             {"action": "keep_waiting", "gap": False},
-            {"action": "interrupt", "gap": False},  # 不应被消费
+            {"action": "interrupt", "gap": False},  # Should not be consumed
         ],
         judging=[
             {"judgment": "on_track", "perceive": "still working"},
@@ -518,7 +519,7 @@ def test_keep_waiting_is_one_shot_reply_wakes_main() -> None:
     assert len(client.act_prompts) == 1
     assert harness.controls == []
     assert any(t.phase != "waiting" and t.harness_output == "done at last!" for t in res.turns)
-    # 心跳记忆进 history，主 decide 能看见思考+动作+墙钟
+    # Heartbeat memory enters history; main decide sees thought + action + wall clock
     hist_bearing = [p for p in client.all_prompts if "<history>" in p and "<main_act>" in p]
     assert any("[+90s] waiting:" in p and "keep_waiting" in p for p in hist_bearing)
 
@@ -536,10 +537,10 @@ def test_keep_waiting_decay_follows_tempo_coef() -> None:
         assert len(wt) == 1
         return wt[0].patience
 
-    # STEADY 基线 5、decay 1 → keep 后 4；IMPATIENT 基线 3、decay 2 → keep 后 1
+    # STEADY baseline 5, decay 1 → after keep 4; IMPATIENT baseline 3, decay 2 → after keep 1
     assert _waiting_patience_after_one_keep(TimeTemperament.STEADY) == 4
     assert _waiting_patience_after_one_keep(TimeTemperament.IMPATIENT) == 1
-    # 正交：同 tempo 下 d43 不再改 waiting 耐心
+    # Orthogonal: d43 under same tempo no longer changes waiting patience
     harness = HeartbeatHarness([("pending", 90.0), ("reply", "done")])
     client = WaitStubClient(
         actions=["send_message", "accept"],
@@ -607,7 +608,7 @@ def test_pathological_keep_waiting_is_bounded() -> None:
 
 
 def test_heartbeat_cap_allows_corrections_until_twelfth_check() -> None:
-    """等待兜底从 8 次放宽到 12 次；仅第 12 次覆盖动作，其余终止规则不变。"""
+    """Wait fallback relaxed from 8 to 12 attempts; only the 12th attempt overrides the action, other termination rules unchanged."""
     harness = HeartbeatHarness([("pending", 90.0)])
     client = WaitStubClient(
         actions=["send_message"],
@@ -699,8 +700,8 @@ def test_stale_progress_taxes_patience_and_can_gap() -> None:
 
 
 def test_prior_activity_carried() -> None:
-    # 第一跳：pending 后脚本下一项即 reply → keep_waiting 动作前 abort，交主 loop。
-    # 第二跳：pending 后再 pending（非 reply）→ interrupt 才能真正执行 control。
+    # First hop: after pending, script's next item is reply → abort before keep_waiting action, pass to main loop.
+    # Second hop: after pending, pending again (not reply) → interrupt can truly execute control.
     harness = HeartbeatHarness(
         [
             ("pending", 90.0),

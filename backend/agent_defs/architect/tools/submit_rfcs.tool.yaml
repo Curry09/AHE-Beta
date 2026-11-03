@@ -1,7 +1,7 @@
 type: tool
 name: submit_rfcs
 description: >-
-  Submit structural proposals and finish. Call this compatibility-named tool
+  Submit structural proposals and finish. Call this tool
   exactly once after reviewing ProposalView, experience trends, and runtime data.
 
   Pass `proposals`: 0..n cross-proposal syntheses. Each item names at least two

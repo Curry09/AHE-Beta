@@ -1,12 +1,12 @@
 ---
 number: "0050"
-title: 轮次交付封口与收益归因
+title: "Round delivery closure and benefit attribution"
 issue: 0
 slug: round-delivery-gate
-summary: 非末轮：用户测完后提案、准入，并等到本轮准入票全部终态才开下一轮用户；卡死则停实验。末轮只跑用户交互，不再跑需求与交付。第 N+1 轮体感相对第 N 轮体感归因于第 N 轮已封口产物。
+summary: "Non-final rounds: after the user finishes testing, run proposals and admission, then wait until all admission tickets for the current round reach terminal states before starting users for the next round; if blocked, stop the experiment. The final round runs only user interaction, with no further demand or delivery. The experience difference of round N+1 relative to round N is attributed to the sealed deliverables from round N."
 tasks:
   - id: T1
-    title: 轮次封口契约
+    title: "Round closure contract"
     status: done
     priority: P0
     tags: []
@@ -15,10 +15,10 @@ tasks:
     parallel: false
     files:
       - docs/specs/0050-round-delivery-gate.md
-    scope: 把「非末轮交付封口后才开下一轮用户；卡死停实验；末轮只测用户」写成自包含 RFC，废止需求面与交付面轮次不同步。
-    acceptance: 九段 RFC 完整；封口条件、卡死停实验、末轮无需求无交付、体感归因公式可机读；spec validate/render/graph 通过。
+    scope: "Write “start users for the next round only after non-final delivery closure; stop the experiment if blocked; run only users in the final round” as a self-contained RFC, eliminating desynchronization between demand-side and delivery-side rounds."
+    acceptance: "The nine-section RFC is complete; closure conditions, stop-the-experiment-on-blocked behavior, no demand or delivery in the final round, and the experience attribution formula are machine-readable; spec validate/render/graph pass."
   - id: T2
-    title: 本轮准入票终态闸
+    title: "Current-round admission-ticket terminal-state gate"
     status: done
     priority: P0
     tags: []
@@ -29,10 +29,10 @@ tasks:
     files:
       - backend/ahe_beta/loop/round_gate.py
       - backend/tests/loop/test_round_gate.py
-    scope: 新增 round_gate：轮询本轮 admitted 票直到全部终态；needs-human/超时/看门狗抛 RoundDeliveryBlocked；全关且无 needs-human 则成功；空名单立即成功。
-    acceptance: Fake 票：全关成功；一张 needs-human 抛错；超时抛错；空名单不轮询；单测不打真 Gitea。
+    scope: "Add round_gate: poll the admitted tickets for the current round until all reach terminal states; throw RoundDeliveryBlocked for needs-human, timeout, or watchdog; succeed when all are closed and none is needs-human; succeed immediately for an empty list."
+    acceptance: "Fake tickets: succeed when all are closed; throw for one needs-human ticket; throw on timeout; do not poll for an empty list; unit tests must not call real Gitea."
   - id: T3
-    title: 编排：末轮跳过需求交付、非末轮准入后封口
+    title: "Orchestration: skip demand and delivery in the final round; close after admission in non-final rounds"
     status: done
     priority: P0
     tags: []
@@ -43,10 +43,10 @@ tasks:
     files:
       - backend/ahe_beta/loop/orchestrator.py
       - backend/tests/loop/test_orchestrator.py
-    scope: run(n) 每轮先用户；非末轮才生成+Owner；用 admit 的 admitted 调闸；闸成功后才解析 sealed SHA；闸抛错中止 run 不开下一轮；末轮不调生成/Owner/闸。
-    acceptance: n=2 时仅第 1 轮走 Owner 与闸；第 2 轮只 launch 用户；闸抛错时第二轮用户次数为 0；既有 run_round 默认仍含需求段不回归。
+    scope: "run(n) starts with users in every round; only non-final rounds generate and invoke Owner; use admit's admitted set to invoke the gate; parse the sealed SHA only after the gate succeeds; a gate exception aborts run and does not start the next round; the final round does not call generation, Owner, or the gate."
+    acceptance: "When n=2, only round 1 goes through Owner and the gate; round 2 only launches users; when the gate throws, the number of user invocations in round 2 is 0; the existing run_round default still includes the demand segment and must not regress."
   - id: T4
-    title: run 接线、看板阶段、卡死保活
+    title: "run wiring, dashboard phase, and blocked-state keep-alive"
     status: done
     priority: P0
     tags: []
@@ -60,10 +60,10 @@ tasks:
       - backend/ahe_beta/loop/live.py
       - backend/tests/loop/test_live.py
       - backend/tests/test_run_vigil.py
-    scope: 捕获 RoundDeliveryBlocked：live 标 blocked、进程非 0 退出、vigil keep-alive。干净收官（含末轮用户结束后）停 vigil。TOTAL_ROUNDS=1 不启 vigil。run.json 增加 phase 与 user_sha/sealed_sha。
-    acceptance: 单测：blocked 不 docker rm；干净结束 stop_vigil 拆容器；TOTAL_ROUNDS=1 不 start_vigil；live 可读写新字段。
+    scope: "Catch RoundDeliveryBlocked: mark live as blocked, exit the process with a non-zero status, and keep vigil alive. Stop vigil on clean completion (including after final-round users finish). Do not start vigil when TOTAL_ROUNDS=1. Add phase and user_sha/sealed_sha to run.json."
+    acceptance: "Unit tests: blocked must not docker rm; clean completion must call stop_vigil to tear down the container; TOTAL_ROUNDS=1 must not call start_vigil; live must be able to read and write the new fields."
   - id: T5
-    title: 架构说明与封口 e2e 脚本
+    title: "Architecture notes and closure e2e script"
     status: done
     priority: P1
     tags: []
@@ -74,189 +74,189 @@ tasks:
     files:
       - CLAUDE.md
       - backend/scripts/e2e-spec-0050-round-delivery-gate.sh
-    scope: CLAUDE.md 闭环段改为末轮只用户、非末轮封口后切轮；e2e 用 Fake tracker 跑两轮断言第二轮用户前闸已成功、卡死不启第二轮。
-    acceptance: 脚本无密钥、不启真 vigil；断言覆盖封口成功与 blocked；CLAUDE.md 不再写两面无需同步。
+    scope: "Change the closed-loop section of CLAUDE.md to final-round users only and switching rounds after non-final closure; use a Fake tracker in e2e to run two rounds and assert that the gate has succeeded before users in round 2, and that a blocked state does not start round 2."
+    acceptance: "The script uses no secrets and does not start real vigil; assertions cover successful closure and blocked states; CLAUDE.md no longer says that the two sides do not need synchronization."
 ---
 
-# 0050 · 轮次交付封口与收益归因
+# 0050 · Round Delivery Gate and Benefit Attribution
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: the frontmatter contains structured source data (including the tasks DAG), and the body is a group-level nine-section rust-RFC overview. -->
 
 ## Summary
 
-一次实验里，**只有封过口的产品**才能被下一轮用户测量；否则体感无法归因到「这一轮改动」。
+Within an experiment, **only a product that has passed the gate can be measured by users in the next round**; otherwise, user experience cannot be attributed to the “changes made in this round.”
 
-编排因此改为两段轮次：
+Orchestration therefore changes to a two-stage round structure:
 
-- **非末轮**：用户测当前 `main` → 提案 → Owner 准入 → **等到本轮准入票全部终态** → 才开下一轮用户。
-- **末轮**：只跑用户交互，**不再跑需求、不再往交付队列放票**。这轮体感就是上一轮已封口产物的收益测量。
+- **Non-final round**: users measure the current `main` → proposals → Owner admission → **wait until all admission issues for this round reach terminal states** → only then start users in the next round.
+- **Final round**: run only user interaction; **do not run requirements and do not add issues to the delivery queue**. The user experience in this round measures the benefit of the product already gated in the previous round.
 
-卡死（`needs-human`、看门狗、等待超时）= 本轮没有合法封口 → **实验停在这一轮，不开下一轮用户**。
+A deadlock (`needs-human`, watchdog, or wait timeout) = this round has no valid gate completion → **the experiment stops in this round and does not start users in the next round**.
 
-同一轮内用户会话仍可并行，同一轮多张票交付面仍可并行。禁止的是下一轮用户与本轮交付重叠。
+User sessions within the same round may still run in parallel, and delivery of multiple issues in the same round may still run in parallel. What is prohibited is overlap between users in the next round and delivery in the current round.
 
 ## Motivation
 
-训练信号是用户体感，测试是 held-out benchmark。要问「第 N 轮改动有没有正收益」，必须比较：
+The training signal is user experience, and the test is a held-out benchmark. To ask whether “the changes in round N produced a positive benefit,” we must compare:
 
-- 第 N 轮用户：在产品 A 上的体感
-- 第 N+1 轮用户：在产品 B 上的体感
+- Round N users: their experience with product A
+- Round N+1 users: their experience with product B
 
-其中 B 必须是「第 N 轮决定做、并且已经做完」的产品，不能是 A 和若干未完成 PR 的随机混合物。
+B must be the product that was decided for implementation in round N and has already been completed; it cannot be a random mixture of A and several unfinished PRs.
 
-现行编排不是这样。需求面 `Orchestrator.run_round` 在 Owner 打上 `openagents` 交接令牌之后立刻结束，只再读一次 `main` HEAD 当作观测游标，**不等合并**。交付面 `openagents vigil` 是实验一开始就拉起的常驻进程：票出现就领，写代码、开 PR、合并，与需求面轮次没有会合点。打开 RFC 之后单票更长，还把「需求面 `TOTAL_ROUNDS` 先结束、交付面继续跑」写成了缺省 keep-alive。
+The current orchestration does not work this way. The requirements side `Orchestrator.run_round` ends immediately after the Owner adds the `openagents` handoff token, then reads `main` HEAD once more as the observation cursor, **without waiting for merges**. The delivery side `openagents vigil` is a persistent process started at the beginning of the experiment: it claims issues when they appear, writes code, opens PRs, and merges them, with no rendezvous point with the requirements-side rounds. After RFCs became available, individual issues also became longer, and “the requirements side `TOTAL_ROUNDS` ends first while the delivery side continues running” was written as the default keep-alive behavior.
 
-后果：第 2 轮用户开始时，第 1 轮票可能还在写。他们测到的是「当时 `origin/main` 碰巧合进去的子集」。体感曲线对不上轮次，无法说某轮有正收益，也无法说某轮把产品改坏了。
+The result is that when round 2 users start, round 1 issues may still be under implementation. They measure the subset that happened to be merged by `origin/main` at that time. The experience curve cannot be aligned with rounds, so we cannot say whether a round produced a positive benefit or whether it damaged the product.
 
-更早的时候开发者还在编排进程里、一轮内直推 `main`，轮次边界和产品边界大致重合。换到常驻 vigil 之后，开发从一轮里拿掉了，轮次变成「出票节拍」，产品进化变成「旁边一直在改」。对墙钟吞吐有利，对归因有害。本组把会合点加回来：vigil 仍然是交付执行器，但**下一轮用户必须等本轮执行器把本轮票做完或明确失败**。
+Earlier, developers were also inside the orchestration process and pushed `main` directly within a round, so round boundaries and product boundaries roughly coincided. After switching to a persistent vigil, development was removed from the round, and a round became an “issue-creation beat” while product evolution became “something continuously changing beside it.” This benefits wall-clock throughput but harms attribution. This group restores the rendezvous point: vigil remains the delivery executor, but **users in the next round must wait until the executor completes or explicitly fails all issues from the current round**.
 
-末轮若再走提案和准入，会产生一批永远没有「下一轮用户」来测量的改动。操作者定：末轮只测，不再进化。
+If the final round also went through proposals and admission, it would produce a set of changes for which there would never be “next-round users” to measure. The operator decided that the final round only measures and does not evolve the product further.
 
 ## Guide-level explanation
 
-`TOTAL_ROUNDS=3` 时实验长这样：
+At `TOTAL_ROUNDS=3`, the experiment looks like this:
 
 ```
-第 1 轮  用户测种子 A
-         提案 + Owner 准入票 #10 #11
-         等待：#10 #11 都关闭且无 needs-human
-         此时 main = 产品 B（#10 #11 的合并结果）
+Round 1  User tests seed A
+         Proposals + Owner admits issues #10 #11
+         Wait: #10 and #11 both closed and no needs-human
+         main is now product B (the result of merging #10 and #11)
 
-第 2 轮  用户测产品 B          ← B 相对 A 的体感差 = 第 1 轮收益
-         提案 + Owner 准入票 #20
-         等待：#20 关闭且无 needs-human
-         此时 main = 产品 C
+Round 2  User tests product B  ← user experience difference between B and A = round 1 gain
+         Proposals + Owner admits issue #20
+         Wait: #20 closed and no needs-human
+         main is now product C
 
-第 3 轮  用户测产品 C          ← C 相对 B 的体感差 = 第 2 轮收益
-         结束。不再提案、不再准入、不再等交付。
+Round 3  User tests product C  ← user experience difference between C and B = round 2 gain
+         End. No more proposals, admissions, or waiting for delivery.
 ```
 
-第 3 轮没有「第 3 轮改动的收益」，这是有意的：最后一轮专门用来出数。
+There is no “benefit from round 3 changes.” This is intentional: the final round is dedicated to producing measurements.
 
-`TOTAL_ROUNDS=1`：只测种子，不启交付面。
+`TOTAL_ROUNDS=1`: measure only the seed; do not start the delivery side.
 
-若第 1 轮等待时 #11 被打上 `needs-human`（或一直不关直到超时）：实验在第 1 轮失败退出，**第 2、第 3 轮用户不跑**。已经合进 `main` 的 #10 仍在仓里，但不进入「第 1 轮正收益」结论——本轮没有完整封口，没有对照实验。
+If #11 receives `needs-human` while round 1 is waiting (or remains open until timeout), the experiment exits with failure in round 1, and **round 2 and round 3 users do not run**. #10, which has already been merged into `main`, remains in the repository, but does not enter the “positive benefit in round 1” conclusion—the round did not have a complete gate closure, so there is no controlled experiment.
 
-看板能看出当前停在「用户 / 提案准入 / 等待交付 / 卡死」。卡死时交付面容器留着等人处理；干净跑完则拆掉。
+The dashboard shows whether the current state is “users / proposal admission / waiting for delivery / deadlocked.” When deadlocked, the delivery-side container remains for manual handling; after a clean run, it is removed.
 
 ## Reference-level explanation
 
-### 轮次过程
+### Round procedure
 
-`Orchestrator.run(n_rounds)`：
+`Orchestrator.run(n_rounds)`:
 
-1. `i = 1 .. n_rounds`。
-2. 解析 `origin/main`（无 origin 则本地 `main`），本轮所有用户会话 `launch` 该 SHA（会话级快照，同轮用户并行仍允许）。记 `user_sha`。
-3. 跑用户会话（现有 a 段）。
-4. 若 `i == n_rounds`：跑完整性绊线，回灌当前 HEAD，`on_round_end`，结束。不调 triage / divergent / architect / Owner，不调交付闸。
-5. 否则：生成两拍 + `Owner.admit_once()`。等待集合 = 本次返回的 `AdmitOutcome.admitted`（仅本轮新打上 `openagents` 的票）。Owner 本轮 merge/decline/hold 的提案不进等待集：它们不是交付面工作项。
-6. `wait_round_delivery(numbers=admitted)`。空名单立即成功（本轮没有放进交付队列，下一轮用户仍测同一 SHA，体感差应接近 0，这是合法结论：「本轮无交付」）。
-7. 闸成功后再 `fetch` 解析 HEAD，记 `sealed_sha`，`on_round_end`。下一轮步骤 2 必须读到这个前进后的 `main`（或相同 SHA，若空等待集）。
-8. 闸抛 `RoundDeliveryBlocked`：不再进入 `i+1`，异常传到 `run.py`。
+1. `i = 1 .. n_rounds`.
+2. Resolve `origin/main` (if there is no origin, use local `main`). All user sessions in this round `launch` that SHA (a session-level snapshot; parallel users in the same round remain allowed). Record `user_sha`.
+3. Run the user sessions (the existing section a).
+4. If `i == n_rounds`: run the integrity tripwire, rehydrate the current HEAD, `on_round_end`, and finish. Do not call triage / divergent / architect / Owner, and do not call the delivery gate.
+5. Otherwise: generate two beats + `Owner.admit_once()`. The wait set = `AdmitOutcome.admitted` returned this time (only issues newly marked with `openagents` in this round). Proposals that the Owner merges/declines/holds in this round do not enter the wait set: they are not delivery-side work items.
+6. `wait_round_delivery(numbers=admitted)`. An empty list succeeds immediately (nothing was added to the delivery queue in this round, so next-round users still measure the same SHA; the experience difference should be close to 0. This is a valid conclusion: “no delivery in this round”).
+7. After the gate succeeds, `fetch` resolve HEAD again, record `sealed_sha`, `on_round_end`. Step 2 of the next round must read this advanced `main` (or the same SHA if the wait set is empty).
+8. If the gate raises `RoundDeliveryBlocked`: do not enter `i+1`; propagate the exception to `run.py`.
 
-`run_round` 保留为「用户 + 需求 + 闸」的非末轮路径，供既有单测默认调用；`run()` 在末轮不走需求段。
+`run_round` remains the non-final path for “users + requirements + gate,” for existing unit tests that call it by default; `run()` does not run the requirements stage in the final round.
 
-### 终态判定
+### Terminal-state determination
 
-读票用 tracker 已有取单票接口（Gitea `get_issue`；测试用 Fake 等价物）。每张等待集内的票：
+Read issues through the tracker’s existing single-issue retrieval interface (Gitea `get_issue`; tests use the equivalent Fake). For every issue in the wait set:
 
-| 观察 | 判定 |
+| Observation | Determination |
 |---|---|
-| `state=closed` 且标签不含 `needs-human` | 成功终态（合并关票或等价关闭） |
-| 标签含 `needs-human`（不论 open/closed） | 卡死 |
-| 仍 open 且无 `needs-human` | 交付中，继续等 |
-| 墙钟超过 `ROUND_DELIVERY_TIMEOUT_SEC`（缺省 14400）仍有交付中 | 卡死（vigil 哑掉 / 看门狗未落标签的兜底） |
+| `state=closed` and the labels do not contain `needs-human` | Successful terminal state (merged and closed, or equivalently closed) |
+| Labels contain `needs-human` (regardless of open/closed) | Deadlocked |
+| Still open and without `needs-human` | In delivery; continue waiting |
+| Wall-clock time exceeds `ROUND_DELIVERY_TIMEOUT_SEC` (default 14400) while delivery is still in progress | Deadlocked (fallback for a silent vigil / watchdog that failed to apply the label) |
 
-任一张卡死 → 整闸失败，抛 `RoundDeliveryBlocked(numbers=…, reason=…)`。不把部分合并当成封口。
+Any deadlocked issue causes the entire gate to fail and raises `RoundDeliveryBlocked(numbers=…, reason=…)`. Partial merges do not count as gate closure.
 
-轮询间隔 `ROUND_DELIVERY_POLL_SEC`（缺省 15）。闸只读 Gitea，不 import OpenAgents，不读 vigil sqlite。
+The polling interval is `ROUND_DELIVERY_POLL_SEC` (default 15). The gate reads only Gitea; it does not import OpenAgents or read the vigil sqlite database.
 
-### 进程与 vigil
+### Processes and vigil
 
-vigil 仍是常驻执行器，本轮多票可并行。它不再与下一轮用户抢时间。
+vigil remains a persistent executor, and multiple issues in a round may run in parallel. It no longer competes with users in the next round for time.
 
-- `TOTAL_ROUNDS=1`：不 `start_vigil`。
-- 非末轮等待期间 vigil 必须在跑。
-- `RoundDeliveryBlocked`：进程退出码非 0；`stop_vigil` **不**拆容器（keep-alive），live `phase=blocked`，记下卡死票号。
-- 末轮用户正常结束后：不再有本实验交付工作，`stop_vigil` 拆容器。干净收官不再依赖「需求面先结束、交付面接着干」——非末轮已经等过了，末轮不再放票。
+- `TOTAL_ROUNDS=1`: do not `start_vigil`.
+- During non-final-round waiting, vigil must be running.
+- `RoundDeliveryBlocked`: the process exits with a nonzero code; `stop_vigil` **does not** remove the container (keep-alive), live `phase=blocked`, and record the deadlocked issue numbers.
+- After users in the final round finish normally: there is no further delivery work for this experiment, so `stop_vigil` removes the container. Clean shutdown no longer depends on “the requirements side finishes first while the delivery side continues working”—the non-final rounds have already waited, and the final round does not add issues.
 
-缺省 keep-alive 从「需求面收尾时交付还在跑」改为「仅卡死时留容器」。显式 `VIGIL_KEEP_ALIVE=1` 仍可在干净收官后留盒调试。
+The default keep-alive changes from “delivery is still running when the requirements side wraps up” to “retain the container only when deadlocked.” Explicit `VIGIL_KEEP_ALIVE=1` may still retain the container for debugging after a clean shutdown.
 
-### 归因公式
+### Attribution formula
 
-设 `F(k)` 为第 k 轮全部用户会话体感的约定汇总（沿用现有 session 分数，本组不改评分细则）。
+Let `F(k)` be the agreed aggregate of the user experience for all user sessions in round k (using the existing session scores; this group does not change the scoring rules).
 
-- `F(1)` 测 `user_sha[1]` = 种子（或本实验起始 `main`）。
-- 对 `k = 1 .. n_rounds-1`，`F(k+1) - F(k)` 归因于第 k 轮等待集的交付结果（`user_sha[k] → sealed_sha[k]`）。
-- `F(n_rounds)` 没有「第 n 轮交付」与之配对。
+- `F(1)` measures `user_sha[1]` = the seed (or the `main` at the start of this experiment).
+- For `k = 1 .. n_rounds-1`, `F(k+1) - F(k)` is attributed to the delivery result of the wait set for round k (`user_sha[k] → sealed_sha[k]`).
+- `F(n_rounds)` has no “round n delivery” paired with it.
 
-benchmark 仍全程 held-out，不进闸、不进切轮条件。
+The benchmark remains held-out throughout and does not enter the gate or round-switching conditions.
 
-### 看板
+### Dashboard
 
-`data/live/run.json` 增加 `phase`（`users` / `demand` / `delivery_wait` / `blocked` / `done`）与可选 `blocked_issues`。既有 `round_shas`：非末轮写入闸后 HEAD（`sealed_sha`）；末轮写入该轮用户所用 SHA。前端未改字段前仍能显示 SHA 列表。
+`data/live/run.json` adds `phase` (`users` / `demand` / `delivery_wait` / `blocked` / `done`) and optional `blocked_issues`. Existing `round_shas` writes the HEAD after the gate for non-final rounds (`sealed_sha`), and writes the SHA used by users in that round for the final round. Until the frontend fields are updated, it can still display the SHA list.
 
-### 与角色调用落盘的关系
+### Relationship to persisted role calls
 
-若实验切片目录记各轮 SHA，非末轮应同时能区分 `user_sha` 与 `sealed_sha`。本组不改那套存储的文件归属。
+If the experiment slice directory records the SHA for each round, non-final rounds should also distinguish `user_sha` from `sealed_sha`. This group does not change file ownership in that storage scheme.
 
-### Task DAG 与文件分配
+### Task DAG and file allocation
 
 ```mermaid
 flowchart TD
-  T1[T1 契约]
-  T2[T2 终态闸]
-  T3[T3 编排切轮]
-  T4[T4 run 与看板]
-  T5[T5 CLAUDE 与 e2e]
+  T1[T1 Contract]
+  T2[T2 Terminal-state gate]
+  T3[T3 Orchestration round transition]
+  T4[T4 run and dashboard]
+  T5[T5 CLAUDE and e2e]
   T1 --> T2
   T2 --> T3
   T3 --> T4
   T3 --> T5
 ```
 
-T4 与 T5 可并行。e2e：`backend/scripts/e2e-spec-0050-round-delivery-gate.sh`。
+T4 and T5 may run in parallel. e2e: `backend/scripts/e2e-spec-0050-round-delivery-gate.sh`.
 
 ## Drawbacks
 
-墙钟变长：非末轮把 RFC/实现/评审算进轮次。以前那些时间与下一轮用户重叠，现在串到切轮之前。这是归因的代价。
+Wall-clock time increases: non-final rounds include the RFC, implementation, and review in the round. Time that previously overlapped with users in the next round is now serialized before the round switch. This is the cost of attribution.
 
-卡死即停实验：一张 `needs-human` 浪费后面几轮用户预算。这是操作者选的，避免用残缺产物去得出「本轮有/无收益」的假结论。
+A deadlock stops the experiment: one `needs-human` wastes the user budget for the remaining rounds. The operator chose this to avoid using an incomplete product to draw a false conclusion about whether the round produced a benefit.
 
-末轮不进化：`TOTAL_ROUNDS` 次用户里只有 `n-1` 次交付。以前末轮也会出票但没有测量轮；现在明确少一轮进化、多一轮干净测量。
+The final round does not evolve the product: among `TOTAL_ROUNDS` users, only `n-1` receive delivery. Previously, the final round also created issues without a measurement round; now there is explicitly one fewer evolution round and one more clean measurement round.
 
-等待是轮询 Gitea，不是 vigil 回调。最多延迟一个 poll 间隔。超时缺省 4 小时，超长 RFC 可能误判卡死，用环境变量加长。
+Waiting polls Gitea rather than receiving a vigil callback. The maximum delay is one poll interval. The default timeout is 4 hours; an unusually long RFC may be incorrectly judged deadlocked, so use an environment variable to extend it.
 
 ## Rationale and alternatives
 
-**会合点放在「下一轮用户之前」，而不是「vigil 内部队列空」。** 等待集是本轮 `admitted`，不是全仓所有 ready。上一实验残留票应在进程启动复位里清掉；本实验只对自己放进去的票负责。
+**Put the rendezvous point before users in the next round, rather than when the vigil internal queue is empty.** The wait set is `admitted` for the current round, not every ready issue in the repository. Issues left over from a previous experiment should be cleared during process-start reset; this experiment is responsible only for the issues it adds.
 
-**卡死停跑，而不是带标记继续。** 带标记继续仍会让下一轮用户踩到部分合并，体感无法解释。停跑把「本轮没封口」变成实验结果，而不是脏数据。
+**Stop on deadlock rather than continuing with a marker.** Continuing with a marker would still expose users in the next round to partial merges, making their experience uninterpretable. Stopping turns “this round did not reach gate closure” into an experiment result rather than dirty data.
 
-**末轮只用户，而不是再加一轮纯测量。** 末轮本身就是测量轮，不必发明第二种轮次类型。
+**The final round contains only users rather than adding another pure measurement round.** The final round itself is the measurement round; there is no need to invent a second kind of round.
 
-备选 A：保持两面不同步，只在日志里记下「本轮用户 SHA vs 当时未合 PR」。能事后解释污染，不能产生干净的轮次收益。已否决。
+Alternative A: keep the two sides unsynchronized and record in the logs “the SHA used by this round’s users versus the unmerged PRs at that time.” This can explain contamination after the fact but cannot produce clean round-level benefits. Rejected.
 
-备选 B：SHA 任意前进就算封口（部分票合入）。下一轮测的是子集，归不进「本轮改动」。已否决。
+Alternative B: consider any SHA advance to be gate closure (partial issue merges). The next round would measure a subset that cannot be attributed to “the changes in this round.” Rejected.
 
-备选 C：需求面 `finally` 等到 vigil 全局空再退出，轮次中间仍重叠。只修了实验收尾，没修轮间归因。已否决。
+Alternative C: have the requirements side `finally` wait until vigil is globally empty before exiting, while still allowing overlap between rounds. This fixes only experiment shutdown, not attribution between rounds. Rejected.
 
-备选 D：把开发者重新嵌回编排进程、一轮内直推 `main`。能封口，但丢掉 PR/评审/围堵盒。已否决。
+Alternative D: embed developers in the orchestration process again and push `main` directly within a round. This can achieve gate closure but loses PRs, review, and the containment box. Rejected.
 
-备选 E：卡死后仍开下一轮、体感标 invalid。看板会有数据，但操作者已要求不开下一轮。已否决。
+Alternative E: continue to the next round after a deadlock and mark the experience invalid. The dashboard would contain data, but the operator has required that the next round not start. Rejected.
 
 ## Prior art
 
-实验设计要求一次只改一组处理、测完整处理后再测下一组；A/B 与 feature freeze 同样把「发布」和「测量」错开。持续交付里 trunk 可以一直合，但「这一版相对上一版的指标」仍以 release 或实验桶为界，而不是以墙上任意时刻的 main 为界。本组把 vigil 当持续交付执行器，把 round 当实验桶。
+Experiment design requires changing one treatment group at a time and measuring the complete treatment before measuring the next group; A/B testing and feature freezes likewise separate “release” from “measurement.” In continuous delivery, trunk may merge continuously, but metrics for “this version relative to the previous version” are still bounded by a release or experiment bucket rather than by an arbitrary moment on main. This group treats vigil as the continuous-delivery executor and the round as the experiment bucket.
 
-OpenAgents vigil 的 `needs-human` 已是交付面公开终态，本仓交付看板按该标签计数。闸复用同一标签，不发明第二套卡死协议。
+OpenAgents vigil’s `needs-human` is already the public terminal state for the delivery side, and this repository’s delivery dashboard counts by that label. The gate reuses the same label rather than inventing a second deadlock protocol.
 
 ## Unresolved questions
 
-无。操作者已定：非末轮等本轮准入票全部终态；卡死停实验；末轮只跑用户交互；不追加额外测量轮。
+None. The operator has decided: non-final rounds wait for all admission issues in the current round to reach terminal states; a deadlock stops the experiment; the final round runs only user interaction; no additional measurement round is added.
 
 ## Future possibilities
 
-闸改为 Gitea webhook / vigil 完成事件，去掉轮询。卡死票人工放行后从 `blocked` 恢复下一轮（现网是失败退出）。把 `F(k+1)-F(k)` 画进看板。超时按票龄而不是整闸一个墙钟。并行实验运行时把闸的等待集限制在本实验 Gitea，避免误等别人的票。
+Change the gate to use Gitea webhooks or vigil completion events and remove polling. After a deadlocked issue is manually released, resume the next round from `blocked` (the current production behavior is failure exit). Draw `F(k+1)-F(k)` on the dashboard. Use issue age rather than one wall-clock timeout for the entire gate. When experiments run in parallel, restrict the gate’s wait set to this experiment’s Gitea issues to avoid waiting for someone else’s issues.
 
 

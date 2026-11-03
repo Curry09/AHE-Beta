@@ -1,4 +1,4 @@
-"""spec-0005/T2：动作空间派生 + 自由产出归类/越权投影/channel 校验。"""
+"""spec-0005/T2: Action space derivation + free output classification / privilege projection / channel validation."""
 
 from __future__ import annotations
 
@@ -67,23 +67,23 @@ def test_active_external_actions_are_unified_across_capability_and_authz() -> No
 
 
 def test_active_offers_all_four_terminals_without_framework_gate() -> None:
-    # loosen：进 ACTIVE 后四个终止动作(accept/accept_with_reservations/file_issue/give_up)全放开，
-    # 不被耐心/诊断/产物门控——验收与否、何时退，均由模型按 persona 性格 + <mood> 自判。耐心满也一样。
+    # loosen: After entering ACTIVE, all four termination actions (accept/accept_with_reservations/file_issue/give_up) are fully unlocked.
+    # Not gated by patience/diagnostics/artifacts — acceptance and exit timing are determined by the model according to persona character + <mood>. Same applies even when patience is exhausted.
     p = _persona(d43=D43Correct.FILE_ISSUE)
     fresh = derive_action_space(Phase.ACTIVE, p, init_state(p))
     assert {"accept", "accept_with_reservations", "file_issue", "give_up"} <= set(fresh)
-    # 对所有 persona 都放开（该开单/该走人由 prompt 里的 D43_CLAUSE 主导，框架不替选）。
+    # Unlocked for all personas (whether to open a issue or exit is governed by D43_CLAUSE in the prompt; the framework does not make the choice).
     p2 = _persona(d43=D43Correct.GIVE_UP)
     fresh2 = derive_action_space(Phase.ACTIVE, p2, init_state(p2))
     assert {"accept", "accept_with_reservations", "file_issue", "give_up"} <= set(fresh2)
-    # accept_with_reservations 与 accept 同为 TERMINATE、end_reason=accepted（照常交付，留体感落差）。
+    # accept_with_reservations and accept are both TERMINATE with end_reason=accepted (delivery proceeds as normal, leaving a gap in user experience).
     assert CATALOG["accept_with_reservations"].effect is CATALOG["accept"].effect
     assert CATALOG["accept_with_reservations"].end_reason == "accepted"
 
 
 def test_resolve_free_falls_back_to_safe_nonterminal() -> None:
-    # 方案 B: resolve 不再用关键词猜意图。无模型自评时, free 一律落安全的非终止动作,
-    # 即便文本里写着 "accept it" 也绝不擅自终止(避免污染体感/issue 信号)。
+    # Option B: resolve no longer guesses intent from keywords. Without model self-evaluation, free always falls back to the safe non-termination action.
+    # Even if the text says "accept it", never arbitrarily terminate (to avoid polluting user experience/issue signals).
     p = _persona()
     space = ["accept", "send_message"]
     aid, msg = resolve_action({"action": "free", "message": "looks good, accept it"}, space, p)
@@ -100,7 +100,7 @@ def test_resolve_rejects_legacy_external_actions() -> None:
 
 def test_resolve_enforces_channel_consistency() -> None:
     p = _persona()
-    # EMIT 但 message 空：client 契约重试仍没修好时必须失败，不能空转或 fabricate。
+    # EMIT with empty message: the client contract must fail if retry has not fixed the issue; cannot spin idle or fabricate.
     space = ["send_message"]
     with pytest.raises(ActionResolutionError, match="channel_mismatch"):
         resolve_action({"action": "send_message", "message": ""}, space, p)
@@ -121,8 +121,8 @@ def test_terminal_message_policy_is_action_specific() -> None:
 
 
 def test_opening_is_the_only_structural_gate_against_accepting_nothing() -> None:
-    # 唯一防"验收虚无"的结构边界是 OPENING（还没发消息→只能 send_message，无任何终止动作）。
-    # 进了 ACTIVE 就至少有一条 harness 回合可反应，验收与否交给模型。
+    # The only structural boundary preventing "acceptance void" is OPENING (no message sent yet → only send_message allowed, no termination actions).
+    # Once ACTIVE, there is at least one harness round to respond; acceptance is left to the model.
     p = _persona()
     opening = derive_action_space(Phase.OPENING, p, init_state(p))
     assert opening == ["send_message"]
@@ -132,7 +132,7 @@ def test_opening_is_the_only_structural_gate_against_accepting_nothing() -> None
 
 
 def test_negative_terminal_outside_space_is_rejected() -> None:
-    # file_issue/give_up 不在当前空间时不可猜测其替代动作，更不能投影到 accept。
+    # When file_issue/give_up are not available in the current state, do not guess substitute actions or project onto accept.
     p = _persona(d43=D43Correct.FILE_ISSUE)
     space = ["accept", "send_message"]
     for action in ("file_issue", "give_up"):

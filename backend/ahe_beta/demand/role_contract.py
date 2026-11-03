@@ -87,23 +87,23 @@ def validate_owner(item: dict, *, review_batch: set[int]) -> list[ContractViolat
 def render_pm_artifact(item: dict) -> str:
     behaviors = "\n".join(f"- {x}" for x in item["observed_behaviors"])
     sessions = ", ".join(item["evidence_sessions"])
-    related = ", ".join(f"#{x}" for x in item.get("related_proposals", [])) or "（无）"
+    related = ", ".join(f"#{x}" for x in item.get("related_proposals", [])) or "(none)"
     return (
-        f"## 用户目标\n\n{item['user_goal']}\n\n"
-        f"## 观察到的行为\n\n{behaviors}\n\n"
-        f"## 体验矛盾\n\n{item['experience_tension']}\n\n"
-        f"## 产品机会\n\n{item['product_opportunity']}\n\n"
-        f"## 期望结果\n\n{item['desired_outcome']}\n\n"
-        f"## 证据\n\n会话：{sessions}\n\n相关提案：{related}"
+        f"## User goal\n\n{item['user_goal']}\n\n"
+        f"## Observed behaviors\n\n{behaviors}\n\n"
+        f"## Experience tension\n\n{item['experience_tension']}\n\n"
+        f"## Product opportunity\n\n{item['product_opportunity']}\n\n"
+        f"## Desired outcome\n\n{item['desired_outcome']}\n\n"
+        f"## Evidence\n\nsession_id: {sessions}\n\nRelated proposals: {related}"
     )
 
 
 def render_synthesis_artifact(item: dict) -> str:
     sources = ", ".join(f"#{x}" for x in item["source_proposals"])
     return (
-        f"## 来源提案\n\n{sources}\n\n"
-        f"## 结构关系\n\n{item['relationship']}\n\n"
-        f"## 共同张力\n\n{item['common_tension']}\n\n"
-        f"## 结构方向\n\n{item['structural_direction']}\n\n"
-        f"## 预期杠杆\n\n{item['expected_leverage']}"
+        f"## Source proposals\n\n{sources}\n\n"
+        f"## Structural relationship\n\n{item['relationship']}\n\n"
+        f"## Common tension\n\n{item['common_tension']}\n\n"
+        f"## Structural direction\n\n{item['structural_direction']}\n\n"
+        f"## Expected leverage\n\n{item['expected_leverage']}"
     )

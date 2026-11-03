@@ -1,7 +1,9 @@
-"""单一 nexau 适配层（spec-0003/T2）：把一份角色定义(prompt+工具)加载成可调用 Agent。
+"""Single nexau adapter (spec-0003/T2): load a role definition (prompt + tools) into a callable Agent.
 
-三角色（user/developer/test）共用：load(agent_def_dir) 读定义、构造 Agent；Agent.run(input) 执行一次
-nexau 调用返回输出文本，薄封装、无状态记忆（多轮编排归消费方）。MVP 只接 nexau；CC/codex 后续在 load 内分发。
+Shared by all three roles (user/developer/test): load(agent_def_dir) reads the definition and builds
+an Agent; Agent.run(input) makes one nexau call and returns output text. This thin wrapper retains
+no session memory; consumers orchestrate multiple turns. The MVP supports nexau only; load will
+later dispatch to CC/codex.
 """
 
 from __future__ import annotations
@@ -13,45 +15,45 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-# 角色定义目录下系统提示文件名（必需）。
+# Required system prompt filename within the role definition directory.
 _PROMPT_FILE = "prompt.md"
-# 网关偶发 502，整次 agent.run 兜底重试次数。
+# Fallback retry count for the entire agent.run call when the gateway returns an occasional 502.
 _RUN_RETRIES = 4
-# 单次 agent.run 硬超时（秒）：nexau 的 llm_config.timeout 实测不生效，故在此层用线程兜底防死等。
+# Hard timeout per agent.run (seconds): nexau llm_config.timeout proved ineffective, so a thread prevents indefinite waits here.
 _CALL_TIMEOUT = 240
 
 
 def _run_with_timeout(call: Callable[[], object], timeout: int) -> object:
-    """在 daemon 线程里跑 call，超 timeout 秒未返回则抛 TimeoutError（丢弃该线程，不阻塞进程）。"""
+    """Run call in a daemon thread; raise TimeoutError after timeout seconds (abandon the thread without blocking process exit)."""
     box: dict = {}
 
     def target() -> None:
         try:
             box["out"] = call()
-        except Exception as exc:  # noqa: BLE001  透传给调用方判定/重试
+        except Exception as exc:  # noqa: BLE001  Pass through for caller evaluation/retry
             box["err"] = exc
 
     t = threading.Thread(target=target, daemon=True)
     t.start()
     t.join(timeout)
     if t.is_alive():
-        raise TimeoutError(f"nexau 调用超时 >{timeout}s")
+        raise TimeoutError(f"nexau call timeout >{timeout}s")
     if "err" in box:
         raise box["err"]
     return box.get("out")
 
 
-# nexau 后端：(system_prompt, input) -> output_text。注入便于测试替身。
+# nexau backend: (system_prompt, input) -> output_text. Injectable for test doubles.
 Backend = Callable[[str, str], str]
 
 
 def _default_nexau_backend(system_prompt: str, user_input: str) -> str:
-    """真实 nexau 后端：用 system_prompt + 环境里的 LLM_* 构造一个无工具 nexau Agent 跑一次。
+    """Real nexau backend: build a tool-free nexau Agent from system_prompt and the LLM_* environment, then run once.
 
-    每次调用建一个全新的瞬态 Agent（无状态：上下文由调用方在 user_input 里拼好），避免历史串味。
-    懒加载 nexau；未装在此显式失败。整次 run 包一层重试，扛网关 502 抽风。
+    Each call creates a fresh transient Agent to avoid history leakage; callers assemble context in user_input.
+    Load nexau lazily and fail explicitly if it is missing. Retry the entire run to handle intermittent gateway 502s.
     """
-    from nexau import Agent  # noqa: PLC0415  运行时依赖，懒加载
+    from nexau import Agent  # noqa: PLC0415  Runtime dependency, loaded lazily
 
     model = os.environ["LLM_MODEL"]
     base_url = os.environ["LLM_BASE_URL"]
@@ -77,7 +79,7 @@ def _default_nexau_backend(system_prompt: str, user_input: str) -> str:
                     else ""
                 )
                 + "  max_tokens: 32768\n"
-                # per-call 超时：不设则 openai 客户端无限挂起；超时即触发本模块重试。
+                # Per-call timeout: without it the openai client hangs indefinitely; a timeout triggers this module's retry.
                 "  timeout: 300\n"
                 "  api_type: openai_chat_completion\n",
                 encoding="utf-8",
@@ -86,14 +88,14 @@ def _default_nexau_backend(system_prompt: str, user_input: str) -> str:
                 agent = Agent.from_yaml(Path(tmp) / "agent.yaml")
                 out = _run_with_timeout(lambda a=agent: a.run(message=user_input), _CALL_TIMEOUT)
                 return out if isinstance(out, str) else out[0]
-            except Exception as exc:  # 网关 502/超时 → 退避后重试
+            except Exception as exc:  # Gateway 502/timeout -> back off and retry
                 last_err = exc
                 time.sleep(1.5 * (attempt + 1))
-    raise RuntimeError(f"nexau 调用重试 {_RUN_RETRIES} 次仍失败：{last_err}") from last_err
+    raise RuntimeError(f"nexau call failed after {_RUN_RETRIES} retries: {last_err}") from last_err
 
 
 class Agent:
-    """加载后的可调用角色：run 是对 nexau 的薄封装，无提示工程/重试/会话记忆。"""
+    """Loaded callable role: run wraps nexau without prompt engineering, retries, or session memory."""
 
     def __init__(self, prompt: str, backend: Backend) -> None:
         self._prompt = prompt
@@ -104,16 +106,16 @@ class Agent:
         return self._prompt
 
     def run(self, user_input: str) -> str:
-        return self._backend(self._prompt, user_input)  # nexau 调用失败原样透传
+        return self._backend(self._prompt, user_input)  # Pass nexau call failures through unchanged
 
 
 def load(agent_def_dir: str) -> Agent:
-    """读取角色定义目录、解析 prompt，构造 Agent。目录缺失或缺 prompt.md 抛错。"""
+    """Read the role definition directory, parse the prompt, and build an Agent. Raise if the directory or prompt.md is missing."""
     root = Path(agent_def_dir)
     if not root.is_dir():
-        raise FileNotFoundError(f"角色定义目录不存在：{root}")
+        raise FileNotFoundError(f"Role definition directory does not exist: {root}")
     prompt_path = root / _PROMPT_FILE
     if not prompt_path.is_file():
-        raise FileNotFoundError(f"角色定义缺 {_PROMPT_FILE}：{prompt_path}")
+        raise FileNotFoundError(f"Role definition is missing {_PROMPT_FILE}: {prompt_path}")
     prompt = prompt_path.read_text(encoding="utf-8")
     return Agent(prompt=prompt, backend=_default_nexau_backend)

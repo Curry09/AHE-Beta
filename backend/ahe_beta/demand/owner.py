@@ -1,18 +1,18 @@
-# Owner 是需求面到 OpenAgents 的交接路由器，不是方案审核者。
-"""Owner 驱动器：把 proposal 无损打包并交接给 OpenAgents。
+# Owner is a handoff router from demand to OpenAgents, not a solution reviewer.
+"""Owner driver: package proposals losslessly and hand off to OpenAgents.
 
-生成器（triage/architect/divergent）负责问题诊断、产品发现和结构设计；Owner 不重新判断根因、
-不选择 prompt/runtime 等实现层，也不以交付风险为由压缩目标。模型协调 PM/结构路线的交付重叠，
-补充 handoff 摘要、需保留的能力和独立验收分组。恢复日志先限定机械准入集合；
-集合内未被模型列出的提案默认直接交接，避免遗漏成为隐性否决。
+Generators (triage/architect/divergent) handle problem diagnosis, product discovery, and structural design; Owner does not re-judge root cause,
+does not select prompt/runtime implementation layers, and does not compress scope due to delivery risk. Model coordinates PM/structural roadmap delivery overlap,
+supplements handoff summary, preserves required capabilities, and segments independent acceptance. Log recovery initially restricts to mechanical admission set;
+items in the set not listed by the model default to direct handoff, preventing omission from becoming implicit veto.
 
-路由动作：
-- admit → 加 `openagents` 交付面交接令牌；
-- merge → 仅限标题与规范化正文完全相同的重复项；非精确重复会被保留为独立交接；
-- hold  → 仅限缺少形成开发任务所必需的信息，并须明确缺口。
+Routing actions:
+- admit → add `openagents` handoff plane token;
+- merge → only for duplicates with identical normalized title and body; non-exact duplicates stay as independent handoffs;
+- hold  → only for missing information essential to forming development tasks, with explicit gap statement.
 
-Architect 的 `covers` 已在结构提案创建阶段执行来源合并；Owner 不再次消费该关系。Owner
-仅处理当前仍开放 proposal 的交接，保留标题与规范化正文完全相同项的历史兼容合并路径。
+Architect's `covers` already executes source merge during structural proposal creation; Owner does not consume that relationship again. Owner
+only processes current open proposals for handoff, preserving backward-compatible merge path for items with identical normalized title and body.
 """
 
 from __future__ import annotations
@@ -48,13 +48,13 @@ StatusFn = Callable[..., None]
 
 @dataclass
 class AdmitOutcome:
-    """一次 admit_once 的结果：各裁决命中的票号。"""
+    """Result of one admit_once: ticket numbers matched by each decision."""
 
     admitted: list[int] = field(default_factory=list)
     merged: list[int] = field(default_factory=list)
     declined: list[int] = field(default_factory=list)
     held: list[int] = field(default_factory=list)
-    # 向后兼容旧 API；全量模型审核后该字段恒为空。
+    # Backward compatibility with old API; always empty after full model review.
     mechanical: list[int] = field(default_factory=list)
     invalid: dict[int, str] = field(default_factory=dict)
     failed: dict[int, str] = field(default_factory=dict)
@@ -62,11 +62,11 @@ class AdmitOutcome:
 
 
 def _ready_labels(current: list[str], priority: str | None) -> list[str]:
-    """admit：去平面/旧工作流标签，加 `openagents` 交接令牌；priority 合法时替换旧 P*（终优先级）。
+    """admit: remove flat/legacy workflow labels, add `openagents` handoff token; replace old P* with valid priority (final priority).
 
-    Spec-0032/T3：Owner 准入不再直接打 ready——`openagents` 是交付面（vigil）的发现标签，vigil
-    `_intake` 发现后自己盖 ready 并触发 curator 依赖排序；Owner 直打 ready 会让 vigil 跳过该票、
-    curator 永不运行（准入语义不变：plane() 把两标签同视为 READY 平面）。
+    Spec-0032/T3: Owner admission no longer directly applies ready—`openagents` is the handoff plane (vigil) discovery label; vigil
+    `_intake` applies ready after discovery and triggers curator dependency sorting; Owner applying ready directly causes vigil to skip the ticket
+    and curator never runs (admission semantics unchanged: plane() treats both labels as READY plane).
     """
     drop = {PROPOSAL, REPORT, NEEDS_TRIAGE, TRIAGED}
     keep = [x for x in current if x not in drop]
@@ -77,14 +77,14 @@ def _ready_labels(current: list[str], priority: str | None) -> list[str]:
 
 
 def _terminal_labels(current: list[str], terminal: str) -> list[str]:
-    """merge/decline：去平面标签（含交付面令牌），加终态标签。"""
+    """merge/decline: remove plane labels (including handoff plane token), add terminal label."""
     drop = {PROPOSAL, REPORT, NEEDS_TRIAGE, TRIAGED, READY, OPENAGENTS}
     keep = [x for x in current if x not in drop]
     return list(dict.fromkeys([*keep, terminal]))
 
 
 class Owner:
-    """交接路由器：模型整理 handoff，driver 保障独立能力不被压缩。"""
+    """Handoff router: model curates handoff, driver ensures independent capabilities are not compressed."""
 
     def __init__(
         self,
@@ -103,7 +103,7 @@ class Owner:
         self._agent_def = Path(agent_def_dir)
         self._on_status = on_status
         self._on_event = on_event
-        # review=False = 纯机械交接：不调用模型，交接恢复日志确认已设计的 proposal。
+        # review=False = pure mechanical handoff: do not invoke model, handoff log recovery confirms designed proposals.
         self._review = review
         self._recovery = recovery
 
@@ -161,9 +161,9 @@ class Owner:
                     key=recovery_key,
                     observed_postconditions={"completed": True},
                 )
-            self._emit(running=False, status="无待准入提案")
+            self._emit(running=False, status="No proposals awaiting admission")
             return AdmitOutcome()
-        self._emit(running=True, status=f"交接打包中…（{len(proposals)} 条提案）")
+        self._emit(running=True, status=f"Preparing handoff… ({len(proposals)} proposals)")
 
         outcome = AdmitOutcome()
         by_number = {i.number: i for i in backlog}
@@ -187,7 +187,7 @@ class Owner:
                     key=recovery_key,
                     output={"decisions": decisions},
                 )
-        # review=False 或 agent 未列出某项：准入集合内的该项在 pass 2 默认直接交接。
+        # review=False or item not listed by agent: items in admission set default to direct handoff in pass 2.
 
         reviewable = {i.number for i in review_needed}
         visible_routing = reviewable | {i.number for i in ready}
@@ -208,21 +208,26 @@ class Owner:
                     if num not in outcome.held:
                         outcome.held.append(num)
                 continue
-            if num not in explicit:  # 只裁本批评审集合；重复决策先者得
+            # Only decide within current review batch; first explicit decision wins on duplicates.
+            if num not in explicit:
                 routing = dict(d)
                 overlaps = d.get("delivery_overlaps", [])
                 visible = visible_routing - {num}
                 if not isinstance(overlaps, list):
                     overlaps = []
-                    outcome.invalid[num] = "delivery_overlaps 必须为可见票号数组；已保留交接"
+                    outcome.invalid[num] = (
+                        "delivery_overlaps must be an array of visible issue numbers; handoff retained"
+                    )
                 valid = [n for n in overlaps if type(n) is int and n in visible]
                 if len(valid) != len(overlaps):
-                    outcome.invalid[num] = "delivery_overlaps 含不可见或自身票号；已过滤并保留交接"
+                    outcome.invalid[num] = (
+                        "delivery_overlaps contained invisible or self references; filtered them and retained the handoff"
+                    )
                 routing["delivery_overlaps"] = list(dict.fromkeys(valid))
                 explicit[num] = routing
 
-        # merge target 必须是既有 ready item，或本批显式 admit 的 proposal；driver 还会验证
-        # 两者是精确重复，不能以“相同价值方向”为由吞掉独立能力。
+        # merge target must be an existing ready item or explicitly admitted proposal in this batch; driver will also verify
+        # that both are exact duplicates, cannot suppress independent capabilities based on "same value direction".
         existing_ready = {i.number for i in ready}
         valid_merge_targets = existing_ready | {
             num
@@ -230,7 +235,7 @@ class Owner:
             if str(decision.get("decision", "")).strip() == "admit"
         }
 
-        # pass 1：显式决策
+        # pass 1: explicit decisions
         decision_order = {"admit": 0, "merge": 1, "decline": 2, "hold": 3}
         for num, d in sorted(
             explicit.items(),
@@ -255,7 +260,7 @@ class Owner:
                     ):
                         self._admit(issue, priority=None, note="handoff: invalid merge preserved")
                         outcome.invalid[num] = (
-                            "merge target 必须是既有 ready item 或本批 admit 提案"
+                            "merge target must be an existing ready item or a proposal admitted in this batch"
                         )
                         outcome.admitted.append(num)
                         continue
@@ -265,21 +270,21 @@ class Owner:
                         )
                         self._safe_comment(num, self._decision_note(d))
                         outcome.invalid[num] = (
-                            "仅标题与规范化正文完全相同的提案可 merge；已独立交接"
+                            "Only proposals with exactly identical titles and normalized bodies may merge; handed off independently"
                         )
                         outcome.admitted.append(num)
                         continue
                     self._merge(issue, into=target.number)
                     self._safe_comment(num, self._decision_note(d))
                     outcome.merged.append(num)
-                else:  # hold 或未知；schema 已移除 decline
+                else:  # hold or unknown; schema removed decline
                     outcome.held.append(num)
-            except Exception as exc:  # noqa: BLE001  单条失败隔离，但必须进入结构化结果
+            except Exception as exc:  # noqa: BLE001  single failure isolation, but must enter structured result
                 outcome.failed[num] = f"{type(exc).__name__}: {exc}"
                 if num not in outcome.held:
                     outcome.held.append(num)
 
-        # pass 2：其余 proposal 默认直接交接。Architect 的 covers 已在创建阶段处理。
+        # pass 2: remaining proposals default to direct handoff. Architect's covers already processed at creation stage.
         decided = set(explicit)
         for i in review_needed:
             if i.number not in decided and i.number not in {
@@ -298,7 +303,7 @@ class Owner:
         self._emit(
             running=False,
             status=(
-                f"交接：admit {len(outcome.admitted)} · "
+                f"Handoff: admit {len(outcome.admitted)} · "
                 f"merge {len(outcome.merged)} · decline {len(outcome.declined)} · "
                 f"hold {len(outcome.held)} · failed {len(outcome.failed)}"
             ),
@@ -449,23 +454,31 @@ class Owner:
     ) -> str:
         goal_summary = self._goal_summary_index(trend)
         return (
-            "你是需求面到 OpenAgents 的 Delivery Router。以下是本批开放 ProposalView、既有 ready item"
-            "和体验趋势。你的工作是逐条无损打包交接，不审核上游方案，不选择实现层，也不因低风险或易交付"
-            "而缩小问题。默认 admit；merge 只用于标题和规范化正文完全相同的重复项；hold 只用于缺少形成开发"
-            "任务所必需的信息。Architect 已在结构提案创建阶段处理 `covers` 来源；你不要据此再次"
-            "关闭或合并来源。\n"
-            "每个不同的用户问题、产品能力或结构机制都必须保留为独立 handoff 或独立 acceptance group。\n\n"
-            "PM 独立到 Owner；Architect 只吸收非 PM 来源。你负责识别双轨交付重叠：用可选 "
-            "delivery_overlaps 列出本批或 ready 中关联票号，并在 handoff_summary 解释共享工作与独立验收边界。"
-            "重叠不代表重复，双方仍分别 admit；此字段不是 merge、依赖或自动合并实现的指令。\n\n"
-            f"## 待评审提案（{len(proposals)} 条）\n{self._format_index(proposals, store=self._store)}\n\n"
-            f"## 已在 ready 的工作项（{len(ready)} 条，判重参照）\n{self._format_index(ready, store=self._store)}\n\n"
-            f"## 体感曲线\n{self._format_trend(trend)}\n\n"
-            "## 目标证据摘要（仅审计元数据，不是客观验收）\n"
+            "You are the Delivery Router from demand-side roles to OpenAgents. This batch's open "
+            "ProposalViews, existing ready items, and experience trends follow. Package each "
+            "handoff without losing information. Do not review upstream solutions, choose an "
+            "implementation layer, or narrow a problem because it is less risky or easier to "
+            "deliver. Default to admit; merge only duplicates with exactly identical titles and "
+            "normalized bodies; hold only for information required to form a development task. "
+            "Architect already handled `covers` sources when creating structural proposals. "
+            "Do not close or merge those sources again.\n"
+            "Preserve every distinct user problem, product capability, or structural mechanism "
+            "as an independent handoff or acceptance group.\n\n"
+            "PM goes independently to Owner; Architect absorbs only non-PM sources. Identify "
+            "delivery overlap across the routes: optional delivery_overlaps lists related issue "
+            "numbers in this batch or ready queue, and handoff_summary explains shared work and "
+            "independent acceptance boundaries. Overlap is not duplication; admit each side "
+            "separately. This field does not instruct merging, dependencies, or automatic "
+            "implementation consolidation.\n\n"
+            f"## Proposals for review ({len(proposals)})\n{self._format_index(proposals, store=self._store)}\n\n"
+            f"## Existing ready items ({len(ready)}, duplicate references)\n{self._format_index(ready, store=self._store)}\n\n"
+            f"## Experience trend\n{self._format_trend(trend)}\n\n"
+            "## Goal-evidence summary (audit metadata only, not objective assessment)\n"
             f"{goal_summary}\n\n"
-            "只依据 ProposalView 整理交接内容，不回到原始会话重新诊断。\n\n"
-            "完成后调用 `submit_admission` 一次：每条 proposal 一项，填写 handoff_summary、"
-            "preserved_capabilities 与 acceptance_groups。未列出的 proposal 仍会由 driver 默认直接交接。"
+            "Prepare handoffs from ProposalView only; do not return to raw sessions for another "
+            "diagnosis.\n\nAfter organizing the handoff, call `submit_admission` once, with one "
+            "item per proposal and handoff_summary, preserved_capabilities, and acceptance_groups. "
+            "The driver still directly hands off omitted proposals by default."
         )
 
     def _goal_summary_index(self, trend: list[tuple[str, int, str, str]]) -> str:
@@ -490,7 +503,7 @@ class Owner:
                 }
             )
         if not rows:
-            return "（暂无可用目标元数据）"
+            return "(No goal metadata available)"
         return json.dumps(rows, ensure_ascii=False, indent=2)
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:
@@ -507,19 +520,19 @@ class Owner:
 
     @staticmethod
     def _format_index(issues: list, *, store) -> str:
-        """准入索引使用所有下游角色共享的 canonical ProposalView。"""
+        """Admission index uses canonical ProposalView shared by all downstream roles."""
         return format_proposal_list(issues, store=store)
 
     @staticmethod
     def _format_trend(trend: list[tuple[str, int, str, str]]) -> str:
         if not trend:
-            return "（暂无体感数据）"
+            return "(No experience data yet)"
         lines = []
         for ts, score, reason, sid in trend:
             why = f" — {reason}" if reason else ""
             sid_bit = f" [session={sid}]" if sid else ""
             lines.append(
-                f"- {ts}{sid_bit}: {score if score is not None else 'unavailable (未评分)'}{why}"
+                f"- {ts}{sid_bit}: {score if score is not None else 'unavailable (unscored)'}{why}"
             )
         return "\n".join(lines)
 
@@ -546,12 +559,13 @@ class Owner:
     def _decision_note(decision: dict) -> str:
         return "\n".join(
             [
-                "## OpenAgents 交接包",
-                f"- 摘要：{decision.get('handoff_summary', '')}",
-                "- 保留能力：" + "；".join(decision.get("preserved_capabilities", [])),
-                "- 验收分组：" + "；".join(decision.get("acceptance_groups", [])),
-                "- 交付重叠（关联，不合并）："
-                + (", ".join(f"#{n}" for n in decision.get("delivery_overlaps", [])) or "无"),
+                "## OpenAgents handoff package",
+                f"- Summary: {decision.get('handoff_summary', '')}",
+                "- Preserved capabilities: "
+                + ", ".join(decision.get("preserved_capabilities", [])),
+                "- Acceptance groups: " + ", ".join(decision.get("acceptance_groups", [])),
+                "- Delivery overlaps (association, not merging): "
+                + (", ".join(f"#{n}" for n in decision.get("delivery_overlaps", [])) or "none"),
             ]
         )
 

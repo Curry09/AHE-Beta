@@ -102,8 +102,8 @@ def test_backpressure_counts_open_queues_and_warns_only_above_threshold(monkeypa
         assert warnings == ""
     else:
         plane = "proposal" if extra == "proposal" else "ready"
-        assert f"第 9 轮末 {plane} 深度 3 > 2" in warnings
-        assert warnings.count("[背压告警]") == 1
+        assert f"End of round 9: {plane} depth 3 > 2" in warnings
+        assert warnings.count("[backpressure warning]") == 1
 
 
 def test_backpressure_read_failure_does_not_block_the_completed_round(monkeypatch, capsys):

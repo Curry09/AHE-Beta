@@ -1,4 +1,4 @@
-# Spec-0047/T5：错误率保护只暂停本实验。
+# Spec-0047/T5: Error-rate protection pauses only this experiment.
 from __future__ import annotations
 
 from pathlib import Path

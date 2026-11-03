@@ -1,12 +1,12 @@
 ---
 number: "0019"
-title: launcher 非 reply 旁路放宽（progress 等）
+title: "Relax launcher non-reply sideband handling (progress, etc.)"
 issue: 0
 slug: control-sideband-peek-wait
-summary: 放宽 harness stdout 旁路协议（任意非 reply JSON 可收，写入 last_sideband/last_progress）；control() 仍支持旁路 ack 或终态 reply 两种形状（wire 兼容）。用户侧经 control 做 peek/status 的路径已由 0022 取代并 abandon（原 T2）。现行用户等待环见 0022。
+summary: "Relax the harness stdout sideband protocol (accept any non-reply JSON and write it to last_sideband/last_progress); control() continues to support both sideband ack and terminal reply shapes (wire compatible). The user-side path for peek/status via control has been superseded by 0022 and abandoned (original T2). See 0022 for the current user wait loop."
 tasks:
   - id: T1
-    title: launcher：非 reply 旁路一律收 + control 旁路/终结分流
+    title: "launcher: accept all non-reply sidebands + route control sideband/terminal responses separately"
     status: done
     priority: P1
     tags: []
@@ -18,64 +18,64 @@ tasks:
     files:
       - backend/ahe_beta/harness/launcher.py
       - backend/tests/harness/test_launcher.py
-    scope: stdout 协议放宽：一轮内可有任意多行非 reply JSON 旁路（progress/其它字段），仅含 reply 的行结束本轮；未知旁路不报协议违例。poll 累积 last_sideband/last_progress。control(name) 等到 reply 或非纯 progress 旁路 ack；暴露 in_flight。用户 sim 主路径仅 interrupt；peek-via-control 不再由用户菜单调用（见 0022）。
-    acceptance: poll 对仅含未知键的旁路 JSON 不抛协议违例、写入 last_sideband；progress 映入 last_progress；control('interrupt') 返回 reply 且 in_flight 为 False。单测覆盖未知旁路、interrupt 终结；wire 上 status 旁路仍可测但不作为用户侧现行能力。
+    scope: "Relax the stdout protocol: a round may contain any number of non-reply JSON sideband lines (progress/other fields); only a line containing reply ends the round; unknown sidebands do not cause protocol violations. poll accumulates last_sideband/last_progress. control(name) waits for a reply or a sideband ack that is not progress-only; expose in_flight. The main user sim path uses only interrupt; peek-via-control is no longer invoked from the user menu (see 0022)."
+    acceptance: "poll does not raise a protocol violation for sideband JSON containing only unknown keys and writes it to last_sideband; progress maps to last_progress; control('interrupt') returns a reply and in_flight is False. Unit tests cover unknown sidebands and interrupt termination; status sidebands remain testable on the wire but are not a current user-side capability."
 ---
 
-# 0019 · launcher 非 reply 旁路放宽（progress 等）
+# 0019 · Relax launcher non-reply sideband handling (progress, etc.)
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is structured source data (including the tasks DAG), and the body is a nine-section, group-level rust-RFC overview. -->
 
 ## Summary
 
-在 0013 的 `begin/poll/control` 之上，放宽 launcher 对 stdout **非 reply 旁路**的接收：任意非 reply JSON 可收，映入 `last_sideband` / `last_progress`，供心跳活动条使用。`control()` 在 wire 上仍区分「旁路 ack」与「终态 reply」。
+On top of `begin/poll/control` in 0013, relax the launcher's acceptance of stdout **non-reply sideband** messages: any non-reply JSON is accepted and mapped to `last_sideband` / `last_progress` for use by the heartbeat activity bar. `control()` still distinguishes between "sideband ack" and "terminal reply" on the wire.
 
-**用户侧**不再经 `invoke_control` 做 peek/status——该路径（原本组 T2）已 abandon，由 **0022** 内外窗口（内=message）取代。本组活快照只保留 **T1（launcher 管道）**。
+**On the user side**, peek/status no longer goes through `invoke_control`; that path (originally T2 in this group) has been abandoned and replaced by the **0022** inner and outer windows (inner=message). This group's live snapshot retains only **T1 (launcher pipeline)**.
 
 ## Motivation
 
-初版 `poll` 过窄时，非 `progress`/`reply` 的旁路会报协议违例，活动条与未来旁路接不住。需要管道放宽。
+When the initial `poll` was too narrow, sideband messages other than `progress`/`reply` caused protocol violations, leaving the activity bar and future sideband messages unsupported. The pipeline needs to be relaxed.
 
-随后曾在用户侧用 control 做 peek；该设计与「内=message」冲突，已迁出本组。管道放宽本身仍有价值（progress 累积）。
+Subsequently, control was used for peek on the user side; that design conflicted with "inner=message" and has been moved out of this group. Relaxing the pipeline itself remains valuable (progress accumulation).
 
 ## Guide-level explanation
 
-- Launcher 收下一切非 reply 旁路；`in_flight` 在终态 reply 前为真。
-- 用户等待环如何决策、菜单是什么 → **0022**。
-- Harness 若仍实现 status 旁路 control，launcher 接得住，但种子 MANUAL 不宣称该用户能力。
+- Launcher accepts all non-reply sideband messages; `in_flight` is true until the terminal reply.
+- How the user-side wait loop makes decisions and what the menu contains → **0022**.
+- If the harness still implements status sideband control, the launcher can accept it, but the seed MANUAL does not claim this user capability.
 
 ## Reference-level explanation
 
-### 锚点
+### Anchors
 
-- `harness/launcher.py`：`_ingest_sideband`、`last_sideband`、`control()`、`in_flight`；另有 0022 的 `emit_message`。
-- 单测：`tests/harness/test_launcher.py`。
+- `harness/launcher.py`: `_ingest_sideband`, `last_sideband`, `control()`, `in_flight`; also `emit_message` in 0022.
+- Unit tests: `tests/harness/test_launcher.py`.
 
 ### DAG
 
-仅 T1。
+T1 only.
 
-### 与相邻组
+### Adjacent groups
 
-- **0013**：拆信封、interrupt、progress 发射。
-- **0022**：用户侧 IO 与等待菜单；取代本组原 T2。
+- **0013**: envelope unpacking, interrupt, progress emission.
+- **0022**: user-side IO and wait menu; replaces the original T2 in this group.
 
 ## Drawbacks
 
-旁路 ack 仍用「非纯 progress」启发式；仅影响仍调用 `control(非 interrupt)` 的调用方。
+Sideband ack still uses a "not pure progress" heuristic; this only affects callers that still invoke `control(non-interrupt)`.
 
 ## Rationale and alternatives
 
-保留 T1、去掉用户侧 peek Task：管道与产品语义解耦。备选「整组 abandon」会丢掉仍 live 的旁路接收说明；拒绝。
+Retain T1 and remove the user-side peek Task: this decouples the pipeline from product semantics. The alternative, "abandon the entire group", would lose the still-live description of sideband reception; rejected.
 
 ## Prior art
 
-0013 stdio JSONL；0022 内外通道。
+0013 stdio JSONL; 0022 inner and outer channels.
 
 ## Unresolved questions
 
-control 面是否最终收窄为仅 interrupt。
+Whether the control surface will eventually be narrowed to interrupt only.
 
 ## Future possibilities
 
-相关帧 `control_result`；或文档化「仅 progress 旁路、无 status ack」的短超时。
+Correlate frames with `control_result`; or document a short timeout for "progress sideband only, no status ack".

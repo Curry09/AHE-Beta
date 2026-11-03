@@ -1,67 +1,71 @@
 # Code Comment Conventions
 
-Spec id referencing conventions for implementation code. All new code should trace back to its
-spec design rationale. OpenAgents is a Python project, so examples use Python syntax.
+Write comments and docstrings in English. Explain the purpose of the code and
+reference the relevant design so another contributor can trace its rationale.
+The examples use Python.
 
-Language: comments may be English or Chinese — clarity over language choice (CLAUDE.md).
-The key invariant is **consistent spec id referencing at every level**.
+## Spec References
 
-## Spec id format & grandfathering (RFC-0014 D11/D12)
+New code uses `# Spec-NNNN/Tn: ...`, for example `# Spec-0014/T3: ...`.
+Existing `# RFC-NNNN` references remain valid: Spec group `NNNN` corresponds
+one-to-one with legacy RFC `NNNN`. Do not rewrite those identifiers solely to
+change the prefix.
 
-- New code uses `# Spec-NNNN/Tn: …` (group number + Task id), e.g. `# Spec-0014/T3: …`.
-- Existing `# RFC-NNNN` comments are **grandfathered, not rewritten** — spec group `NNNN`
-  is 1:1 with old RFC `NNNN`, so `RFC-0007` ≡ `Spec-0007`. Don't mass-rewrite them.
+Preserve protocol keys, paths, URLs, lint directives, and quoted source data when
+their exact spelling matters. Translate the explanation around them.
 
-## 4 Comment Levels
+## Module Docstrings
 
-### 1. Module-level docstring
+Describe the module's responsibility and its relevant Spec:
 
 ```python
-"""Agent 消息转告路由。
+"""Route messages between agents.
 
-Spec-0007/T2: Agent 消息转告机制
+Spec-0007/T2: Agent message relay
 
-提供：接收 Agent 间消息并包装为 User query；按目标 Agent 投递到其消息队列。
+Receive messages, wrap them as User queries, and enqueue them for the target agent.
 """
 ```
 
-### 2. Function / class docstring
+## Function and Class Docstrings
 
-First line: short English summary. Second line: spec reference. Then detail (Chinese ok):
+Start with a short English summary, then the Spec reference and useful details:
 
 ```python
 def relay_message(*, sender: str, target: str, text: str) -> None:
     """Relay a message from one agent to another.
 
-    Spec-0007/T2: 转告 A 给 B 的消息
+    Spec-0007/T2: Relay messages from A to B
 
-    将 sender 的原文包装成 "A 给你发了一条：..." 的 User query，投递到 target 的消息队列。
+    Wrap sender's original text as a User query and enqueue it for target.
     """
 ```
 
-### 3. Inline step comments
+## Inline Step Comments
+
+Explain meaningful steps without repeating the statement:
 
 ```python
-    # 1. 校验 target Agent 存在
+    # 1. Verify that the target agent exists.
     agent = _get_agent(name=target)
-    # 2. 包装为 User query 形式
-    query = f"{sender} 给你发了一条：{text}"
+    # 2. Wrap the original message as a User query.
+    query = f"{sender} sent you a message: {text}"
 ```
 
-### 4. Field / attribute docs
+## Field and Attribute Comments
+
+Describe the field's role and reference the relevant Spec:
 
 ```python
 @dataclass
 class AgentState:
-    # Spec-0002/T1: Agent 背后接的 coding agent 类型（claude code / codex / nexau）
+    # Spec-0002/T1: Coding agent backend (claude code / codex / nexau).
     backend: str
 ```
 
-## Summary
-
 | Level | Content | Purpose |
-|-------|---------|---------|
-| Module | docstring + spec ref | File-level overview |
-| Function/Class | English summary + spec ref + Chinese detail | API docs |
-| Inline steps | `# N.` 描述 | Logic flow |
-| Fields/Attributes | spec ref + description | Data model docs |
+|---|---|---|
+| Module | Responsibility, docstring, and Spec reference | File-level overview |
+| Function/class | English summary, Spec reference, and relevant detail | API behavior |
+| Inline step | Numbered explanation where useful | Logic flow |
+| Field/attribute | Spec reference and description | Data-model meaning |

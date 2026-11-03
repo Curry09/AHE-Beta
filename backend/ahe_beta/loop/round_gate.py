@@ -1,4 +1,4 @@
-# Spec-0050/T2：本轮准入票终态闸——下一轮用户不得与本轮交付重叠。
+# Spec-0050/T2: this round's admission gate final state—next round users must not overlap with this round's delivery.
 """Wait until this round's admitted issues reach a delivery terminal state.
 
 Empty wait sets succeed immediately. `automation-failed`, `needs-human`, or wall-clock

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import type { AgentRole } from "../types";
 
-// 极简卡片：一行头（角色点/呼吸点 + 名字）+ 可选副行（persona 水平·领域）+ status + meta 行。
-// 左缘按角色着色（role-${role}）。整卡可点开详情。
+// Minimal card: header row (role dot / pulse dot + name) + optional subtitle (persona level · domain) + status + metadata row.
+// Color the left edge by role (role-${role}). Click anywhere on the card to open details.
 export function Card(props: {
   role: AgentRole;
   label: string;
@@ -11,8 +11,8 @@ export function Card(props: {
   selected: boolean;
   onClick: () => void;
   meta?: ReactNode;
-  subline?: string; // Spec-0026/T4：用户卡副行（水平·领域），缺省不渲染
-  titleAttr?: string; // 悬浮 tooltip（如 persona goal）
+  subline?: string; // Spec-0026/T4: user card subtitle (level · domain); omit when absent.
+  titleAttr?: string; // Hover tooltip (such as persona goal)
 }) {
   const { role, label, status, running, selected, onClick, meta, subline, titleAttr } = props;
   return (

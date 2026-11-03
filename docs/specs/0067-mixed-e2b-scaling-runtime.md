@@ -1,12 +1,12 @@
 ---
 number: "0067"
-title: 混合 Harness E2B Scaling 运行时
+title: "Mixed Harness E2B Scaling Runtime"
 issue: 0
 slug: mixed-e2b-scaling-runtime
-summary: 保留当前底层 direct 会话与终端 review 契约；历史 mixed E2B scaling 运行时归档，不扩展当前 v2 单任务入口。
+summary: "Retain the current underlying direct-session and terminal-review contracts; archive the historical mixed E2B scaling runtime and do not extend the current v2 single-task entry point."
 tasks:
   - id: T2
-    title: 底层 direct 会话与终端 review 契约
+    title: "Underlying direct-session and terminal-review contracts"
     status: done
     priority: P0
     tags: [e2b, interaction]
@@ -18,85 +18,58 @@ tasks:
     files:
       - backend/ahe_beta/loop/sim_user.py
       - backend/tests/user/test_direct_session.py
-    scope: 保留 sim_user 中 direct 单次 Harness 输入与有界终端 review 的底层接口，与 simulated-user 心跳交互分开；旧 mixed executor 已归档，该接口不使当前 v2 单任务入口支持 N4/N8。
-    acceptance: direct 不产生 heartbeat/follow-up，终端 review 与 issue/session 记录可追溯；direct 会话测试通过；当前公共配置继续拒绝多任务计划。
+    scope: "Retain the existing direct single Harness input and bounded terminal review interfaces in sim_user, separate from simulated-user heartbeat interaction; the old mixed executor is archived, and this interface does not make the current v2 single-task entry point support N4/N8."
+    acceptance: "direct produces no heartbeat/follow-up, terminal review and issue/session records are traceable; direct-session tests pass; the current public configuration continues to reject multi-task plans."
 ---
 
-# 0067 · 混合 Harness E2B Scaling 运行时
+# 0067 · Mixed Harness E2B Scaling Runtime
 
 ## Summary
 
-> 0071 清理后的当前契约：旧 mixed E2B 物化、启动、恢复与研究手册 T1/T3/T4 已退出 living task 列表，原实现归档。仅保留 sim_user 中已存在的 direct 输入/终端 review 接口；这不等于当前 v2 入口已支持 direct scaling 或 N4/N8。以下 E2B+Boyue、N=1/4/8/16/32 及续跑操作是历史设计记录，复现须使用 research/inventory.json 所记录的冻结 checkout，不从归档目录或当前 CLI 运行。
+> Current contract after 0071 cleanup: the old mixed E2B materialization, launch, recovery, and research-manual T1/T3/T4 items have exited the living task list, and the original implementation is archived. Only the existing direct input/terminal-review interfaces in sim_user are retained; this does not mean that the current v2 entry point supports direct scaling or N4/N8. The E2B+Boyue, N=1/4/8/16/32, and resume procedures below are historical design records; reproduction must use the frozen checkout recorded in research/inventory.json and must not run from the archive directory or the current CLI.
 
-正式 scaling 使用 E2B + Boyue。N=1、4、8、16、32 是五个互相隔离的实验单元：每个单元
-拥有自己的 controller、sandbox、Gitea repository、run ID 和 recovery identity，运行五轮。
-物理 sandbox 直接按开发阶段峰值资源创建；用户、triage、architect/PM 和 developer 是
-逻辑阶段，不在阶段之间调整 sandbox 规格。
+Official scaling uses E2B + Boyue. N=1, 4, 8, 16, and 32 are five mutually isolated experimental units: each unit has its own controller, sandbox, Gitea repository, run ID, and recovery identity, and runs five rounds. Physical sandboxes are created directly at peak development-stage resources; user, triage, architect/PM, and developer are logical stages, and sandbox specifications are not adjusted between stages.
 
-任务 assignment 在执行前冻结。agent payload 与 grader payload 分离，receipt 绑定配置、
-任务 revision、prompt/grader SHA、模型 gateway、模板 build、timeout 和 canary evidence。
-launch gate 在任何凭证、网络或付费资源调用前检查这些约束。
+Task assignment is frozen before execution. Agent and grader payloads are separated, and the receipt binds the configuration, task revision, prompt/grader SHA, model gateway, template build, timeout, and canary evidence. The launch gate checks these constraints before any credential, network, or paid-resource call.
 
 ## Interaction and lifecycle
 
-`simulated_user` 沿用已有 persona、heartbeat、workspace/check 访问和多轮终止规则；不再
-注入固定追问。`direct` 只有一条初始 harness 输入，等待 terminal result，再由用户模型做
-一次有界的终端 review；它没有 heartbeat 或中途 follow-up，但仍进入同一 triage → architect/PM
-→ developer → grader 管线。
+`simulated_user` retains the existing persona, heartbeat, workspace/check access, and multi-turn termination rules; fixed follow-up questions are no longer injected. `direct` has only one initial harness input, waits for the terminal result, and then has the user model perform one bounded terminal review; it has no heartbeat or mid-session follow-up, but still enters the same triage → architect/PM → developer → grader pipeline.
 
-每轮按 interaction、triage、architect/PM、developer、grader 的阶段顺序执行，在下一轮之前
-写入原子 checkpoint。最后一轮是否 users-only 由配置决定。断连时 resume 只能连接 receipt
-记录的 sandbox/repository/identity，不创建替代资源，也不重放已完成 session 或 delivery。
+Each round executes the interaction, triage, architect/PM, developer, and grader stages in order and writes an atomic checkpoint before the next round. Whether the final round is users-only is determined by configuration. On disconnection, resume may connect only to the sandbox/repository/identity recorded in the receipt; it must not create replacement resources or replay completed sessions or deliveries.
 
 ## Operator path
 
-执行者应阅读 `evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md`，依次完成
-payload materialization、receipt freeze、单 N `check-launch`，再在五个独立终端按需启动。运行
-产物落在本地 controller 的 `runs/` 和远端 `/opt/hse-run/artifacts`；这些生成目录由 git
-ignore 排除，不进入提交。详细运行时约束见
-`evaluation/harness-suite-20260920/SPEC-mixed-scaling-e2b-executor.md`。
+Operators should read `evaluation/harness-suite-20260920/EXPERIMENT-QUICKSTART.md` and complete payload materialization, receipt freeze, and a single N `check-launch` in sequence, then start the five independent terminals as needed. Runtime artifacts are placed in the local controller's `runs/` and the remote `/opt/hse-run/artifacts`; these generated directories are excluded by gitignore and are not committed. Detailed runtime constraints are specified in `evaluation/harness-suite-20260920/SPEC-mixed-scaling-e2b-executor.md`.
 
 ## Motivation
 
-此前不同 N 的启动脚本各自管理 sandbox、Gitea、用户交互和恢复状态，容易发生身份串线、
-重复 controller 或用新资源替换原资源。0067 将每个 N 固定为独立可审计的实验单元，并
-把冻结、启动、检查点和恢复放进同一 receipt 驱动流程。
+Previously, launch scripts for different N values separately managed sandboxes, Gitea, user interaction, and recovery state, making identity crossover, duplicate controllers, or replacement of original resources with new resources likely. 0067 fixes each N as an independent auditable experimental unit and places freezing, launch, checkpointing, and recovery in one receipt-driven workflow.
 
 ## Guide-level explanation
 
-先物化并冻结 agent/grader payload，再对单个 N 执行 launch gate；通过后才创建付费资源。
-每轮结束写原子 checkpoint，断连恢复只接受原 receipt 记录的 sandbox、仓库、run_id 和
-recovery identity，已完成 session 或 delivery 不重放。
+First materialize and freeze the agent/grader payloads, then execute the launch gate for one N; only after it passes are paid resources created. Write an atomic checkpoint at the end of each round. Disconnection recovery accepts only the sandbox, repository, run_id, and recovery identity recorded in the original receipt; completed sessions or deliveries are not replayed.
 
 ## Reference-level explanation
 
-receipt 绑定 task revision、prompt/grader SHA、模型 gateway、模板 build、资源、timeout 和
-canary evidence。direct 只发送一条 harness 输入并做一次终端 review；simulated-user 保留
-heartbeat 和有限追问。controller、远端 run.sh 与结果报告必须输出同一 session、trace、
-grader、user outcome 和 timeout class。
+The receipt binds the task revision, prompt/grader SHA, model gateway, template build, resources, timeout, and canary evidence. direct sends only one harness input and performs one terminal review; simulated-user retains heartbeat and limited follow-up. The controller, remote run.sh, and result report must output the same session, trace, grader, user outcome, and timeout class.
 
 ## Drawbacks
 
-为每个 N 保持独立资源会增加启动成本和操作面；五轮 checkpoint、receipt 和恢复身份也会增加
-磁盘与审计数据量。代价是可以避免跨实验污染并可靠重连原运行时。
+Maintaining independent resources for each N increases launch costs and the operational surface; five rounds of checkpoints, receipts, and recovery identities also increase the volume of disk and audit data. The benefit is avoiding cross-experiment contamination and reliably reconnecting to the original runtime.
 
 ## Rationale and alternatives
 
-选择按 N 隔离而不是共享一个大 sandbox，是为了让并发扩展和故障恢复有明确边界。选择 receipt
-冻结而不是仅依赖配置文件，是为了阻止任务、grader 或 timeout 在运行中漂移。共享 controller
-或恢复时重建资源虽然更简单，但会破坏可追溯性并可能重复收费。
+Isolation by N rather than sharing one large sandbox gives concurrent scaling and failure recovery clear boundaries. Receipt freezing rather than relying only on configuration files prevents task, grader, or timeout drift during execution. Sharing a controller or rebuilding resources during recovery is simpler, but would undermine traceability and could cause duplicate charges.
 
 ## Prior art
 
-0065 定义评测计划、交互模式和统一结果；0064 定义阶段恢复与幂等副作用；0066 定义官方
-预算与 provider latency 隔离。本 spec 将三者组合为 E2B scaling 的实际运行路径。
+0065 defines the evaluation plan, interaction modes, and unified result; 0064 defines phase recovery and idempotent side effects; 0066 defines official budgets and provider-latency isolation. This spec combines the three into the practical E2B scaling path.
 
 ## Unresolved questions
 
-N=32 以上是否需要分片 controller、跨区域资源以及更细粒度的 artifact backpressure，需由
-正式 scaling 数据决定；当前先保持单 N 单 controller 约束。
+Whether N=32 and above requires sharded controllers, cross-region resources, and finer-grained artifact backpressure will be determined by official scaling data; for now, retain the single-N, single-controller constraint.
 
 ## Future possibilities
 
-可以在不改变 receipt 语义的前提下增加自动调度、跨 N 汇总和故障注入，并用同一 recovery
-identity 重放基础设施无效尝试，保持业务终态不重跑。
+Automatic scheduling, cross-N aggregation, and fault injection can be added without changing receipt semantics, using the same recovery identity to replay infrastructure-invalid attempts while preventing business terminal states from being rerun.

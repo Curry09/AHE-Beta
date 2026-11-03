@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Spec-0033/T1：构建 vigil 容器镜像。OpenAgents 和 NexAU 的版本 pin 均由传入
-# checkout 决定；Docker 命名 build context 使两个仓无需复制到共同父目录。
-# 用法：./build.sh <OpenAgents 仓路径> <NexAU 仓路径>
+# Spec-0033/T1: build vigil container image. Version pins for both OpenAgents and NexAU are determined by the incoming
+# checkout; Docker named build context allows both repos to avoid copying to a common parent directory.
+# Usage: ./build.sh <OpenAgents repo path> <NexAU repo path>
 set -euo pipefail
 
-OPENAGENTS_PATH="${1:?用法: build.sh <OpenAgents 仓路径> <NexAU 仓路径>}"
-NEXAU_PATH="${2:?用法: build.sh <OpenAgents 仓路径> <NexAU 仓路径>}"
+OPENAGENTS_PATH="${1:?Usage: build.sh <OpenAgents-repo-path> <NexAU-repo-path>}"
+NEXAU_PATH="${2:?Usage: build.sh <OpenAgents-repo-path> <NexAU-repo-path>}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PIP_INDEX_URL="${VIGIL_PIP_INDEX_URL:-https://pypi.org/simple}"
 IMAGE_TAG="${VIGIL_IMAGE_TAG:-ahe-beta-vigil:latest}"
@@ -13,29 +13,29 @@ CLAUDE_CODE_VERSION="${VIGIL_CLAUDE_CODE_VERSION:-2.1.261}"
 OBSERVATION_PROFILE="${VIGIL_OBSERVATION_PROFILE:-}"
 if [[ -n "$OBSERVATION_PROFILE" ]]; then
   [[ "$OBSERVATION_PROFILE" == "gitea-com-r2-v1" ]] || {
-    echo "未知 VIGIL_OBSERVATION_PROFILE" >&2; exit 1;
+    echo "Unknown VIGIL_OBSERVATION_PROFILE" >&2; exit 1;
   }
   [[ -n "${VIGIL_IMAGE_TAG:-}" && "$IMAGE_TAG" == *:* && "$IMAGE_TAG" != *:latest ]] || {
-    echo "托管证据构建需要显式 VIGIL_IMAGE_TAG（禁止 latest）" >&2; exit 1;
+    echo "Hosted evidence builds require an explicit VIGIL_IMAGE_TAG (latest is not allowed)" >&2; exit 1;
   }
-  command -v python3 >/dev/null || { echo "能力校验需要 python3" >&2; exit 1; }
+  command -v python3 >/dev/null || { echo "Capability validation requires python3" >&2; exit 1; }
 fi
 
 test -f "$OPENAGENTS_PATH/pyproject.toml" || {
-  echo "不是 OpenAgents 仓（缺 pyproject.toml）：$OPENAGENTS_PATH" >&2
+  echo "Not an OpenAgents repository (missing pyproject.toml): $OPENAGENTS_PATH" >&2
   exit 1
 }
 grep -q 'name = "openagents"' "$OPENAGENTS_PATH/pyproject.toml" || {
-  echo "pyproject 不是 openagents 包：$OPENAGENTS_PATH" >&2
+  echo "pyproject does not declare the openagents package: $OPENAGENTS_PATH" >&2
   exit 1
 }
 
 test -f "$NEXAU_PATH/pyproject.toml" || {
-  echo "不是 NexAU 仓（缺 pyproject.toml）：$NEXAU_PATH" >&2
+  echo "Not a NexAU repository (missing pyproject.toml): $NEXAU_PATH" >&2
   exit 1
 }
 grep -q 'name = "nexau"' "$NEXAU_PATH/pyproject.toml" || {
-  echo "pyproject 不是 nexau 包：$NEXAU_PATH" >&2
+  echo "pyproject does not declare the nexau package: $NEXAU_PATH" >&2
   exit 1
 }
 
@@ -95,12 +95,12 @@ source_before = {"openagents": source_record(oa_path), "nexau": source_record(ne
 subprocess.run(["docker", *sys.argv[5:]], check=True)
 source_after = {"openagents": source_record(oa_path), "nexau": source_record(nexau_path)}
 if source_before != source_after:
-    raise SystemExit("构建期间源码发生变化；请重试，未写入验证记录")
+    raise SystemExit("Source changed during the build; retry. No validation record was written")
 image_id = subprocess.check_output(
     ["docker", "image", "inspect", "--format", "{{.Id}}", image_tag], text=True,
 ).strip()
 if not image_id.startswith("sha256:") or len(image_id) != 71:
-    raise SystemExit("无法获得实际镜像 ID")
+    raise SystemExit("Could not obtain the actual image ID")
 name = "observation-capabilities-" + uuid.uuid4().hex
 try:
     with tempfile.TemporaryFile() as output:
@@ -127,7 +127,7 @@ try:
     if not isinstance(capability, dict) or any(capability.get(k) != v for k, v in expected.items()):
         raise ValueError("reader capabilities do not satisfy the hosted profile")
 except (ValueError, subprocess.SubprocessError):
-    raise SystemExit("构建镜像未通过托管证据离线能力校验；未写入验证记录") from None
+    raise SystemExit("The built image failed offline hosted-evidence capability validation; no validation record was written") from None
 finally:
     subprocess.run(["docker", "rm", "--force", name], stdout=subprocess.DEVNULL,
                    stderr=subprocess.DEVNULL, timeout=10, check=False)
@@ -146,7 +146,7 @@ if record_path:
     with target.open("x", encoding="utf-8") as handle:
         json.dump(record, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
-print("✓ 托管证据 reader 能力校验通过：" + image_id)
+print("✓ Hosted-evidence reader capability validation passed: " + image_id)
 PYCODE
 fi
-echo "✓ 镜像 $IMAGE_TAG 构建完成（OpenAgents pin = $(git -C "$OPENAGENTS_PATH" rev-parse --short HEAD 2>/dev/null || echo '非 git checkout')，NexAU pin = $(git -C "$NEXAU_PATH" rev-parse --short HEAD 2>/dev/null || echo '非 git checkout')）"
+echo "✓ Image $IMAGE_TAG built (OpenAgents pin = $(git -C "$OPENAGENTS_PATH" rev-parse --short HEAD 2>/dev/null || echo 'not a Git checkout'), NexAU pin = $(git -C "$NEXAU_PATH" rev-parse --short HEAD 2>/dev/null || echo 'not a Git checkout'))"

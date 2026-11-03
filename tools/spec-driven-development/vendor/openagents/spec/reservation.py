@@ -34,7 +34,7 @@ def _checked(
     result = _git(repo, *args, input_text=input_text, env=env)
     if result.returncode:
         raise RuntimeError(
-            f"spec 编号预留失败：git {' '.join(args)}：{result.stderr.strip() or result.stdout.strip()}"
+            f"Spec number reservation failed: git {' '.join(args)}: {result.stderr.strip() or result.stdout.strip()}"
         )
     return result.stdout.strip()
 
@@ -54,9 +54,9 @@ def reserve_number(*, specs_root: Path, issue: int, slug: str, number: str | Non
     local = _local_numbers(specs_root)
     if number is not None:
         if not re.fullmatch(r"\d{4}", number) or int(number) == 0:
-            raise ValueError("spec 编号必须是 0001–9999")
+            raise ValueError("Spec number must be 0001–9999")
         if int(number) in local:
-            raise FileExistsError(f"spec 编号 {number} 已在本工作区使用")
+            raise FileExistsError(f"Spec number {number} is already used in this workspace")
 
     probe_dir = specs_root
     while not probe_dir.exists():
@@ -74,7 +74,7 @@ def reserve_number(*, specs_root: Path, issue: int, slug: str, number: str | Non
     elif len(remotes) == 1:
         remote = remotes[0]
     else:
-        raise RuntimeError("spec 编号预留失败：存在多个 Git 远端，但没有 origin")
+        raise RuntimeError("Spec number reservation failed: multiple Git remotes without origin")
 
     # Include the authoritative base branch. A stale worktree must not reuse a
     # number already merged since its checkout was created.
@@ -113,7 +113,9 @@ def reserve_number(*, specs_root: Path, issue: int, slug: str, number: str | Non
     for candidate in candidates:
         if candidate in occupied:
             if number is not None:
-                raise FileExistsError(f"spec 编号 {number} 已被主分支或预留引用使用")
+                raise FileExistsError(
+                    f"Spec number {number} is already used by the base branch or a reservation ref"
+                )
             continue
         formatted = f"{candidate:04d}"
         marker = _checked(
@@ -134,13 +136,15 @@ def reserve_number(*, specs_root: Path, issue: int, slug: str, number: str | Non
         current = _checked(repo, "ls-remote", remote, ref)
         if current:
             if number is not None:
-                raise FileExistsError(f"spec 编号 {formatted} 已被并发工作区预留")
+                raise FileExistsError(
+                    f"Spec number {formatted} was reserved by a concurrent workspace"
+                )
             occupied.add(candidate)
             continue
         raise RuntimeError(
-            f"spec 编号预留失败：git push {ref}：{pushed.stderr.strip() or pushed.stdout.strip()}"
+            f"Spec number reservation failed: git push {ref}: {pushed.stderr.strip() or pushed.stdout.strip()}"
         )
-    raise RuntimeError("spec 编号已超出四位范围")
+    raise RuntimeError("Spec number exceeds the four-digit range")
 
 
 __all__ = ["reserve_number"]

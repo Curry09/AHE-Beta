@@ -1,18 +1,19 @@
-"""最小账单模块基线（seed 工作区 billing-split / spec-0008/T1）。
+"""Minimal billing module baseline (seed workspace billing-split / spec-0008/T1).
 
-这是用户项目里**已有的基线**：一个可 import、可运行的 stdlib-only 模块，
-但**故意不含任何分账实现**——分账逻辑（split_bill）是会话里要让助手新增、
-并由用户在本工作区自行核实的目标。不含 gold / 答案（held-out 红线）。
+This is **an existing baseline** in the user's project: an importable, runnable stdlib-only module,
+but it **deliberately contains no bill-splitting implementation**—the bill-splitting logic (split_bill)
+is what the assistant is expected to add during the session and what the user is expected to verify
+independently in this workspace. Does not contain gold / answers (held-out boundary).
 """
 
 from __future__ import annotations
 
 
 def format_amount(cents: int) -> str:
-    """把「分」格式化为金额字符串（如 1234 -> '12.34'）。基线里已有的小工具。"""
+    """Format a "split" as an amount string (e.g. 1234 -> '12.34'). A small utility already present in the baseline."""
     return f"{cents / 100:.2f}"
 
 
 if __name__ == "__main__":
-    # 基线自检：模块可直接运行（供 sandbox / materialize 测试断言其可跑）。
+    # Baseline self-check: the module can be run directly (used by sandbox/materialize tests to assert that it runs).
     print("billing module baseline ok:", format_amount(1234))

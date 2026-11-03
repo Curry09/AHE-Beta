@@ -1,5 +1,6 @@
-"""SeedSource 实现子包（spec-0009/T1）。
+"""SeedSource implementation subpackage (spec-0009/T1).
 
-`seed_source._discover()` 在 import 期遍历本包逐一 import，触发各模块顶部 `@register`
-的自注册。故新增一个供给源 = 在此落一个模块，无需改注册侧（spec-0009/T2 的 empty 源即此）。
+`seed_source._discover()` traverses this package during import and imports each module in turn, triggering
+self-registration via each module's `@register` decorator. Thus adding a new supply source = adding a module
+here, no registry changes needed (spec-0009/T2's empty source is an example).
 """

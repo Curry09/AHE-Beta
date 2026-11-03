@@ -7,8 +7,8 @@ import { buildFloorModels, historyLabel } from "./buildingModel";
 
 describe("Spec-0068/T4 Architect presentation", () => {
   const agent: Agent = {
-    agent_id: "architect-0", role: "architect", label: "自定义结构组",
-    running: true, status: "综合中", round: 2, turns: [], detail: null, log: [],
+    agent_id: "architect-0", role: "architect", label: "Custom structure group",
+    running: true, status: "Synthesizing", round: 2, turns: [], detail: null, log: [],
     started_at: "", updated_at: "",
   };
   const item: HistoryItem = {
@@ -18,7 +18,7 @@ describe("Spec-0068/T4 Architect presentation", () => {
 
   it("retains Architect occupants, archive proposals, roster capacity and custom labels", () => {
     const [floor] = buildFloorModels({
-      roles: [{ role: "architect", name: "架构师" }], agents: [agent], history,
+      roles: [{ role: "architect", name: "Architect" }], agents: [agent], history,
       roster: { user: 1, triager: 1, architect: 3, developer: 0 }, mode: "live",
     });
     expect(floor.liveAgents).toEqual([agent]);
@@ -29,15 +29,15 @@ describe("Spec-0068/T4 Architect presentation", () => {
     const html = renderToStaticMarkup(<FloorWorkspace floor={floor} mode="live" round="all" onSelect={() => {}} />);
     expect(html).toContain("role-architect");
     expect(html).toContain("ARCHITECT");
-    expect(html).toContain("自定义结构组");
+    expect(html).toContain("Custom structure group");
   });
 
   it("shows live and archived Architect cards on the dashboard", () => {
-    const html = renderToStaticMarkup(<AgentColumn role="architect" name="架构师" agents={[agent]}
+    const html = renderToStaticMarkup(<AgentColumn role="architect" name="Architect" agents={[agent]}
       history={history} showDone selection={null} onSelect={() => {}} />);
-    expect(html).toContain("架构师");
+    expect(html).toContain("Architect");
     expect(html.match(/card role-architect/g)).toHaveLength(2);
-    expect(html).toContain("2 条提案");
-    expect(html).toContain("自定义结构组");
+    expect(html).toContain("2 proposals");
+    expect(html).toContain("Custom structure group");
   });
 });

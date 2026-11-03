@@ -1,17 +1,17 @@
-"""spec CLI（console_script: `spec`）：new / add-task / render / validate / abandon / graph。
+"""spec CLI (console_script: `spec`): new / add-task / render / validate / abandon / graph.
 
-2026-06-24 spec-markdown-form：spec 组改为单 markdown 文件；`spec amend` 退役（直接编辑组
-markdown 即可，历史交给 git）；新增 `spec graph` 生成「对代码的唯一映射」ARCHITECTURE.md。
+2026-06-24 spec-markdown-form: spec group changed to single Markdown file; `spec amend` retired (edit group
+Markdown directly, history goes to git); new `spec graph` generates "unique code mapping" ARCHITECTURE.md.
 
-薄路由层（理念 1 奥卡姆）：把子命令转发到 mutate / render / validate / graph，自己不含业务逻辑。
+Thin routing layer (principle 1 Occam): dispatch subcommands to mutate / render / validate / graph, no business logic in CLI itself.
 - spec new      <slug> --issue --title    → mutate.create_group
 - spec add-task <group> --id --title …    → mutate.add_task
-- spec render                             → 写 OVERVIEW.md
-- spec validate                           → 有 error 退出码非 0
-- spec abandon  <group> <task> --reason   → mutate.abandon（从快照移除，历史在 git）
-- spec graph    [--check]                 → 写 ARCHITECTURE.md / 校验 docstring + 漂移
+- spec render                             → write OVERVIEW.md
+- spec validate                           → non-zero exit code if errors
+- spec abandon  <group> <task> --reason   → mutate.abandon (remove from snapshot, history in git)
+- spec graph    [--check]                 → write ARCHITECTURE.md / validate docstring + drift
 
-默认 specs 根为 docs/specs（可用 --specs-root 覆盖）；graph 默认扫 openagents 包。
+Default specs root is docs/specs (can override with --specs-root); graph scans openagents package by default.
 """
 
 from __future__ import annotations
@@ -30,12 +30,12 @@ _DEFAULT_PACKAGE_ROOT = Path("openagents")
 
 
 def _csv(value: str) -> list[str]:
-    """逗号分隔串 → 去空白的非空项列表（供 --files / --depends-on）。"""
+    """Comma-separated string → list of non-empty items with whitespace stripped (for --files / --depends-on)."""
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
 def main(*, argv: list[str] | None = None) -> int:
-    """Entry point for the `spec` console_script. 返回进程退出码（0 成功 / 非 0 失败）。"""
+    """Entry point for the `spec` console_script. Returns process exit code (0 success / non-zero failure)."""
     parser = _build_parser()
     args = parser.parse_args(argv)
     if args.command is None:
@@ -79,64 +79,82 @@ def main(*, argv: list[str] | None = None) -> int:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    """构造 argparse 解析器。--specs-root 放共享父解析器，子命令前后皆可写。"""
+    """Construct argparse parser. --specs-root in shared parent parser, subcommands can add arguments before and after."""
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument(
         "--specs-root",
         type=Path,
         default=_DEFAULT_SPECS_ROOT,
-        help="specs 源数据根目录（默认 docs/specs）",
+        help="Spec source root (default: docs/specs)",
     )
 
     parser = argparse.ArgumentParser(prog="spec", description=__doc__, parents=[common])
     sub = parser.add_subparsers(dest="command")
 
-    new = sub.add_parser("new", help="新建 spec 组（markdown 单文件）", parents=[common])
-    new.add_argument("slug", help="组 slug（kebab-case 英文短名）")
-    new.add_argument("--issue", type=int, required=True, help="关联 issue 编号")
-    new.add_argument("--title", required=True, help="组标题")
-    # Spec-0015：人话 TL;DR 必填——把「写 summary」做成建组硬步骤。
-    new.add_argument("--summary", required=True, help="组级人话 TL;DR（必填）")
-    new.add_argument("--number", default=None, help="组编号 NNNN（共享仓库须先在远端预留）")
-
-    reserve = sub.add_parser("reserve-number", help="为已有 spec 改号预留新编号", parents=[common])
-    reserve.add_argument("--issue", type=int, required=True, help="关联 issue 编号")
-    reserve.add_argument("--slug", required=True, help="组 slug")
-    reserve.add_argument("--number", default=None, help="指定编号 NNNN（缺省取下一空号）")
-
-    add = sub.add_parser("add-task", help="往 spec 组加一个子任务", parents=[common])
-    add.add_argument("group", help="组编号 NNNN 或文件名")
-    add.add_argument("--id", required=True, dest="task_id", help="Task ID，如 T1")
-    add.add_argument("--title", required=True, help="Task 标题")
-    add.add_argument("--priority", choices=list(PRIORITY_VALUES), required=True, help="优先级")
-    add.add_argument(
-        "--status", choices=list(STATUS_VALUES), default="pending", help="状态（默认 pending）"
+    new = sub.add_parser("new", help="Create a spec group (one Markdown file)", parents=[common])
+    new.add_argument("slug", help="Group slug (short English kebab-case name)")
+    new.add_argument("--issue", type=int, required=True, help="Associated issue number")
+    new.add_argument("--title", required=True, help="Group title")
+    # Spec-0015: Plain-language TL;DR mandatory—make "write summary" a required hard step in group creation.
+    new.add_argument("--summary", required=True, help="Plain-language group TL;DR (required)")
+    new.add_argument(
+        "--number",
+        default=None,
+        help="Group number NNNN (reserved remotely in shared repositories)",
     )
-    add.add_argument("--files", type=_csv, default=[], help="涉及文件（逗号分隔）")
-    add.add_argument(
-        "--depends-on", type=_csv, default=[], dest="depends_on", help="依赖（逗号分隔）"
+
+    reserve = sub.add_parser(
+        "reserve-number", help="Reserve a new number for an existing spec", parents=[common]
     )
-    add.add_argument("--scope", default="", help="子任务范围（Markdown）")
-    add.add_argument("--acceptance", default="", help="验收标准（Markdown）")
+    reserve.add_argument("--issue", type=int, required=True, help="Associated issue number")
+    reserve.add_argument("--slug", required=True, help="Group slug")
+    reserve.add_argument(
+        "--number", default=None, help="Requested number NNNN (default: next available number)"
+    )
 
-    sub.add_parser("render", help="渲染 OVERVIEW.md", parents=[common])
-    sub.add_parser("validate", help="校验 specs（schema + 语义）", parents=[common])
+    add = sub.add_parser("add-task", help="Add a Task to a spec group", parents=[common])
+    add.add_argument("group", help="Group number NNNN or filename")
+    add.add_argument("--id", required=True, dest="task_id", help="Task ID, such as T1")
+    add.add_argument("--title", required=True, help="Task title")
+    add.add_argument("--priority", choices=list(PRIORITY_VALUES), required=True, help="Priority")
+    add.add_argument(
+        "--status", choices=list(STATUS_VALUES), default="pending", help="Status (default: pending)"
+    )
+    add.add_argument("--files", type=_csv, default=[], help="Owned files (comma-separated)")
+    add.add_argument(
+        "--depends-on",
+        type=_csv,
+        default=[],
+        dest="depends_on",
+        help="Dependencies (comma-separated)",
+    )
+    add.add_argument("--scope", default="", help="Task scope (Markdown)")
+    add.add_argument("--acceptance", default="", help="Acceptance criteria (Markdown)")
 
-    abandon = sub.add_parser("abandon", help="从快照移除一个 Task（历史在 git）", parents=[common])
-    abandon.add_argument("group", help="组编号 NNNN 或文件名")
-    abandon.add_argument("task", help="Task ID，如 T3")
-    abandon.add_argument("--reason", required=True, help="移除原因（记入提交信息）")
+    sub.add_parser("render", help="Render OVERVIEW.md", parents=[common])
+    sub.add_parser("validate", help="Validate specs (schema + semantics)", parents=[common])
+
+    abandon = sub.add_parser(
+        "abandon", help="Remove a Task from the snapshot (history stays in git)", parents=[common]
+    )
+    abandon.add_argument("group", help="Group number NNNN or filename")
+    abandon.add_argument("task", help="Task ID, such as T3")
+    abandon.add_argument(
+        "--reason", required=True, help="Reason for removal (record in the commit message)"
+    )
 
     g = sub.add_parser(
-        "graph", help="生成/校验 ARCHITECTURE.md（对代码的唯一映射）", parents=[common]
+        "graph", help="Generate/check ARCHITECTURE.md (the code map)", parents=[common]
     )
     g.add_argument(
         "--package-root",
         type=Path,
         default=_DEFAULT_PACKAGE_ROOT,
-        help="要扫描的包（默认 openagents）",
+        help="Package to scan (default: openagents)",
     )
-    g.add_argument("--check", action="store_true", help="CI 模式：校验 docstring 齐全 + 无漂移")
+    g.add_argument(
+        "--check", action="store_true", help="CI mode: check docstring completeness and drift"
+    )
 
     return parser
 
@@ -144,16 +162,16 @@ def _build_parser() -> argparse.ArgumentParser:
 def _cmd_new(
     *, specs_root: Path, slug: str, title: str, issue: int, summary: str, number: str | None
 ) -> int:
-    """new 子命令：转发 mutate.create_group，打印新建文件。"""
+    """new subcommand: forward to mutate.create_group, print newly created file."""
     path = mutate.create_group(
         specs_root=specs_root, slug=slug, title=title, issue=issue, summary=summary, number=number
     )
-    print(f"✓ 已新建 spec 组 {path.name}（{path}）")
+    print(f"✓ Created spec group {path.name} ({path})")
     return 0
 
 
 def _cmd_add_task(*, specs_root: Path, args: argparse.Namespace) -> int:
-    """add-task 子命令：转发 mutate.add_task。"""
+    """add-task subcommand: forward to mutate.add_task."""
     task = mutate.add_task(
         specs_root=specs_root,
         group=args.group,
@@ -166,57 +184,57 @@ def _cmd_add_task(*, specs_root: Path, args: argparse.Namespace) -> int:
         scope=args.scope,
         acceptance=args.acceptance,
     )
-    print(f"✓ 已加 Task {args.group}/{task.id}（{task.status}）")
+    print(f"✓ Added Task {args.group}/{task.id} ({task.status})")
     return 0
 
 
 def _cmd_render(*, specs_root: Path) -> int:
-    """render 子命令：写 OVERVIEW.md 并打印路径。"""
+    """render subcommand: write OVERVIEW.md and print path."""
     path = write_overview(specs_root=specs_root)
-    print(f"✓ 已生成 {path}")
+    print(f"✓ Generated {path}")
     return 0
 
 
 def _cmd_validate(*, specs_root: Path) -> int:
-    """validate 子命令：打印 issues；有 error 返回 1，仅 warning 返回 0。"""
+    """validate subcommand: print issues; return 1 if errors, 0 if only warnings."""
     report = validate(specs_root=specs_root)
     for issue in report.issues:
         print(f"[{issue.level}] {issue.where}: {issue.message}")
     if not report.ok:
-        print("✗ spec 校验失败（存在 error）")
+        print("✗ Spec validation failed (errors found)")
         return 1
-    print("✓ spec 校验通过")
+    print("✓ Spec validation passed")
     return 0
 
 
 def _cmd_abandon(*, specs_root: Path, group: str, task: str, reason: str) -> int:
-    """abandon 子命令：转发 mutate.abandon。"""
+    """abandon subcommand: forward to mutate.abandon."""
     mutate.abandon(specs_root=specs_root, group=group, task_id=task, reason=reason)
-    print(f"✓ 已 abandon {group}/{task}")
+    print(f"✓ Abandoned {group}/{task}")
     return 0
 
 
 def _cmd_graph(*, specs_root: Path, package_root: Path, check: bool) -> int:
-    """graph 子命令：--check 校验 docstring + 漂移；否则生成 ARCHITECTURE.md。"""
+    """graph subcommand: --check validates docstring completeness + drift; otherwise generate ARCHITECTURE.md."""
     if not check:
         path = graph.write_architecture(specs_root=specs_root, package_root=package_root)
-        print(f"✓ 已生成 {path}")
+        print(f"✓ Generated {path}")
         return 0
 
-    # --check：1) docstring 齐全；2) ARCHITECTURE.md 与代码无漂移。
+    # --check: 1) docstrings complete; 2) ARCHITECTURE.md and code have no drift.
     missing = graph.missing_docstrings(package_root=package_root)
     current = specs_root / graph.ARCHITECTURE_FILENAME
     expected = graph.render_architecture(package_root=package_root)
     drift = (not current.is_file()) or current.read_text(encoding="utf-8") != expected
 
     for path_str in missing:
-        print(f"[error] {path_str}: 缺 docstring（文件级/模块级注释规范）")
+        print(f"[error] {path_str}: missing docstring (file/module documentation convention)")
     if drift:
-        print(f"[error] {current}: 与代码不一致，请运行 `spec graph` 重新生成")
+        print(f"[error] {current}: differs from the code; run `spec graph` to regenerate")
     if missing or drift:
-        print("✗ graph 校验失败")
+        print("✗ Graph validation failed")
         return 1
-    print("✓ graph 校验通过（docstring 齐全、无漂移）")
+    print("✓ Graph validation passed (docstrings complete, no drift)")
     return 0
 
 

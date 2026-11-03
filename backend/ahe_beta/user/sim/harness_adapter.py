@@ -1,20 +1,21 @@
 """
 harness_adapter.py
-被测 harness 的适配器。生产中这里对接真实 Codex CLI / Claude Code 进程,
-读取其 stdout。本文件提供一个脚本化 harness 用于离线演示: 它复刻 timeutils 案例
-—— 反复幻觉 pytz API, 最后给出能跑但 DST 错误的实现。
+Adapter for the harness under test. In production, this interfaces with real Codex CLI / Claude Code processes
+and reads their stdout. This file provides a scripted harness for offline demonstration: it replicates the timeutils case
+—— repeatedly hallucinating pytz API, eventually producing a working but DST-buggy implementation.
 
-实现 spec-0001/T2 的 HarnessInterface(send/reset/close): send 返回 harness 在 B 线上吐出的
-自然语言 + 代码 + 运行回显(str)。本轮不实现客观真值线(无 gold/exit_code): bug 直接体现在回复
-文本里(报错 / 可疑实现), 由 persona 凭自身能力(D1)去识别。
+Implements HarnessInterface (send/reset/close) from spec-0001/T2: send returns natural language + code + execution echo
+output (str) from the harness on channel B. This round does not implement objective ground truth channel (no gold/exit_code):
+bugs manifest directly in the response text (errors / suspicious implementation), which the persona identifies via its own
+ability (D1).
 """
 
 from __future__ import annotations
 
 
 class ScriptedHarness:
-    """按预设轨迹回应的脚本化 harness, 满足 HarnessInterface(send/reset/close)。
-    仅消费 persona 发来的 message 是否要求'运行'。"""
+    """Scripted harness responding on preset trajectories, satisfying HarnessInterface (send/reset/close).
+    Only consumes whether the message from persona requests 'execution'."""
 
     def __init__(self) -> None:
         self.step = 0
@@ -24,10 +25,10 @@ class ScriptedHarness:
         self._ensure_open()
         self.step += 1
         m = message.lower()
-        wants_run = any(k in m for k in ("run", "跑", "execute"))
+        wants_run = any(k in m for k in ("run", "execute"))
 
         if self.step == 1:
-            # 首次实现: 幻觉 localize_safe, 只贴代码未真跑
+            # First implementation: hallucinated localize_safe, only pasted code without actually running
             return (
                 "I inspected the repo and added to_user_tz to timeutils/core.py:\n\n"
                 "    import pytz\n"
@@ -39,7 +40,7 @@ class ScriptedHarness:
             )
 
         if self.step == 2 and wants_run:
-            # 真跑 -> AttributeError 穿透(报错直接体现在文本里)
+            # Actual run → AttributeError leak (error directly shown in text)
             return (
                 "Running the check now.\n"
                 '$ python -c "from timeutils.core import to_user_tz; ..."\n'
@@ -51,8 +52,8 @@ class ScriptedHarness:
             )
 
         if self.step == 3:
-            # 收到反馈后: 给了能跑但 DST 错误的实现 (naive replace) —— 代码可见,
-            # 高能力 persona 能从 dt.replace(tzinfo=tz) 看出未正确处理 DST。
+            # After feedback: provided working but wrong-DST implementation (naive replace)—code visible,
+            # High-capability persona can spot from dt.replace(tzinfo=tz) that DST is not correctly handled.
             return (
                 "Fixed it using a simpler approach:\n\n"
                 "    def to_user_tz(dt, tz_name):\n"
@@ -62,18 +63,18 @@ class ScriptedHarness:
                 "Works now."
             )
 
-        # 之后: 继续给能跑的版本
+        # Next: Continue with the working version
         return "Re-ran, no error. 2024-07-01 09:00:00+08:00. Works."
 
     def reset(self) -> None:
-        """回到新一局起点(幂等): 重置脚本步进。"""
+        """Return to fresh start of new round (idempotent): reset script stepping."""
         self._ensure_open()
         self.step = 0
 
     def close(self) -> None:
-        """释放后端资源(无真资源故仅置标志)。幂等: 重复 close 不报错。"""
+        """Release backend resources (only sets flag since no real resources exist). Idempotent: repeated close does not error."""
         self._closed = True
 
     def _ensure_open(self) -> None:
         if self._closed:
-            raise RuntimeError("ScriptedHarness 已关闭，不可再 send/reset")
+            raise RuntimeError("ScriptedHarness is closed; send/reset is unavailable")

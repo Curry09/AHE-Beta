@@ -25,7 +25,7 @@ import { CommitDetailView } from "./detail/CommitDetail";
 import { IssueDetailView } from "./detail/IssueDetail";
 import { SessionDetailView } from "./detail/SessionDetail";
 
-// 第四栏：无选中时 = Issues + Main 两段列表；点了任意方块 = 该对象的完整信息（可返回）。
+// Fourth column: with no selection, show Issues + Main lists; selecting a card shows its full details with back navigation.
 export function SidePanel(props: {
   selection: Selection | null;
   onSelect: (sel: Selection | null) => void;
@@ -34,7 +34,7 @@ export function SidePanel(props: {
   issues: IssuesResponse | null;
   commits: CommitsResponse | null;
   funnel?: { report: number; proposal: number; ready: number } | null;
-  delivery?: DeliveryResponse | null; // Spec-0032/T7：交付面（PR + needs-human）
+  delivery?: DeliveryResponse | null; // Spec-0032/T7: delivery view (PR + needs-human)
 }) {
   const { selection, onSelect, agents, history, issues, commits, funnel, delivery } = props;
   const commitList: Commit[] = commits?.commits ?? [];
@@ -58,12 +58,12 @@ export function SidePanel(props: {
         onBack={back}
       />
     ) : (
-      <FallbackDetail onBack={back} text="该 agent 的实时槽位已不存在（可能已开新一轮 run）。" />
+      <FallbackDetail onBack={back} text="This live agent slot no longer exists. A new run may have started." />
     );
   } else if (selection?.type === "history") {
     const item = history[selection.index];
     if (!item) {
-      detail = <FallbackDetail onBack={back} text="归档记录不存在（可能已被新一轮 run 清空）。" />;
+      detail = <FallbackDetail onBack={back} text="Archived record not found. A new run may have cleared it." />;
     } else if (item.kind === "user_session") {
       detail = <SessionDetailView item={item} onSelect={onSelect} onBack={back} />;
     } else {
@@ -112,17 +112,17 @@ export function SidePanel(props: {
               )}
             </div>
             {issues && !issues.connected && (
-              <div className="disconnected">未连接 Gitea（issue 列表不可用）。</div>
+              <div className="disconnected">Gitea is disconnected; issues are unavailable.</div>
             )}
             {issues?.connected && issues.issues.length === 0 && (
-              <div className="empty">暂无 issue</div>
+              <div className="empty">No issues yet</div>
             )}
-            {/* Spec-0029/T10：三平面漏斗条（report→proposal→ready 当前量；超软阈值高亮示警）。 */}
+            {/* Spec-0029/T10: three-plane funnel bar (current report→proposal→ready counts; highlight soft-threshold warnings). */}
             {funnel && <FunnelBar funnel={funnel} />}
-            {/* Spec-0029/T10：按三平面分组——报告 / 提案(带来源徽标) / Ready / 已关闭终态。 */}
+            {/* Spec-0029/T10: group by plane: reports / proposals (with provenance badges) / Ready / closed terminal states. */}
             <IssueGroups issues={issues?.issues ?? []} onSelect={onSelect} />
 
-            {/* Spec-0032/T7：交付面——open PR + needs-human 积压（vigil 的工作切面）。 */}
+            {/* Spec-0032/T7: delivery view: open PR + needs-human backlog (vigil's work view). */}
             <DeliveryPanel delivery={delivery ?? null} />
 
             <div className="side-section-head">
@@ -134,10 +134,10 @@ export function SidePanel(props: {
               )}
             </div>
             {commits && !commits.connected && (
-              <div className="disconnected">未连接 Gitea（commit 列表不可用）。</div>
+              <div className="disconnected">Gitea is disconnected; commits are unavailable.</div>
             )}
             {commits?.connected && commitList.length === 0 && (
-              <div className="empty">暂无 commit</div>
+              <div className="empty">No commits yet</div>
             )}
             {commitList.map((c) => (
               <button
@@ -162,7 +162,7 @@ export function SidePanel(props: {
   );
 }
 
-// 优先级徽标配色（内联，避免改 styles.css——非本 task 分配文件）。P0 红、P1 琥珀、其余淡。
+// Priority badge colors (inline to avoid editing styles.css, outside this task's file allocation): P0 red, P1 amber, others muted.
 const PRIORITY_COLOR: Record<string, string> = {
   P0: "var(--red)",
   P1: "var(--amber)",
@@ -170,7 +170,7 @@ const PRIORITY_COLOR: Record<string, string> = {
   P3: "var(--text-faint)",
 };
 
-// 背压软阈值（与后端 run.py 缺省一致；仅前端示警高亮，权威告警在后端 stdout/状态）。
+// Backpressure soft thresholds (match backend run.py defaults; frontend highlights only; authoritative alerts appear in backend stdout/state).
 const DEPTH_SOFT_ALARM = 20;
 
 function FunnelBar({ funnel }: { funnel: { report: number; proposal: number; ready: number } }) {
@@ -178,23 +178,23 @@ function FunnelBar({ funnel }: { funnel: { report: number; proposal: number; rea
     <span
       className="chip"
       style={warn ? { color: "var(--red)", fontWeight: 600 } : undefined}
-      title={warn ? `${label} 深度 ${n} 超软阈值 ${DEPTH_SOFT_ALARM}（背压示警）` : `${label} 当前量`}
+      title={warn ? `${label} count ${n} exceeds the soft limit ${DEPTH_SOFT_ALARM} (backpressure warning)` : `Current ${label} count`}
     >
       {label} {n}
     </span>
   );
   return (
-    <div className="side-section-head" title="三平面漏斗：报告 → 提案 → Ready">
-      {seg("报告", funnel.report, false)}
+    <div className="side-section-head" title="Three-plane funnel: Report → Proposal → Ready">
+      {seg("Report", funnel.report, false)}
       <span style={{ color: "var(--text-faint)" }}>→</span>
-      {seg("提案", funnel.proposal, funnel.proposal > DEPTH_SOFT_ALARM)}
+      {seg("Proposal", funnel.proposal, funnel.proposal > DEPTH_SOFT_ALARM)}
       <span style={{ color: "var(--text-faint)" }}>→</span>
       {seg("Ready", funnel.ready, funnel.ready > DEPTH_SOFT_ALARM)}
     </div>
   );
 }
 
-// 把 issue 分到四组（三平面 + 已关闭终态）。组内按票号升序。
+// Divide issues into four groups (three planes + closed terminal states). Sort each group by issue number ascending.
 function groupIssues(issues: Issue[]) {
   const report: Issue[] = [];
   const proposal: Issue[] = [];
@@ -205,7 +205,7 @@ function groupIssues(issues: Issue[]) {
     if (p === "report") report.push(it);
     else if (p === "proposal") proposal.push(it);
     else if (p === "ready") ready.push(it);
-    else closed.push(it);  // 已关闭（done/merged/declined 等终态）或无平面
+    else closed.push(it);  // Closed (done/merged/declined or other terminal states) or no plane.
   }
   const byNum = (a: Issue, b: Issue) => a.number - b.number;
   return {
@@ -221,10 +221,10 @@ function IssueGroups(props: { issues: Issue[]; onSelect: (sel: Selection) => voi
   const { onSelect } = props;
   return (
     <>
-      <IssueGroup title="Ready · 可领" issues={g.ready} onSelect={onSelect} highlight />
-      <IssueGroup title="提案 · 待准入" issues={g.proposal} onSelect={onSelect} />
-      <IssueGroup title="报告 · 待分诊" issues={g.report} onSelect={onSelect} />
-      <IssueGroup title="已关闭" issues={g.closed} onSelect={onSelect} dim />
+      <IssueGroup title="Ready · Available to claim" issues={g.ready} onSelect={onSelect} highlight />
+      <IssueGroup title="Proposal · Awaiting admission" issues={g.proposal} onSelect={onSelect} />
+      <IssueGroup title="Report · Awaiting triage" issues={g.report} onSelect={onSelect} />
+      <IssueGroup title="Closed" issues={g.closed} onSelect={onSelect} dim />
     </>
   );
 }
@@ -254,11 +254,11 @@ function IssueGroup(props: {
   );
 }
 
-// 提案来源徽标文案（provenance → 短名）。
+// Proposal provenance badge text (provenance → short name).
 const PROVENANCE_BADGE: Record<string, string> = {
-  "from-triage": "分诊",
-  "from-architect": "结构",
-  "from-divergent": "发散",
+  "from-triage": "Triage",
+  "from-architect": "Architect",
+  "from-divergent": "Divergent PM",
 };
 
 function IssueRow(props: { issue: Issue; onSelect: (sel: Selection) => void }) {
@@ -281,44 +281,44 @@ function IssueRow(props: { issue: Issue; onSelect: (sel: Selection) => void }) {
         {kind}
       </span>
       {prov && (
-        <span className="chip tag" title={`提案来源：${prov}`}>
+        <span className="chip tag" title={`Proposal source: ${prov}`}>
           {PROVENANCE_BADGE[prov] ?? prov}
         </span>
       )}
       {prio && (
-        <span className="chip" style={{ color: PRIORITY_COLOR[prio] }} title={`优先级 ${prio}`}>
+        <span className="chip" style={{ color: PRIORITY_COLOR[prio] }} title={`Priority ${prio}`}>
           {prio}
         </span>
       )}
       {round != null && (
-        <span className="chip" title={`第 ${round} 轮提出`}>
+        <span className="chip" title={`Proposed in round ${round}`}>
           r{round}
         </span>
       )}
       {age != null && age > 0 && (
-        <span className="chip" title={`已挂 ${age} 天（积压龄）`}>
+        <span className="chip" title={`Queued for ${age} days (backlog age)`}>
           {age}d
         </span>
       )}
-      {/* 结构提案显覆盖建议清单；被覆盖显 ⊂ #N；merged/declined 等终态给标注 */}
+      {/* Show coverage suggestions for structural proposals, ⊂ #N for covered issues, and labels for merged/declined terminal states. */}
       {(issue.covers?.length ?? 0) > 0 && (
-        <span className="chip tag" title="该提案建议覆盖的票（合并由准入裁决）">
-          覆盖 {issue.covers!.map((n) => `#${n}`).join(" ")}
+        <span className="chip tag" title="Issues this proposal recommends covering; admission determines merges">
+          Cover {issue.covers!.map((n) => `#${n}`).join(" ")}
         </span>
       )}
       {issue.covered_by != null && (
-        <span className="chip" title={`被 #${issue.covered_by} 的 covers 引用`}>
+        <span className="chip" title={`Referenced by covers in #${issue.covered_by}`}>
           ⊂ #{issue.covered_by}
         </span>
       )}
       {(terminal === "merged" || terminal === "superseded" || terminal === "gate-dropped") && (
-        <span className="chip" title="已被合并/取代到主票">
-          合并
+        <span className="chip" title="Merged into or superseded by the parent issue">
+          Merge
         </span>
       )}
       {issue.reject_reason && (
         <span className="chip" title={issue.reject_reason}>
-          驳回
+          Reject
         </span>
       )}
     </button>
@@ -330,9 +330,9 @@ function FallbackDetail({ onBack, text }: { onBack: () => void; text: string }) 
     <div className="detail">
       <div className="detail-head">
         <button className="back" onClick={onBack}>
-          ‹ 返回
+          ‹ Back
         </button>
-        <span className="detail-title">未找到</span>
+        <span className="detail-title">Not found</span>
       </div>
       <div className="detail-body">
         <div className="empty">{text}</div>

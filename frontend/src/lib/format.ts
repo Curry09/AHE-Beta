@@ -1,4 +1,4 @@
-// 展示用小工具：时间/时长格式化。
+// Display helpers: time and duration formatting.
 
 export function fmtTime(iso: string | null | undefined): string {
   if (!iso) return "";

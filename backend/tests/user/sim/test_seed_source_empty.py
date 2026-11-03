@@ -1,8 +1,6 @@
-"""empty SeedSource（spec-0009/T2）。
+"""Empty SeedSource (spec-0009/T2).
 
-覆盖：可加性硬证据（不 import empty 模块、仅 import seed_source 即注册）、空目录隔离落地、
-可选需求文档写入与 doc_name 覆盖、kind=empty 的序列化往返。
-"""
+Coverage: additive hard evidence (no import of empty module, only import seed_source registers it), empty directory isolation landing, optional requirements document writing and doc_name override, serialization round-trip for kind=empty."""
 
 from __future__ import annotations
 
@@ -12,7 +10,7 @@ from ahe_beta.models import WorkspaceSpec
 
 
 def test_empty_auto_registered_without_importing_module() -> None:
-    # 可加性硬证据：本测试不 import sources.empty，仅 import seed_source，empty 即在注册表。
+    # Additive hard evidence: this test does not import sources.empty, only imports seed_source; empty is in the registry.
     from ahe_beta.user.sim import seed_source
 
     assert "empty" in seed_source.available_kinds()
@@ -28,7 +26,7 @@ def test_empty_provisions_empty_isolated_dir() -> None:
     a.freeze_patch_base()
     assert a.export_patch() == ("", "")
     assert Path(a.cwd).is_dir()
-    assert not any(Path(a.cwd).iterdir())  # 无 doc 时为纯空目录
+    assert not any(Path(a.cwd).iterdir())  # Pure empty directory when no doc
 
 
 def test_empty_writes_doc_and_doc_name_override() -> None:

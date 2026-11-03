@@ -1,15 +1,15 @@
-"""内层用户 agent 的原子工具 + D1 能力门控（spec-0008/T2）。
+"""Inner-layer user agent's atomic tools + D1 capability gating (spec-0008/T2).
 
-原子工具（不可再分、可组合）：
-- read_file(sandbox, path)         读文件
-- run_shell(sandbox, cmd, timeout) 在 sandbox cwd 跑命令
-- write_file(sandbox, path, content) 写文件（高能力档专属：能写测试脚本）
-- report_issue(sandbox, body)      中途记一条 issue（不结束对话；真实写入由 agentic client 拦截）
-- web_search(query)                占位，本轮不实现
+Atomic tools (indivisible, composable):
+- read_file(sandbox, path)         read file
+- run_shell(sandbox, cmd, timeout) run command in sandbox cwd
+- write_file(sandbox, path, content) write file (high capability tier only: can write test scripts)
+- report_issue(sandbox, body)      mid-session record one issue (does not end conversation; actual write intercepted by agentic client)
+- web_search(query)                placeholder, not implemented this round
 
-「跑测试 / 构造边界用例」这类是「原子工具 + LLM 推理」涌现出的复合行为，不做成工具。
-工具集按 persona D1 机械门控（tool_stack）：门控发生在「暴露哪些工具给 LLM」这一层，
-不依赖 prompt 自律。映射与 0005 cap_mask（read_code/run_once/run_tests/review_diff）同源。
+"Running tests / constructing edge cases" are emergent composite behaviors from "atomic tools + LLM reasoning", not standalone tools.
+Tool set gated by persona D1 mechanical control (tool_stack): gating occurs at "expose which tools to LLM" layer,
+not prompt self-discipline. Mapping aligns with spec-0005 cap_mask (read_code/run_once/run_tests/review_diff) origin.
 """
 
 from __future__ import annotations
@@ -25,12 +25,12 @@ if TYPE_CHECKING:
 
 
 # --------------------------------------------------------------------------
-# 原子工具（统一返回 {ok, ...}）
+# Atomic tools (unified return format {ok, ...})
 # --------------------------------------------------------------------------
 def read_file(sandbox: Sandbox, path: str) -> dict:
     try:
         return {"ok": True, "content": sandbox.read_text(path)}
-    except Exception as e:  # noqa: BLE001 — 工具层把任何失败转成结构化结果，绝不崩内层循环
+    except Exception as e:  # noqa: BLE001 — tool layer converts any failure to structured result, never crashes inner loop
         return {"ok": False, "error": str(e)}
 
 
@@ -62,21 +62,21 @@ def read_diff(sandbox: Sandbox) -> dict:
 
 
 def report_issue(sandbox: Sandbox, body: str) -> dict:  # noqa: ARG001
-    """占位：真实记笔记由 AgenticPersonaClient._dispatch 拦截；直接调则失败。"""
+    """Placeholder: real note-taking is intercepted by AgenticPersonaClient._dispatch; direct calls will fail."""
     return {"ok": False, "error": "report_issue requires agentic client dispatch"}
 
 
 def web_search(query: str) -> dict:
-    """占位：本轮不实现，永远返回未实现。"""
+    """Placeholder: not implemented this cycle; always returns unimplemented."""
     return {"ok": False, "error": "not_implemented"}
 
 
 # --------------------------------------------------------------------------
-# 工具规格 + D1 门控
+# Tool spec + D1 gating
 # --------------------------------------------------------------------------
 @dataclass(frozen=True)
 class ToolSpec:
-    """供 T3 渲染进 prompt（name/description/args）、供 T4 按 name 派发（fn）。"""
+    """For T3 to render into prompt (name/description/args); for T4 to dispatch by name (fn)."""
 
     name: str
     description: str
@@ -105,11 +105,11 @@ REPORT_ISSUE = ToolSpec(
     report_issue,
 )
 
-# 门控映射（与 cap_mask 同源）：
-#   blind                 -> []                 （只凭文本，不核实）
+# Gating mapping (same origin as cap_mask):
+#   blind                 -> []                 (text only, no verification)
 #   shallow               -> read_file,run_shell + report_issue
 #   competent / expert    -> + write_file
-# report_issue 不绑核实能力：有工具栈的人即可中途记一笔；允许闲置，不靠 prompt 硬推。
+# report_issue not tied to verification capability: anyone with tool stack can record mid-session; allows idling, not prompt-driven.
 _STACK: dict[D1Eval, list[ToolSpec]] = {
     D1Eval.BLIND: [],
     D1Eval.SHALLOW: [READ_FILE, RUN_SHELL, REPORT_ISSUE],
@@ -119,7 +119,7 @@ _STACK: dict[D1Eval, list[ToolSpec]] = {
 
 
 def tool_stack(persona: Persona) -> list[ToolSpec]:
-    """按 persona 的 D1 给出可用工具子集（web_search 不入栈：占位、永不真实启用）。"""
+    """Provide available tool subset by persona's D1 (web_search excluded from stack: placeholder, never truly enabled)."""
     return list(_STACK[persona.d1])
 
 

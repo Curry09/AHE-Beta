@@ -1,22 +1,24 @@
-"""内层用户 agent 的最小执行 sandbox（spec-0008/T2）。
+"""Minimal execution sandbox for inner-layer user agent (spec-0008/T2).
 
-以一个工作目录为 cwd（来自 0008/T1 materialize，或缺省新建空 tempdir），提供受限的
-shell 执行与路径解析。所有路径相对 cwd 解析、禁止逃逸子树。
+Provides restricted shell execution and path resolution within a working directory as cwd
+(from 0008/T1 materialize, or default to a newly created empty tempdir). All paths are
+resolved relative to cwd; escaping the subtree is forbidden.
 
-非安全 sandbox：仅最小隔离（cwd 限定 + 超时），不抗恶意代码（不做 Docker/seccomp）。
-威胁模型是「用户在自己机器上跑助手提议的代码」，与生产沙箱不同；强隔离留后续。
+Not a security sandbox: only minimal isolation (cwd confinement + timeout), no defense
+against malicious code (no Docker/seccomp). The threat model is "user running assistant-proposed
+code on their own machine," different from production sandboxes; strong isolation left for later.
 """
 
 from __future__ import annotations
 
 from ahe_beta.user.sim.runtime import Workspace, as_runtime, make_empty_runtime
 
-# run_shell 输出截断上限（字符），防一次跑出超大输出灌爆 prompt。
+# run_shell output truncation limit (characters), prevent a single run from producing massive output that floods the prompt.
 _MAX_OUTPUT = 20_000
 
 
 class Sandbox:
-    """一个工作目录 + 受限执行。workspace 缺省时自建空 tempdir 并在 cleanup 时删除。"""
+    """One working directory + restricted execution. workspace defaults to creating an empty tempdir and deletes it on cleanup."""
 
     def __init__(self, workspace: Workspace | None = None) -> None:
         self._runtime = make_empty_runtime() if workspace is None else as_runtime(workspace)
@@ -24,7 +26,7 @@ class Sandbox:
         self.cwd = self._runtime.cwd
 
     def resolve(self, path: str) -> str:
-        """把相对 path 解析到 cwd 子树内的绝对路径；逃逸（.. / 绝对路径）即拒。"""
+        """Resolve relative path to absolute path within cwd subtree; reject escapes (.. / absolute paths)."""
         return self._runtime.resolve(path)
 
     def read_text(self, path: str) -> str:
@@ -40,22 +42,24 @@ class Sandbox:
         return self._runtime.read_diff()
 
     def _env(self) -> dict[str, str] | None:
-        """返回私有工具执行环境。
+        """Return the private tool execution environment.
 
-        保持与 harness shell 的默认环境一致：只共享 cwd，不自动激活 workspace 下的
-        `.venv`。如果 harness 创建或使用了某个虚拟环境，它应通过显式命令（例如
-        `.venv/bin/python -m pytest ...`）体现，用户私有工具也用同样命令复现。
+        Keep consistent with the default harness shell environment: share only cwd, do not
+        automatically activate `.venv` under the workspace. If the harness created or used
+        a particular virtual environment, it should be reflected via explicit commands (e.g.
+        `.venv/bin/python -m pytest ...`); user private tools use the same commands to reproduce.
         """
         return None
 
     def run(self, cmd: str, timeout: float = 10.0) -> dict:
-        """在 cwd 下跑一条 shell 命令。返回 {ok, stdout, stderr, returncode}；超时 ok=False。
+        """Run a shell command under cwd. Return {ok, stdout, stderr, returncode}; ok=False on timeout.
 
-        命令继承宿主环境并只切换 cwd；不隐式选择/激活 workspace `.venv`。
+        Command inherits host environment and only switches cwd; does not implicitly select/activate
+        workspace `.venv`.
         """
         return self._runtime.run(cmd, timeout=timeout)
 
     def cleanup(self) -> None:
-        """只清理自建的 tempdir；外部传入的 workspace 不动（归调用方/0008-T1 管理）。"""
+        """Only clean up self-created tempdir; leave externally passed workspace untouched (managed by caller/0008-T1)."""
         if self._owns_tmp:
             self._runtime.close()

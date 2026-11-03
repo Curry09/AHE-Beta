@@ -1,4 +1,4 @@
-"""spec-0005/T5：会话主循环引擎（纯主观、两路体感、能力分叉）。"""
+"""spec-0005/T5: conversation main loop engine (purely subjective, two user experience paths, capability branching)."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ TASK = "Add to_user_tz(dt, tz_name); handle DST. We use Asia/Shanghai and Americ
 
 
 class _StubClient:
-    """受控 client：按脚本逐轮出动作；同构三跳时 judge/intent 不消耗动作。"""
+    """Controlled client: execute actions script-wise per round; judge/intent do not consume actions during isomorphic triple hops."""
 
     def __init__(self, actions: list[str], verdict: str = "unsure", rating: dict | None = None):
         self._actions = actions
@@ -91,14 +91,14 @@ class _StubClient:
                 "message": "x",
                 "gap": False,
             }
-        # 兼容旧单次 decide / 其它提示
+        # Compatible with legacy single-shot decide / other prompts
         a = self._actions[self._i] if self._i < len(self._actions) else self._actions[-1]
         self._i += 1
         return {"perceive": "", "verdict": self._verdict, "action": a, "message": "x"}
 
 
 class _RecordingClient(_StubClient):
-    """记录每轮收到的 user 提示, 用于断言喂给 LLM 的内容(感知是否原样)。"""
+    """Record user prompt received each round, used to assert content fed to LLM (perceive whether unchanged)."""
 
     def __init__(self, actions: list[str], verdict: str = "unsure") -> None:
         super().__init__(actions, verdict=verdict)
@@ -111,7 +111,7 @@ class _RecordingClient(_StubClient):
 
 
 class _ClassifyingClient(_RecordingClient):
-    """act 返回 free 时，模拟同一 persona 的后处理归类；记录 allowed ids 只在此处可见。"""
+    """When act returns free, simulate post-processing categorization of same persona; record allowed ids visible only here."""
 
     def __init__(self, actions: list[str], verdict: str = "unsure") -> None:
         super().__init__(actions, verdict=verdict)
@@ -154,16 +154,17 @@ class _FinalCheckClient(_RecordingClient):
 
 
 def test_harness_text_fed_raw_without_perception_filter() -> None:
-    # 低能力档(原型会用 perceive_filter 抹掉源码行)；删除过滤后, 源码应原样喂入 LLM。
+    # Low-capability tier (prototype uses perceive_filter to erase source lines); after filter removal, source should be fed to LLM unchanged.
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
     client = _RecordingClient(["send_message", "send_message", "accept"], verdict="unsure")
     run_session(p, client, ScriptedHarness(), TASK)
     after_harness = next(u for u in client.seen if "pytz.localize_safe(dt, tz)" in u)
-    assert "you don't read the diff line by line" not in after_harness  # 无过滤占位串
+    # No-filter placeholder string
+    assert "you don't read the diff line by line" not in after_harness
 
 
 def test_main_decide_is_judge_intent_act_isomorphic() -> None:
-    """主 loop 默认 three：judge → intent → act；perceive 带 [verdict|intent→action]。"""
+    """Main loop defaults to three: judge → intent → act; perceive carries [verdict|intent→action]."""
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
     client = _RecordingClient(["send_message", "accept"], verdict="satisfied")
     res = run_session(p, client, ScriptedHarness(), TASK)
@@ -175,7 +176,7 @@ def test_main_decide_is_judge_intent_act_isomorphic() -> None:
             tags.append("intent")
         elif "<main_act>" in u:
             tags.append("act")
-    # 至少两轮主决定 × 三跳
+    # At least two main decision rounds × three hops
     assert tags.count("judge") >= 2
     assert tags.count("intent") >= 2
     assert tags.count("act") >= 2
@@ -340,7 +341,7 @@ def test_accept_without_message_finishes_without_fake_harness_utterance() -> Non
 
 
 def test_active_final_check_converges_through_rejudge_and_reintent() -> None:
-    """一次 final check 后只能 rejudge → reintent → act，不能再次回跳调查。"""
+    """After one final check, can only rejudge → reintent → act; cannot backtrack to investigate again."""
     client = _FinalCheckClient(
         {"perceive": "the implementation is present", "check_status": "completed"}
     )
@@ -471,8 +472,7 @@ def test_self_terminates_at_chosen_turn() -> None:
 
 
 def test_on_progress_pushes_pending_harness_reply_immediately() -> None:
-    """harness 回复到手即推观测层：send 返回后、persona 下一轮响应前，多触发一次
-    on_progress 且快照悬挂该回复；下一条 TurnLog 落日志时悬挂清空（回复已随日志携带）。"""
+    """Harness reply in hand pushes to observation layer: after send returns, before persona's next-round response, trigger on_progress once more and suspend snapshot this reply; when next TurnLog lands in logs, suspend clears (reply already carried with logs)."""
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
     client = _StubClient(["send_message", "accept"], verdict="satisfied")
     snaps: list[tuple[int, str | None]] = []
@@ -483,14 +483,14 @@ def test_on_progress_pushes_pending_harness_reply_immediately() -> None:
         TASK,
         on_progress=lambda res: snaps.append((len(res.turns), res.pending_harness_output)),
     )
-    # turn1 落日志(无悬挂) → harness 回复到手(悬挂推送) → turn2 落日志(悬挂已清)
+    # turn1 lands in logs (no suspend) → harness reply in hand (suspend push) → turn2 lands in logs (suspend cleared)
     assert snaps[0] == (1, None)
     assert snaps[1][0] == 1 and snaps[1][1]
     assert snaps[2] == (2, None)
 
 
 def test_help_text_is_threaded_into_persona_prompt() -> None:
-    # 帮助文本经 run_session(help_text=) 穿透到每轮 persona 看到的 user turn（能力预期锚点）。
+    # Help text pierces through run_session(help_text=) to each round's persona-visible user turn (capability expectation anchor).
     p = _persona(D1Eval.EXPERT, D43Correct.FEEDBACK)
     client = _RecordingClient(["send_message", "accept"], verdict="satisfied")
     run_session(p, client, ScriptedHarness(), TASK, help_text="# Help\nno live progress; no /btw.")
@@ -499,7 +499,7 @@ def test_help_text_is_threaded_into_persona_prompt() -> None:
 
 
 class _AppraisingClient(_RecordingClient):
-    """开局返回一个 task_load 读数；其余轮正常。用于验证起始耐心据任务量浮动。"""
+    """Return a task_load reading at session start; remaining rounds normal. Used to verify starting patience floats with task volume."""
 
     def __init__(self, actions: list[str], task_load: str) -> None:
         super().__init__(actions, verdict="unsure")
@@ -507,24 +507,24 @@ class _AppraisingClient(_RecordingClient):
 
     def respond(self, system: str, user: str) -> dict:
         ret = super().respond(system, user)
-        if "SIZE UP THIS TASK" in user:  # 仅开局那轮带任务量评估指令
+        if "SIZE UP THIS TASK" in user:  # Task volume assessment instruction only at session start
             ret = {**ret, "task_load": self._task_load}
         return ret
 
 
 def test_opening_appraisal_floats_starting_patience() -> None:
-    # STEADY 基线 5；开局报 epic(+2) -> 起始耐心 7，落在首轮 TurnLog。
+    # STEADY baseline 5; session start reports epic(+2) → starting patience 7, falls in first TurnLog.
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
     client = _AppraisingClient(["send_message", "send_message"], task_load="epic")
     res = run_session(p, client, ScriptedHarness(), TASK)
-    assert res.turns[0].patience == 7  # 5 + epic(+2)，unsure 不再动耐心
-    # 评估指令只在开局出现，后续轮不再要 task_load 字段
+    assert res.turns[0].patience == 7  # 5 + epic(+2), unsure does not adjust patience further
+    # Assessment instruction appears only at session start; subsequent rounds no longer need task_load field
     assert "SIZE UP THIS TASK" in client.seen[0]
     assert all("SIZE UP THIS TASK" not in u for u in client.seen[1:])
 
 
 def test_opening_appraisal_quick_lowers_patience() -> None:
-    # IMPATIENT 基线 3；开局报 quick(-1) -> 起始耐心 2（与 d43 无关）。
+    # IMPATIENT baseline 3; session start reports quick(-1) → starting patience 2 (unrelated to d43).
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK, tempo=TimeTemperament.IMPATIENT)
     client = _AppraisingClient(["send_message", "send_message"], task_load="quick")
     res = run_session(p, client, ScriptedHarness(), TASK)
@@ -533,7 +533,7 @@ def test_opening_appraisal_quick_lowers_patience() -> None:
 
 def test_max_turns_cutoff() -> None:
     p = _persona(D1Eval.SHALLOW, D43Correct.FEEDBACK)
-    client = _StubClient(["send_message", "send_message"], verdict="unsure")  # 永不终止
+    client = _StubClient(["send_message", "send_message"], verdict="unsure")  # Never terminate
     res = run_session(p, client, ScriptedHarness(), TASK)
     assert res.end_reason == "max_turns"
     assert len(res.turns) == MAX_TURNS
@@ -568,35 +568,37 @@ def test_capability_fork() -> None:
         ScriptedHarness(),
         TASK,
     )
-    assert shallow.end_reason == "accepted"  # 低能力跑通即接受(高体感)
+    # Low capability acceptance upon completion (high user experience)
+    assert shallow.end_reason == "accepted"
     assert shallow.feeling.score >= 3
-    assert expert.end_reason == "issue_filed"  # 高能力逼证据至耗尽 -> file_issue(低体感)
+    # High capability drive evidence to exhaustion → file_issue (low user experience)
+    assert expert.end_reason == "issue_filed"
     assert expert.feeling.score <= 2
     assert expert.issue_artifact is not None
 
 
 def test_give_up_also_leaves_exit_issue() -> None:
-    # 走人=弃坑也留一条"为什么把我逼走"的问卷式 issue：把"提 issue"从特定动作解耦,
-    # 否则 FEEDBACK/GIVE_UP 型气跑后 backlog 收不到任何信号。end_reason 仍是 abandoned。
+    # Leave=abandon the pit yet still file a questionnaire-style issue "why you drove me away": decouple "file issue" from specific actions,
+    # otherwise FEEDBACK/GIVE_UP type frustrated exits leave backlog with no signal. end_reason remains abandoned.
     p = _persona(D1Eval.EXPERT, D43Correct.GIVE_UP)
-    # EXPERT 连坐实 harness 失败 2 次触发诊断门, give_up 解锁; 第 3 轮走人。
+    # EXPERT: Consecutive harness failures (2×) trigger diagnostic gate; give_up unlocks; exit on round 3.
     client = _StubClient(
         ["send_message", "send_message", "give_up"], verdict="failed_blame_harness"
     )
     res = run_session(p, client, ScriptedHarness(), TASK)
-    assert res.end_reason == "abandoned"  # 机制不变: 仍是放弃
-    assert res.issue_artifact is not None  # 但额外留下退出 issue
+    assert res.end_reason == "abandoned"  # Mechanism unchanged: still give_up
+    assert res.issue_artifact is not None  # But additionally leave an exit issue
 
 
 class _RaisingHarness:
-    """首条即崩：send 抛异常，模拟 harness 超时/崩溃（route 会兜成 [harness error] 哨兵）。"""
+    """Crash on first message: send throws exception, simulating harness timeout/crash (route wraps as [harness error] sentinel)."""
 
     def send(self, message: str) -> str:  # noqa: ARG002
-        raise TimeoutError("agent.run 超时 >240s")
+        raise TimeoutError("agent.run timeout >240s")
 
 
 def test_route_keep_waiting_polls_followup_when_not_awaiting() -> None:
-    """主 loop keep_waiting：reply 后仍应通过 poll 拿到后续输出（Spec-0036）。"""
+    """Main loop keep_waiting: after reply, should still fetch subsequent output via poll (Spec-0036)."""
 
     class _FollowupHarness:
         in_flight = False
@@ -623,14 +625,14 @@ def test_route_keep_waiting_idle_returns_none() -> None:
 
 
 def test_harness_error_surfaced_and_negative_exit_available_immediately() -> None:
-    # 松锁后：框架不再拦 accept，而是把 [harness error] 原样喂给 persona，并让负向出口(give_up/
-    # file_issue)开局即可用——有判断力的用户面对崩溃自然走人/开单而非验收（R4 漏斗已补齐）。
-    # 这里 persona 首轮见崩溃即 give_up：会话以 abandoned 收场并留一条退出 issue，不会被逼进 accept。
+    # After unlock: framework no longer blocks accept; instead feeds [harness error] as-is to persona, enabling negative exits (give_up/
+    # file_issue) from the start—discerning users facing a crash naturally exit/file an issue rather than accept (R4 funnel now complete).
+    # Here persona sees crash on first round and give_ups: session ends abandoned with an exit issue, never forced to accept.
     p = _persona(D1Eval.EXPERT, D43Correct.GIVE_UP)
     client = _StubClient(["send_message", "give_up"], verdict="stuck")
     res = run_session(p, client, _RaisingHarness(), TASK)
-    assert res.end_reason == "abandoned"  # 走人，而非假验收
-    assert res.issue_artifact is not None  # 留下"为什么把我逼走"的退出 issue
+    assert res.end_reason == "abandoned"  # Exit, not false acceptance
+    assert res.issue_artifact is not None  # Leave an exit issue: "why was I forced out"
     assert any("[harness error]" in t.harness_output for t in res.turns if t.harness_output)
 
 
@@ -643,13 +645,13 @@ def test_issue_artifact_is_user_voice_with_metadata_footer() -> None:
     )
     art = expert.issue_artifact
     assert art is not None
-    # 不再套第三人称模板外壳
+    # No longer wrap in third-person template shell
     assert "### What the user reported" not in art
     assert "Issue filed by simulated user" not in art
-    # 正文在前 = persona file_issue 当轮第一人称原话(非空)，与机器脚注用 --- 分隔
+    # Body first = persona file_issue first-person original text (non-empty) for this round, separated from machine footnote by ---
     body, sep, footer = art.partition("\n---\n")
-    assert sep  # 有分隔线
-    assert body.strip()  # 用户原话非空
-    # 脚注是机器自动采集的元信息(含能力档/纠错风格)，供开发者分流
+    assert sep  # Has separator line
+    assert body.strip()  # User original text non-empty
+    # Footnote is machine-collected metadata (including capability tier/correction style) for developer triage
     assert "auto-collected" in footer
     assert "expert/file_issue" in footer

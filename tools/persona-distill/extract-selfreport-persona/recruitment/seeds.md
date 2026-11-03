@@ -1,53 +1,76 @@
 # Recruitment: self-report persona seeds (pluggable)
 
-自述源的发现不能是爬虫（没有"博过自己 AI-coding 工作流的人"的可查索引）。本文件把它做成**可重复**：
-一份按**维度刻度极点**组织的策选 seed 列表，加一个找新鲜第一人称材料的搜索配方。挑**欠锚定的极点**，
-取下一个目标，再跑 SKILL.md L0→emit 管线 + reference.md §3 门。seed 只决定 *看谁*。
+Discovering self-report sources cannot rely on a crawler: there is no searchable index
+of people who have blogged about their own AI-coding workflows. This file makes discovery
+**repeatable** through a curated seed list organized by **dimension-scale extremes** and a
+search recipe for fresh first-person material. Pick an **under-anchored extreme**, choose
+the next target, then run the SKILL.md L0→emit pipeline and the gate in reference.md §3.
+A seed determines only *whom to examine*.
 
-seed 是锚（anchor-B），不是样本：每极点 **1–3 张强卡** 校准刻度，然后让 bulk 采样（dev.to / HN，anchor-A）填量。
+Seeds are anchors (anchor-B), not the bulk sample: use **1–3 strong cards per extreme** to
+calibrate the scale, then let bulk sampling (dev.to / HN, anchor-A) fill out the volume.
 
-## 要锚定的极点（校准格）
+## Extremes to anchor (calibration grid)
 
-按库缺什么排序。每个极点 = 一个 (D1 × D2/D4) 区域，需要一张高保真、完全 grounded 的卡钉住。
+Prioritize what the library lacks. Each extreme is a (D1 × D2/D4) region that needs a
+high-fidelity, fully grounded card to anchor it.
 
-| 极点 | 目标维 | 为何重要 |
+| Extreme | Target dimensions | Why it matters |
 |------|--------|----------|
-| **over-trust / ship-fast / non-technical** | D1 `blind`，D4 `over-trust`，D2 `ship-fast` | 纯 vibe 极端；体感 = "反正能跑" |
-| **expert × over-trust（正交）** | D1 `expert`，D4 `over-trust`，D3 `hands-off` | 证明 D1 ⟂ D4；校准 能力 ≠ 严谨 |
-| **务实中间** | D1 `competent`，D4 `balanced`，D2 `ship-fast` | 庞大的真实中段；ship 丑但能跑生产 |
-| **skeptical / rigorous** | D1 `expert`，D4 `skeptical`，D2 `modern-correct` | agentic-engineering / TDD 纪律端 |
-| **type-safety-purist** | D2 `type-safety-purist`，flags `types` | 正确性狂热验收门（仍薄） |
-| **advisory-only** | D6 `advisory` | 要答案/片段，不让 agent 动手 |
+| **over-trust / ship-fast / non-technical** | D1 `blind`, D4 `over-trust`, D2 `ship-fast` | The pure vibe extreme; user experience = "it runs, anyway" |
+| **expert × over-trust (orthogonal)** | D1 `expert`, D4 `over-trust`, D3 `hands-off` | Demonstrates D1 ⟂ D4; calibrates capability ≠ rigor |
+| **Pragmatic middle** | D1 `competent`, D4 `balanced`, D2 `ship-fast` | The large real-world middle; ships rough work that runs in production |
+| **skeptical / rigorous** | D1 `expert`, D4 `skeptical`, D2 `modern-correct` | The disciplined agentic-engineering / TDD end |
+| **type-safety-purist** | D2 `type-safety-purist`, flags `types` | A correctness-focused acceptance gate (still thinly covered) |
+| **advisory-only** | D6 `advisory` | Wants answers/snippets without letting the agent act |
 
-## 策选 seed（按极点）
+## Curated seeds (by extreme)
 
-作起始目标；每个都有丰富可验证的第一人称长篇。（名字仅供 *招募*；产出卡 hash id、存派生画像 +
-公开原话——见 SKILL.md 原则 #6。）
+Use these as starting targets; each has extensive, verifiable first-person long-form
+material. Names are for *recruitment* only: emitted cards use hashed IDs and retain derived
+personas plus public quotations; see principle #6 in SKILL.md.
 
-- **over-trust / ship-fast / non-technical** → 爆款"vibe 编码翻车被黑"复盘（如 EnrichLead "我被攻击了 /
-  我不懂技术"长推）。认错即 grounding，由公开结局佐证。
-- **expert × over-trust** → Karpathy 的出处定义 + 任何"我周末项目放手让它跑"自述。能力有佐证；立场 stated。
-- **务实中间** → indie-hacker / build-in-public 访谈（如 Lex #440 与 levelsio）："ship 丑、ship 快"，单人跑生产、随手修。
-- **skeptical / rigorous** → Simon Willison 博客语料 + 大会炉边；TDD / "证明过能跑的代码" / "不提交我解释不了的"。
-- **type-safety-purist** → TS/Rust 正确性博主描述如何约束 agent（严类型、"无 `any`"、穷尽匹配）——用搜索配方找。
-- **advisory-only** → 资深开发博"我把它当更聪明的自动补全 / 我问选项但自己写代码"——用搜索配方找。
+- **over-trust / ship-fast / non-technical** → Viral retrospectives on "vibe coding went
+  wrong and got hacked," such as EnrichLead's long thread saying "I was attacked / I am
+  not technical." Acknowledging the mistake provides grounding, corroborated by the public outcome.
+- **expert × over-trust** → Karpathy's original definition plus any first-person account
+  of "letting it run on my weekend project." Capability is corroborated; stance is stated.
+- **Pragmatic middle** → indie-hacker / build-in-public interviews, such as Lex #440 with
+  levelsio: "ship rough, ship fast," running production solo and fixing things as needed.
+- **skeptical / rigorous** → Simon Willison's blog corpus and conference fireside talks;
+  TDD / "code proven to run" / "I do not commit what I cannot explain."
+- **type-safety-purist** → TS/Rust correctness bloggers describing how they constrain
+  agents: strict types, "no `any`," exhaustive matching. Find them with the search recipe.
+- **advisory-only** → Senior developers blogging "I treat it as smarter autocomplete / I
+  ask for options but write the code myself." Find them with the search recipe.
 
-## 搜索配方（找新鲜第一人称材料）
+## Search recipe (fresh first-person material)
 
-某极点无 seed 或想要更多时，搜——然后**读本人长篇**，别从搜索命中本身抽：
+When an extreme has no seed, or you want more, search and then **read the person's own
+long-form material**. Do not extract from search hits alone:
 
-- **dev.to**（Forem API，免 key）：`GET https://dev.to/api/articles?tag=vibecoding&top=30`
-  （也用 tag `ai`, `cursor`, `aiagents`）；再 `GET /api/articles/{id}` 取全文 `body_markdown`。
-  留第一人称"我怎么用 / 我学到了什么"帖；丢工具广告。
-- **Hacker News**（Algolia，免 key）：`GET https://hn.algolia.com/api/v1/search?query=<workflow phrase>&tags=comment`
-  （如 "I never read the diffs"、"I always review"、"claude code workflow"）。高量低信噪——狠筛；顺作者找到其博客读长篇。
-- **直接**：作者博客索引 / "uses" 页 / newsletter 存档常有最丰富、最具体的工作流帖。
+- **dev.to** (Forem API, no key required):
+  `GET https://dev.to/api/articles?tag=vibecoding&top=30`
+  (also use tags `ai`, `cursor`, `aiagents`); then use `GET /api/articles/{id}` to retrieve
+  the full `body_markdown`. Keep first-person "how I use it / what I learned" posts;
+  discard tool advertisements.
+- **Hacker News** (Algolia, no key required):
+  `GET https://hn.algolia.com/api/v1/search?query=<workflow phrase>&tags=comment`
+  (for example, "I never read the diffs," "I always review," "claude code workflow").
+  High volume, low signal-to-noise: filter aggressively, then follow the author to their
+  blog and read long-form material.
+- **Direct**: Authors' blog indexes, "uses" pages, and newsletter archives often contain
+  the richest and most specific workflow posts.
 
-一律过 SKILL.md / reference.md §3 门：拒 `promotional`（课程漏斗）、`second_hand`（关于某人的写作）、
-`contaminated`（AI SEO 流水文）、`insufficient_evidence`（无具体怎么做细节的观点）。
+Apply the gate in SKILL.md / reference.md §3 to every source. Reject `promotional`
+(course funnels), `second_hand` (writing about someone else), `contaminated` (AI SEO
+content mills), and `insufficient_evidence` (opinions without concrete workflow details).
 
-## 覆盖纪律
+## Coverage discipline
 
-- over-trust/blind 还没卡时，别再堆第三张 skeptical-expert——先填**薄极点**。
-- 每张锚卡必须**完全 grounded**（这是 anchor-B；注入重的卡违背初衷——那种需求路由到 dev.to/HN 采样）。
-- 记录每张卡锚定了哪个极点，让库与（未来观测型 spoke 的）格覆盖一起追踪校准覆盖度。
+- If over-trust/blind still has no card, do not add a third skeptical-expert card. Fill
+  the **thinly covered extremes** first.
+- Every anchor card must be **fully grounded**. This is anchor-B; heavily injected cards
+  defeat its purpose. Route those volume needs to dev.to/HN sampling instead.
+- Record which extreme each card anchors so the library can track calibration coverage
+  alongside grid coverage in future observational spokes.

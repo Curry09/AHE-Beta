@@ -1,4 +1,4 @@
-"""spec-0002/T2：GiteaTracker 单测，全程 mock HTTP，不依赖运行中的 Gitea。"""
+"""spec-0002/T2: GiteaTracker unit test with full HTTP mocking, no dependency on running Gitea."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ class _Resp:
 
 
 class _FakeSession:
-    """以 handler(method, url, json)->_Resp 驱动；记录所有调用供断言。"""
+    """Driven by handler(method, url, json)->_Resp; record all calls for assertions."""
 
     def __init__(self, handler) -> None:
         self.headers: dict[str, str] = {}
@@ -39,7 +39,9 @@ class _FakeSession:
         timeout: float | None = None,
         allow_redirects: bool = False,
     ) -> _Resp:
-        assert timeout is not None, "GiteaTracker 的请求必须带超时（防挂死闭环）"
+        assert timeout is not None, (
+            "GiteaTracker requests must include a timeout（Closed loop hang prevention）"
+        )
         assert allow_redirects is False
         self.calls.append((method, url, json))
         return self._handler(method, url, json)
@@ -55,7 +57,7 @@ class _FakeSession:
 
 
 class FakeGitea:
-    """有状态的 mock Gitea 后端：维护 labels / issues，可作为 handler。"""
+    """Stateful mock Gitea backend: maintain labels / issues, usable as handler."""
 
     def __init__(self, race_on_label: bool = False) -> None:
         self.labels: dict[str, int] = {}
@@ -79,7 +81,7 @@ class FakeGitea:
         if method == "POST" and path.endswith("/labels"):
             name = json["name"]
             if self._race or name in self.labels:
-                if name not in self.labels:  # 模拟他处已建
+                if name not in self.labels:  # Simulate already created elsewhere
                     self.labels[name] = self._next_label
                     self._next_label += 1
                 return _Resp(409, text="label exists")
@@ -136,13 +138,13 @@ class FakeGitea:
             return _Resp(200, issue)
         if method == "PATCH" and "/issues/" in path:
             n = int(path.rsplit("/", 1)[1])
-            # Gitea 1.22 EditIssueOption 不含 labels；未知字段被忽略。
+            # Gitea 1.22 EditIssueOption does not contain labels; unknown fields are ignored.
             accepted = {
                 key: value for key, value in json.items() if key in {"title", "body", "state"}
             }
             self.issues[n].update(accepted)
             return _Resp(200, {"number": n, **accepted})
-        if method == "PUT" and path.endswith("/labels"):  # Spec-0025/T3a：整组替换
+        if method == "PUT" and path.endswith("/labels"):  # Spec-0025/T3a: Replace labels in bulk
             n = int(path.rsplit("/", 2)[1])
             self.issues[n]["labels"] = json["labels"]
             return _Resp(200, {"number": n})
@@ -195,14 +197,14 @@ def test_open_issue_queue_does_not_return_partial_data_on_later_page_error() -> 
 def test_authorization_header_set() -> None:
     t = GiteaTracker(base_url="http://gitea", owner="o", repo="r", token="SECRET")
     assert t._session.headers["Authorization"] == "token SECRET"
-    assert t._api == "http://gitea/api/v1"  # base_url 去尾斜杠 + /api/v1
+    assert t._api == "http://gitea/api/v1"  # Strip trailing slash from base_url + /api/v1
 
 
 def test_session_is_thread_local_with_injectable_override() -> None:
-    """Spec-0017/T6：requests.Session 非线程安全 → 每线程独立会话；注入 override 全线程共用。
+    """Spec-0017/T6: requests.Session is not thread-safe → independent session per thread; inject override for shared use across all threads.
 
-    并行 a 段各会话线程收尾并发 create_issue：每线程必须拿到自己的 Session（各带全 header、
-    同线程复用同一实例）；测试的 `t._session = fake` 注入语义保持不变（setter 存 override）。
+    Parallel segment a: each session thread concludes and concurrently creates issues; each thread must obtain its own Session (each with full headers,
+    reuse same instance within thread); test `t._session = fake` injection semantics remain unchanged (setter stores override).
     """
     import threading
 
@@ -212,20 +214,20 @@ def test_session_is_thread_local_with_injectable_override() -> None:
     def grab(key: str) -> None:
         first = t._session
         grabbed[key] = first
-        assert t._session is first  # 同线程复用同一实例
+        assert t._session is first  # Reuse same instance within thread
 
     for key in ("a", "b"):
         th = threading.Thread(target=grab, args=(key,))
         th.start()
         th.join()
     main = t._session
-    assert grabbed["a"] is not grabbed["b"]  # 各线程独立
+    assert grabbed["a"] is not grabbed["b"]  # Independent per thread
     assert grabbed["a"] is not main and grabbed["b"] is not main
     for s in (grabbed["a"], grabbed["b"], main):
-        assert s.headers["Authorization"] == "token SECRET"  # 每线程都带全 header
+        assert s.headers["Authorization"] == "token SECRET"  # Each thread carries full headers
 
     fake = _FakeSession(FakeGitea())
-    t._session = fake  # 测试注入：override 覆盖所有线程
+    t._session = fake  # Test injection: override covers all threads
     assert t._session is fake
     result: list[object] = []
     th = threading.Thread(target=lambda: result.append(t._session))
@@ -245,7 +247,7 @@ def test_create_issue_posts_and_parses_ref() -> None:
 
 
 def test_create_issue_auto_ensures_missing_label() -> None:
-    backend = FakeGitea()  # 无任何预置 label
+    backend = FakeGitea()  # No preset labels
     t = _tracker(backend)
     ref = t.create_issue(IssueDraft(title="t", body="b", labels=["bug"]))
     assert "bug" in backend.labels
@@ -287,7 +289,8 @@ def test_ensure_labels_idempotent() -> None:
     t.ensure_labels(["bug", "feature"])
     t.ensure_labels(["bug", "feature"])
     label_posts = [c for c in t._session.calls if c[0] == "POST" and c[1].endswith("/labels")]
-    assert len(label_posts) == 2  # 仅首轮各建一次，第二轮命中缓存/已存在不重复
+    # Only created once in first round; second round hits cache / already exists, no duplicate
+    assert len(label_posts) == 2
     assert set(backend.labels) == {"bug", "feature"}
 
 
@@ -335,13 +338,13 @@ def test_add_comment_and_set_state() -> None:
     backend = FakeGitea()
     t = _tracker(backend)
     ref = t.create_issue(IssueDraft(title="t", body="b"))
-    t.add_comment(ref.number, "一条评论")
-    t.set_state(ref.number, "closed", "已修复")
+    t.add_comment(ref.number, "A comment")
+    t.set_state(ref.number, "closed", "Fixed")
     methods = [(c[0], c[1].split("/api/v1")[1]) for c in t._session.calls]
     assert ("POST", f"/repos/o/r/issues/{ref.number}/comments") in methods
     assert ("PATCH", f"/repos/o/r/issues/{ref.number}") in methods
     assert backend.issues[ref.number]["state"] == "closed"
-    # set_state 带 reason 额外发一条 comment
+    # set_state with reason sends one additional comment
     comment_calls = [c for c in t._session.calls if c[1].endswith("/comments")]
     assert len(comment_calls) == 2
 
@@ -462,12 +465,12 @@ def test_set_state_illegal_value() -> None:
 
 
 def test_set_labels_replaces_via_put() -> None:
-    """Spec-0025/T3a：整组替换——ensure 缺失标签拿 id → PUT labels（替换语义）。"""
+    """Spec-0025/T3a: Replace labels in bulk—ensure missing labels, get id → PUT labels (replacement semantics)."""
     backend = FakeGitea()
     backend.labels = {"bug": 5, "needs-triage": 6}
     t = _tracker(backend)
     ref = t.create_issue(IssueDraft(title="t", body="b", labels=["bug", "needs-triage"]))
-    # triage 完成：去 needs-triage、加 triaged（triaged 是新标签 → 先 ensure）
+    # Triage complete: remove needs-triage, add triaged (triaged is new label → ensure first)
     t.set_labels(ref.number, ["bug", "triaged"])
     put = [c for c in t._session.calls if c[0] == "PUT" and c[1].endswith("/labels")]
     assert len(put) == 1
@@ -476,13 +479,13 @@ def test_set_labels_replaces_via_put() -> None:
         backend.labels["bug"],
         backend.labels["triaged"],
     ]
-    assert "triaged" in backend.labels  # 新标签被 ensure 建出
+    assert "triaged" in backend.labels  # New label created by ensure
 
 
 def test_label_race_falls_back_to_get() -> None:
-    t = _tracker(FakeGitea(race_on_label=True))  # POST label 恒 409
+    t = _tracker(FakeGitea(race_on_label=True))  # POST label always returns 409
     t.ensure_labels(["bug"])
-    assert t._label_ids.get("bug") is not None  # 回退 GET 取到 id，ensure 仍成功
+    assert t._label_ids.get("bug") is not None  # Fallback: GET to obtain id, ensure still succeeds
 
 
 def test_non_2xx_raises_with_status() -> None:

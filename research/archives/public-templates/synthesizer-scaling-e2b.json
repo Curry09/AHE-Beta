@@ -93,7 +93,7 @@
     "pm_env": "N_DIVERGENTS",
     "owner_mode": "mechanical",
     "basis": "historical_r3_anchor_N16_and_grouped_synthesizer_policy",
-    "note": "每个 N 独立进程读取自己的 roster；不存在跨实验共享角色池。"
+    "note": "Each N independent process reads its own roster; there is no role pool shared across experiments."
   },
   "profiles": {
     "1": {

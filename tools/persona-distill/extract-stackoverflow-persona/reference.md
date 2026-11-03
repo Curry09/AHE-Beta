@@ -1,111 +1,133 @@
 # Reference: Stack Overflow Persona Extraction
 
-<!-- Spec-0037/T5: D7 默认 inject；禁从「发完消失」锁死 impatient；枚举只引用 hub -->
+<!-- Spec-0037/T5: D7 defaults to injected; disappearing after posting does not imply impatient; enums come only from the hub. -->
 
-Stack Exchange API 事实、targeting 配方、反转真实性门、态度轴注入、两个范例。实际抽取时读本文件。
+Stack Exchange API facts, targeting recipes, the reversed authenticity gate, attitude-axis injection,
+and two examples. Read this file when extracting.
 
-维度**枚举、`D5.area` 受控词表、注入分布、卡形状、真实性裁决词表**一律在唯一公共契约
-[`../card-schema.md`](../card-schema.md)。本文件只写 SO 这类**观测型**来源**不同**的部分。
+All dimension **enums, the controlled `D5.area` vocabulary, injection distributions, card shape,
+and authenticity verdicts** are defined in the sole shared contract,
+[`../card-schema.md`](../card-schema.md). This file covers only what differs for SO as an **observational** source.
 
-## 1. Stack Exchange API (v2.3) 事实
+## 1. Stack Exchange API (v2.3) facts
 
-- Base `https://api.stackexchange.com/2.3/`；**必带 `site=stackoverflow`**。
-- **Auth（2026-06 变更）：** key/token 不再走 query params，走 header `Authorization: Bearer {KEY_OR_TOKEN}`。
-  匿名低量可用；app key 提配额到 10k/day（stackapps.com 注册）。
-- **Bodies：** 加 `filter=withbody`（默认省略 `*.body`）。
-- **限流：** ≤30 req/s/IP；遵守 `backoff` 字段；`pagesize≤100`；匿名只能翻到 ~25 页；勿 <1min 重复语义相同请求。
-- **Wrapper 字段：** 查 `has_more`、`quota_remaining`、`backoff`、`error_*`。
+- Base: `https://api.stackexchange.com/2.3/`; **always include `site=stackoverflow`**.
+- **Auth (2026-06 change):** key/token authentication uses the `Authorization: Bearer {KEY_OR_TOKEN}`
+  header, no longer query parameters. Anonymous low-volume use is supported; an app key raises the
+  quota to 10k/day (register at stackapps.com).
+- **Bodies:** include `filter=withbody`; the default omits `*.body`.
+- **Rate limits:** ≤30 req/s/IP; obey `backoff`; `pagesize≤100`; anonymous pagination is limited to ~25 pages.
+  Do not repeat semantically identical requests within <1min.
+- **Wrapper fields:** inspect `has_more`, `quota_remaining`, `backoff`, and `error_*`.
 
-### Endpoint 速查
+### Endpoint reference
+
 ```
 GET /questions?site=stackoverflow&tagged={tag}&sort=creation&filter=withbody&pagesize=50  # askers + bodies + tags + owner.reputation
-GET /search/advanced?site=stackoverflow&q={phrase}&filter=withbody                        # blind-phrase 搜索
+GET /search/advanced?site=stackoverflow&q={phrase}&filter=withbody                        # Blind-phrase search
 GET /users/{ids}?site=stackoverflow                                                       # reputation, creation_date, badge_counts
-GET /users/{id}/questions?site=stackoverflow&filter=withbody                              # 问题历史
-GET /users/{id}/answers?site=stackoverflow                                               # 0 answers + 低 rep = 纯消费者/新手
-GET /users/{id}/tags?site=stackoverflow                                                  # 领域足迹
+GET /users/{id}/questions?site=stackoverflow&filter=withbody                              # Question history
+GET /users/{id}/answers?site=stackoverflow                                               # 0 answers + low rep = consumer-only/newcomer
+GET /users/{id}/tags?site=stackoverflow                                                  # Domain activity
 ```
-问题上的关键 per-item 信号：`owner.reputation`、`owner.user_id`、`owner.creation_date`、`tags`、`score`、
-`answer_count`、`is_answered`、`view_count`、`body`。**`owner.reputation` 是最便宜的文化度探针。**
 
-## 2. targeting blind / newcomer 提问者
+Important per-question signals: `owner.reputation`, `owner.user_id`, `owner.creation_date`, `tags`,
+`score`, `answer_count`, `is_answered`, `view_count`, `body`.
+**`owner.reputation` is the cheapest proxy for technical sophistication.**
 
-- 按 **`owner.reputation` 低（≤ ~50）** + 近期 `creation_date` 过滤。
-- 瞄 **GitHub 薄的域**（`tagged`）：`reactjs`/`next.js`/`html`/`css`（web）、`pandas`/`numpy`/`dataframe`
-  （data-analysis）、`python`+beginner、`excel`/`vba`。
-- Blind-phrase `search/advanced?q=`："why doesn't it work"、"how do i"、"not working"，及贴生 traceback 无诊断的。
-- 交叉核验：`users/{id}/answers` 返回 ~0 + 低 rep = 纯求助者。
-- 关闭/被踩问题是新手信号——但筛掉 spam/作业农场。
+## 2. Target blind / newcomer askers
 
-## 3. D1 从 reputation + 问题质量（**封顶 medium**）
+- Filter for **low `owner.reputation` (≤ ~50)** and recent `creation_date`.
+- Target **domains underrepresented on GitHub** through `tagged`: `reactjs`/`next.js`/`html`/`css` (web),
+  `pandas`/`numpy`/`dataframe` (data-analysis), `python`+beginner, `excel`/`vba`.
+- Blind-phrase `search/advanced?q=`: "why doesn't it work", "how do i", "not working", and raw tracebacks without diagnosis.
+- Cross-check: ~0 entries in `users/{id}/answers` plus low reputation suggests a help-seeker only.
+- Closed/downvoted questions can indicate newcomers, but exclude spam and homework farms.
 
-- **blind**：rep ≈ 1–20；贴 error / "不行"；无 MRE；无诊断。
-- **surface**：中等 rep；能*描述*问题但浅；复制粘贴导向；**无根因推理**。
-- **competent / expert**：任一 **competent tell** 成立 → **出范围，隔离**
-  （`action: out-of-scope, route to GitHub skill`）；绝不为收编而重标 `surface`。
-  competent tells：精确 expected/actual；干净 MRE；对已知良基复现；已自建 workaround；隔离多个失败案例；
-  精确机制/边界问题。*卡住 ≠ 低文化度*。
+## 3. D1 from reputation and question quality: **cap at medium**
 
-**每卡在 `provenance` 记 `owner.reputation`**——最便宜的文化度探针、D1 主要 ground（连同问题质量）。
-`D1` 标 `grounded` 却无记录的 reputation 即不符合。**且 D1 grounded 封顶 `confidence: medium`**：单帖 +
-rep 是弱信号，不足以 high；basis `observed`。
+- **blind:** rep ≈ 1–20; pasted error / "doesn't work"; no MRE; no diagnosis.
+- **surface:** moderate reputation; can *describe* a problem superficially; copy/paste-oriented; **no root-cause reasoning**.
+- **competent / expert:** any **competent tell** places the candidate **out of scope: isolate**
+  (`action: out-of-scope, route to GitHub skill`). Never relabel someone `surface` to admit them here.
+  Tells include precise expected/actual behavior, a clean MRE, reproduction against a known-good baseline,
+  an existing self-built workaround, multiple isolated failure cases, or precise mechanism/boundary questions.
+  *Being stuck does not imply low technical sophistication.*
 
-## 4. D3 从问题风格
+**Record `owner.reputation` in every card's `provenance`**: it is the cheapest sophistication proxy
+and a primary basis for D1 alongside question quality. Marking D1 `grounded` without recording reputation
+is noncompliant. **Grounded D1 is capped at `confidence: medium`**, with basis `observed`:
+a single post plus reputation is weak evidence and cannot support high.
 
-- **delegation**：生代码+error dump、"就让它能跑" → `vibe-dump`；部分上下文 → `loose`；带 expected/actual 的
-  干净 MRE → `spec-driven`（此处罕见，真的话可以）。delegation 从**实际问题文本**观测 → `grounded` /
-  `basis: "observed"`（confidence 保守，单帖），不由档决定。
-- **supervision（过程卷入） / on_offtrack（质量失败策略）**：回应澄清评论/迭代 → `reviews` / `retry`；
-  发完就消失 → `hands-off` / `abandon`。**无评论线程 → `injected`。** `file-issue` 在 blind/surface 端**罕见**——
-  只在问题本身读起来像刻意 bug 报告时才给。
-- **on_offtrack ≠ 等待耐心。** 「发完消失」是质量失败/放弃路径的弱信号，**不是** D7=`impatient` 的证据。
+## 4. D3 from question style
 
-## 4b. D7 time_temperament — *无 → 默认 injected*
+- **delegation:** raw code+error dumps / "just make it work" → `vibe-dump`; partial context → `loose`;
+  a clean MRE with expected/actual behavior → `spec-driven` (rare here, but allowed when genuine).
+  Observe delegation from the **actual question text**, mark `grounded` / `basis: "observed"`, and use
+  conservative confidence for a single post. Do not derive it from the tier.
+- **supervision (process involvement) / on_offtrack (quality-failure response):** responding to clarification
+  comments and iterating suggests `reviews` / `retry`; disappearing after posting suggests `hands-off` / `abandon`.
+  **No comment thread → `injected`.** `file-issue` is **rare** at blind/surface tiers; assign it only
+  when the question itself reads like a deliberate bug report.
+- **on_offtrack ≠ waiting patience.** Disappearing after posting is weak evidence of a quality-failure/
+  abandonment path, **not** evidence for D7=`impatient`.
 
-`patient | steady | impatient`。求助帖几乎从不陈述「干等多久受得了」。**默认 inject**（契约分布），
-与 on_offtrack **独立采样**——禁止「abandon 必配 impatient」。等待气质真人锚交给 selfreport。
+## 4b. D7 time_temperament — *unobservable; default to injected*
 
-## 5. 态度轴注入（本源默认——D2/D4/D6/D7）
+`patient | steady | impatient`. Help-seeking posts almost never state tolerance for waiting without activity.
+**Default to injection** from the contract distribution, **independently of on_offtrack**.
+Never require abandon to pair with impatient. Use self-report for real-person waiting-temperament anchors.
 
-求助者极少暴露验收线、信任模型或等待气质。从 **card-schema.md「受控注入分布」逐卡采样**，置
-`source: "injected"` / `confidence: "low"`（注入维**不带 basis**）：
+## 5. Inject attitude axes: default for D2/D4/D6/D7
 
-- 具体比例见 card-schema.md（不在此重列——轮辐式：契约是唯一真源），含 **time_temperament**。
-- **正交强制**：`on_offtrack` ⊥ `time_temperament`。
-- **SO 弱先验（blind-leaning）**：低端可偏置 over-trust / advisory 等——但**仍标 injected / low**；
-  **弱先验不得用于 D7**。
-- **D5.stack** 从 `tags` grounded；**D5.weak** 低端多 `[]`。
-- **采样，不按档锁死（强制）**：逐卡独立抽；批后查 spread（含 D7）。SO 自选择偏差使刻板卡风险**最高**。
+Help-seekers rarely reveal acceptance criteria, trust, or waiting temperament.
+**Sample per card from card-schema.md's controlled injection distributions**, setting
+`source: "injected"` / `confidence: "low"`; injected dimensions **have no basis**.
 
-## 6. 反转真实性门（SO 特异）
+- The exact proportions, including **time_temperament**, are in card-schema.md. Do not duplicate them:
+  the shared contract is the hub-and-spoke design's single source of truth.
+- **Mandatory orthogonality:** `on_offtrack` ⊥ `time_temperament`.
+- **SO weak priors, leaning toward blind:** lower tiers may bias sampling toward over-trust / advisory,
+  but **still mark injected / low**. **Do not use weak priors for D7.**
+- Ground **D5.stack** from `tags`; **D5.weak** is often `[]` at lower tiers.
+- **Sample; never lock combinations by tier (mandatory).** Draw independently per card and inspect batch
+  spread, including D7. SO's self-selection bias gives it the **highest** risk of stereotyped cards.
 
-**无 trace floor。** 单条连贯问题 + 低 rep 即可入库一张 `blind` 卡——低 trace 是目标，不是缺陷。
+## 6. Reversed authenticity gate: SO-specific
 
-| 裁决 | 触发 | 动作 |
-|------|------|------|
-| `authentic` | 真诚、*凌乱的*卡住-人类问题；rep ⇄ 主题深度一致（低 rep ⇄ 新手主题） | 入库 |
-| `contaminated` | rep≈1/新账号发过度光洁 AI 格式问题（模板分节、`id=` 围栏）；rep≈1 ⊥ 深专家主题 | 隔离，不入 |
-| `suspect` | 作业农场 / spam / 含糊 | 隔离 |
+**No trace floor.** A single coherent question plus low reputation can admit a `blind` card.
+A sparse trace is the target, not a defect.
 
-凌乱是好的。这里的危险与 GitHub 相反：不是假专家 PR，而是**AI 生成/复制粘贴的问题**——对其背后账号显得太干净。
+| Verdict | Trigger | Action |
+|---------|---------|--------|
+| `authentic` | Sincere, *messy* human question from someone stuck; reputation agrees with topic depth (low rep ⇄ beginner topic) | Admit. |
+| `contaminated` | rep≈1/new account with polished AI-formatted questions (template sections, `id=` fences); rep≈1 contradicts expert-level subject matter | Isolate; do not admit. |
+| `suspect` | Homework farm / spam / ambiguity | Isolate. |
 
-## 7. 卡 schema（同公共契约）
+Messiness is useful. The risk is the opposite of GitHub's: not fake expert PRs, but
+**AI-generated/copied questions** that are implausibly polished for the account behind them.
 
-产出 card-schema.md 定义的**同一卡形状**，以便三个 spoke 并入一库：嵌套维带 inline `source`+`basis`+`confidence`，
-单值维用键 `value`，`era` 为 `{value, basis}`，`provenance.evidence_quotes` 为 `{quote, source}`。完整符合性规则
-（含 **`D5.area` = 单一受控词表 token**、grounded 维须有 evidence_quote、injected 维 confidence=low）见 card-schema.md。
+## 7. Card schema: the shared contract
 
-SO 特异：`era.basis` = `owner.creation_date`；`evidence_quotes` = 问题 body 片段 + 问题 URL；
-`provenance.layers` 用 SO 层，如 `["SO-profile","SO-questions"]`；**`provenance` 须含提问者 `reputation`**
-（如 `"reputation": 1`）。卡也带 `D6_autonomy_expectation`（默认 `injected`，从措辞弱推）。
+Produce the **same card shape** from card-schema.md so all three spokes feed one library.
+Nested dimensions carry inline `source`+`basis`+`confidence`; single-valued dimensions use `value`;
+`era` is `{value, basis}`; `provenance.evidence_quotes` entries are `{quote, source}`.
+See card-schema.md for full compliance rules, including **a single controlled token for `D5.area`**,
+evidence_quote for grounded dimensions, and confidence=low for injected dimensions.
 
-## 8. 范例 A — authentic blind newcomer（入库）
+SO-specific rules: `era.basis` comes from `owner.creation_date`; `evidence_quotes` contain question-body
+excerpts and question URLs; use SO layers such as `["SO-profile","SO-questions"]` in `provenance.layers`.
+**`provenance` must include the asker's `reputation`**, for example `"reputation": 1`.
+Include `D6_autonomy_expectation`, defaulting to `injected` with weak wording-based priors.
 
-rep 1、账号 2025-12、tags `[python, pandas]`，问题贴 `KeyError` traceback 问"为啥不行"无隔离。
-一张卡填 **blind + post_vibe + data-analysis** 缺口。D1 blind grounded(`observed`) 但**封顶 medium**
-（单帖 + rep=1 是弱信号）；D5 grounded(`observed`)；delegation grounded(`observed`) 从问题文本；
-**D2/D4/D6/D7/supervision/on_offtrack 注入(`low`)**（无 basis）。范例故意用 `on_offtrack=abandon` ×
-`D7=patient`（注入），示范二者正交——勿焊成 abandon+impatient。
+## 8. Example A — authentic blind newcomer: admit
+
+rep 1, account created 2025-12, tags `[python, pandas]`; the question pastes a `KeyError` traceback,
+asks "why doesn't it work", and does not isolate the failure. This card fills a
+**blind + post_vibe + data-analysis** gap. D1 blind is grounded (`observed`) but **capped at medium**:
+one post and rep=1 are weak evidence. D5 is grounded (`observed`); question text grounds delegation (`observed`).
+**D2/D4/D6/D7/supervision/on_offtrack are injected (`low`) without basis.** The example deliberately combines
+`on_offtrack=abandon` × injected `D7=patient` to demonstrate orthogonality: do not couple abandon with impatient.
 
 ```json
 {
@@ -132,14 +154,15 @@ rep 1、账号 2025-12、tags `[python, pandas]`，问题贴 `KeyError` tracebac
       {"quote": "i get KeyError and i dont know why it doesnt work, here is my code", "source": "stackoverflow.com/q/NNNNNN"}
     ]
   },
-  "behavioral_prediction": "Pastes the error and asks 'why doesn't it work'; can't judge a fix, runs whatever the agent gives and accepts it if it stops erroring. 其信任/验收/自主/等待气质为注入先验；abandon ⟂ patient 示范正交。"
+  "behavioral_prediction": "Pastes the error and asks 'why doesn't it work'; can't judge a fix, runs whatever the agent gives and accepts it if it stops erroring. Trust/acceptance/autonomy/waiting temperament are injected priors; abandon ⟂ patient demonstrates orthogonality."
 }
 ```
 
-## 9. 范例 B — AI 光洁、可疑（拒）
+## 9. Example B — suspicious AI polish: reject
 
-rep 1、账号 2026-01，但问题完美模板化（Description / Repro / Expected / Actual 分节、`id=` 围栏）且问
-深 Rolldown-RSC 构建内幕。**rep≈1 ⊥ 专家主题 + AI 格式 → contaminated。**
+rep 1, account created 2026-01, yet the question is perfectly templated (Description / Repro / Expected /
+Actual sections, `id=` fences) and asks about deep Rolldown-RSC build internals.
+**rep≈1 ⊥ expert subject matter + AI formatting → contaminated.**
 
 ```json
 {
@@ -150,20 +173,23 @@ rep 1、账号 2026-01，但问题完美模板化（Description / Repro / Expect
 }
 ```
 
-## 10. 库中的角色 + 招募
+## 10. Library role and recruitment
 
-本 skill 存在是为**填低端**：`blind`/`surface` 档 + GitHub 薄的域（web/frontend、data-analysis、初学脚本）+
-`post_vibe` newcomer。别在此收专家。对着库配额表用——精确拉 GitHub 产不出的 tier×domain 格。
+This skill fills the **lower tiers**: `blind`/`surface`, domains sparse on GitHub (web/frontend,
+data-analysis, beginner scripting), and `post_vibe` newcomers. Do not recruit experts here.
+Use library quotas to target the tier×domain cells GitHub cannot supply.
 
-**可插拔招募（解耦、可选）。** 要填*某 benchmark* 域的低端，消费 `extract-github-persona` 用的同一批
-recruitment profile——它们多源且带 `pools.stackoverflow` **tag** 列：
+**Pluggable recruitment, decoupled and optional.** To fill a benchmark domain's lower tiers, consume
+the same multi-source recruitment profiles as `extract-github-persona`, with their `pools.stackoverflow` **tag** lists:
 
 - `../extract-github-persona/recruitment/swe-bench.md`
 - `../extract-github-persona/recruitment/terminal-bench.md`
 
-读 profile 的 `pools.stackoverflow` 表，再瞄那些 tag 下的**低 rep 提问者**。一份 profile、D1 两端：
-GitHub 填 expert/competent，本 skill 填 blind/surface，同批 `priority_domains`。profile 只决定 *搜哪些 tag*；
-卡仍按 SO 真实性门（§6）评级。
+Read `pools.stackoverflow` and target **low-reputation askers** under those tags.
+One profile covers both D1 extremes: GitHub fills expert/competent, this skill fills blind/surface,
+for the same `priority_domains`. Profiles decide only *which tags to search*;
+rate cards with the SO authenticity gate (§6).
 
-**分布纪律**（与 GitHub spoke 共享，见 `../extract-github-persona/reference.md` §8）：SO 占
-`D1 tier × D5 domain` 覆盖网格的 `blind`/`surface` 行；判库看格覆盖 + 边际平衡 + 克隆检查，不看原始计数。
+**Distribution discipline**, shared with the GitHub spoke (see `../extract-github-persona/reference.md` §8):
+SO fills the `blind`/`surface` rows of the `D1 tier × D5 domain` grid. Evaluate cell coverage,
+marginal balance, and clone checks, rather than raw counts.

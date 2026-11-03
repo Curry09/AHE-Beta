@@ -1,7 +1,7 @@
 [project]
 name = "ahe-beta"
 version = "0.0.0"
-description = "自进化 harness：模拟用户→开发者闭环，体感驱动、benchmark held-out"
+description = "Self-evolving agent harnesses driven by simulated user feedback, with independent held-out evaluation"
 requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -15,14 +15,14 @@ dependencies = [
     "anthropic<1",
     # NexAU imports SQLAlchemy's asyncio engine even without an async DB driver.
     "greenlet>=3.0.0",
-    # spec CLI（vendored 在 tools/spec-driven-development/vendor）所需
+    # Dependencies of the spec CLI vendored in tools/spec-driven-development/vendor.
     "ruamel.yaml>=0.18",
     "jsonschema>=4",
-    # GiteaTracker（spec-0002）所需的薄 REST 客户端
+    # Thin REST client used by GiteaTracker (spec-0002).
     "requests>=2.31",
     # Signed external grading receipts (Spec-0084/T5).
     "cryptography>=44",
-    # 前端观测看板的只读 HTTP 层
+    # Read-only HTTP layer for the frontend observation dashboard.
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
 ]
@@ -48,31 +48,33 @@ dev = [
     "httpx2>=1.0",
     "ruff>=0.9.0",
     "pytest>=8.0.0",
-    # drift-guard 测试解析 agent_defs 的 *.tool.yaml（对照 agent_contract 生成的 input_schema）
+    # Drift guards parse agent_defs/*.tool.yaml against input_schema from agent_contract.
     "pyyaml>=6.0",
     "pytest-timeout==2.4.0",
 ]
 
-# 本仓暂不作为可安装包；uv 只装依赖。
+# This repository is not installed as a package; uv installs dependencies only.
 [tool.uv]
 package = false
 
 [tool.pytest.ini_options]
-# 后端在 backend/（前后端分目录）：暴露 backend 让测试 import ahe_beta，
-# backend/scripts 暴露以便测试 import bootstrap_harness 等脚本
+# Expose backend/ for ahe_beta imports and backend/scripts/ for script imports
+# such as bootstrap_harness during tests.
 pythonpath = [".", "backend", "backend/scripts"]
 testpaths = ["backend/tests", "evaluation/tests"]
 
-# Ruff lint/format（CLAUDE.md 代码检查：行宽 100）
+# Ruff lint/format settings (100-column convention in CLAUDE.md).
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-# 首方包根：后端在 backend/，使 import 排序把 ahe_beta / bootstrap_harness / 同目录测试模块识别为 first-party
+# Treat backend packages, scripts and sibling test modules as first-party imports.
 src = ["backend", "backend/scripts", "backend/tests", "evaluation"]
-# 外来代码、原始任务指令及 M04 固定配方保持发布字节，由材料哈希校验，不自动格式化。
+# Preserve published bytes of upstream code, task instructions and fixed M04 recipes;
+# material hashes verify them, so automatic formatting excludes these paths.
 extend-exclude = ["tools/spec-driven-development/vendor", "research/archives", "evaluation/harness/meta_artifact", "evaluation/harness/user_engine", "examples/tasks/evolution32/*/instruction.md", "examples/tasks/evolution32/M04/recipes"]
 
 [tool.ruff.lint]
-# E/F: pyflakes+pycodestyle，I: import 排序，UP: pyupgrade，B: bugbear，ASYNC: 异步阻塞防护
+# E/F: pyflakes/pycodestyle; I: import sorting; UP: pyupgrade; B: bugbear;
+# ASYNC: blocking-operation guards for asynchronous code.
 select = ["E", "F", "I", "UP", "B", "ASYNC"]
-ignore = ["E501"]  # 行宽由 formatter 负责
+ignore = ["E501"]  # The formatter handles line length.

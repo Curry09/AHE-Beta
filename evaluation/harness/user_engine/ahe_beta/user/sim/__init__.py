@@ -1,4 +1,4 @@
-"""ahe_beta.user.sim —— persona 驱动的 harness 用户模拟器(控制信封架构, 纯主观)。"""
+"""ahe_beta.user.sim — persona-driven harness user simulator (controls envelope architecture, purely subjective)."""
 
 from .dimensions import (
     D1Eval,

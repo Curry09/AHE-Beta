@@ -1,24 +1,24 @@
-"""spec JSON Schema —— 组 markdown frontmatter / Task 的结构校验单一真源。
+"""spec JSON Schema — single source of truth for group markdown frontmatter / Task structure validation.
 
-Spec-0014/T1（2026-06-24 spec-markdown-form 更新）：
-用 JSON Schema draft 2020-12 声明式描述源数据形状与枚举（决策 D8）：
-- TASK_SCHEMA：frontmatter `tasks` 列表里的单个 Task 对象
-- GROUP_FRONTMATTER_SCHEMA：组 markdown 文件的 frontmatter（number/title/issue/slug/summary/tasks）
+Spec-0014/T1 (2026-06-24 spec-markdown-form update):
+Use JSON Schema draft 2020-12 declaratively describe source data shape and enumerations (decision D8):
+- TASK_SCHEMA: single Task object in frontmatter `tasks` list
+- GROUP_FRONTMATTER_SCHEMA: group markdown file frontmatter (number/title/issue/slug/summary/tasks)
 
-校验逻辑在 validate.py 调用这两个 schema；这里只放声明，保持单一真源。
+Validation logic in validate.py calls these two schemas; only declarations stored here to maintain single source of truth.
 """
 
 from __future__ import annotations
 
 _DRAFT = "https://json-schema.org/draft/2020-12/schema"
 
-# Spec-0014/T1：枚举集中定义，schema 与（未来）文档共用。
+# Spec-0014/T1: enumerations centrally defined, schema and (future) documentation share source.
 STATUS_VALUES = ("pending", "in-progress", "done", "abandoned")
 PRIORITY_VALUES = ("P0", "P1", "P2", "P3")
 RELATES_TYPE_VALUES = ("extends", "supersedes", "note")
 
-# issue #69：Task 退化为工作分解行，只保留两个一行短 prose（进 frontmatter）。
-# 重设计叙述上移到组级 Overview 9 段（正文，不进 frontmatter，故不在此 schema）。
+# issue #69: Tasks are work-breakdown rows; scope and acceptance are their two short prose fields in frontmatter.
+# Narrative redesign moves up to group-level Overview 9 sections (body text, not in frontmatter, thus not in this schema).
 _PROSE_KEYS = (
     "scope",
     "acceptance",
@@ -34,7 +34,7 @@ _RELATES_TO_SCHEMA = {
     "additionalProperties": False,
 }
 
-# Spec-0014/T1：单个 Task 对象的 schema。id/title/status/priority 必填，其余可选。
+# Spec-0014/T1: schema for single Task object. id/title/status/priority required, rest optional.
 TASK_SCHEMA: dict = {
     "$schema": _DRAFT,
     "type": "object",
@@ -57,13 +57,13 @@ TASK_SCHEMA: dict = {
         "derived-from": {"type": "array", "items": {"type": "string"}},
         **{key: {"type": "string"} for key in _PROSE_KEYS},
     },
-    # issue #69：files（单一 writer 所有权）+ acceptance（可验证）每行必填。
+    # issue #69: files (single writer ownership) + acceptance (verifiable) each line required.
     "required": ["id", "title", "status", "priority", "files", "acceptance"],
     "additionalProperties": False,
 }
 
-# 2026-06-24 spec-markdown-form：组 markdown 文件的 frontmatter schema（取代 metadata + history）。
-# 组元数据 number/title/issue/slug + tasks 列表（每项复用 TASK_SCHEMA）。
+# 2026-06-24 spec-markdown-form: group markdown file frontmatter schema (replaces metadata + history).
+# Group metadata number/title/issue/slug + tasks list (each item reuses TASK_SCHEMA).
 GROUP_FRONTMATTER_SCHEMA: dict = {
     "$schema": _DRAFT,
     "type": "object",
@@ -72,7 +72,7 @@ GROUP_FRONTMATTER_SCHEMA: dict = {
         "title": {"type": "string"},
         "issue": {"type": "integer"},
         "slug": {"type": "string"},
-        # Spec-0015：组级人话 TL;DR。schema 只声明类型；非空由 validate 的 _summary_checks 强制。
+        # Spec-0015: group-level plain-English TL;DR. schema declares type only; non-empty enforced by validate's _summary_checks.
         "summary": {"type": "string"},
         "tasks": {"type": "array", "items": TASK_SCHEMA},
     },

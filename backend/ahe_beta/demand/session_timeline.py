@@ -1,31 +1,30 @@
-"""结构综合按需取用：从落盘 Session 投影「使用事件时间线」。
+"""Structured synthesis as-needed projection: extract 'usage event timeline' from persisted Session.
 
-Spec-0024/T4: 使用事件投影 + get_harness_beat / get_harness_step
-Spec-0024/T5: tool 接线见 agent_defs/architect/（本模块只实现投影函数）
+Spec-0024/T4: Usage event projection + get_harness_beat / get_harness_step
+Spec-0024/T5: Tool wiring see agent_defs/architect/ (this module implements projection functions only)
 
-设计取舍（为何不是原样 sim_trace）
+Design tradeoffs (why not raw sim_trace)
 --------------------------------
-落盘权威仍是 Session.sim_trace（含 LLM system/user 原片，供事后 KV/调试）。
-结构综合要的是**完整决策/使用时间线**，不是仿真引擎回放。
+Persisted authority remains Session.sim_trace (contains raw LLM system/user, for post-hoc KV/debugging).
+Structured synthesis needs complete decision/usage timeline, not simulation engine playback.
 
-真实产品日志里通常没有、但对找结构性根因极珍贵的信号（应保留并改写成事件）：
-- 收敛前的自由 intent（人不会先写一段再点按钮）
-- intent↔动作落差 capability_gap（真实点不到的能力缺口；勿与「用户反复无常」混淆）
-- 过程判断 on_track/off_track/unclear（显式标签现实中几乎没有）
-- 私有核实 private_check（本机自测/自读不进 chat）
-- 所见活动摘要 saw_activity（与当拍决策对齐）
-- 静默打断 silent_stop（Ctrl+C 类不进对话 transcript）
-- 局末 feeling / issue 正文
+Signals rarely present in real product logs but extremely valuable for finding structural root causes (should be retained and reformatted as events):
+- Free intent before convergence (users don't write text then click buttons)
+- intent↔action gap capability_gap (truly unreachable capabilities; do not confuse with 'user being indecisive')
+- Process judgment on_track/off_track/unclear (explicit labels almost never exist in reality)
+- Private verification private_check (local self-test/self-read not sent to chat)
+- Observed activity summary saw_activity (aligned with decision at that moment)
+- Silent interruption silent_stop (Ctrl+C style not entering transcript)
+- Session-end feeling / issue statement
 
-应去掉的仿真机制身份证（干扰归因、也不像真人日志）：
-- persona_id、action_space 常驻全表、executor/channel 原名、patience/trust 计数、
-  verdict 细枚举、waiting_judge 等 role 名、decisions.steps 半截 LLM raw、fake:// URL、
-  LLM system/user/raw。
+Should remove simulation machinery identity markers (confound attribution, unlike real user logs):
+- persona_id, action_space permanent table columns, executor/channel original names, patience/trust counters,
+  verdict fine enums, waiting_judge and other role names, decisions.steps half-raw LLM, fake:// URLs,
+  LLM system/user/raw.
 
-capability_gap 例外：仅当 intent 与最终动作对不上时，附带**当期** available 动作列表——
-否则结构综合会疑惑「为何不对」，却看不到「菜单里根本没有想要的动作」。不对齐时才给，
-避免每轮摊开菜单造成导流/过拟合。
-"""
+capability_gap exception: only when intent and final action mismatch, attach the current available action list—
+ otherwise structured synthesis will wonder 'why not do it', yet cannot see 'the menu doesn't have that action at all'. Include only on mismatch,
+ avoid unpacking the menu every round causing drift/overfitting."""
 
 from __future__ import annotations
 
@@ -41,23 +40,23 @@ from ahe_beta.models import PersonaCallTrace, Session, SimTrace, SimTurn
 from ahe_beta.user.session_store import SessionStore
 
 _STORE: ContextVar[SessionStore | None] = ContextVar("architect_session_store", default=None)
-# nexau 工具回调常在别的线程，ContextVar 不会自动拷贝；bind 时同步写这份兜底。
+# nexau tool callbacks often run on different threads; ContextVar is not auto-copied; sync-write this fallback during bind.
 _STORE_FALLBACK: SessionStore | None = None
 
-# 活动条、私有核实和 harness 回复均限长，避免具体命令输出进入默认提案上下文。
+# Activity bars, private verification, and harness replies are length-limited to prevent concrete command output entering default proposal context.
 _ACTIVITY_MAX = 8
 _ACTIVITY_TEXT = 160
 _HEARD_MAX = 1200
 _PRIVATE_STEP_MAX = 6
 _GOAL_TEXT_MAX = 500
 
-# perceive 被 loop 打上的机器头：[judgment|intent→action] …
+# perceive labeled by loop with machine header: [judgment|intent→action] …
 _PERCEIVE_HEAD = re.compile(r"^\[.*?\]\s*")
 
 
 @contextmanager
 def bind_session_store(store: SessionStore) -> Iterator[None]:
-    """在 Architect._run_agent 期间注入 SessionStore，供 tool 读取。"""
+    """Inject SessionStore during Architect._run_agent for tool access."""
     global _STORE_FALLBACK
     token = _STORE.set(store)
     _STORE_FALLBACK = store
@@ -76,12 +75,12 @@ def _require_store() -> SessionStore:
 
 
 def _clean_notes(perceive: str) -> str:
-    """去掉仿真拼装的 [judgment|intent→action] 头，只留人话观察。"""
+    """Remove simulation-assembled [judgment|intent→action] header, keep only human-readable observations."""
     return _PERCEIVE_HEAD.sub("", (perceive or "").strip()).strip()
 
 
 def _phase_when(phase: str) -> str:
-    """phase → 对人友好的时段标签（避免 opening/waiting/active 像状态机）。"""
+    """phase → human-friendly phase labels (avoid opening/waiting/active looking like state machine)."""
     p = (phase or "").strip().lower()
     if p == "waiting":
         return "during_wait"
@@ -105,9 +104,9 @@ def _first_str(parsed_list: list[dict[str, Any]], key: str) -> str:
 
 
 def _activity_summary(turn: SimTurn) -> list[str]:
-    """用户「看见的活动」摘要：真实产品少有与决策对齐的活动条，但对等待归因极珍贵。
+    """User 'observed activity' summary: real products rarely have activity aligned with decisions, but invaluable for debugging delays.
 
-    只留短标题；不搬全量 harness_steps / stdout。
+    Keep only short titles; do not include full harness_steps / stdout.
     """
     out: list[str] = []
     for step in list(turn.harness_steps or [])[-_ACTIVITY_MAX:]:
@@ -117,7 +116,7 @@ def _activity_summary(turn: SimTurn) -> list[str]:
         text = str(step.get("text") or "").strip().replace("\n", " ")
         if not text:
             continue
-        # tool_result 往往很长，活动条以 tool 调用标题为主
+        # tool_result is often lengthy, activity bar emphasizes tool call title
         if kind == "tool_result":
             continue
         line = text if not kind else f"{kind}: {text}"
@@ -126,10 +125,10 @@ def _activity_summary(turn: SimTurn) -> list[str]:
 
 
 def _private_checks(turn: SimTurn) -> list[dict[str, str]]:
-    """私有核实：用户自己跑/读、不发给 harness 的步骤。
+    """Private verification: steps the user ran/read locally, not sent to harness.
 
-    现实 chat 日志几乎看不到「用户本机 pytest」；仿真能采到，对验收门/过信根因很关键。
-    私有核实是 judge/intent/act 内层 agentic 行为，不再对应一个外层 verify_self 动作。
+    Real chat logs rarely show 'user ran pytest locally'; simulation can capture it, critical for acceptance gates and over-confidence root causes.
+    Private verification is inner agentic behavior within judge/intent/act, no longer maps to outer verify_self action.
     """
     out: list[dict[str, str]] = []
     for call in turn.persona_trace:
@@ -151,10 +150,12 @@ def _private_checks(turn: SimTurn) -> list[dict[str, str]]:
 def _capability_gap(
     turn: SimTurn, *, wanted: str, did: str, parsed_list: list[dict[str, Any]]
 ) -> dict[str, Any] | None:
-    """intent 与最终动作对不上时的能力缺口事件。
+    """Capability gap event when intent does not align with final action.
 
-    真实场景看不到「点了 A 其实想要菜单外的 B」。若不标注，结构综合会以为用户前后矛盾；
-    根因往往是 action_space 里没有对应项。故：不对齐才附带当期 available，不每轮摊开菜单。
+    Real scenarios never show "clicked A but actually wanted B outside the menu".
+    Without annotation, structural synthesis would assume user contradiction; the root cause
+    is typically missing items in action_space. Thus: only attach current available when misaligned,
+    not expand menu every turn.
     """
     gap = False
     for p in parsed_list:
@@ -164,7 +165,7 @@ def _capability_gap(
     if not gap:
         return None
     return {
-        # 仿真特供、但对「缺能力 vs 用户反复」分流极珍贵
+        # Simulation-specific, but extremely valuable for distinguishing "missing capability vs. user repetition"
         "wanted": wanted or "(unspecified intent)",
         "did": did,
         "available": [str(x) for x in (turn.action_space or [])],
@@ -260,7 +261,7 @@ def _goal_turn_view(turn: SimTurn) -> dict[str, Any] | None:
 
 
 def _project_turn(turn: SimTurn) -> dict[str, Any]:
-    """一轮 → 一条使用事件（去仿真外壳，留珍贵上帝视角标注）。"""
+    """One turn → one usage event (remove simulation wrapper, preserve valuable god's-eye annotations)."""
     parsed_list = _parsed_from(turn)
     wanted = _first_str(parsed_list, "intent")
     judgment = _first_str(parsed_list, "judgment")
@@ -272,7 +273,7 @@ def _project_turn(turn: SimTurn) -> dict[str, Any]:
         heard = heard[:_HEARD_MAX] + "…"
 
     event: dict[str, Any] = {
-        # SimTurn 暂无墙钟字段；用序号保序。有 elapsed 后再升级为 [+Ns]。
+        # SimTurn lacks wall-clock field; use sequence number for ordering. Upgrade to [+Ns] after elapsed time available.
         "t": turn.turn,
         "when": _phase_when(turn.phase),
     }
@@ -283,10 +284,10 @@ def _project_turn(turn: SimTurn) -> dict[str, Any]:
 
     if notes:
         event["thought"] = notes
-    # 过程判断：现实无此显式标签；对「还以为在轨道上 / 已跑偏」归因有用
+    # Process judgment: no explicit label in reality; useful for attributing "thought still on track / already diverged"
     if judgment:
         event["process_read"] = judgment
-    # 开放意愿：收敛前的自由文本，比最终按钮更接近真实诉求
+    # Open intent: free text before convergence, closer to actual needs than final button
     if wanted:
         event["wanted"] = wanted
 
@@ -294,7 +295,7 @@ def _project_turn(turn: SimTurn) -> dict[str, Any]:
         event["did"] = did
     if said:
         event["said"] = said
-    # Spec-0024/T6：外发指令句柄 + 排队态（一眼区分「插话尚未被当前 reply 消费」）
+    # Spec-0024/T6: outgoing directive handle + queued state (distinguish at a glance "interruption not yet consumed by current reply")
     utt = (turn.utterance_id or "").strip()
     if utt:
         event["utterance"] = utt
@@ -306,7 +307,7 @@ def _project_turn(turn: SimTurn) -> dict[str, Any]:
         event["queued_behind"] = behind
     if heard:
         event["heard"] = heard
-        # Spec-0024/T6：这条 harness 回复应答哪条用户指令
+        # Spec-0024/T6: which user directive should this harness reply respond to
         ans = (turn.answers_utterance_id or "").strip()
         if ans:
             event["answers"] = ans
@@ -314,7 +315,7 @@ def _project_turn(turn: SimTurn) -> dict[str, Any]:
             if preview:
                 event["answers_said"] = preview
 
-    # 静默打断：不进对话 transcript，只看 chat 会漏「用户按过停止」
+    # Silent interruption: not in conversation transcript; viewing only chat would miss "user pressed stop"
     if did == "interrupt":
         event["silent_stop"] = True
 
@@ -334,7 +335,7 @@ def _project_turn(turn: SimTurn) -> dict[str, Any]:
 
 
 def _closing_from_tail(calls: list[PersonaCallTrace]) -> list[dict[str, Any]]:
-    """局尾 file_issue / rate：结构化出口信号（真实场景少有统一 schema）。"""
+    """Session end file_issue / rate: structured exit signals (real scenarios rarely have unified schema)."""
     events: list[dict[str, Any]] = []
     for call in calls:
         parsed = call.parsed if isinstance(call.parsed, dict) else {}
@@ -388,20 +389,20 @@ def _project_sim_trace(trace: SimTrace) -> dict[str, Any]:
         out["goal_acceptance"] = dict(trace.goal_acceptance)
     if trace.terminal_audit:
         out["terminal_audit"] = dict(trace.terminal_audit)
-    # WAIT_GAP 等信号若已落在 turns 的 capability_gap，这里不再原样甩机器信号串
+    # If signals like WAIT_GAP already fall in turns' capability_gap, do not repeat raw machine signal stream here
     return out
 
 
 def format_session_timeline(session: Session) -> str:
-    """Session → 结构综合用的使用事件时间线 JSON.
+    """Session → usage event timeline JSON for structural synthesis.
 
-    Spec-0024/T4: 去仿真外壳投影（非落盘原样透传）。
+    Spec-0024/T4: projection without simulation wrapper (not raw pass-through for storage).
     """
     issues = [
         {
             "number": r.number,
             "state": r.state,
-            # 故意不带 url：fake:// / 内网 tracker URL 会穿帮且对归因无用
+            # Intentionally omit url: fake:// / internal tracker URLs expose implementation and add no value to attribution
         }
         for r in session.issue_refs
     ]
@@ -432,7 +433,7 @@ def find_session_by_id(store: SessionStore, session_id: str) -> Session | None:
 
 
 def find_session_by_issue(store: SessionStore, issue_number: int) -> Session | None:
-    """按 issue 号反查，并在索引缺失时从权威会话文件恢复索引。"""
+    """Reverse lookup by issue number; restore index from authoritative session file if index is missing."""
     sid = store.find_session_id_by_issue(int(issue_number))
     return find_session_by_id(store, sid) if sid else None
 
@@ -440,7 +441,7 @@ def find_session_by_issue(store: SessionStore, issue_number: int) -> Session | N
 def _resolve_session(
     *, issue_number: int | None, session_id: str | None
 ) -> Session | dict[str, Any]:
-    """按 issue/session_id 取 Session；失败返回 ok=False 的 dict。"""
+    """Get Session by issue/session_id; return dict with ok=False on failure."""
     try:
         store = _require_store()
     except RuntimeError as e:
@@ -495,9 +496,9 @@ def get_session_timeline(
     issue_number: int | None = None,
     session_id: str | None = None,
     reason: str = "",
-    agent_state: Any = None,  # noqa: ARG001 — nexau 注入，未用
+    agent_state: Any = None,  # noqa: ARG001 — nexau injected, unused
 ) -> dict[str, Any]:
-    """结构综合 tool：按 issue 或 session_id 取一局使用事件时间线（投影，非 raw dump）。"""
+    """Structural synthesis tool: get one session's usage event timeline by issue or session_id (projection, not raw dump)."""
     del agent_state
     resolved = _resolve_session(issue_number=issue_number, session_id=session_id)
     if isinstance(resolved, dict):
@@ -527,25 +528,25 @@ def get_session_timeline(
     return result
 
 
-# ── get_harness_beat：按需下钻某一拍 harness 内层做了什么 ─────────────────────
-# 为何要单独 tool（而非塞进 timeline）：
-# - 默认时间线只给 heard + 短 saw_activity，够判「超时/意图」；灌全量 steps 会再炸上下文。
-# - 归因「预算烧在探索还是卡在交付前」时，需要**对准某一拍**看 tool 序列——按需细看。
-# - 不提供完整 LLM 原始记录；tool_result 截断，避免单次命令输出进入提案。
+# ── get_harness_beat: drill into what a specific harness beat did when needed ─────────────────────
+# Why a separate tool (rather than embed in timeline):
+# - Default timeline gives heard + short saw_activity, enough to judge "timeout/intent"; full steps would blow context.
+# - When attributing "budget spent on exploration vs. stuck before delivery", need to **inspect one specific beat** and see tool sequence — drill in on demand.
+# - Do not expose full LLM raw records; truncate tool_result to avoid single command output entering proposals.
 
 _BEAT_TOOL_TEXT = 220
 _BEAT_RESULT_TEXT = 280
 _BEAT_HEARD_MAX = 1500
-_BEAT_MAX_STEPS = 80  # ≈ max_iterations×2；更长则头尾保留
+_BEAT_MAX_STEPS = 80  # ≈ max_iterations×2; preserve head and tail if longer
 
 
 def _classify_stop(*, heard: str) -> str:
-    """从 harness 终态回复归类停止原因（给结构综合对照 entry.py / agent.yaml 一级钮）。"""
+    """Classify stop reason from harness terminal reply (for structural synthesis to cross-reference entry.py / agent.yaml primary buttons)."""
     h = (heard or "").strip()
     low = h.lower()
     if "maximum iteration" in low or "iteration limit" in low:
         return "max_iterations"
-    if low.startswith("[timeout]") or "内部时限" in h:
+    if low.startswith("[timeout]"):
         return "wall_timeout"
     if low.startswith("[interrupted]") or "interrupt" in low[:40]:
         return "interrupt"
@@ -557,7 +558,7 @@ def _classify_stop(*, heard: str) -> str:
 
 
 def _clip_step_text(*, kind: str, text: str) -> tuple[str, bool]:
-    """按 kind 截断 step 文本；返回 (text, truncated)。"""
+    """Truncate step text by kind; return (text, truncated)."""
     raw = (text or "").strip().replace("\n", " ")
     limit = (
         _BEAT_RESULT_TEXT if kind in {"tool_result", "tool_error", "assistant"} else _BEAT_TOOL_TEXT
@@ -568,7 +569,7 @@ def _clip_step_text(*, kind: str, text: str) -> tuple[str, bool]:
 
 
 def _format_beat_steps(*, steps: list[Any]) -> list[dict[str, Any]]:
-    """harness_steps → 可审计短列表；超长序列头尾保留。"""
+    """harness_steps → auditable short list; preserve head and tail for oversized sequences."""
     clean: list[dict[str, Any]] = []
     for i, step in enumerate(steps):
         if not isinstance(step, dict):
@@ -599,7 +600,7 @@ def _format_beat_steps(*, steps: list[Any]) -> list[dict[str, Any]]:
 
 
 def _candidate_beats(*, trace: SimTrace, turn: int) -> list[SimTurn]:
-    """同一 turn 号可能有 waiting + active 多拍；优先带 harness 输出/步骤的。"""
+    """Same turn number may have multiple beats (waiting + active); prefer ones with harness output/steps."""
     matches = [t for t in trace.turns if int(t.turn) == int(turn)]
     with_harness = [t for t in matches if (t.harness_steps or (t.harness_output or "").strip())]
     return with_harness or matches
@@ -683,7 +684,7 @@ def _beat_stop(session: Session, beat: SimTurn | _DirectBeat) -> str:
 def format_harness_beat(
     *, session: Session, turn: int, occurrence: int, reason: str = ""
 ) -> dict[str, Any]:
-    """Session × turn → 某一拍 harness 活动细节（供 tool 返回）。"""
+    """Session × turn → harness activity details for one specific beat (for tool return)."""
     if session.sim_trace is None and not session.user_outcome.get("execution_record"):
         return {"ok": False, "error": "session has no sim_trace"}
     denied = _check_role_access(level="L3", session_id=session.session_id, reason=reason)
@@ -717,7 +718,7 @@ def format_harness_beat(
         "turn": beat.turn,
         "occurrence": occurrence,
         "n_candidates": len(candidates),
-        # 与 timeline 的 when 对齐，便于结构综合对照
+        # Align with timeline's when for structural synthesis cross-reference
         "when": _phase_when(beat.phase),
         "phase": beat.phase,
         "user_did": (beat.action or "").strip(),
@@ -764,11 +765,11 @@ def get_harness_beat(
     session_id: str | None = None,
     occurrence: int = 0,
     reason: str = "",
-    agent_state: Any = None,  # noqa: ARG001 — nexau 注入，未用
+    agent_state: Any = None,  # noqa: ARG001 — nexau injected, unused
 ) -> dict[str, Any]:
-    """结构综合 tool：下钻某一拍（timeline 的 t）看 harness 内层做了哪些 tool。
+    """Structural synthesis tool: drill down into a specific beat (timeline's t) to see which tools the harness inner layer performed.
 
-    Spec-0024/T4+T5: stop_kind + 短切 steps；先 timeline 再对本拍下钻。
+    Spec-0024/T4+T5: stop_kind + truncated steps; first traverse timeline, then drill down into this beat.
     """
     del agent_state
     resolved = _resolve_session(issue_number=issue_number, session_id=session_id)
@@ -799,9 +800,9 @@ def get_harness_beat(
     return result
 
 
-# ── get_harness_step：某一步正文按需展开（仍有硬顶，永不无限）────────────────
-# beat 列表故意短切；若结构综合判断「这一步的 stdout/报错还必须看」，再展开单步。
-# 硬顶避免单次 pytest/日志把上下文打爆；超长仍 truncated + n_chars_raw。
+# ── get_harness_step: expand a step's body on demand (still has hard limit, never infinite) ────────────────
+# Beat list is intentionally truncated; if structural synthesis determines "this step's stdout/error must be viewed", then expand the single step.
+# Hard limit prevents a single pytest/log from exploding the context; overly long content still shows truncated + n_chars_raw.
 
 _STEP_EXPAND_MAX = 6_000
 
@@ -809,7 +810,7 @@ _STEP_EXPAND_MAX = 6_000
 def _pick_beat_or_error(
     *, session: Session, turn: int, occurrence: int
 ) -> SimTurn | _DirectBeat | dict[str, Any]:
-    """共用：解析 turn/occurrence → SimTurn，或 ok=False dict。"""
+    """Shared: parse turn/occurrence → SimTurn, or ok=False dict."""
     if session.sim_trace is None and not session.user_outcome.get("execution_record"):
         return {"ok": False, "error": "session has no sim_trace"}
     candidates = _session_beats(session, turn)
@@ -835,7 +836,7 @@ def _pick_beat_or_error(
 def format_harness_step(
     *, session: Session, turn: int, occurrence: int, step_i: int
 ) -> dict[str, Any]:
-    """展开某一拍里第 step_i 步的正文（硬顶截断）。"""
+    """Expand the body of step_i within a beat (hard-limited truncation)."""
     picked = _pick_beat_or_error(session=session, turn=turn, occurrence=occurrence)
     if isinstance(picked, dict):
         return picked
@@ -852,7 +853,7 @@ def format_harness_step(
     if not isinstance(raw_step, dict):
         return {"ok": False, "error": f"step_i={step_i} is not a dict step"}
     kind = str(raw_step.get("kind") or "").strip() or "unknown"
-    # 展开保留换行，便于读 traceback / diff；仍计字符硬顶
+    # Expansion preserves newlines for easier reading of tracebacks / diffs; still applies character hard limit
     raw = str(raw_step.get("text") or "")
     n_chars = len(raw)
     truncated = n_chars > _STEP_EXPAND_MAX
@@ -891,11 +892,11 @@ def get_harness_step(
     session_id: str | None = None,
     occurrence: int = 0,
     reason: str = "",
-    agent_state: Any = None,  # noqa: ARG001 — nexau 注入，未用
+    agent_state: Any = None,  # noqa: ARG001 — nexau injected, unused
 ) -> dict[str, Any]:
-    """结构综合 tool：展开 get_harness_beat 里某一步的较长正文（仍有硬顶）。
+    """Structural synthesis tool: expand the longer body of a step in get_harness_beat (still has hard limit).
 
-    Spec-0024/T4+T5: 硬顶字符，永不无限 raw。
+    Spec-0024/T4+T5: hard character limit, never unlimited raw.
     """
     del agent_state
     resolved = _resolve_session(issue_number=issue_number, session_id=session_id)

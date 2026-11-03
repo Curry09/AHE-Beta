@@ -1,4 +1,4 @@
-"""spec-0010/T1：SeedLibrary 读写 + 卡 schema round-trip + 契约约束校验。"""
+"""spec-0010/T1: SeedLibrary read/write + card schema round-trip + contract constraint validation."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from ahe_beta.distill.seed_library import (
 
 
 def _card(seed_id: str = "seed-requests-6964") -> dict:
-    # seed-card-schema.md 卡形状；字段长相取自真实 harvest 示例（psf/requests netrc 泄露修复）。
+    # seed-card-schema.md card shape; field appearance derived from real harvest examples (psf/requests netrc leak fix).
     return {
         "id": seed_id,
         "source": {
@@ -77,7 +77,7 @@ def test_add_then_load_and_get(tmp_path) -> None:
 
 
 def test_load_tolerates_harvest_envelope(tmp_path) -> None:
-    # harvest 产出的 {version, harvested_at, note, seeds:[...]} 信封：load 取 seeds、忽略元数据键。
+    # Envelope produced by harvest: {version, harvested_at, note, seeds:[...]}; load extracts seeds and ignores metadata keys.
     import json
 
     path = tmp_path / "seeds.json"
@@ -105,12 +105,13 @@ def test_get_missing_raises_keyerror(tmp_path) -> None:
 def test_card_roundtrips_and_tolerates_unknown_keys(tmp_path) -> None:
     lib = SeedLibrary(tmp_path / "seeds.json")
     card = _card()
-    # 演化友好：未知键应被原样保留、读侧不报错（前向兼容）。
-    card["future_field"] = {"note": "schema 演化新增"}
+    # Evolution-friendly: unknown keys should be preserved as-is and the read side should not error (forward compatible).
+    card["future_field"] = {"note": "schema Added through evolution"}
     lib.add(card)
     got = lib.get(card["id"])
-    assert got == card  # 字段级一致，含 source/task/env/oracle/gates/provenance 与未知键
-    # held-out 字段随卡沉淀（采集侧保留；注入侧才剥离，见 0010/T2）。
+    # Field-level consistency: includes source/task/env/oracle/gates/provenance and unknown keys
+    assert got == card
+    # held-out fields sediment with the card (retained on collection side; stripped on injection side, see 0010/T2).
     assert got["oracle"]["tier"] == "executable-test"
     assert got["env"]["test_cmd"] == "pytest tests/test_utils.py -k netrc"
     assert got["gates"]["oracle_gate"] == "pass"
@@ -118,33 +119,35 @@ def test_card_roundtrips_and_tolerates_unknown_keys(tmp_path) -> None:
 
 def test_validate_card_rejects_benchmark_field() -> None:
     bad = _card()
-    bad["benchmark_score"] = 0.87  # 契约外字段（benchmark 派生）→ 必拒
-    with pytest.raises(ValueError, match="契约外字段"):
+    # Field outside the contract (benchmark-derived) → must be rejected
+    bad["benchmark_score"] = 0.87
+    with pytest.raises(ValueError, match="fields outside the contract"):
         validate_card(bad)
 
 
 def test_validate_card_rejects_not_in_benchmark_false() -> None:
     bad = _card()
-    bad["source"]["not_in_benchmark"] = False  # benchmark 实例 → 必拒（防污染）
+    # benchmark instances → must reject (prevent contamination)
+    bad["source"]["not_in_benchmark"] = False
     with pytest.raises(ValueError, match="not_in_benchmark"):
         validate_card(bad)
 
 
 def test_validate_card_rejects_domain_out_of_vocab() -> None:
     bad = _card()
-    bad["domain"] = "quantum-computing"  # 不在受控词表
-    with pytest.raises(ValueError, match="受控词表"):
+    bad["domain"] = "quantum-computing"  # Not in the controlled vocabulary
+    with pytest.raises(ValueError, match="controlled vocabulary"):
         validate_card(bad)
 
 
 def test_validate_card_rejects_capability_out_of_taxonomy() -> None:
     bad = _card()
-    bad["capability_probed"] = ["correctness-edgecase", "telepathy"]  # telepathy 越表
-    with pytest.raises(ValueError, match="分类法外能力"):
+    bad["capability_probed"] = ["correctness-edgecase", "telepathy"]  # telepathy cross-table
+    with pytest.raises(ValueError, match="capabilities outside the taxonomy"):
         validate_card(bad)
 
 
 def test_valid_card_passes_validation() -> None:
-    validate_card(_card())  # 不抛即通过
+    validate_card(_card())  # Passing = no exception raised
     assert _card()["domain"] in DOMAIN_VOCAB
     assert set(_card()["capability_probed"]) <= CAPABILITY_TAXONOMY

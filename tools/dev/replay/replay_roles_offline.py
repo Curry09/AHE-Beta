@@ -76,10 +76,10 @@ def main() -> int:
             reason = str(entry.get("reason", "")).strip()
             ref = tracker.create_issue(
                 IssueDraft(
-                    title=f"用户体验报告：{reason[:80] or '会话体验未达预期'}",
+                    title=f"User experience report: {reason[:80] or 'Session experience fell short of expectations'}",
                     body=(
                         f"session_id: {entry['session_id']}\n\n"
-                        f"体验评分：{entry.get('score')}\n\n用户说明：{reason}"
+                        f"Experience score: {entry.get('score')}\n\nUser explanation: {reason}"
                     ),
                     labels=[REPORT, "round-1"],
                 )

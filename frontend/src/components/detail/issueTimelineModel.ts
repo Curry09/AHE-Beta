@@ -45,13 +45,13 @@ export interface IssueTimelineViewModel {
 }
 
 const GROUP_LABEL: Record<LabelGroupKey, string> = {
-  plane: "平面",
-  source: "来源",
-  priority: "优先级",
-  round: "轮次",
-  delivery: "交付 / 阻塞",
-  terminal: "终态",
-  other: "其它",
+  plane: "Plane",
+  source: "Source",
+  priority: "Priority",
+  round: "Round",
+  delivery: "Delivery / blockers",
+  terminal: "Terminal state",
+  other: "Other",
 };
 
 const TERMINAL = new Set([
@@ -97,7 +97,7 @@ export function buildIssueTimelineView(
   }
   return {
     available: timeline?.available ?? false,
-    unavailableReason: timeline?.reason ?? "当前后端未提供标签时间线",
+    unavailableReason: timeline?.reason ?? "Current backend does not provide a label timeline",
     complete: timeline?.complete ?? false,
     groups: groupIssueLabels(issue.labels ?? []),
     transitions: (timeline?.transitions ?? []).map((transition) =>
@@ -150,5 +150,5 @@ function stateSummary(state: IssueTimelineState): string {
     state.blocked ? "needs-human" : null,
     state.terminal,
   ].filter(Boolean);
-  return values.length > 0 ? values.join(" · ") : "无维度状态";
+  return values.length > 0 ? values.join(" · ") : "No dimension status";
 }

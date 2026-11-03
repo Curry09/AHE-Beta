@@ -1,12 +1,12 @@
 ---
 number: "0007"
-title: 开发者侧改为纯 trunk(main) 自进化
+title: "Switch the developer side to pure trunk(main) self-evolution"
 issue: 12
 slug: dev-trunk-main
 summary: '## Summary'
 tasks:
   - id: T1
-    title: 开发者侧直推 main（去 branch/merge）
+    title: "Developer side pushes directly to main (remove branch/merge)"
     status: pending
     priority: P0
     tags: []
@@ -17,10 +17,10 @@ tasks:
       - backend/ahe_beta/dev/agentic_developer.py
       - backend/agent_defs/developer_agent/systemprompt.md
       - backend/tests/dev/test_agentic_developer.py
-    scope: 把 dev agent 的 git 流程从「fix/issue-N 分支 + --no-ff 合 release + 打 tag + push branch/release/tag」改为直推 main：work_one 注入的流程与 systemprompt.md 文案统一为 `git checkout main → 改 agents/main.md → commit → git tag vK → git push origin main vK`，去掉 branch、merge、release 全部字样。DevOutcome.released 语义改为「committed（已推 main）」（字段名可保留或重命名，二选一在实现时定）；ground-truth 判定仍为「新 vK tag 出现」，成功即 close 该 issue（沿用 tracker.set_state）。不分 bug/feature，单 dev agent 串行领 issue 不变。不动 launcher、orchestrator。
-    acceptance: work_one 全程不创建 fix/issue-* 分支、不执行 --no-ff merge；实际 git 历史落在 main 上；流程产出新 vK tag 且 main 与 vK 均被 push origin；DevOutcome 表达「已 commit 到 main」语义；新 tag 出现→issue 被 close；systemprompt.md 无 branch/merge/release 字样、与注入流程一致。单测（mock nexau + 临时 git 仓 fixture）覆盖：直推 main 后仓内无新分支、有新 commit+tag；无可领 issue 返回空 DevOutcome；新 tag→close 调用。
+    scope: "Change the dev agent's git workflow from “fix/issue-N branch + --no-ff merge into release + create tag + push branch/release/tag” to pushing directly to main: align the workflow injected by work_one and the wording in systemprompt.md to `git checkout main → modify agents/main.md → commit → git tag vK → git push origin main vK`, removing all mentions of branch, merge, and release. Change the semantics of DevOutcome.released to “committed (pushed to main)” (the field name may be retained or renamed; choose one during implementation); ground-truth determination remains “a new vK tag appears,” and success closes the issue (continue using tracker.set_state). No distinction between bug/feature; a single dev agent continues claiming issues serially. Do not modify launcher or orchestrator."
+    acceptance: "Throughout work_one, do not create fix/issue-* branches or perform --no-ff merges; actual git history is on main; the workflow produces a new vK tag and pushes both main and vK to origin; DevOutcome expresses the semantics of “committed to main”; new tag appears→issue is closed; systemprompt.md contains no mentions of branch/merge/release and is consistent with the injected workflow. Unit tests (mock nexau + temporary git repository fixture) cover: after pushing directly to main, the repository has no new branches and has a new commit+tag; no claimable issue returns an empty DevOutcome; new tag→close call."
   - id: T2
-    title: 编排去 release 链 · 会话级 main SHA 快照回灌
+    title: "Remove the release chain from orchestration · Feed session-level main SHA snapshots back in"
     status: pending
     priority: P0
     tags: []
@@ -33,10 +33,10 @@ tasks:
       - backend/ahe_beta/loop/run_state.py
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_run_state.py
-    scope: 保留 main SHA 观测游标与按 SHA 启动会话的快照语义；当前闭环在轮次交付屏障后解析 sealed SHA，不再依赖内置 dev 直推或 vK tag。具体阶段恢复和封口由当前 round gate 契约约束。
-    acceptance: 同一会话保持同一 Harness SHA，main SHA 与 run_state 可往返持久化；下一轮只使用完成交付的封口版本，不依赖已退出的 migration 或内置开发角色。
+    scope: "Retain the main SHA observation cursor and snapshot semantics for starting sessions by SHA; the current closed loop resolves the sealed SHA after the round delivery barrier and no longer depends on direct pushes by the built-in dev or vK tags. Specific phase recovery and sealing are governed by the current round gate contract."
+    acceptance: "The same session retains the same Harness SHA, and main SHA and run_state support persistence round trips; the next round uses only the sealed version whose delivery is complete, without depending on the retired migration or built-in development role."
   - id: T4
-    title: 去 release：种子/bootstrap/e2e trunk 化
+    title: "Remove release: move seed/bootstrap/e2e to trunk"
     status: pending
     priority: P1
     tags: []
@@ -49,132 +49,132 @@ tasks:
       - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/scripts/bootstrap_harness.py
       - backend/tests/test_bootstrap_harness.py
-    scope: 包内 ordinary controller 与 bootstrap 工具初始化 main 作为 Harness 主干，保留固定起点和 main SHA 观测；不创建旧 release 主干或要求 vK tag，正式实验由统一 v2 入口初始化。
-    acceptance: seed/bootstrap 默认主干为 main，不创建 release；当前 bootstrap 与 controller 测试验证初始化和版本边界，原一次性迁移不进入当前实验流程。
+    scope: "The in-package ordinary controller and bootstrap tools initialize main as the Harness trunk, retaining a fixed starting point and main SHA observation; they do not create the old release trunk or require vK tags. Formal experiments are initialized through the unified v2 entry point."
+    acceptance: "The default trunk for seed/bootstrap is main, and release is not created; current bootstrap and controller tests verify initialization and version boundaries, and the original one-time migration is not part of the current experiment workflow."
 ---
 
-# 0007 · 开发者侧改为纯 trunk(main) 自进化
+# 0007 · Change the developer side to pure trunk(main) self-evolution
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: the frontmatter contains structured source data (including the tasks DAG), and the body is a nine-section group-level rust-RFC overview. -->
 
 ## Summary
 
-> 0071 清理后的当前映射：一次性迁移任务 T3 已退出 living task 列表，原脚本及测试归档，历史设计通过 Git 与 research/inventory.json 追溯。下文 release→main 迁移段落是原设计背景，不是当前操作入口；现行交付由 OpenAgents PR 合并，main SHA 观测仍保留。
+> Current mapping after 0071 cleanup: the one-time migration task T3 has exited the living task list; the original scripts and tests have been archived, and the historical design is traceable through Git and research/inventory.json. The release→main migration paragraphs below describe the original design background and are not the current operational entry point; current delivery is handled by OpenAgents PR merges, while main SHA observation is retained.
 
-去掉 harness 仓的 `release` 常驻分支、发版、体感门禁与回退，改纯 **trunk（单 `main`）** 自进化：user agent 永远使用最新 `main`（会话开始锁定其 HEAD SHA、整局跑该快照），dev agent 不分 bug/feature、直接 commit 到 `main`。每次成功推进给 `main` 打轻量 `vK` tag，**仅作观测锚点，不是发版**。一往无前，不回退。
+Remove the harness repository's persistent `release` branch, releases, experience gates, and rollback, and switch to pure **trunk (single `main`)** self-evolution: the user agent always uses the latest `main` (locking its HEAD SHA at the start of a session and running the entire session on that snapshot), while the dev agent does not distinguish bugs from features and commits directly to `main`. After each successful advancement, create a lightweight `vK` tag on `main`, **for observation anchoring only, not a release**. Keep moving forward without rollback.
 
-一轮闭环（节点后标负责任务）：
+One closed loop (responsible task shown after each node):
 
 ```
-a  user 会话(每局锁 main HEAD SHA, launcher 按 SHA checkout) ─产→ issue(Gitea) + 体感(SessionStore)
+a  user session (pin main HEAD SHA per session, launcher checks out by SHA) ─produces→ issue(Gitea) + user experience(SessionStore)
         │
-b       └ dev agent(T1)  领一条 open issue → checkout main → 改 agents/main.md
-                          → commit → git tag vK → git push origin main vK（无 branch/merge/门禁）
+b       └ dev agent(T1)  claim an open issue → checkout main → modify agents/main.md
+                          → commit → git tag vK → git push origin main vK (no branch/merge/gate)
         │
-c  orchestrator(T2) 回灌「main 最新 SHA」给下一轮 a；vK tag = 观测锚点
-   迁移(T3) main ← release + 删分支；种子/bootstrap/e2e 去 release(T4)
+c  orchestrator(T2) feeds the latest main SHA back to the next round of a; vK tag = observability anchor
+   migration(T3) main ← release + delete branches; remove release from seed/bootstrap/e2e(T4)
 ```
 
 ## Motivation
 
-**现状（背景就地复述，本 spec 自包含）。** harness 源码是托管于 Gitea 的独立 git 仓，原设计为 `release` 常驻分支 + 发版（`vK` tag）+ 体感门禁：dev 在 `fix/issue-N` 分支改 `agents/main.md`，`--no-ff` 合入 `release`、打 tag、推送；测试 agent 跑 N 局算平均体感、与 `release` 基线比较做回归门禁；orchestrator 把新 tag 作为下一轮用户侧的 harness。最近 commit `f27cc8c`「无门禁直接发版」移除了体感门禁与回退逻辑（`release.py` / `test_agent.py` 已删除）。
+**Current state (background restated here; this spec is self-contained).** The harness source is an independent Git repository hosted on Gitea. The original design used a persistent `release` branch plus releases (`vK` tag) and an experience gate: dev modified `agents/main.md` on the `fix/issue-N` branch, `--no-ff` merged it into `release`, created a tag, and pushed; the test agent ran N sessions, calculated the average experience score, and compared it with the `release` baseline for a regression gate; the orchestrator used the new tag as the harness for the next user-side round. The recent commit `f27cc8c` "release directly without a gate" removed the experience gate and rollback logic (`release.py` / `test_agent.py` have been deleted).
 
-**门禁一去，`release` 退化为 `main` 的滞后副本，带来四个问题：**
+**Once the gate was removed, `release` degraded into a lagging copy of `main`, creating four problems:**
 
-1. **不挡任何东西** —— 门禁已删，`release` 分支不再承担任何把关职责。
-2. **用户用滞后快照** —— user agent 跑的是 `release`（上一次切版的快照），dev 修好的 bug 要等下一次切版才对用户生效。
-3. **削弱闭环核心信号** —— 训练信号是体感；切版滞后让体感 delta 无法干净归因到最近一次 commit，issue 曲线被切版节奏（而非真实改动）扭曲。
-4. **仓状态混乱** —— `main` 冻在 557B 空种子、`release` 16KB 才是真进化版；`main` 是 `release` 的祖先（`release ⊃ main`，领先约 17 个提交）；遗留 4 条孤儿 `fix/issue-*` 分支与 re-seed 双 seed 历史；Gitea 默认分支仍指向冻结的 `main`。
+1. **It blocks nothing** — the gate has been removed, so the `release` branch no longer performs any gating function.
+2. **Users run a lagging snapshot** — the user agent runs `release` (the snapshot from the previous cut); bugs fixed by dev do not take effect for users until the next cut.
+3. **It weakens the core closed-loop signal** — the training signal is the experience score; the lag between cuts prevents the experience delta from being cleanly attributed to the latest commit, and the issue curve is distorted by the cutting cadence rather than by the actual changes.
+4. **The repository state is confusing** — `main` is frozen at the 557B empty seed, while `release` at 16KB is the actual evolved version; `main` is an ancestor of `release` (`release ⊃ main`, approximately 17 commits behind); four orphan `fix/issue-*` branches and the re-seed double-seed history remain; Gitea's default branch still points to the frozen `main`.
 
-**为什么改 trunk。** 项目约束是「训练信号（体感）与测试（benchmark held-out）分离，发版门禁只用体感、benchmark 全程不参与」。门禁既已移除，`release` 的唯一残余作用只是滞后。纯 trunk 让 dev 的每次 commit 立刻成为下一局用户所用的版本，使体感 delta 能干净归因到最近改动——这正是闭环最需要的纯净信号。坏 commit 不靠门禁拦截，而靠后续多轮迭代回正（梯度下降式）。
+**Why change to trunk.** The project constraint is that the training signal (experience score) and testing (benchmark held-out) are separated, and the release gate uses only the experience score, with the benchmark never participating. Once the gate has been removed, the sole remaining purpose of `release` is to lag behind. Pure trunk makes every dev commit immediately become the version used by the next user session, allowing the experience delta to be cleanly attributed to the latest change — exactly the clean signal the closed loop needs most. Bad commits are not stopped by a gate; subsequent rounds of iteration correct them, in a gradient-descent-like process.
 
 ## Guide-level explanation
 
-改完后各视角：
+After the change, the perspectives are as follows:
 
-- **用户侧（a）**：每局会话开始记下 harness 仓 `main` 的 HEAD SHA，整个多轮会话固定跑这个 SHA（launcher 已支持按 SHA checkout，单会话内 harness 不会在脚下变）；体感分数与产出的 issue 都归因到该 SHA。下一局自然取到 dev 推进后的更新 `main`——对用户永远是「最新 main」。
-- **开发者侧（b）**：单个 dev agent，不区分 bug/feature。`work_one` 领一条 open issue，端到端 `git checkout main → 改 agents/main.md → commit → git tag vK → git push origin main vK`。没有 branch、没有 merge、没有门禁。仓状态是 ground truth：新 `vK` tag 出现 = 成功，成功即 close 该 issue。`vK` 仅作版本戳。
-- **观测（替代 release 的唯一正经用途）**：每次成功推进给 `main` 打 `vK` tag；体感回归 = 比较不同 `vK` tag 的体感**分布**（纯观测，不门禁、不挡）；benchmark held-out，指向某个 `vK` 的 SHA 事后判定。
-- **分支模型**：只有 `main` 一条线，Gitea 默认分支保持 `main`（默认展示的就是真正在进化的版本）。`release`、孤儿 `fix/issue-*`、已合并分支全部删除。**一往无前，不回退。**
+- **User side (a)**: At the start of each session, record the HEAD SHA of `main` in the harness repository, and run the entire multi-turn session against that SHA (the launcher already supports checkout by SHA, so the harness cannot change underfoot within a session); both the experience score and the resulting issues are attributed to that SHA. The next session naturally picks up the updated `main` after dev advances it — users always receive the "latest main".
+- **Developer side (b)**: A single dev agent handles both bugs and features. `work_one` claims an open issue and completes `git checkout main → modify agents/main.md → commit → git tag vK → git push origin main vK` end to end. There are no branches, merges, or gates. The repository state is the ground truth: the appearance of a new `vK` tag means success, and success closes the issue. `vK` is only a version marker.
+- **Observation (the only legitimate serious use replacing release)**: Create an `vK` tag on `main` after each successful advancement; experience regressions are observed by comparing the **distributions** of experience scores across different `vK` tags (observation only, with no gate or blocking); the benchmark is held out, and its result is determined retrospectively for the SHA associated with a given `vK`.
+- **Branch model**: There is only one line, `main`, and Gitea's default branch remains `main` (the default view is the version that is actually evolving). Delete `release`, orphan `fix/issue-*` branches, and all merged branches. **Keep moving forward without rollback.**
 
 ## Reference-level explanation
 
-### 现状代码锚点（迁移前）
+### Current code anchors (before migration)
 
-- `dev/agentic_developer.py:79` `branch=f"fix/issue-{issue.number}"`；`:132-135` 注入给 nexau 的流程 `git checkout -B {branch} release` → `git merge --no-ff {branch}` → `git tag` → `git push origin {branch} release {tag}`；`DevOutcome`（定义于 `:27-34`，含 `released: bool`）；`:103-104` `released = bool(new_tags)`（新 tag 出现即成功，沿用为 ground truth）。
-- `loop/orchestrator.py:39` `run_round(self, release_ref)`；`:42` 整个 fixed_set 用同一 `release_ref` launch；`:54` `ref = outcome.tag`（release 链式回灌）；`:63` `run(initial_ref)`。
-- `loop/run_state.py:24` `current_release_ref: str`（编排游标）。
-- `harness/launcher.py:109-139` `_resolve_sha` + `_checkout`：**已**按 commit SHA 解析并按 SHA 缓存 checkout（`release` 这类会变分支，内容一变即落新目录，绝不复用陈旧 checkout）。→ **本 spec 无需改动 launcher。**
-- `run.py:81` `_git(HARNESS_REPO, "branch", "release")`、`:226` `initial_ref="release"`；`scripts/bootstrap_harness.py:106-110` 建 `release` 分支。
-- `agent_defs/developer_agent/systemprompt.md`：强制「第一步先建分支再改文件」`git checkout -B fix/issue-<N> release` + merge release + push branch/release/tag。
+- `dev/agentic_developer.py:79` `branch=f"fix/issue-{issue.number}"`; the process injecting `:132-135` into nexau `git checkout -B {branch} release` → `git merge --no-ff {branch}` → `git tag` → `git push origin {branch} release {tag}`; `DevOutcome` (defined in `:27-34`, containing `released: bool`); `:103-104` `released = bool(new_tags)` (the appearance of a new tag means success and remains the ground truth).
+- `loop/orchestrator.py:39` `run_round(self, release_ref)`; `:42` launches the entire fixed_set with the same `release_ref`; `:54` `ref = outcome.tag` (release chain feedback); `:63` `run(initial_ref)`.
+- `loop/run_state.py:24` `current_release_ref: str` (orchestration cursor).
+- `harness/launcher.py:109-139` `_resolve_sha` + `_checkout`: **already** resolves by commit SHA and caches checkout by SHA (a changing branch such as `release` creates a new directory whenever its contents change, and never reuses a stale checkout). → **This spec requires no launcher changes.**
+- `run.py:81` `_git(HARNESS_REPO, "branch", "release")`, `:226` `initial_ref="release"`; `scripts/bootstrap_harness.py:106-110` creates the `release` branch.
+- `agent_defs/developer_agent/systemprompt.md`: enforces "create the branch first, then modify files" `git checkout -B fix/issue-<N> release` + merge release + push branch/release/tag.
 
-### 目标方案
+### Target design
 
-| 关注点 | 现状 | 目标 |
+| Concern | Current | Target |
 |---|---|---|
-| dev git 流程 | `fix/issue-N` 分支 + `--no-ff` merge `release` + tag + push branch/release/tag | `checkout main` → 改 → commit → `tag vK` → `push origin main vK` |
-| `DevOutcome.released` | "已发版（new tag）" | 语义改为 "committed（已推 main）"；判定仍为「新 tag 出现」 |
-| orchestrator 回灌 | `release_ref` 链：`ref = outcome.tag` | 去链；每局解析 `main` HEAD SHA、按该 SHA launch（会话级快照）；回灌 = 「main 最新 SHA」 |
-| `run_state.current_release_ref` | 当前 release 版本 | 语义改为「当前 main SHA」（观测游标） |
-| 分支 | `main` + `release` + 孤儿 + 已合并 | 仅 `main` |
-| 门禁/回退/merge/release 链 | 存在（门禁已先删） | 全部去除 |
-| launcher | 按 SHA checkout | **不动**（已满足会话级 SHA 快照） |
+| dev Git workflow | `fix/issue-N` branch + `--no-ff` merge `release` + tag + push branch/release/tag | `checkout main` → modify → commit → `tag vK` → `push origin main vK` |
+| `DevOutcome.released` | "released (new tag)" | Semantics changed to "committed (pushed to main)"; determination remains "a new tag appears" |
+| orchestrator feedback | `release_ref` chain: `ref = outcome.tag` | Remove the chain; for each session, resolve the `main` HEAD SHA and launch by that SHA (session-level snapshot); feedback = "latest main SHA" |
+| `run_state.current_release_ref` | Current release version | Semantics changed to "current main SHA" (observation cursor) |
+| Branches | `main` + `release` + orphan + merged | Only `main` |
+| Gates/rollback/merge/release chain | Present (the gate was already removed) | Remove all |
+| launcher | Checkout by SHA | **Do not change** (already provides a session-level SHA snapshot) |
 
 ### DAG
 
 ```mermaid
 graph LR
-  T1[T1 开发者侧直推 main] --> T2[T2 编排去 release 链·main SHA 快照]
-  T1 --> T4[T4 去 release 种子/bootstrap/e2e]
+  T1[T1 Developer side pushes directly to main] --> T2[T2 Remove release chain from orchestration · main SHA snapshot]
+  T1 --> T4[T4 Remove release from seed/bootstrap/e2e]
   T2 --> T4
-  T3[T3 一次性迁移脚本 main←release]
+  T3[T3 One-time migration script main←release]
 ```
 
-T3（一次性迁移）与 T1 无代码依赖，可并行；T4 总装 e2e，依赖 T1、T2。
+T3 (one-time migration) has no code dependency on T1 and can run in parallel; T4, the integrated e2e, depends on T1 and T2.
 
-### 文件分配（各 Task `files` 互斥）
+### File allocation (each Task `files` is mutually exclusive)
 
-- **T1**：`dev/agentic_developer.py`、`agent_defs/developer_agent/systemprompt.md`、`tests/dev/test_agentic_developer.py`
-- **T2**：`loop/orchestrator.py`、`loop/run_state.py`、`tests/loop/test_orchestrator.py`、`tests/loop/test_run_state.py`
-- **T3**：`scripts/migrate_trunk_main.py`、`tests/test_migrate_trunk_main.py`
-- **T4**：`run.py`、`scripts/bootstrap_harness.py`、`tests/test_bootstrap_harness.py`
+- **T1**: `dev/agentic_developer.py`, `agent_defs/developer_agent/systemprompt.md`, `tests/dev/test_agentic_developer.py`
+- **T2**: `loop/orchestrator.py`, `loop/run_state.py`, `tests/loop/test_orchestrator.py`, `tests/loop/test_run_state.py`
+- **T3**: `scripts/migrate_trunk_main.py`, `tests/test_migrate_trunk_main.py`
+- **T4**: `run.py`, `scripts/bootstrap_harness.py`, `tests/test_bootstrap_harness.py`
 
-### e2e 脚本
+### e2e script
 
-`backend/ahe_beta/experiment/controllers/ordinary.py` —— 真实端到端跑一轮闭环（a→b→c，真 nexau + 真 Gitea + 本地 git 仓）。T4 改其种子（只种 `main`）、`initial_ref="main"` 与结果打印（「main SHA / 分支」取代「release_ref 链」）。
+`backend/ahe_beta/experiment/controllers/ordinary.py` —— Run one real end-to-end closed loop (a→b→c, with real nexau + real Gitea + a local Git repository). T4 changes its seed (seed only `main`), `initial_ref="main"`, and the result output ("main SHA / branch" replaces the "release_ref chain").
 
 ## Drawbacks
 
-- **无门禁兜底**：dev 推坏 commit，`main` 立刻劣化、下一局用户即受影响，只靠后续多轮迭代回正；短期体感可能抖动。
-- **不回退**：放弃「随时回到稳定版」的能力，历史上「稳定 release」的概念消失，benchmark 只能锚到任意 `vK`/SHA 而非一个被祝福的发布版。
-- **`vK` 语义稀释**：tag 失去发版含义后可能堆积成纯计数器，需靠观测看板赋予意义。
-- **一次性迁移有破坏性**：`git branch -f` 与删远端分支不可逆，迁移脚本须幂等且对错误仓状态安全。
+- **No gate fallback**: if dev pushes a bad commit, `main` immediately deteriorates and users are affected in the next session; correction relies only on subsequent rounds of iteration, so the experience score may fluctuate in the short term.
+- **No rollback**: the ability to "return to a stable version at any time" is abandoned; the historical concept of a "stable release" disappears, and the benchmark can only be anchored to any `vK`/SHA rather than to a blessed release version.
+- **Diluted meaning of `vK`**: after the tag loses its release meaning, it may accumulate as a pure counter and require an observation dashboard to give it meaning.
+- **The one-time migration is destructive**: `git branch -f` and deleting remote branches are irreversible; the migration script must be idempotent and safe against erroneous repository states.
 
 ## Rationale and alternatives
 
-选纯 trunk，因为它让体感 delta 干净归因到最近 commit——闭环训练信号最纯，且与「门禁已移除」的现状一致、最简（奥卡姆）。
+Pure trunk is selected because it cleanly attributes the experience delta to the latest commit — the closed-loop training signal is purest — while matching the current state in which the gate has been removed and being the simplest option (Occam's razor).
 
-- **备选 A：保留 `release`，每轮自动 fast-forward 到 `main`。** 行为等价于 trunk，却多一层永远等于 `main` 的无意义分支与同步逻辑，违奥卡姆。
-- **备选 B：重新引入体感门禁挡回退。** 与项目硬约束「发版门禁只用体感、benchmark held-out、体感只作训练信号/观测」相容性差，且门禁刚在 `f27cc8c` 被有意移除——重新加回是倒退。
-- **备选 C：每 dev 用短命分支 + 即时合并。** 仍引入 merge 提交噪声、却无任何并发收益（当前 dev 串行），徒增复杂度。
+- **Alternative A: retain `release` and automatically fast-forward it to `main` each round.** This is behaviorally equivalent to trunk, but adds a meaningless branch that is always equal to `main` and synchronization logic, contrary to Occam's razor.
+- **Alternative B: reintroduce the experience gate to block regressions.** This is poorly compatible with the project's hard constraints that the release gate use only the experience score, the benchmark remain held out, and the experience score serve only as a training signal/observation; moreover, the gate was intentionally removed in `f27cc8c`, so adding it back would be a regression.
+- **Alternative C: use a short-lived branch for each dev agent and merge immediately.** This still introduces merge-commit noise without any concurrency benefit (dev is currently serial), increasing complexity for no gain.
 
-故选 dev 直推 `main`。
+Therefore, dev pushes directly to `main`.
 
 ## Prior art
 
-- **Trunk-based development**：业界持续集成实践，单一主干、短迭代、避免长命分支，与本设计的「单 `main` + 不回退」一致。
-- **项目原设计**：CLAUDE.md「harness 源码为独立 git 仓，`release` + `feature` 分支，tag 即发布版本」——本 spec 将其收敛为单 `main`，是对该设计在「门禁移除」后的修正。
-- **直接前置**：commit `f27cc8c`「无门禁直接发版」移除体感门禁与回退，是本 spec 的触发点。
+- **Trunk-based development**: an industry continuous-integration practice using a single mainline and short iterations while avoiding long-lived branches, consistent with this design's "single `main` + no rollback".
+- **The project's original design**: CLAUDE.md stated that "the harness source is an independent Git repository, with `release` + `feature` branches, and a tag is the released version" — this spec consolidates that into a single `main` as a correction to the design after the gate was removed.
+- **Direct trigger**: commit `f27cc8c` "release directly without a gate" removed the experience gate and rollback, triggering this spec.
 
 ## Unresolved questions
 
-- **`vK` tag 的粒度**：每条成功 issue 打一个 vs 每轮打一个？（当前实现：每条成功 issue 一个 `vK`，见 `agentic_developer.py:80,105`。）需用户确认。
-- **体感/issue→SHA 归因的落盘**：MVP 是否仅靠「按 `main` HEAD SHA launch」隐式保证单会话快照即可，还是需把 SHA 显式写进 session 记录以支撑「按 `vK` 比体感分布」的观测？
-- **迁移清单与执行者**：待删的 4 条孤儿 `fix/issue-*` 与 4 条已合并分支的确切名单，以及远端默认分支切换由脚本自动还是人工执行。
+- **Granularity of `vK` tags**: one for each successful issue versus one per round? (Current implementation: one `vK` per successful issue; see `agentic_developer.py:80,105`.) User confirmation is required.
+- **Persistence of experience/issue→SHA attribution**: for the MVP, is the implicit guarantee provided by launching via the `main` HEAD SHA and using a session-level snapshot sufficient, or must the SHA be written explicitly into the session record to support observing experience-score distributions by comparing `vK` tags?
+- **Migration checklist and executor**: the exact names of the four orphan `fix/issue-*` branches and four merged branches to delete, and whether switching the remote default branch is performed automatically by the script or manually.
 
 ## Future possibilities
 
-- 体感分布回归看板：按 `vK` tag 对比体感分布（纯观测，不门禁）。
-- benchmark held-out 评测挂钩到选定 `vK` 的 SHA，事后验证体感驱动进化是否带来真实能力提升。
-- 坏 commit 的「软回退」观测：标记（而非 `revert`）退化点，保持「一往无前」的同时可视化退化。
-- 多 dev 并发直推 `main` 的冲突合并策略（当前串行各领不同 issue）。
+- Experience-distribution regression dashboard: compare experience-score distributions by `vK` tag (observation only, no gate).
+- Attach benchmark held-out evaluation to the SHA of a selected `vK`, retrospectively verifying whether experience-driven evolution produces genuine capability improvements.
+- "Soft rollback" observation for bad commits: mark (rather than `revert`) degradation points, visualizing degradation while preserving the "keep moving forward" approach.
+- Conflict-merging strategy for multiple dev agents pushing directly to `main` concurrently (currently serial, with each claiming a different issue).

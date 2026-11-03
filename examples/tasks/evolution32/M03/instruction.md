@@ -1,1 +1,1 @@
-基于材料和资源约束，协助确定 BI 平台下一期真正值得解决的问题，形成可评审、可验收的立项建议。
+Based on the materials and resource constraints, help determine the problems in the BI platform's next phase that are genuinely worth solving, and develop a project proposal that is ready for review and acceptance.

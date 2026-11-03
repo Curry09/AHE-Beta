@@ -83,7 +83,7 @@ def _load_json(path: Path) -> Any:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise AuditLaunchError(f"JSON 不可读：{path}: {exc}") from exc
+        raise AuditLaunchError(f"JSON Unreadable：{path}: {exc}") from exc
 
 
 def _atomic_private_write(path: Path, payload: str) -> None:
@@ -99,7 +99,7 @@ def _run(command: list[str], *, cwd: Path | None = None) -> subprocess.Completed
     result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, check=False)
     if result.returncode != 0:
         raise AuditLaunchError(
-            f"命令失败 ({result.returncode})：{' '.join(command[:5])}: "
+            f"Command failed ({result.returncode})：{' '.join(command[:5])}: "
             f"{result.stderr.strip()[:400]}"
         )
     return result
@@ -149,52 +149,52 @@ class FrozenExperiment:
         path = Path(str(node.get("path") or "")).expanduser().resolve()
         expected = str(node.get("sha256") or "")
         if not path.is_file():
-            raise AuditLaunchError(f"{label} 不存在：{path}")
+            raise AuditLaunchError(f"{label} Does not exist：{path}")
         actual = _sha256(path)
         if actual != expected:
-            raise AuditLaunchError(f"{label} SHA 漂移：expected={expected} actual={actual}")
+            raise AuditLaunchError(f"{label} SHA Drift：expected={expected} actual={actual}")
         return path
 
     def validate_contract(self) -> None:
         if self.config.mode not in {"full-evolution", "user-only"}:
-            raise AuditLaunchError("审计闭环只接受 mode=full-evolution 或 user-only")
+            raise AuditLaunchError("The audit loop only accepts mode=full-evolution Or user-only")
         execution = self.raw.get("execution")
         if not isinstance(execution, dict) or execution.get("runner") != "swebench-closed-loop":
-            raise AuditLaunchError("execution.runner 必须为 swebench-closed-loop")
+            raise AuditLaunchError("execution.runner Must be swebench-closed-loop")
         if type(execution.get("synthesizer_grouping", False)) is not bool:
-            raise AuditLaunchError("execution.synthesizer_grouping 必须为 boolean")
+            raise AuditLaunchError("execution.synthesizer_grouping Must be boolean")
         rounds = int(execution.get("total_rounds") or 0)
         if self.config.mode == "full-evolution":
             if rounds < 2 or not execution.get("final_round_users_only"):
-                raise AuditLaunchError("完整闭环要求至少两轮且末轮 users-only")
+                raise AuditLaunchError("A complete loop requires at least two rounds and the final round users-only")
             if not execution.get("wait_for_delivery_between_rounds"):
-                raise AuditLaunchError("闭环必须等待本轮交付封口后再切轮")
+                raise AuditLaunchError("The loop must wait for delivery closure in the current round before switching rounds")
         elif rounds != 1 or not execution.get("final_round_users_only"):
-            raise AuditLaunchError("user-only canary 必须恰好一轮且为 users-only")
+            raise AuditLaunchError("user-only canary Must have exactly one round and be users-only")
 
         roster = self.raw.get("roster")
         if not isinstance(roster, dict) or set(roster) != _REQUIRED_ROSTER:
-            raise AuditLaunchError(f"roster 必须且只能包含 {sorted(_REQUIRED_ROSTER)}")
+            raise AuditLaunchError(f"roster Must contain only {sorted(_REQUIRED_ROSTER)}")
         normalized = self.roster
         if any(value < 0 for value in normalized.values()):
-            raise AuditLaunchError("roster 计数不得为负")
+            raise AuditLaunchError("roster Count must not be negative")
         if self.config.mode == "full-evolution" and normalized["owner"] != 1:
-            raise AuditLaunchError("full-evolution 的 owner 必须为 1")
+            raise AuditLaunchError("full-evolution of owner Must be 1")
         if self.config.mode == "user-only" and any(
             normalized[role] != 0
             for role in ("triager", "synthesizer", "divergent", "owner", "developer")
         ):
-            raise AuditLaunchError("user-only canary 除 user 外的 roster 必须全为 0")
+            raise AuditLaunchError("user-only canary Except user Other than roster Must all be 0")
         capacity = self.config.capacity
         if int(capacity.get("user_parallel") or 0) != normalized["user"]:
-            raise AuditLaunchError("capacity.user_parallel 必须等于 roster.user")
+            raise AuditLaunchError("capacity.user_parallel Must equal roster.user")
         if int(capacity.get("delivery_parallel") or 0) != normalized["developer"]:
-            raise AuditLaunchError("capacity.delivery_parallel 必须等于 roster.developer")
+            raise AuditLaunchError("capacity.delivery_parallel Must equal roster.developer")
 
         source = self.raw.get("source") or {}
         harness = self._pinned_file(dict(source.get("harness") or {}), label="Harness archive")
         if not harness.name.endswith(".tar.gz"):
-            raise AuditLaunchError("Harness archive 必须为 .tar.gz")
+            raise AuditLaunchError("Harness archive Must be .tar.gz")
         personas = self.raw.get("personas") or {}
         library_path = self._pinned_file(
             dict(personas.get("library") or {}), label="persona library"
@@ -205,7 +205,7 @@ class FrozenExperiment:
             dict(workload.get("dataset") or {}), label="SWE-bench dataset"
         )
         if dataset_path.suffix != ".parquet":
-            raise AuditLaunchError("SWE-bench dataset 必须为 parquet")
+            raise AuditLaunchError("SWE-bench dataset Must be parquet")
         pool_path = self._pinned_file(dict(workload.get("pool") or {}), label="SWE-bench pool")
         plan_path = self._pinned_file(dict(execution.get("plan") or {}), label="interaction plan")
         self._validate_plan(
@@ -218,11 +218,11 @@ class FrozenExperiment:
 
         for role in ("user", "harness", "triage", "synthesizer", "divergent", "owner", "delivery"):
             if not str(self.config.models.get(role) or ""):
-                raise AuditLaunchError(f"models.{role} 缺失")
+                raise AuditLaunchError(f"models.{role} Missing")
         for role in ("gitea", "runner", "egress", "vigil", "seed"):
             reference = str(self.config.images.get(role) or "")
             if not reference or ":latest" in reference or not reference.rsplit("sha256:", 1)[-1]:
-                raise AuditLaunchError(f"images.{role} 必须为不可变引用")
+                raise AuditLaunchError(f"images.{role} Must be an immutable reference")
 
     def _validate_plan(
         self,
@@ -238,46 +238,46 @@ class FrozenExperiment:
         pool = _load_json(pool_path)
         plan = _load_json(plan_path)
         if not isinstance(library, list) or not isinstance(persona_doc, dict):
-            raise AuditLaunchError("persona library/roster 结构非法")
+            raise AuditLaunchError("persona library/roster Invalid structure")
         cards = {str(item["id"]): item for item in library}
         records = persona_doc.get("personas") or []
         persona_ids = [str(item["id"]) for item in records]
         strategies = {str(item["id"]): str(item["strategy"]) for item in records}
         if len(persona_ids) != self.roster["user"] or len(set(persona_ids)) != len(persona_ids):
-            raise AuditLaunchError("persona roster 数量必须等于 roster.user 且 ID 唯一")
+            raise AuditLaunchError("persona roster Count must equal roster.user And ID Unique")
         for persona_id, strategy in strategies.items():
             try:
                 actual = cards[persona_id]["dimensions"]["D3_interaction_style"]["on_offtrack"][
                     "value"
                 ]
             except (KeyError, TypeError) as exc:
-                raise AuditLaunchError(f"persona 卡缺策略：{persona_id}") from exc
+                raise AuditLaunchError(f"persona Card missing strategy：{persona_id}") from exc
             if actual != strategy:
-                raise AuditLaunchError(f"persona 策略漂移：{persona_id}: {strategy} != {actual}")
+                raise AuditLaunchError(f"persona Strategy drift：{persona_id}: {strategy} != {actual}")
         pool_ids = {str(item["instance_id"]) for item in pool.get("instances") or []}
         if not isinstance(plan, list) or len(plan) != rounds:
-            raise AuditLaunchError(f"interaction plan 必须恰好 {rounds} 轮")
+            raise AuditLaunchError(f"interaction plan Must be exactly {rounds} Round")
         expected_distribution = {
             str(key): int(value) for key, value in (persona_doc.get("distribution") or {}).items()
         }
         for index, round_plan in enumerate(plan, start=1):
             if not isinstance(round_plan, list) or len(round_plan) != self.roster["user"]:
-                raise AuditLaunchError(f"第 {index} 轮必须恰好 {self.roster['user']} 个 session")
+                raise AuditLaunchError(f"Round {index} Rounds must be exactly {self.roster['user']} Items session")
             round_personas = [str(pair[0]) for pair in round_plan]
             round_instances = [str(pair[1]) for pair in round_plan]
             if set(round_personas) != set(persona_ids):
-                raise AuditLaunchError(f"第 {index} 轮 persona 集与 roster 不一致")
+                raise AuditLaunchError(f"Round {index} Round persona Set and roster Mismatch")
             if (
                 len(set(round_instances)) != len(round_instances)
                 or not set(round_instances) <= pool_ids
             ):
-                raise AuditLaunchError(f"第 {index} 轮 instance 非唯一或越出题池")
+                raise AuditLaunchError(f"Round {index} Round instance Not unique or outside the question pool")
             observed = {key: 0 for key in expected_distribution}
             for persona_id in round_personas:
                 observed[strategies[persona_id]] = observed.get(strategies[persona_id], 0) + 1
             if observed != expected_distribution:
                 raise AuditLaunchError(
-                    f"第 {index} 轮 persona 配比漂移：{observed} != {expected_distribution}"
+                    f"Round {index} Round persona Ratio drift：{observed} != {expected_distribution}"
                 )
 
 
@@ -285,9 +285,9 @@ def _load_profile(path: Path) -> dict[str, str]:
     try:
         mode = path.stat().st_mode & 0o777
     except OSError as exc:
-        raise AuditLaunchError(f"模型 profile 不存在：{path}") from exc
+        raise AuditLaunchError(f"Model profile Does not exist：{path}") from exc
     if mode & 0o077:
-        raise AuditLaunchError(f"模型 profile 必须为 0600：{path}")
+        raise AuditLaunchError(f"Model profile Must be 0600：{path}")
     values: dict[str, str] = {}
     for line_number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         line = raw.strip()
@@ -295,11 +295,11 @@ def _load_profile(path: Path) -> dict[str, str]:
             continue
         key, separator, value = line.partition("=")
         if not separator or not key.strip() or "\x00" in value:
-            raise AuditLaunchError(f"模型 profile 第 {line_number} 行非法")
+            raise AuditLaunchError(f"Model profile Round {line_number} Invalid row")
         values[key.strip()] = value.strip().strip('"')
     missing = sorted(key for key in _PROFILE_KEYS if not values.get(key))
     if missing:
-        raise AuditLaunchError(f"模型 profile 缺字段：{', '.join(missing)}")
+        raise AuditLaunchError(f"Model profile Missing fields：{', '.join(missing)}")
     return values
 
 
@@ -316,7 +316,7 @@ def _verify_git_pins(spec: FrozenExperiment) -> dict[str, str]:
     controller_head = _run(["git", "-C", str(REPOSITORY), "rev-parse", "HEAD"]).stdout.strip()
     if controller_head != resolved["auto-designer"]:
         raise AuditLaunchError(
-            "controller HEAD 与 source.auto_designer_sha 不一致："
+            "controller HEAD And source.auto_designer_sha Mismatch："
             f"head={controller_head} pin={resolved['auto-designer']}"
         )
     return resolved
@@ -330,7 +330,7 @@ def _verify_images(spec: FrozenExperiment) -> None:
             labels = (info.get("Config") or {}).get("Labels") or {}
             if labels.get("org.auto-designer.seed-runtime") != "1":
                 raise AuditLaunchError(
-                    "images.seed 不是 runnable v1；禁止使用 storage-only seed 启动实验"
+                    "images.seed Is not runnable v1；Use prohibited storage-only seed Start experiment"
                 )
 
 
@@ -342,8 +342,8 @@ def _verify_official_evaluator() -> None:
     )
     if result.returncode != 0:
         raise AuditLaunchError(
-            "缺官方 SWE-bench evaluator；请安装项目 evaluation extra，"
-            "客观验收不可退化为 persona 自测"
+            "Missing official SWE-bench evaluator；Please install the project evaluation extra，"
+            "Objective acceptance must not degrade into persona Self testing"
         )
 
 
@@ -360,7 +360,7 @@ def _probe_endpoint(*, profile: dict[str, str], model: str) -> None:
         proxies={"http": None, "https": None},
     )
     if response.status_code != 200 or not response.json().get("choices"):
-        raise AuditLaunchError(f"OpenAI endpoint 探测失败：HTTP {response.status_code}")
+        raise AuditLaunchError(f"OpenAI endpoint Probe failed：HTTP {response.status_code}")
     anthropic_url = profile["ANTHROPIC_BASE_URL"].rstrip("/") + "/v1/messages"
     response = requests.post(
         anthropic_url,
@@ -375,7 +375,7 @@ def _probe_endpoint(*, profile: dict[str, str], model: str) -> None:
         proxies={"http": None, "https": None},
     )
     if response.status_code != 200 or not response.json().get("content"):
-        raise AuditLaunchError(f"Anthropic endpoint 探测失败：HTTP {response.status_code}")
+        raise AuditLaunchError(f"Anthropic endpoint Probe failed：HTTP {response.status_code}")
 
 
 def _compose(
@@ -389,20 +389,20 @@ def _compose(
     )
     result = subprocess.run(command, capture_output=True, text=True, check=False)
     if check and result.returncode != 0:
-        raise AuditLaunchError(f"Docker Compose 失败：{result.stderr.strip()[:500]}")
+        raise AuditLaunchError(f"Docker Compose Failed：{result.stderr.strip()[:500]}")
     return result
 
 
 def _ensure_created(spec: FrozenExperiment, *, resume: bool = False) -> None:
     if not spec.root.exists():
         if resume:
-            raise AuditLaunchError(f"resume 实验不存在：{spec.root}")
+            raise AuditLaunchError(f"resume Experiment does not exist：{spec.root}")
         runtime.create(config_path=spec.config_path, root=spec.root.parent)
         return
     manifest = read_manifest(path=spec.paths["manifest"])
     expected = config_hash(data=spec.raw)
     if manifest.get("config_hash") != expected:
-        raise AuditLaunchError("已有 experiment_id 的 manifest 与当前配置不一致")
+        raise AuditLaunchError("Existing experiment_id of manifest Does not match the current configuration")
 
 
 def _validate_recovery_identity(spec: FrozenExperiment, *, resume: bool) -> dict[str, str]:
@@ -418,7 +418,7 @@ def _validate_recovery_identity(spec: FrozenExperiment, *, resume: bool) -> dict
         key: (expected[key], identity[key]) for key in expected if expected[key] != identity[key]
     }
     if drift:
-        raise AuditLaunchError(f"manifest 恢复身份漂移：{drift}")
+        raise AuditLaunchError(f"manifest Resume identity drift：{drift}")
     recovery_path = spec.paths["checkpoints"] / "recovery.json"
     if resume:
         try:
@@ -426,9 +426,9 @@ def _validate_recovery_identity(spec: FrozenExperiment, *, resume: bool) -> dict
                 root=spec.paths["checkpoints"], identity=RecoveryIdentity(**identity)
             )
         except RecoveryError as exc:
-            raise AuditLaunchError(f"recovery state 不可续跑：{exc}") from exc
+            raise AuditLaunchError(f"recovery state Cannot resume：{exc}") from exc
     elif recovery_path.exists():
-        raise AuditLaunchError("fresh 发现已有 recovery state；请使用 --resume")
+        raise AuditLaunchError("fresh Found existing recovery state；Please use --resume")
     return identity
 
 
@@ -458,7 +458,7 @@ def _gitea_base_url(spec: FrozenExperiment) -> str:
     address = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else ""
     _host, separator, port = address.rpartition(":")
     if not separator or not port.isdigit():
-        raise AuditLaunchError(f"无法解析 Gitea 动态端口：{address!r}")
+        raise AuditLaunchError(f"Unable to parse Gitea Dynamic port：{address!r}")
     return f"http://127.0.0.1:{port}"
 
 
@@ -469,7 +469,7 @@ def _bootstrap_gitea(spec: FrozenExperiment) -> dict[str, str]:
         values = _load_json(credentials_path)
         if isinstance(values, dict):
             return {str(key): str(value) for key, value in values.items()}
-        raise AuditLaunchError("已有 Gitea credentials 结构非法")
+        raise AuditLaunchError("Existing Gitea credentials Invalid structure")
 
     base_url = _gitea_base_url(spec)
     deadline = time.monotonic() + 90
@@ -482,7 +482,7 @@ def _bootstrap_gitea(spec: FrozenExperiment) -> dict[str, str]:
             break
         time.sleep(0.5)
     else:
-        raise AuditLaunchError(f"Gitea readiness 超时：{base_url}")
+        raise AuditLaunchError(f"Gitea readiness timeout：{base_url}")
 
     owner = "designer"
     repository = "harness"
@@ -509,7 +509,7 @@ def _bootstrap_gitea(spec: FrozenExperiment) -> dict[str, str]:
         check=False,
     )
     if created.returncode != 0 and "already exists" not in created.stderr.lower():
-        raise AuditLaunchError(f"创建 Gitea 用户失败：{created.stderr.strip()[:300]}")
+        raise AuditLaunchError(f"Create Gitea User failed：{created.stderr.strip()[:300]}")
     token_result = _compose(
         spec,
         "exec",
@@ -537,7 +537,7 @@ def _bootstrap_gitea(spec: FrozenExperiment) -> dict[str, str]:
         timeout=15,
     )
     if response.status_code not in {201, 409}:
-        raise AuditLaunchError(f"创建 Gitea 仓失败：HTTP {response.status_code}")
+        raise AuditLaunchError(f"Create Gitea Repository failed：HTTP {response.status_code}")
     credentials = {
         "base_url": base_url,
         "owner": owner,
@@ -744,8 +744,8 @@ def run_experiment(
     dirty = plan["controller_worktree_dirty"]
     if dirty and not allow_dirty_controller:
         raise AuditLaunchError(
-            "controller worktree 非干净状态，正式实验拒绝启动；"
-            "先提交并更新 source.auto_designer_sha，开发联调才可显式使用 "
+            "controller worktree Unclean state，Formal experiment startup refused；"
+            "Commit and update first source.auto_designer_sha，Explicit use allowed only for development integration testing "
             "--allow-dirty-controller"
         )
     _ensure_created(spec, resume=resume)
@@ -756,7 +756,7 @@ def run_experiment(
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
-            raise AuditLaunchError("已有 controller 正在运行该实验") from exc
+            raise AuditLaunchError("Existing controller Running this experiment") from exc
         state = last_state(path=spec.paths["journal"])
         allowed = (
             {"FAILED", "STOPPED", "PROVISIONED", "READY"}
@@ -769,7 +769,7 @@ def run_experiment(
         )
         if state not in allowed:
             action = "resume" if resume else "fresh"
-            raise AuditLaunchError(f"实验当前状态 {state}，拒绝 {action}")
+            raise AuditLaunchError(f"Current experiment status {state}，Reject {action}")
         if resume:
             ledger = RecoveryStore.open(
                 root=spec.paths["checkpoints"], identity=RecoveryIdentity(**identity)
@@ -838,7 +838,7 @@ def run_experiment(
                 to_state="FAILED",
                 resources={"returncode": returncode, "log": str(log_path)},
             )
-            raise AuditLaunchError(f"闭环退出 {returncode}；现场已保留：{spec.root}")
+            raise AuditLaunchError(f"Closed loop exited {returncode}；State preserved：{spec.root}")
         append_journal(
             path=spec.paths["journal"],
             action="closed-loop-completed",
@@ -860,20 +860,20 @@ def run_experiment(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="配置驱动的可审计闭环实验启动器")
+    parser = argparse.ArgumentParser(description="Configuration driven auditable closed loop experiment launcher")
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--secrets-file", type=Path)
     parser.add_argument("--runs-dir", type=Path)
     parser.add_argument("--run-id")
     parser.add_argument(
-        "--check", action="store_true", help="只做静态/环境预检，不创建实验或启动容器"
+        "--check", action="store_true", help="Static checks only/Environment preflight，Do not create experiments or start containers"
     )
-    parser.add_argument("--no-probe", action="store_true", help="预检时不调用模型 endpoint")
-    parser.add_argument("--resume", action="store_true", help="复用冻结身份并从 recovery 状态续跑")
+    parser.add_argument("--no-probe", action="store_true", help="Do not call the model during preflight endpoint")
+    parser.add_argument("--resume", action="store_true", help="Reuse the frozen identity and resume from recovery Resume from state")
     parser.add_argument(
         "--allow-dirty-controller",
         action="store_true",
-        help="仅开发联调：允许未提交 controller 代码，正式实验禁止使用",
+        help="Development integration testing only：Allow uncommitted controller Code，Prohibited in formal experiments",
     )
     return parser
 

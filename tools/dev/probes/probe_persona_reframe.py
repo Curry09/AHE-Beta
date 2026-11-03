@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""手动对照模拟：tempo ⊥ d43、过程卷入影响 stuck、卡注入缺省/显式 D7。
+"""Manual reference simulation: tempo ⊥ d43, process involvement affects stuck, card injection default/explicit D7.
 
-Spec-0037/T6: 脚本态正交探针（非 CI 门禁）。
+Spec-0037/T6: script-mode orthogonal probe (not CI gate).
 
-不依赖 LLM、不绑 v0 harness 协议细节——只跑状态机 + 脚本会话 + 卡注入。
+No LLM dependency, no v0 harness protocol details binding—only state machine + scripted session + card injection.
 
   PYTHONPATH=backend python -m tools.dev.probes.probe_persona_reframe
 """
@@ -67,7 +67,7 @@ def section(title: str) -> None:
 
 
 def probe_orthogonality() -> list[str]:
-    """期望：patience 跟 tempo，不跟 d43。"""
+    """Expectation: patience follows tempo, not d43."""
     bugs: list[str] = []
     cases = [
         ("feedback+impatient", D43Correct.FEEDBACK, TimeTemperament.IMPATIENT, 3, 2),
@@ -75,7 +75,7 @@ def probe_orthogonality() -> list[str]:
         ("give_up+patient", D43Correct.GIVE_UP, TimeTemperament.PATIENT, 7, 1),
         ("give_up+impatient", D43Correct.GIVE_UP, TimeTemperament.IMPATIENT, 3, 2),
     ]
-    section("1) tempo ⊥ d43（耐心基线/衰减）")
+    section("1) tempo ⊥ d43（patience baseline/decay）")
     for name, d43, tempo, want_p0, want_decay in cases:
         p = _p(pid=name, tempo=tempo, d43=d43)
         st = init_state(p)
@@ -93,7 +93,7 @@ def probe_orthogonality() -> list[str]:
 
 def probe_stuck_involvement() -> list[str]:
     bugs: list[str] = []
-    section("2) 过程卷入抬高 stuck 扣减")
+    section("2) Process involvement increases the stuck penalty")
     low = _p(pid="low", tempo=TimeTemperament.STEADY, d42=D42Supervise.FIRE_FORGET)
     high = _p(pid="high", tempo=TimeTemperament.STEADY, d42=D42Supervise.EVERY_STEP)
     s_low, s_high = init_state(low), init_state(high)
@@ -111,7 +111,7 @@ def probe_stuck_involvement() -> list[str]:
 
 def probe_prompt_language() -> list[str]:
     bugs: list[str] = []
-    section("3) BLOCK-P 是人话，不焊产品 UX")
+    section("3) BLOCK-P describes human behavior without prescribing product UX")
     p = _p(
         pid="prompt",
         tempo=TimeTemperament.IMPATIENT,
@@ -143,7 +143,7 @@ def probe_prompt_language() -> list[str]:
 
 def probe_card_injection() -> list[str]:
     bugs: list[str] = []
-    section("4) 卡注入：显式 D7 + 旧卡缺省 steady")
+    section("4) Card injection: explicit D7 + steady default for older cards")
     base = {
         "id": "probe-card",
         "authenticity": "authentic",
@@ -196,7 +196,7 @@ def probe_card_injection() -> list[str]:
 
 def probe_scripted_session() -> list[str]:
     bugs: list[str] = []
-    section("5) 脚本会话冒烟（能力分叉仍可跑通）")
+    section("5) Scripted session smoke test (capability branches still work)")
     client = ScriptedPersonaClient()
     for p in (
         _p(pid="sess-shallow", tempo=TimeTemperament.STEADY, d1=D1Eval.SHALLOW),

@@ -3,7 +3,7 @@ name: extract-harness-seed
 description: >-
   Harvest one reproducible task seed (with a built-in oracle) from an
   already-resolved real artifact — a closed issue + merged fix PR, or a
-  high-voted Q&A — to feed the seed library that drives the user → issue → 体感
+  high-voted Q&A — to feed the seed library that drives the user → issue → experience
   loop. Use when building or expanding the seed library, sourcing real coding
   tasks for harness simulation, or auditing seed oracle/reproducibility quality.
   A seed = a real user demand + a harness-independent success oracle + a
@@ -16,58 +16,58 @@ description: >-
 
 # Extract Harness-Seed
 
-一个**薄抽取 skill（spoke）**：从**已解决的真实制品**（closed issue + merged fix PR、accepted /
-高票 Q&A）harvest **一张种子卡**。卡的 schema / 枚举 / domain 词表 / 两道门原则 / held-out 字段
-存放约定一律来自唯一公共契约 [`../seed-card-schema.md`](../seed-card-schema.md)，本文件只写
-**「从『已解决制品』这类来源 harvest、过两道门、ground/转录哪几字段」**这一来源特异性，不内嵌
-schema，也不依赖任何其它 skill。
+A **thin extraction skill (spoke)**: harvest **one seed card** from a **resolved real-world artifact** (closed issue + merged fix PR, accepted /
+highly voted Q&A). The card schema / enums / domain vocabulary / two-gate principles / held-out field
+storage conventions all come from the sole shared contract [`../seed-card-schema.md`](../seed-card-schema.md). This file describes only
+**the source-specific details of harvesting from 'resolved artifacts', passing the two gates, and which fields to ground/transcribe**; it embeds no
+schema and depends on no other skill.
 
-它是 `signal = persona × seed × judgment` 里 **WHAT + 成功标尺** 那一半：persona 供 WHO，seed 供
-真实任务 + 客观 oracle。seed 与 persona **独立采集**，下游按约束配对（domain 匹配 + 能力可信 +
-autonomy 适配）——配对不在本 skill、也不在 0010 本组。
+It is the **WHAT + success criteria** half of `signal = persona × seed × judgment`: persona supplies WHO, seed supplies
+the real task + objective oracle. Seeds and personas are **collected independently**, and paired downstream under constraints (domain match + credible capability +
+autonomy fit) — pairing is outside this skill and outside the 0010 group.
 
-> **收编说明**：本 skill 收编 NexAU 仓 `extract-harness-seed` 沉淀的既有方法（harvest 不 author /
-> 两道门 / 与 held-out 解耦），但**只引本仓契约、不拷贝 NexAU 的 skill 文件**。契约以本仓
-> `seed-card-schema.md` 为准。
+> **Incorporation note**: This skill incorporates the established methods developed in NexAU repository `extract-harness-seed` (harvest, not author /
+> two gates / decoupling from held-out), but **references only this repository's contract and does not copy NexAU's skill files**. The contract is defined by this repository's
+> `seed-card-schema.md`.
 
-## 核心原则（本源特异，其余引契约铁律）
+## Core Principles (Specific to This Source; Refer to the Contract's Inviolable Rules for the Rest)
 
-1. **Harvest，不 author（本源的立身之本）**：只从**已解决**的真实制品取卡。真实世界那次解决
-   *即* 沉淀好的 oracle——转录它，别发明。fix PR 新增的回归测试是理想 oracle（FAIL@parent →
-   PASS@fix，即 SWE-bench 配方，但施于**非 benchmark** 实例）。见契约铁律 #2。
-2. **capability-first**：只保留压测某个**distinct** harness 能力的卡（契约 §capability 分类法）。
-   库的对象是**分类法覆盖度**，不是任务堆。从 *修复揭示* 的真实所需去标 `capability_probed`。
-3. **两道门缺一不可**：oracle 门（成功须 harness-独立且可判）+ harbor 可复现门（可确定性搭环境跑
-   oracle）。门细则、oracle 分层、可复现分层一律见契约 §两道门原则。不过门 → 出**被拒卡**
-   （`{reject_reason, action}`），不入库。
-4. **保留真实诉求原貌**：`task.prompt` 保留用户原话与规格层级（欠规格 / 含糊 / 缺上下文都保留），
-   不 sanitize 成干净 spec。见契约铁律 #4。
-5. **非 benchmark + 与当前 bug 解耦**：绝不采 held-out benchmark 实例（契约铁律 #3）；也不据 harness
-   *当前已知* bug 采卡（否则过拟合今日失败而非泛化能力）。
-6. **FACT 转录 / JUDGMENT 判定**：`repo_at`/`test_cmd`/`not_in_benchmark`/`resolution_quote`/urls
-   逐字转录工具输出或由命令派生（**绝不发明**——错的 fact 会静默让 oracle 反转或不跑）；
-   `task.prompt`/`domain`/`capability_probed`/`difficulty`/`scope`/`oracle.tier` 按准则判定。
+1. **Harvest, not author (the foundation of this source)**: Take cards only from **resolved** real-world artifacts. The actual real-world resolution
+   *is* the established oracle — transcribe it, do not invent one. Regression tests added by the fix PR are the ideal oracle (FAIL@parent →
+   PASS@fix, the SWE-bench recipe applied to **non-benchmark** instances). See contract inviolable rule #2.
+2. **capability-first**: Retain only cards that stress-test a **distinct** harness capability (contract §capability taxonomy).
+   The repository aims for **taxonomy coverage**, not a pile of tasks. Label `capability_probed` based on the real need *revealed by the fix*.
+3. **Both gates are mandatory**: the oracle gate (success must be harness-independent and determinable) + the harbor reproducibility gate (the environment can be set up deterministically to run
+   the oracle). For gate details, oracle tiers, and reproducibility tiers, see contract §Two-Gate Principles. If a card fails a gate, → produce a **rejected card**
+   (`{reject_reason, action}`); do not add it to the repository.
+4. **Preserve the original real-world request**: `task.prompt` preserves the user's original wording and level of specification (including underspecification / ambiguity / missing context);
+   do not sanitize it into a clean spec. See contract inviolable rule #4.
+5. **Non-benchmark + decoupled from current bugs**: Never harvest held-out benchmark instances (contract inviolable rule #3); nor harvest cards based on harness
+   *currently known* bugs (otherwise they overfit today's failures rather than generalizable capabilities).
+6. **FACT transcription / JUDGMENT determination**: `repo_at`/`test_cmd`/`not_in_benchmark`/`resolution_quote`/urls
+   are transcribed verbatim from tool output or derived from commands (**never invented** — incorrect facts can silently reverse the oracle or prevent it from running);
+   `task.prompt`/`domain`/`capability_probed`/`difficulty`/`scope`/`oracle.tier` are determined according to the criteria.
 
-## harvest 流水线
+## Harvest Pipeline
 
 ```
 Seed harvest progress:
-- [ ] 选目标：(domain → 其锚点仓) × (一个欠覆盖的 capability)
-- [ ] 找一个 RESOLVED 制品（closed issue + merged fix PR / accepted answer）——不是 benchmark 实例
-- [ ] 抽 task：自然诉求（保留 messiness）+ 最小 context
-- [ ] 从解决制品 harvest oracle；分层；记 reference_solution 与 resolution_quote
-- [ ] 搭 env spec：base_image、repo@parent-commit（真实 SHA）、setup、test_cmd、external_deps、budget
-- [ ] oracle 门：成功是否 harness-独立且可判？
-- [ ] harbor 可复现门：能否在 budget 内确定性搭环境 + 跑 oracle？
-- [ ] 校准 difficulty/scope/autonomy_required；设 pairing_constraints；产出契约形状的卡
+- [ ] Select a target: (domain → its anchor repository) × (an under-covered capability)
+- [ ] Find a RESOLVED artifact (closed issue + merged fix PR / accepted answer)—not a benchmark instance
+- [ ] Extract task: natural request (retain messiness) + minimal context
+- [ ] From the solved artifact harvest oracle; stratify; record reference_solution and resolution_quote
+- [ ] Build env spec: base_image, repo@parent-commit (real SHA), setup, test_cmd, external_deps, budget
+- [ ] oracle gate: Is success harness-independent and judgeable?
+- [ ] harbor reproducibility gate: Can the environment be set up deterministically within budget and oracle be run?
+- [ ] Calibrate difficulty/scope/autonomy_required; set pairing_constraints; produce cards in the shape of the contract
 ```
 
-来源类型词表、oracle / repro 分层表、difficulty/scope 校准、harvest mechanics（发现 query、
-`repo_at` 求法、`not_in_benchmark` 机检、`external_deps` 读法、reproduce-once）与三个范例
-（admit / reject / rubric）见 [reference.md](reference.md)。枚举 / domain 词表 / 卡形状 / 两道门 /
-held-out 存放约定见 [`../seed-card-schema.md`](../seed-card-schema.md)。
+For the source-type vocabulary, oracle / repro tier tables, difficulty/scope calibration, harvest mechanics (discovery queries,
+how to obtain `repo_at`, mechanical checks for `not_in_benchmark`, how to read `external_deps`, reproduce-once), and three examples
+(admit / reject / rubric), see [reference.md](reference.md). For enums / domain vocabulary / card shape / the two gates /
+held-out storage conventions, see [`../seed-card-schema.md`](../seed-card-schema.md).
 
-## 完成时报告
+## Report on Completion
 
-报告：这张卡填的 `(domain × capability)` 格、oracle tier、harbor 可复现 tier、difficulty。宁可**显式
-拒**（oracle-less 或不可复现，出被拒卡）也不要 admit 一张无法产出可归因、可运行信号的卡。
+Report: the `(domain × capability)` cell this card fills, oracle tier, harbor reproducibility tier, and difficulty. Prefer to **explicitly
+reject** (oracle-less or irreproducible, producing a rejected card) rather than admit a card that cannot yield an attributable, runnable signal.

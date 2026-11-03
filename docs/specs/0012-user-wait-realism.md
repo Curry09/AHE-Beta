@@ -1,12 +1,12 @@
 ---
 number: "0012"
-title: 用户侧等待体感真实化：心跳主动权 · 进度可见 · 任务相关耐心
+title: "Making the user's waiting experience realistic: heartbeat-driven initiative · visible progress · task-dependent patience"
 issue: 0
 slug: user-wait-realism
-summary: 把用户 agent 面对慢/卡 harness 时的「干等」升级为可感知的真实体感：等待中心跳唤醒后经 judge→intent→act 决策；等待条展示 live progress 与 prior_activity；keep_waiting 仅在无新进度时耗耐心；WAIT_GAP 与 ATTRIBUTION。起始耐心随任务量浮动。等待菜单与内外 IO 语义以 0022 为准（本组不再定义 invoke_control）。
+summary: "Upgrade the user agent's “idle waiting” when facing a slow/stalled harness to a perceptible, realistic user experience: after a heartbeat wakes it during a wait, it decides through judge→intent→act; the waiting bar displays live progress and prior_activity; keep_waiting consumes patience only when there is no new progress; WAIT_GAP and ATTRIBUTION. Initial patience varies with task load. Waiting menus and internal/external IO semantics follow 0022 (this group no longer defines invoke_control)."
 tasks:
   - id: T1
-    title: 等待中主动权：心跳唤醒 + 进度可见 + 等待衰减口径统一
+    title: "Initiative while waiting: heartbeat wake-ups + visible progress + consistent waiting decay rules"
     status: done
     priority: P1
     tags: []
@@ -17,10 +17,10 @@ tasks:
     parallel: false
     files:
       - backend/tests/user/sim/test_loop.py
-    scope: 真实子进程经 begin/poll 心跳唤醒；等待上下文喂 progress/prior_activity；keep_waiting 仅无 new_progress 时按 patience_decay 耗心；_MAX_HEARTBEATS 兜底；评分 ATTRIBUTION。菜单形状、emit_message、开放 intent/gap、interrupt 归因文案的现行定义见 0022（本组不再维护 invoke_control）。本 Task 文件列表仅保留未被 0022 独占声明的 test_loop；实现主体在 0022/T1 与本组 T2。
-    acceptance: 真实子进程才 supervised；无新进度 keep_waiting 扣心、有进度不扣；耐心耗尽/心跳上限可转 give_up；等待 prompt 含 progress/prior_activity；评分含 ATTRIBUTION。与 0022 菜单单测一并覆盖。
+    scope: "Real subprocesses wake via begin/poll heartbeats; waiting context is supplied with progress/prior_activity; keep_waiting consumes patience according to patience_decay only when there is no new_progress; _MAX_HEARTBEATS provides a fallback limit; scoring ATTRIBUTION. See 0022 for current definitions of menu structure, emit_message, open intent/gap, and interrupt attribution wording (this group no longer maintains invoke_control). This Task's file list retains only test_loop, which is not claimed exclusively by 0022; the main implementation is in 0022/T1 and this group's T2."
+    acceptance: "Only real subprocesses are supervised; keep_waiting deducts patience when there is no new progress and does not deduct it when there is progress; patience exhaustion/the heartbeat limit can lead to give_up; the waiting prompt includes progress/prior_activity; scoring includes ATTRIBUTION. Cover these together with the 0022 menu unit tests."
   - id: T2
-    title: 状态耐心模型：任务量起始浮动 + 性格衰减系数
+    title: "State patience model: task-load-based initial variation + personality-based decay coefficient"
     status: done
     priority: P1
     tags: []
@@ -30,74 +30,74 @@ tasks:
     files:
       - backend/ahe_beta/user/sim/state.py
       - backend/tests/user/sim/test_state.py
-    scope: 把跨轮耐心从固定基线升级为「性格档位 + 任务量微浮动」两级：init_state 由 D4.3 给耐心基线；开局 OPENING 据 task_load 经 apply_task_load 叠加 TASK_LOAD_DELTA，钳到 >=1。Coef.patience_decay 由性格派生，供 apply_verdict 与心跳 keep_waiting 共用。
-    acceptance: 同一 persona 面对 quick 的起始耐心严格低于 epic；浮动只在 OPENING 一次、钳位 >=1；patience_decay 急躁=2 否则 1；apply_verdict 规则单测覆盖。
+    scope: "Upgrade patience across turns from a fixed baseline to two levels: “personality tier + slight task-load variation”: init_state obtains the patience baseline from D4.3; during the initial OPENING, apply_task_load adds TASK_LOAD_DELTA based on task_load, clamped to >=1. Coef.patience_decay is derived from personality and shared by apply_verdict and heartbeat keep_waiting."
+    acceptance: "For the same persona, initial patience for quick is strictly lower than for epic; the variation is applied only once during OPENING and clamped to >=1; patience_decay is 2 for impatient personalities and otherwise 1; apply_verdict rules are covered by unit tests."
 ---
 
-# 0012 · 用户侧等待体感真实化：心跳主动权 · 进度可见 · 任务相关耐心
+# 0012 · Realistic User Waiting Experience: Heartbeat Agency · Visible Progress · Task-Dependent Patience
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level nine-section rust-RFC overview. -->
 
 ## Summary
 
-把用户 agent 面对慢/卡 harness 时的行为，从「静默干等到超时」升级为拟真机制：
+Upgrade the user agent's behavior when facing a slow/stalled harness from “silently waiting until timeout” to realistic mechanisms:
 
-1. **等待中的主动权**——心跳唤醒后走 **judge → intent → act**。
-2. **可见进度**——等待 prompt 喂 `last_progress` 与跨轮 `prior_activity`。
-3. **有条件耗心**——`keep_waiting` **仅当本心跳无 new_progress** 才扣耐心。
-4. **WAIT_GAP + ATTRIBUTION**——意愿未兑现记 gap；用户自打断不归咎 harness。
-5. **任务相关起始耐心**——性格档位 + 任务量微浮动。
+1. **Agency while waiting**—follow **judge → intent → act** after a heartbeat wake-up.
+2. **Visible progress**—feed `last_progress` and cross-turn `prior_activity` into the waiting prompt.
+3. **Conditional patience depletion**—`keep_waiting` reduces patience **only when this heartbeat has no new_progress**.
+4. **WAIT_GAP + ATTRIBUTION**—record a gap when intent is not fulfilled; do not blame the harness for user-initiated interruption.
+5. **Task-dependent initial patience**—personality level + slight variation based on task size.
 
-**等待菜单、内外通道、开放 intent、`emit_message`、interrupt 归因的现行定义见 0022**（本组不再描述 `invoke_control` / 封闭 intent 枚举）。
+**See 0022 for the current definitions of the waiting menu, internal/external channels, open intent, `emit_message`, and interrupt attribution** (this group no longer describes `invoke_control` / closed intent enums).
 
 ## Motivation
 
-0005 回合制把慢 harness 压成「最终一次判断」，丢掉等待过程体感；起始耐心与任务量无关。本组引入心跳、进度可见、有条件耗心与任务量浮动。菜单与 IO 边界的换代由 0022 完成。
+The turn-based approach in 0005 compresses a slow harness into “one final judgment,” losing the user experience during the wait; initial patience is unrelated to task size. This group introduces heartbeats, visible progress, conditional patience depletion, and task-size variation. 0022 handles the replacement of the menu and IO boundaries.
 
 ## Guide-level explanation
 
-- 真实子进程才心跳；Fake/Scripted 否。
-- 决策三跳；上下文含秒数、history、MANUAL、progress、prior_activity。
-- `keep_waiting`：无新进度才耗心；触顶或耐心耗尽 → 放弃（具体动作 ID 见 0022）。
-- 起始耐心：OPENING `task_load` 微浮动。
-- ATTRIBUTION：自 interrupt 勿怪 harness。
+- Heartbeats apply only to real subprocesses; not Fake/Scripted.
+- Three decision hops; context includes elapsed seconds, history, MANUAL, progress, and prior_activity.
+- `keep_waiting`: deplete patience only when there is no new progress; reaching the cap or exhausting patience → give up (see 0022 for specific action IDs).
+- Initial patience: slight OPENING `task_load` variation.
+- ATTRIBUTION: do not blame the harness for self-initiated interrupt.
 
 ## Reference-level explanation
 
-### 锚点
+### Anchors
 
-- 心跳编排与菜单现行代码：见 **0022/T1**（`loop.py` / `prompt.py` / `launcher.py`）。
-- 耐心模型：`state.py`（本组 T2）。
+- Current heartbeat orchestration and menu code: see **0022/T1** (`loop.py` / `prompt.py` / `launcher.py`).
+- Patience model: `state.py` (T2 in this group).
 
 ### DAG
 
 ```mermaid
 graph LR
-  T1[T1 心跳与衰减口径]
-  T2[T2 耐心模型]
+  T1[T1 Heartbeat and decay definitions]
+  T2[T2 Patience model]
 ```
 
-### 与相邻组
+### Adjacent groups
 
-- **0022**：内外窗口、等待菜单、开放 intent、`report_issue`、slash。
-- **0013 / 0019/T1**：progress 发射与旁路接收。
+- **0022**: internal/external windows, waiting menu, open intent, `report_issue`, slash.
+- **0013 / 0019/T1**: progress emission and side-channel reception.
 
 ## Drawbacks
 
-只对真实子进程生效；three 模式 LLM 调用多；常量经验值。
+Applies only to real subprocesses; three mode makes more LLM calls; constants are empirical values.
 
 ## Rationale and alternatives
 
-心跳 + 有条件耗心优于「超时直接放弃」或「每次 keep 都扣心」。菜单换代不在本组重复设计，交给 0022。
+Heartbeats + conditional patience depletion are preferable to “give up immediately on timeout” or “deduct patience on every keep.” Menu replacement is delegated to 0022 rather than redesigned in this group.
 
 ## Prior art
 
-0005；长运行 agent heartbeat；0022 IO 边界。
+0005; long-running agent heartbeat; 0022 IO boundaries.
 
 ## Unresolved questions
 
-阈值与 `TASK_LOAD_DELTA` 是否重标。
+Whether to recalibrate the thresholds and `TASK_LOAD_DELTA`.
 
 ## Future possibilities
 
-等待序列结构化喂 0016；按情绪调心跳频率。
+Feed structured waiting sequences into 0016; adjust heartbeat frequency based on emotion.

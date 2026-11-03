@@ -1,12 +1,12 @@
-# Conventional Commits（CLAUDE.md 代码规范）
-# 类型：feat / fix / refactor / chore / docs / test / ci / style / perf / build / spec
+# Conventional Commits (see the code conventions in CLAUDE.md)
+# Types: feat / fix / refactor / chore / docs / test / ci / style / perf / build / spec
 extends:
   - '@commitlint/config-conventional'
 rules:
-  # 本仓提交 subject 为中文，且常以专有名词起头（OVERVIEW / CLAUDE.md / Gitea），
-  # config-conventional 的 subject-case（禁 upper/pascal/start-case）对此场景误报，关闭之。
+  # Subjects may begin with proper names such as OVERVIEW, CLAUDE.md or Gitea.
+  # Disable subject-case restrictions to avoid false positives for those names.
   subject-case: [0]
-  # 在 config-conventional 默认类型基础上增补 `spec`（spec-driven 项目专用：撰写/修订 spec 制品）。
+  # Add spec to the conventional types for creating and revising specifications.
   type-enum:
     - 2
     - always

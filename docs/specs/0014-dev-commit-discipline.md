@@ -1,46 +1,46 @@
 ---
 number: "0014"
-title: 旧内置 Developer 提交纪律（已退役）
+title: "Legacy Built-in Developer Commit Discipline (Retired)"
 issue: 0
 slug: dev-commit-discipline
-summary: 旧内置 Developer 的两个提交中间件及其装配任务已退役，不再作为当前运行保障；历史设计与实现保留在 Git 历史。
+summary: "The legacy built-in Developer's two commit middleware components and their assembly tasks have been retired and no longer serve as current runtime safeguards; the historical design and implementation remain in Git history."
 tasks: []
 ---
 
-# 0014 · 旧内置 Developer 提交纪律（已退役）
+# 0014 · Legacy Built-in Developer Commit Discipline (Retired)
 
 ## Summary
 
-本组无现役任务。旧内置 Developer 的增量提交催促、收尾检查和对应配置接线已经退役。此次清理删除未被当前运行时加载的两个中间件与专属测试，原任务通过 `spec abandon` 移出活快照。
+This group has no active tasks. The legacy built-in Developer's incremental commit reminders, completion checks, and corresponding configuration wiring have been retired. This cleanup deletes two middleware components not loaded by the current runtime and their dedicated tests; the original tasks are removed from the active snapshot through `spec abandon`.
 
 ## Motivation
 
-需求面和交付面已经分离，代码实现由独立 OpenAgents CLI 执行。保留未接线的旧中间件，会使维护者误以为阶段性提交、手册同步和主入口 AST 检查仍在运行。
+The requirements side and delivery side have been separated, with code implementation performed by the independent OpenAgents CLI. Retaining unwired legacy middleware would mislead maintainers into thinking that intermediate commits, manual synchronization, and main-entry AST checks are still running.
 
 ## Guide-level explanation
 
-当前不配置这组旧中间件。仍有效的需求 Agent 文件访问检查、编排仓完整性检查和 Harness 提交钩子位于 `backend/ahe_beta/guards/`，它们不等同于旧 Developer 的提交纪律。
+This legacy middleware group is not configured in the current system. The requirements Agent file-access checks, orchestration repository integrity checks, and Harness commit hooks that remain active are located in `backend/ahe_beta/guards/`; they are not equivalent to the legacy Developer's commit discipline.
 
 ## Reference-level explanation
 
-T1、T2 及专门装配它们的 T3 已退役；本组不再拥有代码文件。过去的源文件、参数、测试与实现可通过 Git 历史追溯。当前 `guards/` 仅包含 `workspace_jail.py`、`repo_guard.py`、`harness_boundary.py` 与包入口，没有旧模块的转发导出。
+T1, T2, and T3, which specifically assembled them, have been retired; this group no longer owns any code files. Past source files, parameters, tests, and implementations can be traced through Git history. Currently, `guards/` contains only `workspace_jail.py`, `repo_guard.py`, `harness_boundary.py`, and the package entry point, with no forwarding exports for the old modules.
 
 ## Drawbacks
 
-当前发布不再提供这两份旧中间件的可导入入口；依赖旧内置 Developer 的实验需使用原版本。
+The current release no longer provides importable entry points for these two legacy middleware components; experiments that depend on the legacy built-in Developer must use the original version.
 
 ## Rationale and alternatives
 
-不把无运行时引用的中间件一起搬入 `guards/`，因为这会继续混淆现役保障与历史实现；也不将它们移植到 OpenAgents，因为这涉及独立的执行协议和质量门设计。
+Middleware without runtime references is not moved into `guards/`, because that would continue to confuse active safeguards with historical implementations; nor is it ported to OpenAgents, because that involves a separate execution protocol and quality gate design.
 
 ## Prior art
 
-旧设计试图在 Agent 内施加增量提交与收尾约束。当前 OpenAgents 按自身配置执行工程交付，本组不宣称它等价实现旧中间件的全部检查。
+The old design attempted to impose incremental commit and completion constraints within the Agent. Current OpenAgents performs engineering delivery according to its own configuration; this group does not claim that it equivalently implements all checks from the legacy middleware.
 
 ## Unresolved questions
 
-无。退役范围限定为旧提交中间件及其配置接线，有效边界检查保留。
+None. Retirement is limited to the legacy commit middleware and its configuration wiring; active boundary checks are retained.
 
 ## Future possibilities
 
-若需要在交付面恢复特定提交纪律，应单独提出需求，并在 OpenAgents 仓验证实际装配与效果。
+If specific commit discipline needs to be restored on the delivery side, propose separate requirements and verify the actual assembly and effects in the OpenAgents repository.

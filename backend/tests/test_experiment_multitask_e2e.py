@@ -277,9 +277,9 @@ def test_two_round_mixed_workload_stops_resumes_and_delivers_nonempty(
                         "priority": "P1",
                         "proposal_title": "Harness reports changes without verification receipts",
                         "fields": {
-                            "根因区域": "reply verification",
-                            "边界": "generic Harness output",
-                            "验收": "report checks performed",
+                            "root_cause": "reply verification",
+                            "boundary": "generic Harness output",
+                            "acceptance": "report checks performed",
                         },
                         "artifact": {
                             "reported_problem": "Claims of changes lack verification receipts.",

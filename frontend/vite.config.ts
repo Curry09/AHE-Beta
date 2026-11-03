@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// dev 时把 /api 代理到 uvicorn（默认 8000），生产由 FastAPI 托管 dist。
+// Proxy /api to uvicorn (port 8000 by default) in development; FastAPI serves dist in production.
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || "/",
   plugins: [react()],

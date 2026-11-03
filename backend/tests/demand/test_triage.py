@@ -1,15 +1,17 @@
-# Spec-0029/T3：Triager 单测——三值 disposition（accept/reject/needs_info），accept 就地升 proposal。
-"""stub agent（回放固定 submit_triage 返回）+ FakeTracker + 临时 SessionStore：验证 driver 把每条
-disposition 正确落成三平面标签/评论/关闭；不判重；支持分片传入 pending。不跑真 nexau。"""
+# Spec-0029/T3: Triager unit test — three-valued disposition (accept/reject/needs_info); accept promotes to proposal in place.
+"""stub agent (replays a fixed submit_triage return) + FakeTracker + temporary SessionStore: verify the driver correctly materializes each
+disposition into three-plane labels/comments/closure; no dedup; supports passing in a pending shard. Does not run real nexau."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
+import jsonschema
 import pytest
 import requests
 
+from ahe_beta.demand import agent_contract as ac
 from ahe_beta.demand import issue_schema as sc
 from ahe_beta.demand.triage import TriageOutcome, Triager, _proposal_labels, _proposal_title
 from ahe_beta.loop.recovery import (
@@ -26,7 +28,7 @@ from ahe_beta.user.session_store import SessionStore
 
 
 class _StubTriager(Triager):
-    """覆盖 _run_agent：不跑真 nexau，回放固定 submit 返回，并记录喂进的 pending 集合。"""
+    """Override _run_agent: does not run real nexau; replays a fixed submit return and records the pending set fed in."""
 
     def __init__(self, *args, canned: str, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -54,7 +56,7 @@ def _report(tracker: FakeTracker, title: str, kind: str = "bug") -> int:
 
 
 def _submit(dispositions: list) -> str:
-    """打成 submit_triage 的返回形状（stop tool binding 的输出）。"""
+    """Shaped into the return form of submit_triage (the output of the stop tool binding)."""
     return json.dumps({"dispositions": dispositions}, ensure_ascii=False)
 
 
@@ -90,21 +92,21 @@ def _recovery(tmp_path: Path) -> RecoveryStore:
 
 def _accept(n: int, *, kind: str = "bug", priority: str = "P1", fields: dict | None = None) -> dict:
     default_fields = {
-        "根因区域": "entry.py 无预算感知",
-        "边界": "只改通用能力",
-        "验收": "预算内交付",
+        "root_cause": "entry.py No budget awareness",
+        "boundary": "Only change general capabilities",
+        "acceptance": "Delivery within budget",
     }
     return {
         "issue": n,
         "disposition": "accept",
         "kind": kind,
         "priority": priority,
-        "proposal_title": "精确任务执行缺少预算感知",
+        "proposal_title": "Precise task execution lacks budget awareness",
         "fields": fields if fields is not None else default_fields,
         "artifact": {
-            "reported_problem": "任务执行超出预算",
-            "user_impact": "用户未获得可用交付",
-            "scope_boundary": "通用 harness 执行行为",
+            "reported_problem": "Task execution exceeds budget",
+            "user_impact": "User did not receive usable delivery",
+            "scope_boundary": "General harness Execution behavior",
             "evidence": [f"report:#{n}"],
             "uncertainties": [],
             "implementation_target": "harness",
@@ -113,7 +115,7 @@ def _accept(n: int, *, kind: str = "bug", priority: str = "P1", fields: dict | N
 
 
 def test_submit_triage_yaml_matches_contract() -> None:
-    """drift-guard：submit_triage.tool.yaml 的 input_schema 与 dispositions_input_schema() 深度相等。"""
+    """drift-guard: the input_schema of submit_triage.tool.yaml is deeply equal to dispositions_input_schema()."""
     import yaml
 
     from ahe_beta.demand.agent_contract import dispositions_input_schema
@@ -127,7 +129,7 @@ def test_submit_triage_yaml_matches_contract() -> None:
     )
     tool_def = yaml.safe_load(p.read_text(encoding="utf-8"))
     assert tool_def["input_schema"] == dispositions_input_schema()
-    # 三值 enum：duplicate 已退役（跨提案吸收归 Architect）
+    # Three-valued enum: duplicate has been retired (cross-proposal absorption is handled by the Architect)
     enum = tool_def["input_schema"]["properties"]["dispositions"]["items"]["properties"][
         "disposition"
     ]["enum"]
@@ -136,41 +138,120 @@ def test_submit_triage_yaml_matches_contract() -> None:
 
 def test_no_pending_is_noop(tmp_path) -> None:
     tracker = FakeTracker()
-    tracker.create_issue(IssueDraft(title="已是提案", body="x", labels=["bug", sc.PROPOSAL]))
+    tracker.create_issue(
+        IssueDraft(title="Already a proposal", body="x", labels=["bug", sc.PROPOSAL])
+    )
     t = _triager(tmp_path, tracker, _submit([]))
     out = t.triage_once()
     assert out.handled == 0
-    assert t.agent_calls == 0  # 无 report → 不跑 LLM
+    assert t.agent_calls == 0  # No report → no LLM run
 
 
 def test_accept_promotes_report_to_proposal(tmp_path) -> None:
     tracker = FakeTracker()
-    n = _report(tracker, "unidecode 超时", kind="bug")
-    out = _triager(tmp_path, tracker, _submit([_accept(n)])).triage_once()
+    n = _report(tracker, "unidecode timeout", kind="bug")
+    submitted = {"dispositions": [_accept(n)]}
+    jsonschema.validate(submitted, ac.dispositions_input_schema())
+    out = _triager(tmp_path, tracker, json.dumps(submitted, ensure_ascii=False)).triage_once()
 
     assert isinstance(out, TriageOutcome) and out.accepted == [n]
     snap = tracker.issue(n)
     assert sc.PROPOSAL in snap["labels"] and sc.FROM_TRIAGE in snap["labels"]
     assert "bug" in snap["labels"] and "P1" in snap["labels"]
-    assert sc.REPORT not in snap["labels"]  # 离开 report 平面
-    assert "round-1" in snap["labels"]  # 属性保留
+    assert sc.REPORT not in snap["labels"]  # Leave the report plane
+    assert "round-1" in snap["labels"]  # Attributes preserved
     assert snap["state"] == "open"
-    # 提案不可领（由 Delivery Router 打 openagents 交接令牌后进入交付面）
+    # Proposals cannot be claimed (the Delivery Router applies an openagents handoff token, after which they enter the delivery plane)
     assert not sc.is_ready(labels=snap["labels"], state=snap["state"])
     assert sc.plane(snap["labels"]) == sc.PROPOSAL
-    assert snap["body"].startswith("## Triage 规范化提案（实施对象：harness）")
-    assert "entry.py 无预算感知" in snap["body"]
-    assert snap["title"] == "精确任务执行缺少预算感知"
-    assert "原始用户报告" not in snap["body"]
-    assert any("原始标题" in c and "unidecode 超时" in c and "x" in c for c in snap["comments"])
-    assert "根因区域" in snap["body"] and "entry.py 无预算感知" in snap["body"]
+    assert snap["body"].startswith("## Triage normalized proposal (implementation target: harness)")
+    assert "entry.py No budget awareness" in snap["body"]
+    assert snap["title"] == "Precise task execution lacks budget awareness"
+    assert "Original user report" not in snap["body"]
+    assert any(
+        "Original title" in c and "unidecode timeout" in c and "x" in c for c in snap["comments"]
+    )
+    assert "### Root cause" in snap["body"] and "entry.py No budget awareness" in snap["body"]
+    assert "### Boundary\n\nOnly change general capabilities" in snap["body"]
+    assert "### Acceptance criteria\n\nDelivery within budget" in snap["body"]
+    assert "### Root cause area" not in snap["body"]
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"Root cause area": "cause", "Boundary": "scope", "Acceptance": "result"},
+        {
+            "root_cause": "cause",
+            "boundary": "scope",
+            "acceptance": "result",
+            "Root cause area": "old",
+        },
+        {"root_cause": "cause", "boundary": "scope", "acceptance": "result", "Root cause": "label"},
+        {"root_cause": "cause", "boundary": "scope", "Acceptance": "old"},
+        {"root_cause": "cause", "boundary": "scope", "acceptance": "result", "extra": "unknown"},
+        {"root_cause": 42, "boundary": "scope", "acceptance": "result"},
+        None,
+        [],
+        "not an object",
+    ],
+)
+def test_driver_fallback_rejects_noncanonical_or_malformed_fields(tmp_path, fields) -> None:
+    tracker = FakeTracker()
+    number = _report(tracker, "Unicode Original report")
+    decision = _accept(number)
+    decision["fields"] = fields
+
+    outcome = _triager(tmp_path, tracker, _submit([decision])).triage_once()
+
+    assert outcome.needs_info == [number] and outcome.accepted == []
+    assert outcome.failed == {}
+    issue = tracker.issue(number)
+    assert issue["state"] == "closed" and sc.DECLINED in issue["labels"]
+    assert sc.PROPOSAL not in issue["labels"]
+
+
+@pytest.mark.parametrize(
+    ("kind", "fields"),
+    [
+        (
+            "bug",
+            {
+                "root_cause": "cause",
+                "boundary": "scope",
+                "acceptance": "result",
+                "deliverable": "feature-only field",
+            },
+        ),
+        (
+            "feature",
+            {
+                "boundary": "scope",
+                "deliverable": "result",
+                "acceptance": "check",
+                "root_cause": "bug-only field",
+            },
+        ),
+    ],
+)
+def test_tool_union_allows_cross_kind_keys_but_driver_rejects_them(tmp_path, kind, fields):
+    tracker = FakeTracker()
+    number = _report(tracker, "Cross-kind fields")
+    decision = _accept(number, kind=kind, fields=fields)
+    submitted = {"dispositions": [decision]}
+    jsonschema.validate(submitted, ac.dispositions_input_schema())
+
+    outcome = _triager(tmp_path, tracker, json.dumps(submitted)).triage_once()
+
+    assert outcome.needs_info == [number] and outcome.accepted == []
+    assert sc.PROPOSAL not in tracker.issue(number)["labels"]
 
 
 def test_long_multibyte_proposal_title_is_bounded_without_splitting_utf8(tmp_path) -> None:
     tracker = FakeTracker()
-    number = _report(tracker, "原报告")
+    number = _report(tracker, "Original report")
     disposition = _accept(number)
-    model_title = "中文提案" * 35
+    model_title = "Chinese proposal" * 35
     disposition["proposal_title"] = model_title
 
     outcome = _triager(tmp_path, tracker, _submit([disposition])).triage_once()
@@ -183,10 +264,10 @@ def test_long_multibyte_proposal_title_is_bounded_without_splitting_utf8(tmp_pat
 
 
 def test_accept_old_needs_triage_data_also_works(tmp_path) -> None:
-    """旧数据（needs-triage 标签）经 plane 映射进 pending，accept 后同样升 proposal、旧标签清除。"""
+    """Legacy data (needs-triage label) is mapped into pending via the plane; after accept it likewise promotes to proposal and the old label is cleared."""
     tracker = FakeTracker()
     n = tracker.create_issue(
-        IssueDraft(title="旧数据", body="x", labels=["bug", sc.NEEDS_TRIAGE, "round-2"])
+        IssueDraft(title="Old data", body="x", labels=["bug", sc.NEEDS_TRIAGE, "round-2"])
     ).number
     out = _triager(tmp_path, tracker, _submit([_accept(n)])).triage_once()
     assert out.accepted == [n]
@@ -196,29 +277,33 @@ def test_accept_old_needs_triage_data_also_works(tmp_path) -> None:
 
 def test_accept_reclassifies_kind(tmp_path) -> None:
     tracker = FakeTracker()
-    n = _report(tracker, "其实是需求", kind="bug")  # sim 暂定 bug
-    fields = {"边界": "只加通用能力", "交付物": "导出接口", "验收": "能批量导出"}
+    n = _report(tracker, "Actually a requirement", kind="bug")  # sim tentatively a bug
+    fields = {
+        "boundary": "Only add general capabilities",
+        "deliverable": "Export interface",
+        "acceptance": "Supports bulk export",
+    }
     out = _triager(
         tmp_path, tracker, _submit([_accept(n, kind="feature", priority="P2", fields=fields)])
     ).triage_once()
     assert out.accepted == [n]
     labels = tracker.issue(n)["labels"]
-    assert "feature" in labels and "bug" not in labels  # 纠正 kind
+    assert "feature" in labels and "bug" not in labels  # Correct the kind
 
 
 def test_accept_invalid_priority_not_labeled(tmp_path) -> None:
     tracker = FakeTracker()
-    n = _report(tracker, "超时")
-    _triager(tmp_path, tracker, _submit([_accept(n, priority="紧急")])).triage_once()
+    n = _report(tracker, "timeout")
+    _triager(tmp_path, tracker, _submit([_accept(n, priority="Urgent")])).triage_once()
     labels = tracker.issue(n)["labels"]
     assert sc.PROPOSAL in labels and not any(p in labels for p in sc.PRIORITIES)
 
 
 def test_accept_missing_fields_downgrades_to_needs_info(tmp_path) -> None:
     tracker = FakeTracker()
-    n = _report(tracker, "坏了")
+    n = _report(tracker, "Broken")
     out = _triager(
-        tmp_path, tracker, _submit([_accept(n, fields={"根因区域": "只填了这个"})])
+        tmp_path, tracker, _submit([_accept(n, fields={"root_cause": "Only filled this in"})])
     ).triage_once()
     assert out.needs_info == [n] and out.accepted == []
     snap = tracker.issue(n)
@@ -227,7 +312,7 @@ def test_accept_missing_fields_downgrades_to_needs_info(tmp_path) -> None:
 
 def test_accept_missing_normalized_title_downgrades_to_needs_info(tmp_path) -> None:
     tracker = FakeTracker()
-    n = _report(tracker, "某被测对象的具体问题")
+    n = _report(tracker, "Specific issue with a tested subject")
     disposition = _accept(n)
     disposition.pop("proposal_title")
     out = _triager(tmp_path, tracker, _submit([disposition])).triage_once()
@@ -240,11 +325,11 @@ def test_accept_missing_normalized_title_downgrades_to_needs_info(tmp_path) -> N
 )
 def test_out_of_scope_accept_closes_report_and_recovery_unit(tmp_path, target, bucket) -> None:
     tracker = FakeTracker()
-    number = _report(tracker, "缺少输入文件")
+    number = _report(tracker, "Missing input file")
     frozen_issue = tracker.list_open_issues()[0]
     disposition = _accept(number)
     disposition["artifact"]["implementation_target"] = target
-    disposition["reason"] = "文件接入的实现归属尚待确认"
+    disposition["reason"] = "Ownership of the file ingestion implementation remains to be confirmed"
     recovery = _recovery(tmp_path)
     triager = _StubTriager(
         tracker,
@@ -264,7 +349,10 @@ def test_out_of_scope_accept_closes_report_and_recovery_unit(tmp_path, target, b
     snap = tracker.issue(number)
     assert snap["state"] == "closed" and sc.DECLINED in snap["labels"]
     assert sc.PROPOSAL not in snap["labels"]
-    assert any("原分诊为 accept" in comment and target in comment for comment in snap["comments"])
+    assert any(
+        "original disposition was accept" in comment and target in comment
+        for comment in snap["comments"]
+    )
     unit = recovery.unit(
         round_no=1,
         stage="triage",
@@ -276,19 +364,27 @@ def test_out_of_scope_accept_closes_report_and_recovery_unit(tmp_path, target, b
 
 def test_accept_invalid_kind_downgrades(tmp_path) -> None:
     tracker = FakeTracker()
-    n = _report(tracker, "怪 kind")
+    n = _report(tracker, "Strange kind")
     out = _triager(tmp_path, tracker, _submit([_accept(n, kind="rfc")])).triage_once()
     assert out.needs_info == [n]
 
 
 def test_reject_and_needs_info_decline_with_reason(tmp_path) -> None:
     tracker = FakeTracker()
-    a = _report(tracker, "超范围的")
-    b = _report(tracker, "说不清的")
+    a = _report(tracker, "Out of scope")
+    b = _report(tracker, "Unclear")
     canned = _submit(
         [
-            {"issue": a, "disposition": "reject", "reason": "要改的是 launcher（编排层）"},
-            {"issue": b, "disposition": "needs_info", "reason": "轨迹无有效信息"},
+            {
+                "issue": a,
+                "disposition": "reject",
+                "reason": "What needs to be changed is launcher（Orchestration layer）",
+            },
+            {
+                "issue": b,
+                "disposition": "needs_info",
+                "reason": "Trace contains no useful information",
+            },
         ]
     )
 
@@ -308,17 +404,17 @@ def test_reject_and_needs_info_decline_with_reason(tmp_path) -> None:
     for n in (a, b):
         snap = tracker.issue(n)
         assert sc.DECLINED in snap["labels"] and snap["state"] == "closed"
-        assert sc.plane(snap["labels"]) is None  # 终态不在任何平面
+        assert sc.plane(snap["labels"]) is None  # Terminal state is not on any plane
     assert any("launcher" in c for c in tracker.issue(a)["comments"])
 
 
 def test_no_submit_is_noop(tmp_path) -> None:
-    """agent 没调 submit（散文返回）→ 本轮 no-op，report 原样留下轮。"""
+    """Agent did not call submit (prose return) → no-op this round; the report is left as-is for the next round."""
     tracker = FakeTracker()
-    n = _report(tracker, "留下轮")
-    out = _triager(tmp_path, tracker, "我跑完了但没提交").triage_once()
+    n = _report(tracker, "Retain round")
+    out = _triager(tmp_path, tracker, "I finished the run but did not submit").triage_once()
     assert out.handled == 0
-    assert sc.REPORT in tracker.issue(n)["labels"]  # 未被动过
+    assert sc.REPORT in tracker.issue(n)["labels"]  # Untouched
 
 
 def test_finalizer_is_bounded_and_report_histories_do_not_mix(tmp_path, monkeypatch) -> None:
@@ -363,12 +459,14 @@ def test_core_update_failure_is_reported_and_report_remains(tmp_path: Path) -> N
             raise RuntimeError("write failed")
 
     tracker = BrokenUpdateTracker()
-    n = _report(tracker, "具体案例")
+    n = _report(tracker, "Specific example")
     out = _triager(tmp_path, tracker, _submit([_accept(n)])).triage_once()
     assert n in out.failed and "write failed" in out.failed[n]
     assert out.accepted == []
     snap = tracker.issue(n)
-    assert sc.REPORT in snap["labels"] and snap["title"] == "具体案例" and snap["body"] == "x"
+    assert (
+        sc.REPORT in snap["labels"] and snap["title"] == "Specific example" and snap["body"] == "x"
+    )
 
 
 def test_audit_comment_failure_is_warning_but_proposal_is_created(tmp_path: Path) -> None:
@@ -377,17 +475,17 @@ def test_audit_comment_failure_is_warning_but_proposal_is_created(tmp_path: Path
             raise RuntimeError("comment failed")
 
     tracker = BrokenCommentTracker()
-    n = _report(tracker, "具体案例")
+    n = _report(tracker, "Specific example")
     out = _triager(tmp_path, tracker, _submit([_accept(n)])).triage_once()
     assert out.accepted == [n]
-    assert out.warnings[n] == ["原始报告审计评论写入失败"]
+    assert out.warnings[n] == ["Original report audit comment write failed"]
     assert sc.PROPOSAL in tracker.issue(n)["labels"]
 
 
 def test_out_of_batch_issue_skipped(tmp_path) -> None:
-    """disposition 指向不在本批的票号 → 跳过（防越界改动）。"""
+    """A disposition pointing to a issue number not in this batch → skip (prevents out-of-bounds changes)."""
     tracker = FakeTracker()
-    n = _report(tracker, "在批内")
+    n = _report(tracker, "Within the batch")
     out = _triager(tmp_path, tracker, _submit([_accept(999)])).triage_once()
     assert out.accepted == []
     assert out.failed == {n: "missing-report-disposition"}
@@ -395,17 +493,17 @@ def test_out_of_batch_issue_skipped(tmp_path) -> None:
 
 
 def test_shard_pending_param_scopes_batch(tmp_path) -> None:
-    """Spec-0029/T8 分片支持：传入 pending 子集则只处理该子集，其余 report 不动、也不喂给 agent。"""
+    """Spec-0029/T8 shard support: when a pending subset is passed in, only that subset is processed; the remaining reports are left untouched and are not fed to the agent."""
     tracker = FakeTracker()
-    a = _report(tracker, "片内")
-    b = _report(tracker, "片外")
+    a = _report(tracker, "Within the slice")
+    b = _report(tracker, "Outside the slice")
     backlog = tracker.list_open_issues()
     shard = [i for i in backlog if i.number == a]
     t = _triager(tmp_path, tracker, _submit([_accept(a)]))
     out = t.triage_once(pending=shard)
     assert out.accepted == [a]
-    assert [i.number for i in t.seen_pending] == [a]  # 只喂本片
-    assert sc.REPORT in tracker.issue(b)["labels"]  # 片外不动
+    assert [i.number for i in t.seen_pending] == [a]  # Feed only this shard
+    assert sc.REPORT in tracker.issue(b)["labels"]  # Leave everything outside the shard untouched
 
 
 def test_proposal_labels_keep_attributes_only() -> None:
@@ -452,9 +550,67 @@ def test_recovery_replays_saved_triage_output_without_model_or_duplicate_comment
     )
     with bind_usage_context(round_no=1, operation="triage-worker-0"):
         outcome = resumed.triage_once(pending=[frozen_issue])
-    assert outcome.accepted == [number]
+    assert outcome.accepted == [number] and outcome.failed == {}
     assert resumed.agent_calls == 0
     assert len(tracker.issue(number)["comments"]) == 1
+    assert "### Root cause\n\nentry.py No budget awareness" in tracker.issue(number)["body"]
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"Root cause area": "Reason", "Boundary": "Scope", "Acceptance": "Result"},
+        {
+            "root_cause": "Reason",
+            "boundary": "Scope",
+            "acceptance": "Result",
+            "Acceptance": "Old key",
+        },
+    ],
+)
+def test_recovery_rejects_noncanonical_saved_fields_without_mutating_report(
+    tmp_path, fields
+) -> None:
+    tracker = FakeTracker()
+    number = _report(tracker, "Original Unicode Report")
+    frozen_issue = tracker.list_open_issues()[0]
+    before = json.dumps(tracker.issue(number), sort_keys=True)
+    recovery = _recovery(tmp_path)
+    key = operation_key("triage-worker-0", "report", number)
+    recovery.begin_unit(
+        round_no=1,
+        stage="triage",
+        key=key,
+        input_value={"report": frozen_issue.to_dict()},
+        expected_postconditions={"completed": True},
+        dependencies=("users",),
+    )
+    decision = _accept(number)
+    decision["fields"] = fields
+    saved_output = {"dispositions": [decision]}
+    recovery.save_output(round_no=1, stage="triage", key=key, output=saved_output)
+
+    class ResumeOnlyTriager(_StubTriager):
+        def _run_agent(self, *, pending: list) -> str:
+            pytest.fail("Saved output must be checked without running the model again")
+
+    resumed = ResumeOnlyTriager(
+        tracker,
+        SessionStore(tmp_path / "sessions"),
+        str(tmp_path / "harness"),
+        str(tmp_path / "agent"),
+        canned="must not be used",
+        recovery=recovery,
+    )
+    with bind_usage_context(round_no=1, operation="triage-worker-0"):
+        with pytest.raises(RecoveryConflictError, match="remain incomplete"):
+            resumed.triage_once(pending=[frozen_issue])
+
+    unit = recovery.unit(round_no=1, stage="triage", key=key)
+    assert unit["status"] == "failed" and unit["error"] == "saved-submit-contract-mismatch"
+    assert recovery.read_output(round_no=1, stage="triage", key=key) == saved_output
+    assert json.dumps(tracker.issue(number), sort_keys=True) == before
+    assert resumed.agent_calls == 0
 
 
 @pytest.mark.parametrize("with_recovery", [False, True])
@@ -493,7 +649,7 @@ def test_conflicting_decisions_do_not_partially_migrate_report(tmp_path, with_re
 def test_recovery_reconciles_partial_proposal_only_if_content_is_ours(
     tmp_path, external_edit
 ) -> None:
-    model_title = "中文提案" * 35
+    model_title = "Chinese proposal" * 35
 
     class PartialWriteTracker(FakeTracker):
         fail_once = True
@@ -506,7 +662,7 @@ def test_recovery_reconciles_partial_proposal_only_if_content_is_ours(
             return super().update_issue(number, title=title, body=body, labels=labels)
 
     tracker = PartialWriteTracker()
-    number = _report(tracker, "原报告")
+    number = _report(tracker, "Original report")
     frozen_issue = tracker.list_open_issues()[0]
     disposition = _accept(number)
     disposition["proposal_title"] = model_title
@@ -559,7 +715,7 @@ def test_recovery_retries_transient_read_without_rerunning_model(tmp_path, monke
             return super().get_issue(number=number)
 
     tracker = FlakyReadTracker()
-    number = _report(tracker, "原报告")
+    number = _report(tracker, "Original report")
     frozen = tracker.list_open_issues()[0]
     recovery = _recovery(tmp_path)
     triager = _StubTriager(
@@ -599,7 +755,7 @@ def test_recovery_reconciles_lost_update_response_without_second_write(
                 raise requests.ConnectionError("response lost after write")
 
     tracker = LostResponseTracker()
-    number = _report(tracker, "原报告")
+    number = _report(tracker, "Original report")
     frozen = tracker.list_open_issues()[0]
     recovery = _recovery(tmp_path)
     triager = _StubTriager(
@@ -632,10 +788,10 @@ def test_recovery_reconciles_lost_decline_response_without_second_write(
                 raise requests.ConnectionError("response lost after close")
 
     tracker = LostResponseTracker()
-    number = _report(tracker, "原报告")
+    number = _report(tracker, "Original report")
     frozen = tracker.list_open_issues()[0]
     recovery = _recovery(tmp_path)
-    disposition = {"issue": number, "disposition": "reject", "reason": "范围外"}
+    disposition = {"issue": number, "disposition": "reject", "reason": "Out of scope"}
     triager = _StubTriager(
         tracker,
         SessionStore(tmp_path / "sessions"),
@@ -663,7 +819,7 @@ def test_recovery_stops_after_bounded_transient_retries(tmp_path, monkeypatch) -
             raise requests.ConnectionError("Gitea unavailable")
 
     tracker = UnavailableTracker()
-    number = _report(tracker, "原报告")
+    number = _report(tracker, "Original report")
     frozen = tracker.list_open_issues()[0]
     recovery = _recovery(tmp_path)
     triager = _StubTriager(
@@ -678,7 +834,7 @@ def test_recovery_stops_after_bounded_transient_retries(tmp_path, monkeypatch) -
         with pytest.raises(RecoveryConflictError, match="remain incomplete"):
             triager.triage_once(pending=[frozen])
     assert tracker.reads == 3 and triager.agent_calls == 1
-    assert tracker.issue(number)["title"] == "原报告"
+    assert tracker.issue(number)["title"] == "Original report"
     assert (
         recovery.unit(
             round_no=1, stage="triage", key=operation_key("triage-worker-0", "report", number)
@@ -708,7 +864,7 @@ def test_recovery_replays_only_our_partial_migration(tmp_path, monkeypatch) -> N
             return super().update_issue(number, title=title, body=body, labels=labels)
 
     tracker = PartialMigrationTracker()
-    number = _report(tracker, "原报告")
+    number = _report(tracker, "Original report")
     frozen = tracker.list_open_issues()[0]
     triager = _StubTriager(
         tracker,
@@ -740,7 +896,7 @@ def test_recovery_does_not_overwrite_external_edit_after_lost_response(
             raise requests.ConnectionError("response lost")
 
     tracker = ConcurrentEditTracker()
-    number = _report(tracker, "原报告")
+    number = _report(tracker, "Original report")
     frozen = tracker.list_open_issues()[0]
     triager = _StubTriager(
         tracker,
@@ -770,7 +926,7 @@ def test_recovery_retries_temporary_server_error(tmp_path, monkeypatch) -> None:
             return super().get_issue(number=number)
 
     tracker = TemporaryServerErrorTracker()
-    number = _report(tracker, "原报告")
+    number = _report(tracker, "Original report")
     frozen = tracker.list_open_issues()[0]
     triager = _StubTriager(
         tracker,
@@ -797,7 +953,7 @@ def test_recovery_reuses_saved_output_after_previous_tracker_outage(tmp_path, mo
             return super().get_issue(number=number)
 
     tracker = RecoveredTracker()
-    number = _report(tracker, "原报告")
+    number = _report(tracker, "Original report")
     frozen = tracker.list_open_issues()[0]
     recovery = _recovery(tmp_path)
     args = (

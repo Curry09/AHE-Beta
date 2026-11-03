@@ -1,8 +1,7 @@
-"""git SeedSource（spec-0009/T4）。
+"""git SeedSource (spec-0009/T4).
 
-覆盖：本地临时 git 仓 clone@commit 恢复快照、目录隔离、缺 repo/commit 与 clone/checkout
-失败的诊断报错、可加性/分派（仅 import seed_source 即自动发现 git）、kind=git 序列化往返。
-皆离线——用 `git init` 造本地仓当 repo，不走真实网络。
+Coverage: local temporary git repo clone@commit snapshot recovery, directory isolation, missing repo/commit and clone/checkout failure diagnostic errors, additivity/dispatch (auto-discovery of git on import seed_source only), kind=git serialization round-trip.
+All offline—use `git init` to create local repo as repo, no real network.
 """
 
 from __future__ import annotations
@@ -37,7 +36,7 @@ def _rev_parse(*, cwd: Path) -> str:
 
 
 def _make_repo(*, root: Path) -> tuple[str, str]:
-    """造一个含两个 commit 的本地仓；返回 (C1, C2) 的 sha。"""
+    """Create a local repo with two commits; return sha of (C1, C2)."""
     root.mkdir(parents=True, exist_ok=True)
     _git(args=["init"], cwd=root)
     (root / "a.txt").write_text("first\n")
@@ -52,7 +51,7 @@ def _make_repo(*, root: Path) -> tuple[str, str]:
 
 
 def test_git_auto_registered_without_importing_module() -> None:
-    # 可加性硬证据：本测试不 import sources.git，仅 import seed_source，git 即在注册表。
+    # hard evidence of additivity: this test does not import sources.git, only import seed_source, so git is in the registry.
     from ahe_beta.user.sim import seed_source
 
     assert "git" in seed_source.available_kinds()
@@ -73,12 +72,12 @@ def test_git_provisions_snapshot_at_commit(tmp_path: Path) -> None:
     ws = seed_source.provision(WorkspaceSpec(kind="git", params={"repo": str(repo), "commit": c1}))
     ws_path = Path(ws)
     assert ws_path.is_dir()
-    # 工作树恢复到 C1：HEAD == C1、C1 文件在、C2 新增文件不在。
+    # working tree restored to C1: HEAD == C1, C1 files present, C2 new files absent.
     assert _rev_parse(cwd=ws_path) == c1
     assert (ws_path / "a.txt").is_file()
     assert not (ws_path / "b.txt").exists()
 
-    # checkout 到 C2 时另有其文件。
+    # when checking out to C2 there are different files.
     ws2 = seed_source.provision(WorkspaceSpec(kind="git", params={"repo": str(repo), "commit": c2}))
     assert _rev_parse(cwd=Path(ws2)) == c2
     assert (Path(ws2) / "b.txt").is_file()
@@ -94,7 +93,7 @@ def test_git_dirs_isolated(tmp_path: Path) -> None:
     a = seed_source.provision(spec)
     b = seed_source.provision(spec)
     assert a != b
-    # 改一份不影响另一份。
+    # modifying one copy does not affect the other.
     (Path(a) / "a.txt").write_text("clobbered\n")
     assert (Path(b) / "a.txt").read_text() == "first\n"
 

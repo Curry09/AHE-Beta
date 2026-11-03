@@ -3,8 +3,10 @@
 import json
 from types import SimpleNamespace
 
+import jsonschema
 import pytest
 
+from ahe_beta.demand import agent_contract as ac
 from ahe_beta.loop.feedback_pipeline import FeedbackPipeline
 from ahe_beta.loop.recovery import (
     RecoveryConflictError,
@@ -243,17 +245,25 @@ def test_real_triager_saved_output_retries_failed_side_effect(
 
         def _run_agent(self, *, pending):
             calls["model"] += 1
-            return json.dumps(
-                {
-                    "dispositions": [
-                        {
-                            "issue": pending[0].number,
-                            "disposition": "reject",
-                            "reason": "outside product scope",
-                        }
-                    ]
-                }
-            )
+            submitted = {
+                "dispositions": [
+                    {
+                        "issue": pending[0].number,
+                        "disposition": "reject",
+                        "reason": "outside product scope",
+                        "artifact": {
+                            "reported_problem": pending[0].body,
+                            "user_impact": "The user cannot observe progress",
+                            "scope_boundary": "outside product scope",
+                            "evidence": [f"report:#{pending[0].number}"],
+                            "uncertainties": [],
+                            "implementation_target": "outside_harness",
+                        },
+                    }
+                ]
+            }
+            jsonschema.validate(submitted, ac.dispositions_input_schema())
+            return json.dumps(submitted)
 
         def _apply_with_retry(self, *args, **kwargs):
             calls["apply"] += 1

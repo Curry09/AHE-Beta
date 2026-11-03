@@ -1,10 +1,10 @@
-# Architect 提案分组
+# Architect Proposal Grouping
 
-提案分组将相关需求分配给同一个 Architect，减少重复处理，并保留需要一起讨论的上下文。分类器只决定哪些提案适合共同综合；提案的发布、关闭和准入仍由原有流程负责。
+Proposal grouping assigns related requirements to the same Architect, reducing duplicate handling while preserving the context that needs to be discussed together. The classifier only decides which proposals are suitable for joint synthesis; proposal publication, closure, and admission remain the responsibility of the existing process.
 
-## 配置
+## Configuration
 
-在实验 JSON 中设置以下策略，再准备并启动新实验：
+Set the following strategy in the experiment JSON, then prepare and start a new experiment:
 
 ```json
 {
@@ -14,35 +14,35 @@
 }
 ```
 
-这是合入完整实验定义的配置片段。该策略默认为 `false`，启用值在 `prepare` 时固定，并由 local 和 E2B 后端传递给控制器。宿主或凭证文件中的 `ARCHITECT_GROUPING` 不覆盖实验配置。已有 run 继续使用其冻结设置。
+This is the configuration fragment merged into the complete experiment definition. The strategy defaults to `false`, the enabled value is fixed at `prepare`, and it is passed to the controller by the local and E2B backends. `ARCHITECT_GROUPING` in the host or credential file does not override the experiment configuration. Existing runs continue to use their frozen settings.
 
-分组也适用于单用户实验。Architect 数量由 `roles.architect` 指定；U1 产生多条相关提案时，同样可以启用。完整字段见[配置说明](CONFIGURATION.zh-CN.md#运行策略)。
+Grouping also applies to single-user experiments. The number of Architects is specified by `roles.architect`; it can likewise be enabled when U1 produces multiple related proposals. See the [configuration reference](CONFIGURATION.md#runtime-policies) for the complete fields.
 
-## 调度过程
+## Scheduling Process
 
-非末轮按以下顺序处理需求：
+Requests are processed in the following order in non-final rounds:
 
-1. 等待本轮全部 Triage 完成，收集非 PM 的开放提案。
-2. 调用一次分组模型，输入提案 ID、标题及最多 1200 字符的摘要。
-3. 校验返回的 `{"groups": [[1, 2], [3]]}`，确保每个输入 ID 恰好出现一次。
-4. 将各组拆成每批最多 6 条的任务。同组批次由同一个 Architect 实例顺序处理，不同组可并行。
-5. 将综合结果交给 Owner 准入，再等待代码交付。
+1. Wait for all Triage operations in the round to complete, and collect open proposals that are not from PM.
+2. Call the grouping model once, providing proposal IDs, titles, and summaries of at most 1200 characters.
+3. Validate the returned `{"groups": [[1, 2], [3]]}`, ensuring that every input ID appears exactly once.
+4. Split each group into tasks of at most 6 items per batch. Batches from the same group are processed sequentially by the same Architect instance; different groups may run in parallel.
+5. Pass the synthesis results to the Owner for admission, then wait for code delivery.
 
-Divergent PM 保持独立的 Owner 准入路径。单条来源保留给 Owner，不强制生成综合提案。每个批次仅能引用自己的来源，沿用 `source_proposals` 和 `covers` 校验。
+Divergent PM retains an independent Owner admission path. A single source is retained for the Owner, and a synthesis proposal is not forcibly generated. Each batch may reference only its own sources and continues to use the `source_proposals` and `covers` checks.
 
-## 失败处理与记录
+## Failure Handling and Records
 
-分组模型沿用 Architect 的连接配置，输出上限为 16384 token，请求超时为 300 秒，SDK 不自动重试。请求失败、输出截断、JSON 无效或 ID 重复／遗漏时，调度器回退到按 ID 排序、每批最多 6 条的串行综合。
+The grouping model uses the Architect connection configuration, with an output limit of 16384 tokens, a request timeout of 300 seconds, and no automatic SDK retries. If the request fails, the output is truncated, the JSON is invalid, or IDs are duplicated or omitted, the scheduler falls back to serial synthesis sorted by ID, with at most 6 items per batch.
 
-某个 Architect 批次失败时会记录错误，其余批次继续，未处理的开放来源仍留在队列中。读取 Gitea 队列时会遍历分页；分页读取失败会报错，不使用不完整的提案列表继续分组。
+When an Architect batch fails, the error is recorded and the remaining batches continue; unprocessed open sources remain in the queue. When reading the Gitea queue, pagination is traversed; a pagination read failure raises an error, and grouping does not continue using an incomplete proposal list.
 
-分组输入、模型输出、耗时、回退原因和批次结果保存在本轮角色记录的 `architect_grouping/` 下，用量进入现有 Token 统计。分组记录写入失败会告警，提案处理仍继续执行。
+Grouping inputs, model outputs, durations, fallback reasons, and batch results are stored under `architect_grouping/` in the records for the current round and role; usage is included in the existing Token statistics. A warning is issued if writing the grouping records fails, while proposal processing continues.
 
-每批 6 条是数量限制，不保证满足任意模型的上下文窗口。同组批次仍各自调用模型，不共享连续对话；分组本身也不保证提案已经完成语义去重。实际效果应结合提案和交付结果评估。
+6 items per batch is a quantity limit and does not guarantee that any model's context window will be satisfied. Batches from the same group still call the model independently and do not share a continuous conversation; grouping itself also does not guarantee that proposals have undergone semantic deduplication. Actual effects should be evaluated together with the proposals and delivery results.
 
-## 开发验证
+## Development Verification
 
-安装开发依赖后，可运行相关回归测试：
+After installing the development dependencies, the relevant regression tests can be run:
 
 ```bash
 uv run --locked --extra experiments --extra dev pytest backend/tests/demand/test_grouped_architect.py backend/tests/loop/test_architect.py backend/tests/test_stage_resume_e2e.py

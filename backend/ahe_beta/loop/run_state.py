@@ -1,7 +1,7 @@
-"""run_state（spec-0004/T1）：编排游标 + 三侧中间态标记，作为「无法从产物观测」之外的兜底。
+"""run_state (spec-0004/T1): orchestration cursor + three-side intermediate state markers, as fallback beyond "unobservable from artifacts".
 
-能从产物（session 文件、main HEAD、tag 存在）推断的进度优先推断；run_state 只记不可观测的游标与分派。
-JSON、原子写。空 STATE_DIR 读 → 初始 RunState(round=0)。
+Progress observable from artifacts (session files, main HEAD, tag existence) takes priority; run_state only records unobservable cursors and dispatch.
+JSON, atomic write. Empty STATE_DIR read → initial RunState(round=0).
 """
 
 from __future__ import annotations
@@ -17,17 +17,18 @@ _RUN_STATE_FILE = "run_state.json"
 
 @dataclass
 class RunState:
-    """轮次/阶段/当前 main SHA + 用户侧已完成 session、开发者侧 issue 分派、编排瞬态。
+    """Round/phase/current main SHA + user-side completed sessions, developer-side issue dispatch, orchestration transient state.
 
-    Spec-0007/T2：纯 trunk 后 `current_release_ref` 字段名保留、语义改为「当前 main HEAD SHA」——
-    纯观测游标（每轮末 orchestrator 解析的 main 最新 SHA），不再是 release 版本号、不参与解析。
+    Spec-0007/T2: after pure trunk, `current_release_ref` field name retained, semantics changed to "current main HEAD SHA"—
+    pure observation cursor (main latest SHA parsed by orchestrator at round end), no longer a release version number, does not participate in parsing.
     """
 
     schema_version: int = 1
     recovery_revision: int = 0
     round: int = 0
     phase: str = "a"
-    current_release_ref: str = ""  # Spec-0007/T2：语义 = 当前 main HEAD SHA（观测游标）
+    # Spec-0007/T2: semantics = current main HEAD SHA (observation cursor)
+    current_release_ref: str = ""
     done_session_keys: list[str] = field(default_factory=list)
     issue_assignments: dict[str, str] = field(default_factory=dict)
     pending: list[str] = field(default_factory=list)
@@ -63,7 +64,7 @@ def run_state_path(state_dir: Path) -> Path:
 
 
 def read_run_state(state_dir: Path) -> RunState:
-    """读 STATE_DIR/run_state.json；缺失 → 初始 RunState(round=0)，不抛错。"""
+    """Read STATE_DIR/run_state.json; if missing → initial RunState(round=0), do not raise."""
     path = run_state_path(state_dir)
     if not path.is_file():
         return RunState()
@@ -71,7 +72,7 @@ def read_run_state(state_dir: Path) -> RunState:
 
 
 def write_run_state(state_dir: Path, run_state: RunState) -> None:
-    """原子写 run_state.json（tmp + os.replace），避免中途死留半截。"""
+    """Atomic write run_state.json (tmp + os.replace) to avoid leaving half-written on interruption."""
     Path(state_dir).mkdir(parents=True, exist_ok=True)
     path = run_state_path(state_dir)
     tmp = path.with_suffix(".json.tmp")

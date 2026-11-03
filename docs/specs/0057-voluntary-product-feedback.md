@@ -1,12 +1,12 @@
 ---
 number: "0057"
-title: 自主产品反馈与交互主动作并行
+title: "Voluntary product feedback in parallel with the primary interaction action"
 issue: 0
 slug: voluntary-product-feedback
-summary: 在原有用户动作中附带自主产品反馈，保留继续、等待、接受或放弃的语义；反馈可达性不依赖工具能力或纠偏策略，格式异常仅警告，不按低分自动提单。
+summary: "Attach voluntary product feedback to existing user actions while preserving the semantics of continuing, waiting, accepting, or giving up; feedback reachability does not depend on tool capabilities or correction strategies, and format errors produce only warnings rather than automatically creating issues based on low scores."
 tasks:
   - id: T1
-    title: 主动作伴随反馈与既有提单兼容
+    title: "Compatibility between feedback accompanying primary actions and existing issue creation"
     status: done
     priority: P0
     tags: []
@@ -17,10 +17,10 @@ tasks:
       - backend/ahe_beta/user/sim/loop.py
       - backend/ahe_beta/user/sim/prompt.py
       - backend/ahe_beta/user/sim/clauses.py
-    scope: 意图区分当前任务与产品反馈接收者；main_act 和 waiting_act 支持可选 report_issue，正文精确去重并在既有收尾阶段创建 issue。
-    acceptance: 合法反馈不替换主动作，不新增模型调用；缺省或非法反馈不自动提单；correct persona 可自愿反馈且无需自行接管任务。
+    scope: "Distinguish the recipients of the current task and product feedback; main_act and waiting_act support an optional report_issue, deduplicate the body exactly, and create an issue during the existing closing phase."
+    acceptance: "Valid feedback does not replace the primary action and does not add model calls; absent or invalid feedback does not automatically create an issue; a correct persona may provide feedback voluntarily without taking over the task."
   - id: T2
-    title: 动作兼容与持久化回归
+    title: "Action compatibility and persistence regression"
     status: done
     priority: P0
     tags: []
@@ -32,78 +32,68 @@ tasks:
       - backend/tests/user/sim/test_feedback.py
       - backend/tests/user/sim/test_heartbeat.py
       - backend/tests/user/sim/test_prompt.py
-    scope: 覆盖继续、接受、等待与终止报告；验证不同能力 persona 的同等可达性和 session 到 needs-triage 的持久化。
-    acceptance: 盲评及专家 persona 均可报告；重复正文仅一条 issue；非法反馈和低分沉默不更改合法主动作；既有终止反馈可继续使用。
+    scope: "Cover reports accompanying continue, accept, wait, and terminal actions; verify equal reachability for Personas with different capabilities and persistence from session to needs-triage."
+    acceptance: "Blind and expert Personas can both report; duplicate bodies create only one issue; invalid feedback and low-score silence do not change valid primary actions; existing terminal feedback remains usable."
 ---
 
-# 0057 — 自主产品反馈与交互主动作并行
+# 0057 — Voluntary Product Feedback in Parallel with the Primary Interaction Action
 
 ## Summary
 
-用户的主动作可伴随一条自愿的产品反馈，不必为反馈暂停、放弃或改变接受结果。
-可达性不取决于 workspace 工具权限；框架保留真实报告与沉默，不根据体感分数制造 issue。
+A user's primary action may be accompanied by one voluntary product feedback report, without requiring the user to pause, give up, or change the acceptance result because of the feedback.
+Reachability does not depend on workspace tool permissions; the framework preserves both actual reports and silence and does not create issues based on the experience score.
 
 ## Motivation
 
-任务最终完成与使用体验值得改进可以同时成立。旧机制虽然有非终止的
-report_issue 工具，但它只出现在部分 persona 的感知工具栈中，意图/动作阶段
-又禁止工具。file_issue 则同时承担退出语义，使继续解决任务的用户很少报告。
-报告体验不需要读代码能力，也不应该要求用户停止工作或证明产品根因。
+Task completion and opportunities to improve the user experience can coexist. Although the old mechanism has a non-terminal
+report_issue tool, it appears only in some Personas' perception tool stacks, while the intent/action phase
+also prohibits tools. file_issue simultaneously carries exit semantics, so users who continue solving the task rarely report issues.
+Reporting an experience does not require code-reading capability and should not require the user to stop working or prove the product's root cause.
 
 ## Guide-level explanation
 
-意图阶段说明两个接收者：harness 消息推进当前任务；产品反馈供开发者改善
-后续使用，不承诺立即修复当前任务。是否报告由 persona 自主选择，允许沉默。
-不能根据低评分、抱怨、反复纠正或 gap 自动创建用户报告。
+The intent phase identifies two recipients: harness messages advance the current task; product feedback helps developers improve
+future use and does not promise an immediate fix for the current task. Whether to report is chosen autonomously by the Persona, and silence is allowed.
+A user report must not be created automatically based on a low score, complaint, repeated correction, or gap.
 
-main_act / waiting_act 的原有 JSON 可额外携带
-`"report_issue": {"body": "用户自己的反馈"}`。继续、等待、打断、接受或离开
-均可同时报告，主动作和目标语义不变。字段缺省/null 表示没有报告；不额外
-增加模型调用。所有 persona/client 均可使用，包括无工作区工具的 blind persona。
-保留旧的感知阶段 report_issue 工具和终止报告路径以兼容已有交互。
+The existing JSON for main_act / waiting_act may additionally carry
+`"report_issue": {"body": "The user's own feedback"}`. Continue, wait, interrupt, accept, or leave
+may all be accompanied by a report; the primary action and goal semantics remain unchanged. An absent or null field means no report; no additional model call is made. All Personas/clients can use it, including blind Personas without workspace tools.
+Retain the old perception-stage report_issue tool and terminal reporting path for compatibility with existing interactions.
 
-正文描述实际经历、期望及影响，必要时说明后来已解决。无需技术诊断、证明
-复现性或提供开发方案。原任务困难本身不是必须提单的理由。
+The body describes what was actually experienced, what was expected, and the impact, optionally noting that it was later resolved. No technical diagnosis, proof of reproducibility, or development plan is required. Difficulty in the original task alone is not a required reason to file an issue.
 
 ## Reference-level explanation
 
-复用 issue_notes → 会话结束时 tracker.create_issue → issue_refs 的既有路径。
-原始 act 调用 trace 保留反馈选择和正文；tracker 保存正式正文；会话 issue_refs
-关联正式问题供 triage 使用。后续历史注明已记录且等待收尾提交，防止模型误以为
-正在由开发团队处理。相同正文在同一会话内精确去重，语义近似不擅自合并。
+Reuse the existing issue_notes → tracker.create_issue at session end → issue_refs path.
+The original act-call trace retains the feedback choice and body; tracker stores the official body; the session issue_refs associates the official issue for triage. Subsequent history records that it has been logged and is awaiting closing submission, preventing the model from mistakenly believing that the development team is handling it.
+Within one session, identical bodies are deduplicated exactly; semantically similar bodies are not merged without authorization.
 
-反馈字段格式错误只记带阶段/轮次的 warning，不触发主动作重试、改变 accept、
-强制退出或从抱怨推断正文。正常字段无论主动作为何均不改变接受依据或目标。
-本次不改变现有会话收尾提交时机、tracker 外部故障恢复或终止报告语义。
+A malformed feedback field records only a warning with its phase/round and does not trigger a retry of the primary action, change accept, force an exit, or infer a body from a complaint. Normal fields do not change the acceptance basis or goals regardless of the primary action. This change does not alter the existing session-closing submission timing, recovery from external tracker failures, or terminal-report semantics.
 
-T1 负责 loop、prompt 与纠偏条款，T2 依赖 T1 并负责反馈、心跳和 prompt 回归测试。
-具体文件分配见 frontmatter。离线验证脚本为 `backend/scripts/e2e-spec-0056-0057-user-semantics.sh`。
+T1 handles the loop, prompts, and correction clauses; T2 depends on T1 and handles feedback, heartbeat, and prompt regression tests.
+See the frontmatter for specific file assignments. The offline validation script is `backend/scripts/e2e-spec-0056-0057-user-semantics.sh`.
 
-### 验证边界
+### Validation boundaries
 
-覆盖继续+报告、接受+报告、心跳等待+报告；blind/expert 同等可提交；报告关联
-到持久化 session 并进入 needs-triage；重复正文不重复建单；低分且无报告时保持
-无 issue；非法反馈不阻止合法主动作。单元测试验证机制，不证明真实模型会更
-自主、更准确地反馈；后续真实回放同时观察有效反馈和过度提单。
+Cover continue+report, accept+report, and heartbeat wait+report; blind/expert can submit equally; reports are associated with persisted sessions and enter needs-triage; duplicate bodies do not create duplicate issues; low scores without reports remain issue-free; invalid feedback does not block a valid primary action. Unit tests verify the mechanism but do not prove that a real model will provide feedback more autonomously or accurately; subsequent real replays should observe both useful feedback and excessive issue creation.
 
 ## Drawbacks
 
-同一会话内仅去除完全相同的正文，近义重复仍可能存在。反馈在收尾时提交，突然进程崩溃时的
-外部 tracker 恢复不在本改动范围。提示可达也不能保证模型愿意反馈。
+Only exactly identical bodies are removed within a session, so semantically similar duplicates may remain. Feedback is submitted during closing, and recovery from an external tracker after a sudden process crash is outside the scope of this change. Prompt reachability also cannot guarantee that the model will choose to provide feedback.
 
 ## Rationale and alternatives
 
-没有采用低分强制提单，因为它会把评分规则制造的文本误当用户意见；没有追加一次必答反馈模型调用，
-因为它增加延迟并改变用户报告意愿。保留旧 report_issue 工具和终止提单路径，新增可选字段只补足动作阶段的可达性。
+We did not adopt forced issue creation for low scores because it would mistake text produced by the scoring rules for user opinion; nor did we add a mandatory feedback model call because it would increase latency and change users' willingness to report. Retain the old report_issue tool and terminal issue-reporting path; the new optional field only fills the reachability gap in the action phase.
 
 ## Prior art
 
-复用现有 issue_notes、终止报告及 tracker/session 关联机制，不引入新的报告队列或反馈角色。
+Reuse the existing issue_notes, terminal reporting, and tracker/session association mechanisms without introducing a new reporting queue or feedback role.
 
 ## Unresolved questions
 
-暂无本次提交必须决策的开放项；真实反馈率和误报率留给独立交互观察。
+There are no open items requiring a decision for this submission; real feedback and false-positive rates are left to independent interaction observation.
 
 ## Future possibilities
 
-后续可改善提交失败后的恢复和重复报告检索，但不把低分或抱怨自动转换成正式报告。
+Future work may improve recovery after submission failures and duplicate-report retrieval, but low scores or complaints must not be automatically converted into official reports.

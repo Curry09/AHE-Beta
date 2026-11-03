@@ -1,6 +1,7 @@
-# Spec-0021/T1：编排仓完整性绊线单测——快照/校验对提交、改 tracked、新 untracked 各分支。
-"""verify_unchanged 应放行「未变」，对新增 commit / 改 tracked / 新 untracked 抛 RepoIntegrityError，
-既有 untracked 前后都在时不误报；git 读失败也抛（宁紧勿松）。用 symbolic-ref 建仓兼容 git <2.28。"""
+# Spec-0021/T1: orchestration repository integrity tripwire unit test—snapshot/checksum for commits, tracked modifications, new untracked files across branches.
+"""verify_unchanged should allow "unchanged"; throw RepoIntegrityError for new commits / modified tracked / new untracked,
+no false positive when pre-existing untracked files exist before and after; throw on git read failure too (fail closed). Use symbolic-ref for repository compatibility with git <2.28.
+"""
 
 from __future__ import annotations
 
@@ -40,43 +41,46 @@ def _seed_repo(tmp_path: Path) -> Path:
 def test_unchanged_passes(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     before = snapshot_repo(repo=str(repo))
-    verify_unchanged(repo=str(repo), before=before)  # 不抛即通过
+    verify_unchanged(repo=str(repo), before=before)  # Passing = no exception raised
 
 
 def test_new_commit_detected(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     before = snapshot_repo(repo=str(repo))
     (repo / "tracked.txt").write_text("v1\n", encoding="utf-8")
-    _git(repo, "commit", "-am", "dev 偷偷提交")
-    with pytest.raises(RepoIntegrityError, match="新提交"):
+    _git(repo, "commit", "-am", "dev Submit covertly")
+    with pytest.raises(RepoIntegrityError, match="new commit"):
         verify_unchanged(repo=str(repo), before=before)
 
 
 def test_modified_tracked_file_detected(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     before = snapshot_repo(repo=str(repo))
-    (repo / "tracked.txt").write_text("被改\n", encoding="utf-8")  # 改了不提交
-    with pytest.raises(RepoIntegrityError, match="新增改动"):
+    (repo / "tracked.txt").write_text("Modified\n", encoding="utf-8")  # Modified but not committed
+    with pytest.raises(RepoIntegrityError, match="New working tree changes"):
         verify_unchanged(repo=str(repo), before=before)
 
 
 def test_new_untracked_file_detected(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     before = snapshot_repo(repo=str(repo))
-    (repo / "escape.md").write_text("harness 内容写进 def\n", encoding="utf-8")
+    (repo / "escape.md").write_text("harness Write content into def\n", encoding="utf-8")
     with pytest.raises(RepoIntegrityError):
         verify_unchanged(repo=str(repo), before=before)
 
 
 def test_preexisting_untracked_not_flagged(tmp_path) -> None:
-    """既有 untracked（如本地 docs / .idea）在前后快照都在 → 不误报。"""
+    """Pre-existing untracked files (e.g., local docs / .idea) present in both pre and post snapshots → no false positive."""
     repo = _seed_repo(tmp_path)
-    (repo / "local-note.md").write_text("我早就在这\n", encoding="utf-8")  # run 前就存在
+    (repo / "local-note.md").write_text(
+        "I was already here\n", encoding="utf-8"
+    )  # Existed before run
     before = snapshot_repo(repo=str(repo))
-    verify_unchanged(repo=str(repo), before=before)  # 同一个 untracked 仍在 → 不抛
+    # Same untracked file still present → do not throw
+    verify_unchanged(repo=str(repo), before=before)
 
 
 def test_git_read_failure_raises(tmp_path) -> None:
-    """非 git 仓 → snapshot 抛 RepoIntegrityError（宁紧勿松，不放过）。"""
+    """Non-git repository → snapshot throws RepoIntegrityError (fail closed, do not pass)."""
     with pytest.raises(RepoIntegrityError):
         snapshot_repo(repo=str(tmp_path / "not-a-repo"))

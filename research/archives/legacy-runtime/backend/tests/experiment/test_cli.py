@@ -1,4 +1,4 @@
-# Spec-0047/T4：CLI 幂等与 plan 无密钥。
+# Spec-0047/T4: CLI idempotency and keyless plan.
 from __future__ import annotations
 
 import json

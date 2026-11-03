@@ -19,7 +19,7 @@ def test_docker_seed_requires_image_and_instance() -> None:
         seed_source.provision(WorkspaceSpec(kind="docker-seed"))
     with pytest.raises(ValueError, match="params.instance_id"):
         seed_source.provision(WorkspaceSpec(kind="docker-seed", params={"image": "seed:test"}))
-    with pytest.raises(ValueError, match="单路径段"):
+    with pytest.raises(ValueError, match="safe path segment"):
         seed_source.provision(
             WorkspaceSpec(
                 kind="docker-seed",

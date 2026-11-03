@@ -1,4 +1,4 @@
-# Spec-0047/T5：跨实验共享 endpoint 的容量租约。
+# Spec-0047/T5: Capacity leases for endpoints shared across experiments.
 """File-locked lease registry under EXPERIMENTS_ROOT. Expired leases reclaim only if pid is dead."""
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ def acquire(
     now: float | None = None,
 ) -> dict[str, Any]:
     if units <= 0:
-        raise CapacityError("租约单位必须为正")
+        raise CapacityError("Lease units must be positive")
     path = _registry_path(root=root)
     owner_pid = pid if pid is not None else os.getpid()
     clock = time.time() if now is None else now
@@ -81,7 +81,7 @@ def acquire(
         used = sum(int(item["units"]) for item in bucket["leases"])
         if used + units > capacity:
             raise CapacityError(
-                f"endpoint {endpoint} 容量不足：used={used} request={units} cap={capacity}"
+                f"endpoint {endpoint} Insufficient capacity：used={used} request={units} cap={capacity}"
             )
         lease = {
             "experiment_id": experiment_id,

@@ -1,14 +1,14 @@
 """
 demo.py
-对照两组正交轴：
-  1) 能力分叉（浅层 vs 专家）——体感/验收差异
-  2) 时间气质分叉（同失败策略下 impatient vs patient）——等待耐心差异
+Compare two orthogonal axes:
+  1) Capability fork (shallow vs expert) — subjective experience / acceptance difference
+  2) Time temperament fork (same failure strategy, impatient vs patient) — patience difference
 
-Spec-0037/T2: demo 打印 tempo / patience0 / stuck_extra，展示正交。
+Spec-0037/T2: demo prints tempo / patience0 / stuck_extra to show orthogonality.
 
-运行(无需 API key, 用离线脚本后端):
+Run (no API key needed; uses offline script backend):
   python3 -m ahe_beta.user.sim.demo
-有 LLM 网关 (USER_LLM_BASE_URL+USER_LLM_API_KEY) 或 OPENAI_API_KEY 时自动改用真实 LLM。
+When LLM gateway (USER_LLM_BASE_URL + USER_LLM_API_KEY) or OPENAI_API_KEY present, automatically uses real LLM.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ TASK = (
 
 
 def make_personas():
-    # 能力分叉：浅层易浅接受；专家易识破并 file_issue
+    # Capability fork: shallow accepts easily; expert identifies and files_issue.
     shallow = finalize_persona(
         Persona(
             persona_id="P-shallow-steady",
@@ -62,7 +62,7 @@ def make_personas():
             tempo=TimeTemperament.STEADY,
         )
     )
-    # 正交证明：同为 FEEDBACK，仅 tempo 不同（脚本后端不会走长等待，但 state 初值可见）
+    # Orthogonal proof: both FEEDBACK, only tempo differs (script backend avoids long waits, but initial state is visible).
     impatient = finalize_persona(
         Persona(
             persona_id="P-feedback-impatient",

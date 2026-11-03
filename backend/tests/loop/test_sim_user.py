@@ -1,7 +1,6 @@
-"""sim 用户 agent 接入闭环的适配器（loop/sim_user.py）。
+"""Adapter for sim user agent closed-loop integration (loop/sim_user.py).
 
-用 Fake tracker + ScriptedPersonaClient + ScriptedHarness 离线验证：适配器跑 sim、把
-issue_artifact 真落 tracker、SessionResult 转 models.Session 落 store、逐轮+收尾回调 on_turn。
+Offline verification using Fake tracker + ScriptedPersonaClient + ScriptedHarness: adapter runs sim, persists issue_artifact to tracker, converts SessionResult to models.Session into store, per-turn and end-of-turn callbacks on_turn.
 """
 
 from __future__ import annotations
@@ -71,10 +70,9 @@ def _turn(
 
 
 def test_result_to_turns_dedupes_repeated_harness_snapshot() -> None:
-    """harness_output 是「本轮 persona 看到的上轮回复」快照，可能跨无新回复轮重复携带。
+    """harness_output is a snapshot of 'the previous round's reply as seen by this round's persona', potentially repeated across rounds with no new replies.
 
-    result_to_turns 必须按「真有新 harness 回复」去重，否则同一条被展开成多条 harness 轮、
-    与 user 错位。
+    result_to_turns must deduplicate by 'true new harness reply' only; otherwise the same reply expands into multiple harness rounds, misaligning with user.
     """
     completion = '{"result": "done: split_bill implemented"}'
     res = SessionResult(
@@ -82,7 +80,7 @@ def test_result_to_turns_dedupes_repeated_harness_snapshot() -> None:
         end_reason="accepted",
         turns=[
             _turn(0, "send_message", "emit", "Please inspect billing/core.py ...", ""),
-            _turn(1, "silent_reflect", "silent", "", completion),  # 快照同一 completion
+            _turn(1, "silent_reflect", "silent", "", completion),  # Snapshot same completion
             _turn(2, "silent_reflect", "silent", "", completion),
             _turn(3, "silent_reflect", "silent", "", completion),
             _turn(4, "accept", "emit", "Looks good, thanks.", completion),
@@ -91,7 +89,7 @@ def test_result_to_turns_dedupes_repeated_harness_snapshot() -> None:
 
     turns = result_to_turns(res)
 
-    # accept 是 persona 本地 terminal note，不是发送给 harness 的 user turn。
+    # accept is a local terminal note in persona, not a user turn sent to harness
     roles = [t.role for t in turns]
     assert roles == ["user", "harness"]
     assert turns[1].content == completion
@@ -99,7 +97,7 @@ def test_result_to_turns_dedupes_repeated_harness_snapshot() -> None:
 
 
 def test_result_to_sim_trace_keeps_perceive_alongside_dialogue() -> None:
-    """god-view 投影保留心路；message/harness_output 与 perceive 同条，无需事后对表。"""
+    """God-view projection preserves reasoning; message/harness_output aligns with perceive on the same row, no post-hoc reconciliation needed."""
     res = SessionResult(
         persona_id="P-0991",
         end_reason="abandoned",
@@ -139,8 +137,7 @@ def test_result_to_sim_trace_keeps_perceive_alongside_dialogue() -> None:
 
 
 def test_result_to_turns_includes_pending_harness_reply() -> None:
-    """实时快照：已到手、尚未随下一条 TurnLog 落日志的悬挂 harness 回复也要进对话，
-    否则 harness 长任务期间看板只见用户消息不见回复；与末条已入日志回复相同时不重复。"""
+    """Live snapshot: pending harness replies already received but not yet logged with the next TurnLog must be included in conversation; otherwise the dashboard shows only user messages with no replies during long harness tasks. Deduplicate against the last logged reply snapshot."""
     res = SessionResult(
         persona_id="P-0991",
         end_reason="max_turns",
@@ -153,7 +150,7 @@ def test_result_to_turns_includes_pending_harness_reply() -> None:
         ("harness", "done: interpreter implemented"),
     ]
 
-    # 悬挂内容与最后一条已入日志的 harness 快照相同 → 视为同一条，不重复
+    # Pending content identical to the last logged harness snapshot → treat as same row, no duplication
     res.turns.append(_turn(2, "send_message", "emit", "again", "done: interpreter implemented"))
     roles = [t.role for t in result_to_turns(res)]
     assert roles == ["user", "harness", "user"]
@@ -170,14 +167,16 @@ def _model_persona(sp) -> Persona:
 
 
 def test_sim_adapter_files_issue_saves_session_and_emits(tmp_path) -> None:
-    sp = expert()  # 逼证据 -> file_issue（ScriptedPersonaClient×ScriptedHarness 下确定性提 issue）
+    # Coerce evidence → file_issue (deterministically raise issue under ScriptedPersonaClient×ScriptedHarness)
+    sp = expert()
     mp = _model_persona(sp)
     tracker = FakeTracker()
     store = SessionStore(tmp_path)
     seen: list[tuple[bool, str | None]] = []
 
     fn = make_sim_run_session_fn(
-        client_factory=ScriptedPersonaClient,  # Spec-0017/T2：工厂注入，每局新建
+        # Spec-0017/T2: factory injection, create fresh per session
+        client_factory=ScriptedPersonaClient,
         tracker=tracker,
         store=store,
         sim_personas={mp.identity: sp},
@@ -189,30 +188,30 @@ def test_sim_adapter_files_issue_saves_session_and_emits(tmp_path) -> None:
 
     assert isinstance(session, Session)
     assert session.persona.identity == sp.persona_id
-    # issue 真落 tracker，session 持回执
+    # issue truly persisted to tracker, session holds receipt
     open_issues = tracker.list_open_issues()
     assert len(open_issues) == 1
     assert "bug" in open_issues[0].labels
     assert session.issue_refs and session.issue_refs[0].number == open_issues[0].number
-    # session 落盘可回读
+    # session persisted, readable on retrieval
     loaded = store.load(session.session_id)
     assert loaded.session_id == session.session_id
-    # god-view 一并落盘：心路与决策时间线可回读
+    # god-view also persisted: reasoning and decision timeline readable on retrieval
     assert session.sim_trace is not None
     assert loaded.sim_trace is not None
     assert loaded.sim_trace.persona_id == sp.persona_id
-    assert loaded.sim_trace.turns  # 至少有决策轮
+    assert loaded.sim_trace.turns  # at least one decision round
     assert any(t.perceive or t.verdict or t.action for t in loaded.sim_trace.turns)
-    # 用户 agent 原始调用：system/user 全量落盘（供后续 KV 复用分析）
+    # user agent raw invocation: full system/user persisted (for downstream KV reuse analysis)
     assert any(t.persona_trace for t in loaded.sim_trace.turns)
     first_call = next(c for t in loaded.sim_trace.turns for c in t.persona_trace)
     assert first_call.role in ("decide", "main_judge", "main_judge_intent")
-    assert first_call.system  # 完整 system 原文
+    assert first_call.system  # complete system text as-is
     assert first_call.user
-    assert first_call.parsed  # 至少有合同字段
-    assert loaded.sim_trace.persona_tail  # file_issue / rate 局末调用
+    assert first_call.parsed  # at least one contract field
+    assert loaded.sim_trace.persona_tail  # file_issue / rate called at end of session
     assert {c.role for c in loaded.sim_trace.persona_tail} >= {"file_issue", "rate"}
-    # 逐轮回调(若干 True，无 session_id) + 收尾一次 False（带 session_id 供看板归档关联）
+    # per-round callback (multiple True, no session_id) + final callback once False (with session_id for dashboard archive correlation)
     assert seen and seen[-1] == (False, session.session_id)
     assert any(running for running, _ in seen[:-1])
     assert all(sid is None for _, sid in seen[:-1])
@@ -265,7 +264,7 @@ def test_issue_side_effect_is_reconciled_after_crash_before_session_save(tmp_pat
 
 
 def test_sim_adapter_wraps_harness_in_connector(tmp_path, monkeypatch) -> None:
-    """sim_user 只经平台 connector 接入 harness，发给 harness 的仍是 human-like 文本。"""
+    """sim_user integrates with harness only through platform connector; text sent to harness remains human-like."""
     sp = expert()
     mp = _model_persona(sp)
     seen = []
@@ -322,7 +321,7 @@ def test_sim_adapter_no_issue_when_not_filed(tmp_path) -> None:
     tracker = FakeTracker()
     store = SessionStore(tmp_path)
 
-    # 客户端始终满意 -> 不会 file_issue -> 不应有 issue 落库。
+    # client always satisfied → will not file_issue → should have no issue persisted to store
     class _HappyClient:
         def respond(self, system: str, user: str) -> dict:
             if "<rate_experience>" in user:
@@ -354,7 +353,7 @@ def test_sim_adapter_no_issue_when_not_filed(tmp_path) -> None:
 
 
 def test_sim_adapter_flushes_mid_session_issue_notes(tmp_path) -> None:
-    """中途 report_issue notes 与终结 artifact 一并 create_issue；无 notes 时行为不变。"""
+    """report_issue notes mid-session and terminal artifact are created together in create_issue; behavior unchanged when notes absent."""
     sp = expert()
     mp = _model_persona(sp)
     tracker = FakeTracker()
@@ -394,7 +393,7 @@ def test_sim_adapter_flushes_mid_session_issue_notes(tmp_path) -> None:
             }
 
         def drain_issue_notes(self) -> list[str]:
-            # 第一轮 respond 后被 drain；这里用一次性标记模拟中途已记
+            # Drained after first round respond; one-time marker used here to simulate mid-session recording
             notes = getattr(self, "_notes", ["mid-session: rounding bug"])
             self._notes = []
             return notes
@@ -424,11 +423,7 @@ def _fn(tmp_path):
 
 
 def test_client_factory_gives_each_session_its_own_instance(tmp_path) -> None:
-    """Spec-0017/T2：每局一实例——工厂逐局调用，bind_session 互不覆盖（并发串台的根治点）。
-
-    用记录型 fake：既记工厂产出的实例，也记每个实例 bind 到的 (persona, workspace)。
-    并发跑两局（线程屏障齐射），断言两局各自的实例独立、各自 bind 各自的工作区。
-    """
+    """Spec-0017/T2: One instance per session—factory invoked per session, bind_session does not overwrite (root fix for concurrent cross-session). Use recording-style fake: record both factory-produced instances and (persona, workspace) each instance binds to. Run two sessions concurrently (thread barrier synchronized), assert each session's instances are independent and each binds its own workspace."""
     import threading
     from concurrent.futures import ThreadPoolExecutor
 
@@ -471,7 +466,7 @@ def test_client_factory_gives_each_session_its_own_instance(tmp_path) -> None:
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(one, ["/ws/a", "/ws/b"]))
 
-    assert len(made) == 2 and made[0] is not made[1]  # 每局独立实例
+    assert len(made) == 2 and made[0] is not made[1]  # Independent instance per session
     # Each client first sees its own interaction workspace, then its own immutable terminal view.
     all_bound = [c.bound for c in made]
     assert all(len(b) == 2 for b in all_bound)
@@ -480,9 +475,7 @@ def test_client_factory_gives_each_session_its_own_instance(tmp_path) -> None:
 
 
 def test_fallback_materialize_then_ensure_deps(tmp_path, monkeypatch) -> None:
-    """Spec-0009/T3：不经 orchestrator 的直连回落——未传 workspace_dir 但 scenario 带 workspace 时，
-    run() 自行 materialize，且必须在 materialize 之后对称调 ensure_deps（顺序：materialize 在前）。
-    """
+    """Spec-0009/T3: Direct fallback bypass orchestrator—when workspace_dir not provided but scenario carries workspace, run() materializes itself and must symmetrically call ensure_deps after materialization (order: materialize first)."""
     events: list = []
     monkeypatch.setattr(
         "ahe_beta.loop.sim_user.materialize_workspace",
@@ -500,7 +493,7 @@ def test_fallback_materialize_then_ensure_deps(tmp_path, monkeypatch) -> None:
         workspace=WorkspaceSpec(fixture="funcy", setup=["python -m venv .venv"]),
     )
 
-    fn(mp, scenario, ScriptedHarness())  # 不传 workspace_dir → 走回落分支
+    fn(mp, scenario, ScriptedHarness())  # No workspace_dir provided → take fallback branch
 
     assert events[0] == ("materialize", "funcy")
     assert events[1][0] == "ensure_deps"
@@ -508,15 +501,14 @@ def test_fallback_materialize_then_ensure_deps(tmp_path, monkeypatch) -> None:
 
 
 def test_main_path_does_not_ensure_deps_in_sim_user(tmp_path, monkeypatch) -> None:
-    """传入 workspace_dir 的 orchestrator 主路径：依赖已由 orchestrator 就位，sim_user 不重复
-    materialize/ensure_deps（反向断言）。"""
+    """Orchestrator main path with workspace_dir provided: dependencies already staged by orchestrator, sim_user does not repeat materialize/ensure_deps (inverse assertion)."""
     monkeypatch.setattr(
         "ahe_beta.loop.sim_user.materialize_workspace",
-        lambda spec: (_ for _ in ()).throw(AssertionError("主路径不应 materialize")),
+        lambda spec: (_ for _ in ()).throw(AssertionError("Main path should not materialize")),
     )
     monkeypatch.setattr(
         "ahe_beta.loop.sim_user.ensure_deps",
-        lambda ws, spec: (_ for _ in ()).throw(AssertionError("主路径不应 ensure_deps")),
+        lambda ws, spec: (_ for _ in ()).throw(AssertionError("Main path should not ensure_deps")),
     )
     fn, mp = _fn(tmp_path)
     scenario = SeedScenario(
@@ -524,28 +516,32 @@ def test_main_path_does_not_ensure_deps_in_sim_user(tmp_path, monkeypatch) -> No
         workspace=WorkspaceSpec(fixture="funcy", setup=["python -m venv .venv"]),
     )
 
-    # 传入 workspace_dir（orchestrator 已 materialize+ensure）→ sim_user 不再碰这两者，不抛即通过。
+    # workspace_dir provided (orchestrator already materialized+ensured) → sim_user no longer touches these two, pass if no exception thrown
     fn(mp, scenario, ScriptedHarness(), workspace_dir=_NonGitWorkspace("/given/ws"))
 
 
-# ---- Spec-0025/T2：raw issue 结构化——暂定 type + needs-triage + round 标签 ----
+# ---- Spec-0025/T2: Raw issue structuring—tentative type + needs-triage + round labels ----
 
 
 def test_infer_kind_defaults_bug_and_detects_feature() -> None:
-    assert _infer_kind("装不上包，反复超时后放弃") == "bug"
-    assert _infer_kind("希望能增加一个批量导出功能") == "feature"
+    assert _infer_kind("Package installation failed，Abandoned after repeated timeouts") == "bug"
+    assert _infer_kind("Please add a batch export feature") == "feature"
     assert _infer_kind("would be nice to add a dark mode") == "feature"
+    assert _infer_kind("I hope the report can include a summary") == "feature"
+    assert _infer_kind("Can you export the results as CSV?") == "feature"
+    assert _infer_kind("Please support batch imports") == "feature"
 
 
 def test_raw_issue_labels_type_and_needs_triage() -> None:
-    draft = _issue_draft_from_body("unidecode 装不上，超时放弃")
-    assert "bug" in draft.labels  # 暂定 type（triage 会确认）
-    assert "needs-triage" in draft.labels  # 待 triage，dev 不领
-    assert not any(lb.startswith("round-") for lb in draft.labels)  # 无轮号时不加
+    draft = _issue_draft_from_body("unidecode Installation failed，Abandoned after timeout")
+    assert "bug" in draft.labels  # Tentative type (triage will confirm)
+    assert "needs-triage" in draft.labels  # Awaiting triage, dev does not claim
+    # Do not add label when no round number
+    assert not any(lb.startswith("round-") for lb in draft.labels)
 
 
 def test_raw_issue_stamps_round_when_given() -> None:
-    draft = _issue_draft_from_body("坏了", round_no=3)
+    draft = _issue_draft_from_body("Broken", round_no=3)
     assert "round-3" in draft.labels
     assert "needs-triage" in draft.labels
 
@@ -560,7 +556,7 @@ def test_round_provider_threads_round_into_issue(tmp_path) -> None:
         tracker=tracker,
         store=store,
         sim_personas={mp.identity: sp},
-        round_provider=lambda: 5,  # Spec-0025/T6 会传真轮号，这里固定 5
+        round_provider=lambda: 5,  # Spec-0025/T6 will pass actual round number, fixed to 5 here
     )
     fn(mp, SeedScenario(description="task"), ScriptedHarness())
     issues = tracker.list_open_issues()

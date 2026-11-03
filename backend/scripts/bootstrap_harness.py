@@ -1,10 +1,8 @@
-# Spec-0007/T4：纯 trunk——bootstrap 不再建 release 分支，只种 main 并确保默认分支为 main。
-"""harness 仓初始化（spec-0002/T3）：把 backend/harness_template/ 作为 v0 推到 Gitea，建独立 harness 仓。
+# Spec-0007/T4: pure trunk——bootstrap no longer creates release branches, only seeds main and ensures default branch is main.
+"""harness repo initialization (spec-0002/T3): push backend/harness_template/ as v0 to Gitea, create independent harness repo.
 
-读 backend/deploy/gitea/.env 的 {GITEA_URL, OWNER, TOKEN} → 建仓（缺则建，幂等）→ git push 种子到 main。
-纯 trunk（Spec-0007）：只建单 main 分支（不再建 release），默认分支即 main。幂等且保护演化历史：仓已
-存在则不强推覆盖。核心逻辑 bootstrap_harness 经依赖注入（session / run_git），便于 mock Gitea + 临时 git 单测。
-"""
+Read {GITEA_URL, OWNER, TOKEN} from backend/deploy/gitea/.env → create repo (create if missing, idempotent) → git push seed to main.
+Pure trunk (Spec-0007): create only single main branch (no release branches), default branch is main. Idempotent and preserves evolution history: if repo exists, do not force-push overwrite. Core logic bootstrap_harness uses dependency injection (session / run_git) for easy mocking of Gitea + temporary git unit tests."""
 
 from __future__ import annotations
 
@@ -18,16 +16,16 @@ from urllib.parse import urlparse
 
 import requests
 
-# harness 仓名，独立于 T1 的 issue 工作仓，避免 issue 流与代码演化混用。
+# harness repo name, independent from T1's issue tracking repo, avoiding mixing issue flow with code evolution.
 HARNESS_REPO = "harness"
 _SEED_COMMIT_MSG = "seed: harness_template v0"
 
-# 注入的 git 执行器：(args, cwd) -> None，失败抛 CalledProcessError。
+# Injected git executor: (args, cwd) -> None; raises CalledProcessError on failure.
 GitRun = Callable[[list[str], str], None]
 
 
 def _read_env(env_path: Path) -> dict[str, str]:
-    """解析 KEY=VALUE 行的 .env。"""
+    """Parse a .env of KEY=VALUE lines."""
     env: dict[str, str] = {}
     for line in env_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -39,14 +37,14 @@ def _read_env(env_path: Path) -> dict[str, str]:
 
 
 def _remote_url(gitea_url: str, token: str, owner: str, repo: str) -> str:
-    """把 token 注入 remote URL（不落入仓内容）。"""
+    """Inject the token into the remote URL (never lands in repo content)."""
     host = urlparse(gitea_url).netloc
     scheme = urlparse(gitea_url).scheme or "http"
     return f"{scheme}://{token}@{host}/{owner}/{repo}.git"
 
 
 def _push_seed(template_dir: Path, remote: str, run_git: GitRun) -> None:
-    """在临时工作目录初始化 git、复制种子、单条初始提交并 push 到 main。"""
+    """Initialize git in a temp workdir, copy the seed, make a single initial commit, and push to main."""
     with tempfile.TemporaryDirectory() as tmp:
         run_git(["init", "-b", "main"], tmp)
         for item in template_dir.iterdir():
@@ -82,10 +80,13 @@ def bootstrap_harness(
     token: str,
     harness_repo: str,
 ) -> int:
-    """初始化 harness 仓，返回退出码（成功/幂等重跑=0，前置缺失=2，连接/鉴权失败=1）。"""
+    """Initialize the harness repo and return the exit code (success/idempotent rerun=0, missing prerequisite=2, connection/auth failure=1)."""
     template_dir = repo_root / "harness_template"
     if not template_dir.is_dir() or not any(template_dir.iterdir()):
-        print(f"[bootstrap-harness] 前置缺失：{template_dir} 不存在或为空", file=sys.stderr)
+        print(
+            f"[bootstrap-harness] Missing prerequisite: {template_dir} does not exist or is empty",
+            file=sys.stderr,
+        )
         return 2
 
     api = f"{gitea_url.rstrip('/')}/api/v1"
@@ -95,31 +96,36 @@ def bootstrap_harness(
             json={"name": harness_repo, "auto_init": False, "private": True},
         )
         if created.status_code == 201:
-            # 新建空仓 → 推种子到 main。
+            # New empty repo → push seed to main.
             _push_seed(template_dir, _remote_url(gitea_url, token, owner, harness_repo), run_git)
         elif created.status_code == 409:
-            # 仓已存在 → 不强推覆盖，保护开发者 agent 已产生的演化历史。
-            print("[bootstrap-harness] harness 仓已存在，跳过推种子（保护演化历史）")
+            # Repo already exists → do not force-push over it; protect the evolution history already produced by the developer agent.
+            print(
+                "[bootstrap-harness] Harness repository already exists; skipping the seed push to preserve its evolution history"
+            )
         else:
-            print(f"[bootstrap-harness] 建仓失败：HTTP {created.status_code}", file=sys.stderr)
+            print(
+                f"[bootstrap-harness] Repository creation failed: HTTP {created.status_code}",
+                file=sys.stderr,
+            )
             return 1
 
-        # Spec-0007/T4：纯 trunk——不再建 release 分支，确保 Gitea 默认分支为 main。
+        # Spec-0007/T4: pure trunk — no more release branches; ensure the Gitea default branch is main.
         default = session.patch(
             f"{api}/repos/{owner}/{harness_repo}",
             json={"default_branch": "main"},
         )
         if default.status_code not in (200, 201):
             print(
-                f"[bootstrap-harness] 设默认分支 main 失败：HTTP {default.status_code}",
+                f"[bootstrap-harness] Failed to set main as the default branch: HTTP {default.status_code}",
                 file=sys.stderr,
             )
             return 1
     except requests.RequestException as exc:
-        print(f"[bootstrap-harness] Gitea 不可达：{exc}", file=sys.stderr)
+        print(f"[bootstrap-harness] Gitea is unreachable: {exc}", file=sys.stderr)
         return 1
 
-    print(f"[bootstrap-harness] 完成：{owner}/{harness_repo}（纯 trunk：单 main）")
+    print(f"[bootstrap-harness] Complete: {owner}/{harness_repo} (single main trunk)")
     return 0
 
 

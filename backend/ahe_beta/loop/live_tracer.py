@@ -1,15 +1,16 @@
-"""StepTracer：把 nexau agent 运行中的过程流成看板可见的结构化事件。
+"""StepTracer: transform nexau agent runtime process flow into structured events visible on the dashboard.
 
-nexau 在每次工具执行时发 TOOL span（name="Tool: {tool_name}"，inputs.parameters=入参），
-每次模型调用时发 LLM span（end 时 outputs=完整响应）。本 tracer 订阅两类 span，重建
-「assistant 发言 → 工具调用 → 工具结果」的完整过程流，经 on_event(kind, text) 回调写进
-live 注册表的 log 时间线——dev/architect 的黑盒 agent.run 由此变成逐步可观测：
+nexau emits a TOOL span on each tool execution (name="Tool: {tool_name}", inputs.parameters=input args),
+and an LLM span on each model call (outputs=full response at end). This tracer subscribes to both span types,
+reconstructing the complete process flow "assistant utterance → tool invocation → tool result", passing it via
+on_event(kind, text) callback to write into the log timeline in the live registry—the black-box agent.run
+of dev/architect thus becomes incrementally observable:
 
-- LLM end   → kind="assistant"：模型这一步说了什么（全文，宽上限）
-- TOOL start → kind="tool"：🔧 工具名 + 入参摘要
-- TOOL end   → kind="tool_result"：工具输出摘要；失败则 kind="tool_error"（❌）
+- LLM end   → kind="assistant": what the model said in this step (full text, high limit)
+- TOOL start → kind="tool": 🔧 tool name + input summary
+- TOOL end   → kind="tool_result": tool output summary; on failure kind="tool_error" (❌)
 
-依赖 nexau，调用方（architect/triage/owner 等 agent driver）须在运行期懒加载本模块。
+Depends on nexau; callers (architect/triage/owner agent drivers, etc.) must lazily load this module at runtime.
 """
 
 from __future__ import annotations
@@ -28,8 +29,8 @@ from ahe_beta.usage import (
     record_usage,
 )
 
-# 各类事件文本长度上限：工具入参/输出可能携带整文件内容，摘要后进时间线；
-# assistant 是过程流主体（要完整对话），给宽上限只防极端失控。
+# Length limits for event text: tool inputs/outputs may carry entire file contents, summarized into timeline;
+# assistant is the main process flow (requires complete dialogue), given a high limit only against extreme runaway.
 _TOOL_TEXT_CAP = 200
 _TOOL_RESULT_CAP = 500
 _ASSISTANT_TEXT_CAP = 20_000
@@ -38,7 +39,7 @@ EventFn = Callable[[str, str], None]  # (kind, text)
 
 
 def _compact_params(params: dict[str, Any]) -> str:
-    """入参摘要：shell 类工具直接给 command（最可读），其余压成单行 JSON 后截断。"""
+    """Input summary: shell-class tools pass command directly (most readable), others compressed to single-line JSON then truncated."""
     for key in ("command", "cmd"):
         value = params.get(key)
         if isinstance(value, str) and value.strip():
@@ -50,13 +51,13 @@ def _compact_params(params: dict[str, Any]) -> str:
 
 
 def _assistant_text(outputs: Any) -> str:
-    """从 LLM span 的 outputs 里提取 assistant 文本。
+    """Extract assistant text from LLM span outputs.
 
-    兼容三种真实形态（见 nexau llm_caller）：
-    - 流式聚合 payload：{"role": "assistant", "content": "..."}
-    - OpenAI 完整响应：{"choices": [{"message": {"content": "..."}}]}
-    - Anthropic 响应/聚合：{"content": [{"type": "text", "text": "..."}, ...]}
-    提取不到一律返回 ""（不吐事件），绝不抛错。
+    Compatible with three real forms (see nexau llm_caller):
+    - streamed aggregated payload: {"role": "assistant", "content": "..."}
+    - OpenAI complete response: {"choices": [{"message": {"content": "..."}}]}
+    - Anthropic response/aggregate: {"content": [{"type": "text", "text": "..."}, ...]}
+    Return "" if extraction fails (suppress event), never raise.
     """
     if not isinstance(outputs, dict):
         return ""
@@ -77,7 +78,7 @@ def _assistant_text(outputs: Any) -> str:
 
 
 def _compact_outputs(outputs: Any) -> str:
-    """工具输出摘要：字符串原样、其余压 JSON，超长截断。"""
+    """Tool output summary: strings unchanged, others compressed to JSON, truncated if too long."""
     if outputs is None:
         return ""
     if isinstance(outputs, str):
@@ -89,7 +90,7 @@ def _compact_outputs(outputs: Any) -> str:
 
 
 class StepTracer(BaseTracer):
-    """把 TOOL/LLM span 转成 on_event 过程流回调的 tracer（观测投影，出错静默不拖垮 agent）。"""
+    """Transform TOOL/LLM spans into on_event process flow callback tracer (observation projection, fail silently without breaking agent)."""
 
     def __init__(self, on_event: EventFn) -> None:
         self._on_event = on_event
@@ -104,7 +105,7 @@ class StepTracer(BaseTracer):
     def _emit(self, *, kind: str, text: str, cap: int) -> None:
         try:
             self._on_event(kind, text[:cap])
-        except Exception:  # noqa: BLE001  观测层失败不影响 agent 主流程
+        except Exception:  # noqa: BLE001  observation layer failure does not affect agent main flow
             pass
 
     def start_span(

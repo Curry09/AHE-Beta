@@ -1,10 +1,10 @@
-# seed 工作区 fixture 元信息（spec-0008/T1）。
-# 描述这个基线项目的语言/入口/期望运行方式，供内层用户 agent 的 sandbox 取用。
-# 不含 gold 测试或 benchmark 信息（held-out 红线无关）。
+# Seed workspace fixture metadata (spec-0008/T1).
+# Describes the language/entry point/expected execution method of this baseline project for use by the inner user agent's sandbox.
+# Does not contain gold tests or benchmark information (unrelated to the held-out boundary).
 name: billing-split
 language: python
-runtime: stdlib-only            # 无第三方依赖，materialize 只需 copytree
-root: project                   # 拷贝/运行的项目根（相对本 fixture 目录）
-entry: billing/core.py          # 主模块（相对 root）
-description: 最小账单模块基线（仅 format_amount，故意不含 split_bill），作为用户 agent 自有核实的落脚基线。
-run: python billing/core.py     # 在 materialize 出的项目根（cwd）下的示例运行命令
+runtime: stdlib-only            # No third-party dependencies; materialization only requires copytree
+root: project                   # Project root for copying/running (relative to this fixture directory)
+entry: billing/core.py          # Main module (relative to root)
+description: Minimal billing baseline with format_amount but no split_bill implementation, for the user agent to extend and verify.
+run: python billing/core.py     # Example command to run under the materialized project root (cwd)

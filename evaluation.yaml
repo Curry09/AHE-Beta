@@ -1,4 +1,4 @@
-# 唯一需要手动编辑的评测配置；API密钥写入.env。
+# The only evaluation configuration that needs to be edited manually; write the API key to .env.
 version: 1
 name: harbor-evaluation
 
@@ -7,18 +7,18 @@ paths:
   cache: .cache
   runs: runs
 
-# 任务源的规则由其profile解释。harbor可直接使用本地标准Harbor任务包。
+# The task source's rules are interpreted by its profile. harbor can directly use local standard Harbor task packages.
 task_source: harbor_index
-# harbor_index: published38 / all / [题目ID, ...]
+# harbor_index: published38 / all / [task ID, ...]
 tasks: published38
-# 可选：v0、u8、u8-direct、u16、u32、claude-code、meta-harness
+# Optional: v0, u8, u8-direct, u16, u32, claude-code, meta-harness
 harnesses: [v0, u32]
 
 actor:
   model: glm-5.3-flash
   base_url: https://open.bigmodel.cn/api/paas/v4
   api_key_env: ACTOR_API_KEY
-  # 选claude-code时填写兼容Anthropic协议的地址；密钥默认同上。
+  # When claude-code is selected, enter an address compatible with the Anthropic protocol; the key defaults to the same as above.
   anthropic_base_url: null
   reasoning_effort: max
   max_output_tokens: 65536
@@ -28,16 +28,16 @@ actor:
 user:
   enabled: true
   model: glm-5.3-flash
-  # 未填地址/密钥变量时沿用actor；persona固定为原实验设定。
+  # When the address/API key variables are omitted, actor is used; persona is fixed to the original experiment settings.
   reasoning_effort: max
 
 judge:
-  # 仅需要官方LLM裁判的题目使用；不更换题目规定的裁判。
+  # Only tasks requiring an official LLM judge use this; do not replace the judge specified by the task.
   base_url: null
   api_key_env: JUDGE_API_KEY
-  # 网关要求前缀时可改为anthropic/claude-opus-5，仅作为同一裁判的接口别名。
+  # When the gateway requires a prefix, it can be changed to anthropic/claude-opus-5, serving only as an interface alias for the same judge.
   model: claude-opus-5
-  # 仅对返回usage.server_tool_use: null的兼容网关启用；须填写base_url。
+  # Enable only for compatible gateways that return usage.server_tool_use: null; base_url must be provided.
   normalize_usage: false
 
 execution:
@@ -47,5 +47,5 @@ execution:
   time_adaptation: false
 
 experience:
-  # 解题结束并冻结提交后统一评分，不占用官方解题预算。
+  # Score uniformly after the solution is complete and the submission is frozen; this does not consume the official solution budget.
   timeout_seconds: 600

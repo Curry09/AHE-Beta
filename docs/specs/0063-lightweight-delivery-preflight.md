@@ -1,12 +1,12 @@
 ---
 number: "0063"
-title: 轻量交付前置与软调度
+title: "Lightweight delivery preflight and soft scheduling"
 issue: 0
 slug: lightweight-delivery-preflight
-summary: 对需求侧 proposal 先做一次分组并把交付侧共享机制、建议顺序与复用提示作为有界软信号，在不合票、不阻塞 worker 的前提下降低并行返工。
+summary: "Group requirements-side proposals once and use delivery-side shared mechanisms, suggested ordering, and reuse hints as bounded soft signals to reduce parallel rework without merging issues or blocking workers."
 tasks:
   - id: T1
-    title: 需求侧提案分组与并行 Architect
+    title: "Requirements-side proposal grouping and parallel Architect execution"
     status: done
     priority: P1
     tags: []
@@ -22,10 +22,10 @@ tasks:
       - backend/tests/demand/test_grouped_architect.py
       - backend/tests/tracker/test_gitea.py
       - docs/architect-grouping.md
-    scope: '保留包内 ordinary/SWE controller 生成 coordination: soft 的交付配置、需求接线和共享 tracker 行为；旧 auditable wrapper 已归档，不作为交付入口。'
-    acceptance: 当前 controller 的轻量前置参数生效，coordination 关闭可回普通队列；相关需求、tracker 与 controller 测试通过。
+    scope: "Retain the delivery configuration generated with coordination: soft by the in-package ordinary/SWE controller, requirements wiring, and shared tracker behavior; the old auditable wrapper has been archived and is not a delivery entry point."
+    acceptance: "The current controller's lightweight preflight parameters take effect; disabling coordination restores the ordinary queue. Related requirements, tracker, and controller tests pass."
   - id: T2
-    title: 交付侧有界前置与软调度
+    title: "Bounded delivery-side preflight and soft scheduling"
     status: done
     priority: P1
     tags: []
@@ -42,75 +42,75 @@ tasks:
       - OpenAgents/openagents/recipes/vigil.py
       - OpenAgents/tests/test_preflight.py
       - OpenAgents/tools/preflight_stress.py
-    scope: 为 ready 队列生成共享机制、建议先后与复用提示，按内容指纹缓存并只影响同级新开发票的领取偏好。
-    acceptance: 前置单轮、无执行工具、有 token/时间/输出上限；失败和坏输出回普通调度；不写硬依赖、不合票、不覆盖独立验收，等待老化后回 FIFO。
+    scope: "Generate shared mechanisms, suggested ordering, and reuse hints for the ready queue, cache them by content fingerprint, and affect only claim preferences among new development issues at the same priority."
+    acceptance: "Preflight uses a single round, no execution tools, and token/time/output limits; failures and invalid output fall back to ordinary scheduling. It writes no hard dependencies, merges no issues, and does not override independent acceptance; waiting-time aging restores FIFO."
 ---
 
-# 0063 · 轻量交付前置与软调度
+# 0063 · Lightweight delivery preflight and soft scheduling
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level nine-section rust-RFC overview. -->
 
 ## Summary
 
-优化目标是“有效并行交付收益减去协调与返工成本”。需求侧在 Triage 后把同轮 proposal
-做一次有界分组，由已有 Architect workers 按互斥组设计；交付侧在 Owner 独立准入后，对 ready
-队列生成共享机制、建议顺序和复用提示。两次前置都只购买便宜信息，不合并独立需求、不改变验收、
-不把建议变成硬依赖，失败时恢复原有处理路径。
+The optimization objective is “effective parallel delivery gains minus coordination and rework costs.” After Triage, the requirements side performs bounded grouping of proposals
+from the same round once, and existing Architect workers design them in mutually exclusive groups; after independent Owner admission, the delivery side generates shared mechanisms,
+suggested ordering, and reuse hints for the ready queue. Both preflight steps only purchase inexpensive information: they do not merge independent requirements, change acceptance,
+or turn suggestions into hard dependencies, and failures restore the original processing paths.
 
-本组已经实现并验证。交付侧实现对应 OpenAgents 的轻量前置版本；Auto Architect 负责启用配置、
-需求侧分组和跨边界接线。
+This group has been implemented and verified. The delivery-side implementation corresponds to the lightweight preflight version in OpenAgents; Auto Architect handles configuration enablement,
+requirements-side grouping, and wiring across boundaries.
 
 ## Motivation
 
-大量 issue 同轮进入时，完全无协调的多个 Architect 会各自读取整池 proposal，重复分类并可能同时
-设计重叠机制；交付 worker 也可能并行实现相同底层能力，直到冲突或评审阶段才发现复用机会。
-将所有票先做完整规划或建立强依赖又会产生另一类成本：模型漏判、建议成环或一张慢票会阻塞本可
-独立交付的工作，规划本身还可能比实现更昂贵。
+When many issues arrive in the same round, multiple entirely uncoordinated Architects each read the entire proposal pool, repeat classification, and may simultaneously
+design overlapping mechanisms; delivery workers may also implement the same underlying capabilities in parallel, discovering reuse opportunities only during conflict resolution or review.
+Fully planning all issues first or establishing strong dependencies introduces another class of costs: model misclassification, cyclic suggestions, or a slow issue can block work
+that could be delivered independently, and planning itself may cost more than implementation.
 
-因此前置只影响工作分配和同级领取偏好。需求、目标和 acceptance 继续由每张 Gitea issue 保存；
-Owner 保留每张票的独立交接；worker 开始工作后仍须核实当前代码。benchmark 不进入分类、调度或
-交付门禁，仍只在事后观测。
+Preflight therefore affects only work assignment and claim preferences at the same priority. Requirements, objectives, and acceptance remain stored in each Gitea issue;
+Owner retains independent handoff for each issue, and workers must still verify the current code after starting work. The benchmark does not enter classification, scheduling, or
+delivery gates and remains available only for retrospective observation.
 
 ## Guide-level explanation
 
-用户先在本轮冻结 main SHA 上交互。非末轮产生的普通报告经 Triage 变成 proposal，PM proposal
-独立到 Owner。启用 `ARCHITECT_GROUPING` 时，协调器只读取本轮可见 proposal 的编号、标题和摘要，
-调用一次无工具分类；每个 ID 必须恰好出现一次。组内超过六张时切成连续 batch，同一组固定由一个
-Architect 顺序处理，不同组由现有 Architect 并行领取。分类超时、截断或非法时，按票号切成最多
-六张的 batch 串行执行，所有票继续保留。
+Users first interact on the main SHA frozen for the current round. Ordinary reports produced in non-final rounds become proposals through Triage; PM proposals
+proceed independently to Owner. When `ARCHITECT_GROUPING` is enabled, the coordinator reads only the numbers, titles, and summaries of proposals visible in the current round
+and makes one tool-free classification call; each ID must appear exactly once. Groups with more than six issues are split into consecutive batches, with each
+group assigned to one Architect for sequential processing, while different groups are claimed in parallel by existing Architects. If classification times out, is truncated, or is invalid,
+issues are split by issue number into batches of at most six and executed sequentially, retaining every issue.
 
-Owner 对各 proposal 独立准入并打 `openagents`。Vigil 发现后打 ready，soft 模式读取最多 64 张
-开放 ready 票，排除 `automation-failed`，生成至多 8 个共享机制候选、8 条建议先后和 8 条复用
-提示。输出是限长规划视图，原 issue 始终是完整权威输入。
+Owner independently admits each proposal and applies `openagents`. Vigil applies ready upon discovery; soft mode reads up to 64
+open ready issues, excludes `automation-failed`, and generates at most 8 shared mechanism candidates, 8 suggested ordering relationships, and 8 reuse
+hints. The output is a length-limited planning view; the original issue always remains the complete authoritative input.
 
-领取时，回复、合并、评审等既有动作优先级保持不变；只在同级新开发票之间参考热点差异和建议前序。
-有空槽就继续派发，同热点或建议成环不阻塞。等待 15 分钟后 FIFO 老化抵消建议偏好。每张票仍走
-独立 worktree、设计、实现、CI/e2e 配置闸、评审、合并与关闭；worker 完成即领下一张，不等整批。
+During claiming, existing action priorities for replies, merges, reviews, and similar actions remain unchanged; hotspot differences and suggested predecessors are considered only among new development issues at the same priority.
+Dispatch continues whenever a slot is available; shared hotspots or cyclic suggestions do not block it. After 15 minutes of waiting, FIFO aging offsets suggestion preferences. Each issue still goes through
+its own worktree, design, implementation, CI/e2e configuration gates, review, merge, and closure; workers claim the next issue as soon as they finish, without waiting for the entire batch.
 
-Auto Architect 等本轮全部准入票终态后才开始下一轮用户。任何 `automation-failed`、历史
-`needs-human` 或超时仍停止本轮；末轮只做用户观察。
+Auto Architect starts the next user round only after all admitted issues in the current round reach terminal states. Any `automation-failed`, historical
+`needs-human`, or timeout still stops the current round; the final round performs user observation only.
 
 ## Reference-level explanation
 
-### 配置与预算
+### Configuration and budgets
 
-`backend/ahe_beta/experiment/controllers/ordinary.py` 生成 `coordination: soft`，同一份 `openagents.yml` 用于 subprocess 和 vigil
-容器。`VIGIL_COORDINATION=off` 关闭前置并恢复普通优先级/FIFO；`dependencies` 显式选择强依赖
-模式。模式在下次启动生效，不修改正在运行的实验。运行镜像必须包含认识 `coordination` 字段的
-OpenAgents 版本。
+`backend/ahe_beta/experiment/controllers/ordinary.py` generates `coordination: soft`, and the same `openagents.yml` is used for subprocess and vigil
+containers. `VIGIL_COORDINATION=off` disables preflight and restores ordinary priority/FIFO; `dependencies` explicitly selects strong-dependency
+mode. The mode takes effect at the next startup and does not modify running experiments. The runtime image must contain an
+OpenAgents version that recognizes the `coordination` field.
 
-Architect grouping 使用单次 completion、无工具、16,384 输出 token 上限和 300 秒墙钟预算。
-交付前置使用单轮、无执行工具、8,192 输出 token 上限和 90 秒墙钟预算，不追加协议修复调用。
-交付结果按 issue 内容指纹缓存，失败也缓存；Owner 密集准入时有 120 秒冷却，单纯闭票不触发重算。
-截断、漏判、非法输出和超时均回普通调度，不设置 `automation-failed` 或 `blocked_by`。
+Architect grouping uses a single completion, no tools, a 16,384 output-token limit, and a 300-second wall-clock budget.
+Delivery preflight uses a single round, no execution tools, an 8,192 output-token limit, and a 90-second wall-clock budget, with no additional protocol-repair calls.
+Delivery results are cached by issue content fingerprint, including failures; a 120-second cooldown applies during rapid Owner admissions, and issue closure alone does not trigger recomputation.
+Truncation, missed classifications, invalid output, and timeouts all fall back to ordinary scheduling without setting `automation-failed` or `blocked_by`.
 
-实际并发取 `N_DEVELOPERS`，内建默认 1；近期混合实验配置为 4。生成的 OpenAgents 阶段仍是
-triage/ci/e2e=skip，rfc/conflict/review/merge=agent，CI 可由 `VIGIL_CI_STAGE` 开启。启用前置
-不会提高 worker 数或把跳过阶段宣称为已执行。
+Actual concurrency is `N_DEVELOPERS`, with a built-in default of 1; recent mixed experiments configured it as 4. Generated OpenAgents stages remain
+triage/ci/e2e=skip and rfc/conflict/review/merge=agent; CI can be enabled through `VIGIL_CI_STAGE`. Enabling preflight
+does not increase the worker count or claim that skipped stages were executed.
 
-### 任务与验证
+### Tasks and verification
 
-T1 与 T2 可独立实现，最终在 Auto Architect 入口和固定 OpenAgents 镜像处汇合：
+T1 and T2 can be implemented independently, ultimately converging at the Auto Architect entry point and the pinned OpenAgents image:
 
 ```mermaid
 flowchart LR
@@ -118,47 +118,47 @@ flowchart LR
     T2[0063/T2 delivery preflight] --> I
 ```
 
-需求侧回归覆盖 ID 完整性、批大小、组亲和、并行互斥、fallback、当前轮隔离和审计配置入口。
-交付侧验证入口为 `OpenAgents/tools/preflight_stress.py` 与 `OpenAgents/tests/test_preflight.py`；结果保存
-在 `OpenAgents/docs/e2e-results/preflight-20260911/REPORT.md`。`.openagents/preflight.json`
-记录指纹、状态、耗时和净化建议，token 用量进入 `token-usage.jsonl`。
+Requirements-side regression covers ID completeness, batch size, group affinity, parallel mutual exclusion, fallback, current-round isolation, and the audit configuration entry point.
+Delivery-side verification entry points are `OpenAgents/tools/preflight_stress.py` and `OpenAgents/tests/test_preflight.py`; results are saved
+in `OpenAgents/docs/e2e-results/preflight-20260911/REPORT.md`. `.openagents/preflight.json`
+records fingerprints, status, elapsed time, and sanitized suggestions; token usage goes into `token-usage.jsonl`.
 
-验证包含真实前置模型、历史规划输出回放、无网络容器配置加载和本地并发队列压力测试，没有启动真实
-developer A/B。因此它证明接线、队列安全与降级行为，不证明长期返工率或端到端耗时收益。
+Verification includes a real preflight model, replay of historical planning output, configuration loading in containers without network access, and local concurrent-queue stress tests; it did not launch a real
+developer A/B test. It therefore establishes wiring, queue safety, and fallback behavior, not long-term rework rates or end-to-end elapsed-time gains.
 
 ## Drawbacks
 
-两次分类增加模型成本和首票等待时间。软建议不保证最优顺序，错误建议仍可能让相关 worker 多做调查；
-失败缓存会在内容不变时保留一次暂时性失败。按最多 64 张票观察也可能漏掉更深积压的关系。
+The two classifications add model cost and waiting time for the first issue. Soft suggestions do not guarantee optimal ordering, and incorrect suggestions may still cause related workers to do more investigation;
+failure caching preserves a transient failure while content remains unchanged. Observing at most 64 issues may also miss relationships deeper in the backlog.
 
-组亲和减少同一组内部并行度；当分类把可独立票放在一起时，吞吐会下降。设计选择以避免重复读池和
-共享机制冲突为目标，不承诺所有负载都更快。
+Group affinity reduces parallelism within each group; throughput declines when classification groups independently executable issues together. The design aims to avoid repeated pool reads and
+shared-mechanism conflicts, without promising faster execution for every workload.
 
 ## Rationale and alternatives
 
-选择软调度，是因为错误提示的损失应有界：worker 仍可核实和纠正，没有建议也能领取，老化最终回到
-FIFO。将建议写成 `blocked_by` 或批次 barrier 会放大漏判和慢票影响，因此只保留显式 forge 依赖的
-硬约束。
+Soft scheduling is chosen because the cost of incorrect hints should be bounded: workers can still verify and correct them, claiming works without suggestions, and aging eventually returns scheduling to
+FIFO. Writing suggestions as `blocked_by` or batch barriers would amplify the impact of missed classifications and slow issues, so only explicit forge dependencies remain
+hard constraints.
 
-每张票各自调用协调模型会快速增加成本，并在 Owner 连续准入时对几乎相同队列重复规划；本组采用队列
-快照、内容指纹缓存和冷却。完全取消协调成本最低，但保留了重复设计、重复实现和晚期冲突问题。
+Calling the coordination model for every issue would quickly increase costs and repeatedly plan nearly identical queues during successive Owner admissions; this group uses queue
+snapshots, content-fingerprint caching, and cooldowns. Eliminating coordination entirely has the lowest cost but retains duplicate design, duplicate implementation, and late conflicts.
 
-自动合票可以减少任务数，却会压缩独立用户目标与验收，也让失败归因变模糊；本组只提供共享机制和
-复用提示，每张 issue 始终独立。
+Automatically merging issues could reduce task counts, but would compress independent user objectives and acceptance and blur failure attribution; this group provides only shared mechanisms and
+reuse hints, and each issue always remains independent.
 
 ## Prior art
 
-调度器的优先级老化、编译构建系统的内容寻址缓存，以及团队 backlog refinement 都提供了可借鉴的
-机制：建议影响选择，权威任务保持独立，缓存按输入失效。现有 Vigil 的事务领取、flock、生存证明和
-崩溃回收继续承担并发正确性，前置不另建队列协议。
+Scheduler priority aging, content-addressed caching in compilation/build systems, and team backlog refinement all offer mechanisms
+worth drawing on: suggestions affect selection, authoritative tasks remain independent, and caches are invalidated by input changes. Existing Vigil transactional claiming, flock, liveness proofs, and
+crash recovery continue to provide concurrency correctness; preflight does not establish another queue protocol.
 
 ## Unresolved questions
 
-真实 developer A/B 尚未执行，因此共享实现复用率、返工率、合并冲突率和总耗时收益仍需由后续正常
-实验观测。当前并发保持不变，不能从本次受控验证推导最佳 worker 数或前置预算。
+A real developer A/B test has not yet been run, so shared implementation reuse, rework rates, merge-conflict rates, and total elapsed-time gains still require observation in subsequent normal
+experiments. Current concurrency remains unchanged; this controlled verification cannot establish the optimal worker count or preflight budget.
 
 ## Future possibilities
 
-积累足够真实交付数据后，可以比较 soft/off 的首票延迟、重复修改、冲突和总封口时间，再决定是否调整
-快照上限、冷却、老化或建议数量。未来也可在看板展示前置缓存命中、fallback 和提示采纳情况，但这些
-观测不能反向成为 benchmark 驱动的训练门禁。
+After accumulating sufficient real delivery data, compare soft/off in terms of first-issue latency, repeated changes, conflicts, and total finalization time, then decide whether to adjust
+snapshot limits, cooldowns, aging, or suggestion counts. A board could also display preflight cache hits, fallback, and hint adoption in the future, but these
+observations must not feed back into benchmark-driven training gates.

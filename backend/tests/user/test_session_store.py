@@ -1,4 +1,4 @@
-"""spec-0001/T6：本地 SessionStore 落盘与索引单测。"""
+"""spec-0001/T6: Unit tests for local SessionStore persistence and indexing."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def _session(n_issues: int = 1) -> Session:
         persona=Persona(identity="i", level="l", domain="d", goal="g", speaking_style="s"),
         scenario=SeedScenario(description="x"),
         transcript=Transcript(turns=[Turn("user", "a"), Turn("harness", "b")]),
-        feeling=FeelingScore(score=3, reason="还行"),
+        feeling=FeelingScore(score=3, reason="Fair enough"),
         issue_refs=[
             IssueRef(number=i + 1, url=f"fake://issues/{i + 1}", state="open")
             for i in range(n_issues)
@@ -61,7 +61,7 @@ def test_index_keeps_subjective_and_objective_acceptance_separate(tmp_path) -> N
 def test_save_auto_creates_root(tmp_path) -> None:
     store = SessionStore(tmp_path / "nested" / "sessions")
     s = _session()
-    store.save(s)  # 不存在的 root 应自动创建
+    store.save(s)  # Non-existent root should be created automatically
     assert store.load(s.session_id) == s
 
 
@@ -190,10 +190,10 @@ def test_rebuild_index_recovers_all_authoritative_session_files(tmp_path) -> Non
 
 
 def test_concurrent_saves_lose_no_index_entries(tmp_path) -> None:
-    """Spec-0017/T1 竞态回归：并发 save N 局后 index 恰好 N 条、全量文件 N 个。
+    """Spec-0017/T1 Race condition regression: after concurrently saving N sessions, index has exactly N entries and N complete files.
 
-    加锁前 index.json 是无锁读-改-写，并发追加会基于同一旧快照互相覆盖（丢条目）。
-    用屏障让所有线程同时冲 save，最大化竞态窗口。
+    Before locking, index.json uses lock-free read-modify-write; concurrent appends based on the same stale snapshot overwrite each other (lost entries).
+    Use a barrier to make all threads hit save simultaneously, maximizing the race window.
     """
     import threading
     from concurrent.futures import ThreadPoolExecutor
@@ -204,16 +204,16 @@ def test_concurrent_saves_lose_no_index_entries(tmp_path) -> None:
     barrier = threading.Barrier(n)
 
     def save_one(s):
-        barrier.wait()  # 齐射，逼出读-改-写交错
+        barrier.wait()  # Volleys to trigger read-modify-write interleaving
         store.save(s)
 
     with ThreadPoolExecutor(max_workers=n) as pool:
         list(pool.map(save_one, sessions))
 
     entries = store.index()
-    assert len(entries) == n  # 丢条目即回归
+    assert len(entries) == n  # Lost entries constitute the regression
     assert {e["session_id"] for e in entries} == {s.session_id for s in sessions}
     full_files = {p.name for p in tmp_path.glob("*.json")} - {"index.json"}
-    assert len(full_files) == n  # 全量文件一个不少，逐个可读回
+    assert len(full_files) == n  # All complete files present and readable one by one
     for s in sessions:
         assert store.load(s.session_id) == s

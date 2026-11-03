@@ -1,4 +1,4 @@
-"""spec-0005/T2 + Spec-0037/T2：patience/trust 状态机仅吃主观 verdict；耐心跟 tempo 正交于 d43。"""
+"""spec-0005/T2 + Spec-0037/T2: patience/trust state machine only consumes subjective verdict; patience is orthogonal to tempo and d43."""
 
 from __future__ import annotations
 
@@ -48,11 +48,11 @@ def _persona(
 
 
 def test_init_state_patience_base_by_tempo_not_d43() -> None:
-    # 同一失败策略、不同时间气质 → 耐心不同
+    # Same failure strategy, different temporal characteristic → different patience
     assert init_state(_persona(tempo=TimeTemperament.IMPATIENT)).patience == 3
     assert init_state(_persona(tempo=TimeTemperament.STEADY)).patience == 5
     assert init_state(_persona(tempo=TimeTemperament.PATIENT)).patience == 7
-    # 正交：give_up 不再压低耐心基线
+    # Orthogonal: give_up no longer depresses patience baseline
     assert init_state(_persona(d43=D43Correct.GIVE_UP, tempo=TimeTemperament.PATIENT)).patience == 7
     assert (
         init_state(_persona(d43=D43Correct.FILE_ISSUE, tempo=TimeTemperament.IMPATIENT)).patience
@@ -61,7 +61,7 @@ def test_init_state_patience_base_by_tempo_not_d43() -> None:
 
 
 def test_apply_task_load_floats_around_base() -> None:
-    p = _persona(tempo=TimeTemperament.STEADY)  # 基线 5
+    p = _persona(tempo=TimeTemperament.STEADY)  # Baseline 5
     assert apply_task_load(init_state(p), "normal").patience == 5
     assert apply_task_load(init_state(p), "quick").patience == 4
     assert apply_task_load(init_state(p), "big").patience == 6
@@ -70,7 +70,7 @@ def test_apply_task_load_floats_around_base() -> None:
 
 
 def test_apply_task_load_unknown_is_noop_and_floor() -> None:
-    p = _persona(tempo=TimeTemperament.IMPATIENT)  # 基线 3
+    p = _persona(tempo=TimeTemperament.IMPATIENT)  # Baseline 3
     assert apply_task_load(init_state(p), "wat").patience == 3
     s = init_state(p)
     s.patience = 1
@@ -80,7 +80,8 @@ def test_apply_task_load_unknown_is_noop_and_floor() -> None:
 def test_make_coef_reflects_tempo_and_eval() -> None:
     assert make_coef(_persona(tempo=TimeTemperament.IMPATIENT)).patience_decay == 2
     assert make_coef(_persona(tempo=TimeTemperament.STEADY)).patience_decay == 1
-    assert make_coef(_persona(d43=D43Correct.GIVE_UP)).patience_decay == 1  # d43 不再驱动衰减
+    # d43 no longer drives decay
+    assert make_coef(_persona(d43=D43Correct.GIVE_UP)).patience_decay == 1
     assert make_coef(_persona(d1=D1Eval.EXPERT)).trust_decay == 2
     assert make_coef(_persona(d1=D1Eval.SHALLOW)).trust_decay == 1
     assert make_coef(_persona(d42=D42Supervise.EVERY_STEP)).stuck_extra == 1

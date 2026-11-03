@@ -1,12 +1,12 @@
 ---
 number: "0042"
-title: 需求面角色契约治理：统一术语、规范化提案投影与可靠状态迁移
+title: "Requirements-side role contract governance: unified terminology, normalized proposal projections, and reliable state transitions"
 issue: 0
 slug: role-contract-governance
-summary: 消除需求面多代工作流语义并存的问题，以正式术语和角色职责矩阵为权威定义，建立统一 ProposalView，修复 Triage/Architect/Owner 状态迁移与交接边界，统一 System Prompt、运行时消息与 submit-tool 契约，并以跨角色测试和历史会话回放验证。
+summary: "Eliminate the coexistence of multiple generations of requirements-side workflow semantics, use formal terminology and the role responsibility matrix as authoritative definitions, establish a unified ProposalView, fix Triage/Architect/Owner state transitions and handoff boundaries, unify System Prompt, runtime message, and submit-tool contracts, and verify through cross-role tests and historical session replay."
 tasks:
   - id: T1
-    title: 权威术语表、角色职责矩阵与现行流程基线
+    title: "Authoritative glossary, role responsibility matrix, and current workflow baseline"
     status: done
     priority: P0
     tags: []
@@ -16,10 +16,10 @@ tasks:
     files:
       - docs/specs/0042-role-contract-governance.md
       - docs/specs/OVERVIEW.md
-    scope: 定义 report/proposal/ready item、Triage/Divergent/Architect/Owner、渐进式证据检索、merge target、covers 等正式术语；明确各角色输入、输出、权限和禁止事项；本 Spec 显式取代 0029 中机械准入、旧 Triage 落库、旧 Owner 输入和 dev 阶段描述，不改写历史决策记录。0052 进一步规定 Architect 的 covers 吸收权。
-    acceptance: 每个活动概念只有一个正式名称与机器标识；角色矩阵覆盖五个需求面角色；列出被取代的 0029 条款；OVERVIEW 指向本 Spec 作为现行补充规范。
+    scope: "Define formal terms including report/proposal/ready item, Triage/Divergent/Architect/Owner, progressive evidence retrieval, merge target, and covers; clarify each role's inputs, outputs, permissions, and prohibitions; this Spec explicitly supersedes the mechanical admission, old Triage persistence, old Owner input, and dev-stage descriptions in 0029 without rewriting historical decision records. 0052 further specifies Architect's authority to absorb covers."
+    acceptance: "Each active concept has exactly one formal name and machine identifier; the role matrix covers the five requirements-side roles; superseded clauses of 0029 are listed; OVERVIEW points to this Spec as the current supplementary specification."
   - id: T2
-    title: Canonical ProposalView 与规范化提案版本
+    title: "Canonical ProposalView and normalized proposal versions"
     status: done
     priority: P0
     tags: []
@@ -31,10 +31,10 @@ tasks:
       - backend/ahe_beta/demand/architect.py
       - backend/ahe_beta/demand/divergent.py
       - backend/tests/demand/test_proposal_view.py
-    scope: 建立任务无关的规范化提案投影单一真源，统一标题、字段、标签、优先级、来源和 covers 格式；Architect、Divergent、Owner 不再分别拼接和截断正文；原始 report 与执行细节仅经评论审计或 timeline/beat/step 渐进检索。
-    acceptance: 三角色基于同一 ProposalView 数据模型生成职责适配的显式投影；Divergent 参照不含正文，Architect 与 Owner 获得规范化正文；默认投影不含原始报告和旧工作流标签；截断策略只有一处；相关单测通过。
+    scope: "Establish a single source of truth for task-independent normalized proposal projections, unifying titles, fields, labels, priorities, sources, and covers formats; Architect, Divergent, and Owner no longer independently concatenate and truncate bodies; raw reports and execution details are available only through comment audits or progressive timeline/beat/step retrieval."
+    acceptance: "The three roles generate explicit projections suited to their responsibilities from the same ProposalView data model; Divergent references omit bodies, while Architect and Owner receive normalized bodies; default projections exclude raw reports and old workflow labels; the truncation policy exists in only one place; relevant unit tests pass."
   - id: T3
-    title: Triage 可靠规范化迁移与结构化失败结果
+    title: "Reliable Triage normalization transitions and structured failure results"
     status: done
     priority: P0
     tags: []
@@ -49,10 +49,10 @@ tasks:
       - backend/tests/demand/test_triage.py
       - backend/tests/tracker/test_fake.py
       - backend/tests/tracker/test_gitea.py
-    scope: 将 title/body/labels 的规范化更新收敛为 tracker 单次可重试语义操作；Gitea 按其 EditIssue 与 labels 端点分步执行、校验写后状态并在可观测后步失败时补偿回滚；TriageOutcome 增加 failed，核心写入异常不得静默吞掉；原始报告审计评论失败可降级但必须产生可观测警告；重复执行不嵌套、不破坏原始证据。
-    acceptance: Fake 以单次内存更新实现，Gitea 使用符合 Swagger 的分步调用、写后校验和补偿回滚；迁移失败以包含票号、主失败、回滚结果和观测状态的专用错误呈现；评论失败不改变 proposal 状态但可观测；相关测试通过。
+    scope: "Consolidate normalization updates to title/body/labels into a single retryable semantic tracker operation; Gitea executes steps through its EditIssue and labels endpoints, validates post-write state, and performs compensating rollback when a subsequent step fails observably; add failed to TriageOutcome, and never silently swallow core write exceptions; failure of the raw-report audit comment may degrade gracefully but must produce an observable warning; repeated execution must not nest content or damage original evidence."
+    acceptance: "Fake implements this with a single in-memory update; Gitea uses Swagger-compliant stepwise calls, post-write validation, and compensating rollback; transition failures surface as dedicated errors containing the issue number, primary failure, rollback result, and observed state; comment failure does not change proposal state but is observable; relevant tests pass."
   - id: T4
-    title: Owner 决策图验证与可靠批量落库
+    title: "Owner decision graph validation and reliable batch persistence"
     status: done
     priority: P0
     tags: []
@@ -62,10 +62,10 @@ tasks:
     files:
       - backend/ahe_beta/demand/owner.py
       - backend/tests/demand/test_owner.py
-    scope: Owner 保持轻量交付路由；执行既有交接状态迁移，历史 exact duplicate 兼容路径不得扩展为语义去重；核心落库失败进入 failed/held 并可观测，不得静默丢失交接。
-    acceptance: 所有开放 proposal 默认进入交接；非法/失败的交接动作可观测；Architect 已处理的 covers 来源不由 Owner 再次关闭；相关测试通过。
+    scope: "Owner remains a lightweight delivery router; execute existing handoff state transitions, and do not extend the historical exact duplicate compatibility path into semantic deduplication; core persistence failures enter failed/held and are observable, and handoffs must not be silently lost."
+    acceptance: "All open proposals enter handoff by default; invalid/failed handoff actions are observable; Owner does not close covers sources already handled by Architect again; relevant tests pass."
   - id: T5
-    title: 五角色专业化 Prompt 与 Tool 契约统一
+    title: "Specialized Prompts for five roles and unified Tool contracts"
     status: done
     priority: P1
     tags: []
@@ -82,10 +82,10 @@ tasks:
       - backend/agent_defs/divergent_pm/tools/submit_divergent.tool.yaml
       - backend/agent_defs/architect/tools/submit_rfcs.tool.yaml
       - backend/agent_defs/owner/tools/submit_admission.tool.yaml
-    scope: System Prompt 只声明角色不变量，运行时消息只携带本轮上下文，Tool description 只描述调用契约；统一正式术语并清除退役工作流语义；机器枚举保留英文，首次出现给出固定中文定义。user_agent 文件定义与生产 simulator 的运行时组装分别审查，不宣称两者是同一活动路径。
-    acceptance: 需求面角色定义只表达现行职责、输入边界和输出契约；System Prompt、运行时消息与 Tool description 不改变彼此的工作流状态；tool schema drift-guard 与跨角色行为测试通过。
+    scope: "System Prompt declares only role invariants, runtime messages carry only the current round's context, and Tool description describes only the invocation contract; unify formal terminology and remove retired workflow semantics; machine enums remain in English, with a fixed Chinese definition at first occurrence. Review user_agent file definitions and production simulator runtime assembly separately, without claiming they are the same active path."
+    acceptance: "Requirements-side role definitions express only current responsibilities, input boundaries, and output contracts; System Prompt, runtime messages, and Tool description do not alter one another's workflow state; tool schema drift-guard and cross-role behavior tests pass."
   - id: T6
-    title: 跨角色契约测试、规格索引与历史会话回放
+    title: "Cross-role contract tests, specification index, and historical session replay"
     status: done
     priority: P1
     tags: []
@@ -95,86 +95,86 @@ tasks:
     files:
       - backend/tests/demand/test_role_contract_flow.py
       - tools/dev/replay/replay_roles_from_sessions.py
-    scope: 新增 report→Triage→Architect/Divergent 投影→Owner 的跨角色行为测试；运行设计/loop/tracker 回归，并以既有16份会话回放到 Owner 后停止，不启动 OpenAgents。
-    acceptance: 无 API 测试验证 Triage 产生的精确票号集合经 Divergent 参照、Architect 输入到达 Owner；原始题面不进入默认下游上下文；非法状态图不可落库；相关测试、ruff、diff-check 全部通过；真实回放冻结模型、裁决、产物校验和与未启动 OpenAgents，并明确其只验证需求方向而非实现就绪度。
+    scope: "Add cross-role behavior tests for report→Triage→Architect/Divergent projections→Owner; run design/loop/tracker regressions, and replay the existing 16 sessions through Owner, then stop without starting OpenAgents."
+    acceptance: "Tests without API access verify that the exact set of issue numbers produced by Triage reaches Owner through Divergent references and Architect inputs; original problem statements do not enter default downstream context; invalid state graphs cannot be persisted; relevant tests, ruff, and diff-check all pass; real replays freeze the model, adjudications, and artifact checksums, verify that OpenAgents was not started, and explicitly state that they validate only the requirements direction rather than implementation readiness."
 ---
 
-# 0042 · 需求面角色契约治理
+# 0042 · Demand-side Role Contract Governance
 
 ## Summary
 
-将需求面从多个历史版本叠加的 Prompt 与状态语义，收敛为一个可测试的角色契约体系。正式流程为：
-`report（原始报告） → proposal（规范化提案） → Owner → ready item（已准入工作项）`。Triage 负责单条
-规范化，Divergent 负责基于会话行为的能力发现，Architect 负责跨提案结构综合及 covers 吸收决定，
-Owner 只负责批量交接与优先级整理。所有角色默认读取统一 ProposalView，具体案例通过渐进式证据检索获取；
-覆盖合并的细化语义以 Spec-0052 为准。
+Consolidate demand-side prompts and state semantics accumulated across multiple historical versions into a testable role contract system. The formal workflow is:
+`report (raw report) → proposal (normalized proposal) → Owner → ready item (admitted work item)`. Triage handles individual
+normalization, Divergent handles capability discovery based on session behavior, Architect handles cross-proposal structural synthesis and covers absorption decisions,
+and Owner handles only batch handoff and prioritization. All roles read a unified ProposalView by default, with specific cases obtained through progressive evidence retrieval;
+the detailed semantics of coverage merging are governed by Spec-0052.
 
 ## Motivation
 
-当前 Spec、System Prompt、运行时消息、Tool description、Schema 与 driver 校验分别保存了不同版本的
-角色制度。测试能够证明局部字段和标签可运行，却不能证明信息确实传到下一角色，也不能防止旧机械准入、
-superseded 或开发完成后 covers 级联等语义重新进入活动 Prompt。多次局部修复进一步产生三份 proposal
-格式化逻辑和多请求半迁移风险，需要从契约、状态和验证三个层面统一治理。
+The current Spec, System Prompt, runtime messages, Tool descriptions, Schema, and driver validation each retain different versions of
+the role rules. Tests can prove that individual fields and labels work, but cannot prove that information actually reaches the next role, nor prevent legacy mechanical admission,
+superseded, or post-development covers cascading semantics from reentering active prompts. Repeated local fixes have also produced three sets of proposal
+formatting logic and risks of partial migration across multiple requests, requiring unified governance across contracts, state, and validation.
 
 ## Canonical terminology
 
-| 正式术语 | 机器标识 | 定义 |
+| Formal term | Machine identifier | Definition |
 |---|---|---|
-| 原始报告 | `report` | 用户产生的原始证据，不要求产品抽象 |
-| 规范化提案 | `proposal` | 任务无关、尚未准入的需求描述 |
-| 已准入工作项 | `ready` / `openagents` | 已通过 Owner 裁决，可进入交付面 |
-| 报告规范化 | Triage | 单条 report 的分类、定位、标题与字段规范化 |
-| 能力发现 | Divergent | 从未显式形成 report 的会话行为中识别产品能力缺口 |
-| 结构综合 | Architect | 在规范化 backlog 上识别跨提案结构性根因 |
-| 交付路由 | Owner | 批量 admit/hold 与优先级整理；保留 exact duplicate 兼容 |
-| 渐进式证据检索 | timeline→beat→step | 从摘要到执行细节的按需证据访问 |
+| Raw report | `report` | Raw evidence produced by users, with no requirement for product abstraction |
+| Normalized proposal | `proposal` | A task-independent requirement description that has not yet been admitted |
+| Admitted work item | `ready` / `openagents` | Has passed Owner adjudication and may enter the delivery side |
+| Report normalization | Triage | Classification, localization, title normalization, and field normalization for a single report |
+| Capability discovery | Divergent | Identify gaps in product capabilities from session behavior that has not explicitly become a report |
+| Structural synthesis | Architect | Identify cross-proposal structural root causes in the normalized backlog |
+| Delivery routing | Owner | Batch admit/hold and prioritization; retain exact duplicate compatibility |
+| Progressive evidence retrieval | timeline→beat→step | On-demand evidence access from summaries to execution details |
 
 ## Role boundaries
 
-| 角色 | 默认输入 | 输出 | 不负责 |
+| Role | Default input | Output | Not responsible for |
 |---|---|---|---|
-| User Simulator | 场景、persona、harness 响应 | 原始报告与体验评价 | 产品抽象和准入 |
-| Triage | 单条 report、对应会话证据、只读 harness | 规范化 proposal 或 reject/needs_info | 跨提案判重 |
-| Divergent | 体验索引、按需会话证据、ProposalView 参照 | 能力类 proposal | 结构性机制综合和准入 |
-| Architect | 全量 ProposalView、ready 参照、体验与运行聚合 | 结构类 proposal 与 covers 吸收决定 | 实现设计和下游交接 |
-| Owner | ProposalView、ready queue、体验索引 | admit/hold 交接（及 exact duplicate 兼容） | 语义去重、重新诊断、架构设计和代码实现 |
+| User Simulator | Scenarios, persona, harness responses | Raw reports and experience evaluations | Product abstraction and admission |
+| Triage | A single report, corresponding session evidence, read-only harness | A normalized proposal or reject/needs_info | Cross-proposal duplicate detection |
+| Divergent | Experience index, on-demand session evidence, ProposalView references | Capability proposals | Structural mechanism synthesis and admission |
+| Architect | Full ProposalView, ready references, experience and run aggregates | Structural proposals and covers absorption decisions | Implementation design and downstream handoff |
+| Owner | ProposalView, ready queue, experience index | admit/hold handoff (and exact duplicate compatibility) | Semantic deduplication, rediagnosis, architectural design, and code implementation |
 
 ## Superseded behavior
 
-本 Spec 取代 0029 中以下现行描述：Owner 机械准入、`owner=0` 机械降级、Triage 规范化字段只写评论、
-Owner 不读取规范化正文、Architect 使用旧 triaged/superseded 生命周期、进程内 dev 阶段。0052 进一步
-取代本 Spec 中“covers 仅为关系/Owner 负责语义合并”的旧描述。0029 保留为历史决策记录；活动实现与
-Overview 以 0032、0042 和 0052 为准。
+This Spec supersedes the following current descriptions in 0029: mechanical admission by Owner, mechanical demotion of `owner=0`, Triage writing normalized fields only in comments,
+Owner not reading normalized bodies, Architect using the old triaged/superseded lifecycle, and the in-process dev phase. 0052 further
+supersedes this Spec's old description that “covers is only a relationship/Owner handles semantic merging.” 0029 remains a historical decision record; active implementations and
+the Overview follow 0032, 0042, and 0052.
 
 ## Reliability requirements
 
-核心状态迁移不得使用静默 `except Exception: pass`。观测与审计评论允许 best effort，但失败必须进入
-事件或 outcome。多字段 issue 更新必须由 tracker 提供可重试语义操作；后端无法原子提交时必须执行写后校验，并对可观测的后步失败补偿回滚。该语义不等同于跨 HTTP 请求事务；进程在请求间终止时可能留下可识别的中间状态，调用方必须以幂等重试恢复，不得宣称原子性。Owner 必须先验证整批决策图，再执行
-单条状态迁移；失败不得产生悬空 merge 关系。
+Core state transitions must not use silent `except Exception: pass`. Observability and audit comments may be best effort, but failures must be recorded in
+an event or outcome. Multi-field issue updates must use retryable semantic operations provided by the tracker; when the backend cannot commit atomically, post-write verification is required, along with compensating rollback for observable failures in subsequent steps. These semantics are not equivalent to a transaction across HTTP requests; process termination between requests may leave an identifiable intermediate state, which callers must recover through idempotent retries, without claiming atomicity. Owner must validate the entire batch decision graph before performing
+individual state transitions; failures must not produce dangling merge relationships.
 
 ## Reference-level explanation
 
-规范化边界位于 Triage：report 保留为审计证据，活动 backlog 只暴露 ProposalView。ProposalView 是
-Architect、Divergent 与 Owner 的共同只读数据模型，负责统一正文提取、规范化元数据和长度限制；Divergent 使用不含正文的紧凑判重投影，Architect 与 Owner 使用规范化正文投影。写入边界由 tracker
-提供两类语义操作：`update_issue` 迁移 title/body/labels，`transition_issue` 迁移 state/labels。Fake 后端
-可原子完成；Gitea 1.22 分别调用 EditIssue 与 labels 端点，校验最终状态，并在可观测的后续步骤失败时恢复操作前快照。Gitea 不提供覆盖两个端点的事务，故进程终止窗口由幂等重试处理。
-Architect 创建结构提案后，driver 按 `covers` 将仍开放的 report/proposal 来源合并关闭并写入
-`merged-into`。Owner 只处理合并后仍开放的 proposal；其自身的 exact duplicate 兼容操作不改变
-`covers` 已完成的状态。
+The normalization boundary is at Triage: reports remain audit evidence, while the active backlog exposes only ProposalView. ProposalView is
+the shared read-only data model for Architect, Divergent, and Owner, unifying body extraction, normalized metadata, and length limits; Divergent uses a compact deduplication projection without bodies, while Architect and Owner use the normalized body projection. At the write boundary, the tracker
+provides two types of semantic operations: `update_issue` transitions title/body/labels, and `transition_issue` transitions state/labels. The Fake backend
+can complete them atomically; Gitea 1.22 calls EditIssue and the labels endpoint separately, verifies the final state, and restores the pre-operation snapshot upon observable failures in subsequent steps. Gitea provides no transaction spanning the two endpoints, so the process termination window is handled through idempotent retries.
+After Architect creates a structural proposal, the driver merges and closes report/proposal sources that are still open according to `covers` and writes
+`merged-into`. Owner processes only proposals that remain open after merging; its own exact duplicate compatibility operations do not change
+the state already established by `covers`.
 
 ## Compatibility
 
-旧标签只允许在 tracker/issue projection 的兼容入口转换为 canonical model，不得进入活动角色 Prompt。
-保留既有类名、环境变量和 submit 工具名作为 API 兼容标识，但文档和模型可见语义统一使用正式术语。
+Legacy labels may be converted to the canonical model only at compatibility entry points in the tracker/issue projection and must not enter active role prompts.
+Retain existing class names, environment variables, and submit tool names as API compatibility identifiers, while documentation and model-visible semantics consistently use the formal terminology.
 
 ## Rationale and alternatives
 
-未采用提示词禁词表：词汇黑名单只能覆盖已知事故，无法证明角色职责正确。专业表达通过权威术语和职责边界
-评审，自动测试验证数据隔离、状态迁移和决策图等行为结果。未将原始 report 继续嵌入 proposal body，因为
-下游批量读取会扩大案例泄漏与 Token 消耗；审计评论和渐进式证据工具仍保留完整可追溯性。未采用逐字段
-tracker 写入，因为中途失败会产生无法可靠重试的半迁移状态。
+A prompt word blacklist was not adopted: vocabulary blacklists cover only known incidents and cannot prove that role responsibilities are correct. Professional wording is reviewed against authoritative terminology and responsibility boundaries,
+while automated tests verify behavioral outcomes such as data isolation, state transitions, and decision graphs. Raw reports are no longer embedded in proposal bodies because
+downstream batch reads increase case leakage and Token consumption; audit comments and progressive evidence tools still preserve full traceability. Per-field
+tracker writes were not adopted because failures midway would produce partially migrated states that cannot be reliably retried.
 
 ## Validation
 
-验证分为静态契约、单元状态机、跨角色闭环和真实回放四层。真实回放复用既有会话与报告，不重新消耗用户
-模拟调用；运行至 Owner 后停止，OpenAgents 不启动。
+Validation has four layers: static contracts, unit state machines, cross-role closed loops, and real replays. Real replays reuse existing sessions and reports without consuming additional user
+simulation calls; execution stops after Owner, and OpenAgents is not started.

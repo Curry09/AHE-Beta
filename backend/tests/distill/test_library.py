@@ -1,4 +1,4 @@
-"""spec-0006/T1：PersonaLibrary 读写 + 卡 schema round-trip + 契约约束校验。"""
+"""spec-0006/T1: PersonaLibrary read/write + card schema round-trip + contract constraint validation."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from ahe_beta.distill.library import (
 
 
 def _card(persona_id: str = "selfreport-example-c") -> dict:
-    # card-schema.md 卡形状：含 source/basis/confidence 与 provenance 并集字段。
+    # card-schema.md card shape: contains source/basis/confidence plus the union of provenance fields.
     return {
         "id": persona_id,
         "authenticity": "authentic",
@@ -113,26 +113,27 @@ def test_get_missing_raises_keyerror(tmp_path) -> None:
 def test_card_roundtrips_and_tolerates_unknown_keys(tmp_path) -> None:
     lib = PersonaLibrary(tmp_path / "cards.json")
     card = _card()
-    # 演化友好：未知键应被原样保留、读侧不报错（前向兼容）。
-    card["future_field"] = {"note": "schema 演化新增"}
+    # Evolution-friendly: unknown keys should be preserved as-is and the read side should not error (forward compatible).
+    card["future_field"] = {"note": "schema Added through evolution"}
     lib.add(card)
-    assert lib.get(card["id"]) == card  # 字段级一致，含未知键
+    assert lib.get(card["id"]) == card  # Field-level equality, including unknown keys
 
 
 def test_validate_card_rejects_benchmark_field() -> None:
     bad = _card()
-    bad["benchmark_score"] = 0.87  # 契约外字段（benchmark 派生）→ 必拒
-    with pytest.raises(ValueError, match="契约外字段"):
+    # Field outside the contract (benchmark-derived) → must be rejected
+    bad["benchmark_score"] = 0.87
+    with pytest.raises(ValueError, match="fields outside the contract"):
         validate_card(bad)
 
 
 def test_validate_card_rejects_d5_area_out_of_vocab() -> None:
     bad = _card()
-    bad["dimensions"]["D5_domain"]["area"] = "quantum-computing"  # 不在受控词表
-    with pytest.raises(ValueError, match="受控词表"):
+    bad["dimensions"]["D5_domain"]["area"] = "quantum-computing"  # Not in the controlled vocabulary
+    with pytest.raises(ValueError, match="controlled vocabulary"):
         validate_card(bad)
 
 
 def test_valid_card_passes_validation() -> None:
-    validate_card(_card())  # 不抛即通过
+    validate_card(_card())  # Passing = no exception raised
     assert _card()["dimensions"]["D5_domain"]["area"] in D5_AREA_VOCAB

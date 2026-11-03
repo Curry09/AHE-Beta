@@ -1,6 +1,6 @@
-"""harness 提交边界闸单测：violations 判定 + 安装后的 pre-commit 钩子真拦密钥/放行结构演进。
+"""harness submission boundary gate unit test: violations determination + pre-commit hook truly blocks secrets/allows structural evolution post-installation.
 
-Spec-0040/T2: 拒绝清单放行 docs/specs 与结构性演进，拒绝 .env 与 .openagents。
+Spec-0040/T2: reject list allows docs/specs and structural evolution, rejects .env and .openagents.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def _seed_repo(tmp_path: Path) -> Path:
-    """建一个装了边界钩子的 harness 仓（entry.py 作 v0 本体）。"""
+    """Create a harness repository with boundary hooks installed (entry.py as v0 body)."""
     repo = tmp_path / "harness"
     repo.mkdir()
     subprocess.run(["git", "init", "-b", "main", str(repo)], check=True, capture_output=True)
@@ -40,19 +40,20 @@ def test_violations_flags_only_secrets_and_runtime() -> None:
     staged = [
         "entry.py",
         "agents/main.md",
-        "docs/specs/0001-version-command.md",  # RFC 施工规格：放行
+        "docs/specs/0001-version-command.md",  # RFC construction spec: allow
         "docs/specs/OVERVIEW.md",
-        "pyproject.toml",  # 结构性演进：放行
+        "pyproject.toml",  # Structural evolution: allow
         "README.md",
         "src/harness/cli.py",
-        "unicode_ascii/core.py",  # 容器围堵后不再当越界（agent 看不见宿主任务仓）
+        # No longer treated as cross-boundary after container containment (agent cannot see host task repository)
+        "unicode_ascii/core.py",
         "test_toplevel.py",
         ".gitea/workflows/smoke.yml",
         "__pycache__/entry.cpython-312.pyc",
         ".env",
         ".env.local",
         "secrets/.env.production",
-        ".env.example",  # 模板：放行
+        ".env.example",  # Template: allow
         ".openagents/vigil-queue.db",
     ]
     assert violations(staged) == [
@@ -75,7 +76,7 @@ def test_denied_top_is_runtime_only() -> None:
 
 
 def test_gitea_ci_dir_is_allowed() -> None:
-    """CI 定义随仓演进（rfc/结构改动可能要改 smoke）；存在性由 runner 跑，不再预提交拒写。"""
+    """CI definition evolves with repository (rfc/structural changes may require smoke test updates); existence is run by runner, no longer pre-commit rejection."""
     assert violations([".gitea/workflows/smoke.yml"]) == []
 
 

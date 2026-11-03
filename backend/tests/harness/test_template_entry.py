@@ -1,7 +1,7 @@
-"""harness 种子 entry.py 的 _reply 鲁棒性单测：空回复不得静默通过（不依赖真 nexau/网络）。
+"""Unit tests for the robustness of _reply in the harness seed entry.py: empty replies must not pass silently (no real nexau/network dependency).
 
-entry.py 在 harness_template/（非包），用 importlib 按路径加载，以假 agent 验证重试和中断。
-实际 NexAU 终态证据与进程协议验证见 test_seed_terminal_status.py。
+entry.py lives in harness_template/ (not a package); load it by path with importlib and use a fake agent to verify retries and interrupts.
+For actual NexAU terminal-state evidence and process-protocol verification, see test_seed_terminal_status.py.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ def _load_entry() -> ModuleType:
 
 
 class _Agent:
-    """按预设序列逐次返回；Exception 项被 raise，其余原样返回。记录调用次数。"""
+    """Returns items from a preset sequence one call at a time; Exception entries are raised, everything else is returned as-is. Records the call count."""
 
     def __init__(self, outs: list) -> None:
         self._outs = list(outs)
@@ -47,21 +47,21 @@ def entry(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     # Match `python entry.py`: sibling seed modules are on the entrypoint import path.
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[2] / "harness_template"))
     module = _load_entry()
-    monkeypatch.setattr(module.time, "sleep", lambda _s: None)  # 退避不真睡
+    monkeypatch.setattr(module.time, "sleep", lambda _s: None)  # Backoff does not actually sleep
     return module
 
 
 def _no_rebuild(_stale):
-    """非超时用例不该触发重建；若被调用即失败。"""
-    raise AssertionError("rebuild 不应被调用")
+    """Non-timeout cases must not trigger a rebuild; fails if it is ever called."""
+    raise AssertionError("rebuild Should not be called")
 
 
 def test_meta_spec_documents_baseline_and_changeability() -> None:
-    """Meta-Spec 提供项目基线，但不把当前实现冻结成不可修改。"""
+    """The Meta-Spec provides the project baseline, but does not freeze the current implementation as unmodifiable."""
     text = (_TEMPLATE / "META_SPEC.md").read_text(encoding="utf-8")
     assert "session_id" in text
-    assert "NexAU" in text and "均可修改" in text
-    assert "不是实现冻结清单" in text
+    assert "Both the harness and NexAU can be modified" in text
+    assert "neither an SDD Spec nor a frozen Implementation checklist" in text
     assert "Terminology and naming standard" in text
     assert "Spec topology" in text and "Execution DAG" in text
     assert "SDD Spec" in text and "Objective Contract" in text
@@ -98,7 +98,7 @@ def test_reply_without_execution_facts_is_not_completed(entry: ModuleType) -> No
     out_agent, text, status = entry._reply(agent, "hi", _no_rebuild)
     assert text == "[incomplete: unavailable]\nhello"
     assert status == "incomplete"
-    assert out_agent is agent  # 未重建，沿用同实例
+    assert out_agent is agent  # No rebuild; the same instance is reused
     assert agent.calls == 1
 
 
@@ -107,14 +107,14 @@ def test_reply_retries_on_blank_then_succeeds(entry: ModuleType) -> None:
     out_agent, text, status = entry._reply(agent, "hi", _no_rebuild)
     assert text == "[incomplete: unavailable]\nreal answer"
     assert status == "incomplete"
-    assert out_agent is agent  # 空回复同 agent 重试，不重建
-    assert agent.calls == 3  # 空串/纯空白都触发重试
+    assert out_agent is agent  # Empty replies retry on the same agent, no rebuild
+    assert agent.calls == 3  # Both empty strings and pure whitespace trigger a retry
 
 
 def test_reply_all_blank_returns_explicit_marker(entry: ModuleType) -> None:
     agent = _Agent(["", "", "", ""])
     _, out, status = entry._reply(agent, "hi", _no_rebuild)
-    assert out != ""  # 关键：绝不静默返回空
+    assert out != ""  # Key point: never silently return empty
     assert out.startswith("[harness error]")
     assert status == "crashed"
 
@@ -129,7 +129,7 @@ def test_reply_exception_then_marker(entry: ModuleType) -> None:
 
 
 def test_run_supervised_has_no_wall_clock_timeout(entry: ModuleType) -> None:
-    """慢 agent 只能由完成或 persona interrupt 结束，不再被 harness deadline 丢弃。"""
+    """A slow agent can only be ended by completion or a persona interrupt; it is no longer dropped by the harness deadline."""
 
     release = threading.Event()
 
@@ -151,7 +151,7 @@ def test_run_supervised_has_no_wall_clock_timeout(entry: ModuleType) -> None:
 
 
 def test_snapshot_and_restore_history_roundtrip(entry: ModuleType) -> None:
-    """_snapshot_history / _restore_history：rebuild 接线用的纯辅助，不依赖真 nexau。"""
+    """_snapshot_history / _restore_history: pure helpers for rebuild wiring, with no real nexau dependency."""
     src = _Agent([])
     src.history = [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}]
     snap = entry._snapshot_history(src)
@@ -161,7 +161,7 @@ def test_snapshot_and_restore_history_roundtrip(entry: ModuleType) -> None:
 
 
 class _StopExec:
-    """假 executor：force_stop 置位 stopped 事件（模拟 nexau 优雅停止原语，线程安全）。"""
+    """Fake executor: force_stop sets the stopped event (simulating nexau's graceful-stop primitive; thread-safe)."""
 
     def __init__(self) -> None:
         self.stopped = threading.Event()
@@ -171,7 +171,7 @@ class _StopExec:
 
 
 class _StoppableAgent:
-    """agent.run 阻塞到 executor.force_stop 置位才优雅返回（模拟保留会话的可中断 run）。"""
+    """agent.run blocks until executor.force_stop is set, then returns gracefully (simulating an interruptible run that preserves the session)."""
 
     def __init__(self) -> None:
         self.executor = _StopExec()
@@ -180,24 +180,26 @@ class _StoppableAgent:
 
     def run(self, *, message: str):  # noqa: ARG002
         self.calls += 1
-        self.executor.stopped.wait(timeout=5)  # 收到停止信号即优雅退出
+        # Exits gracefully as soon as the stop signal is received
+        self.executor.stopped.wait(timeout=5)
         return "partial work (discarded on interrupt)"
 
 
 def test_reply_interrupt_gracefully_stops_and_keeps_agent(entry: ModuleType) -> None:
-    """打断：ctrl_q 收到 interrupt → force_stop 优雅停 → 回定型 [interrupted]，不重试、保留同 agent（会话不丢）。"""
+    """Interrupt: ctrl_q received interrupt → force_stop graceful shutdown → return to stable state [interrupted], no retry, preserve same agent (session retained)."""
     agent = _StoppableAgent()
     ctrl_q: queue.Queue = queue.Queue()
     threading.Timer(0.2, lambda: ctrl_q.put({"type": "interrupt"})).start()
     out_agent, text, status = entry._reply(agent, "hi", _no_rebuild, ctrl_q)
     assert text == entry._INTERRUPT_REPLY
-    assert out_agent is agent  # 优雅停止保留 history → 沿用同实例，未重建
-    assert agent.executor.stopped.is_set()  # 确实置了停止信号
+    # Graceful shutdown preserves history → reuse same instance, no rebuild
+    assert out_agent is agent
+    assert agent.executor.stopped.is_set()  # Stop signal definitely set
     assert status == "interrupted"
 
 
 class _UnstoppableAgent:
-    """无 executor.force_stop（老 nexau）：打断无法优雅停 → 只能丢弃该实例、重建避自锁。"""
+    """No executor.force_stop (legacy nexau): interrupt cannot gracefully stop → must discard instance and rebuild to avoid self-deadlock."""
 
     def __init__(self) -> None:
         self.calls = 0
@@ -206,7 +208,8 @@ class _UnstoppableAgent:
 
     def run(self, *, message: str):  # noqa: ARG002
         self.calls += 1
-        self._never.wait(timeout=5)  # 用 Event.wait 真阻塞（time.sleep 被 fixture 补成 no-op）
+        # Use Event.wait for true blocking (time.sleep replaced with no-op by fixture)
+        self._never.wait(timeout=5)
         return "x"
 
 
@@ -214,14 +217,14 @@ def test_reply_interrupt_without_stop_capability_rebuilds_with_history(entry: Mo
     stale = _UnstoppableAgent()
     fresh = _Agent(["after rebuild interrupt"])
     ctrl_q: queue.Queue = queue.Queue()
-    ctrl_q.put({"type": "interrupt"})  # 起手即有打断
+    ctrl_q.put({"type": "interrupt"})  # Interrupt present from start
 
     def rebuild(old):
         fresh.history = list(getattr(old, "history", []) or [])
         return fresh
 
     out_agent, text, status = entry._reply(stale, "hi", rebuild, ctrl_q)
-    assert text == entry._INTERRUPT_REPLY  # 打断仍回定型回复，不重试
-    assert out_agent is fresh  # 没有优雅停止能力 → 重建避自锁
+    assert text == entry._INTERRUPT_REPLY  # Interrupt still returns stable response, no retry
+    assert out_agent is fresh  # No graceful shutdown capability → rebuild to avoid self-deadlock
     assert fresh.history == ["from-stale"]
     assert status == "interrupted"

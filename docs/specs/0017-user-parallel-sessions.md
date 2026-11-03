@@ -1,12 +1,12 @@
 ---
 number: "0017"
-title: 多用户会话并行化：a 段线程池 + 共享状态加锁
+title: "Parallelize multi-user sessions: thread pool for stage a + lock shared state"
 issue: 0
 slug: user-parallel-sessions
-summary: 把闭环 a 段的用户会话从串行改为 ThreadPoolExecutor 并行：并发单元=整局会话（工作区+harness 子进程+client+run_session 一整包），信封内部时序不动；配套修共享状态（client 每局一实例、工作区供给前移、SessionStore/live 加锁），单会话失败降级不废整轮。d/b 段维持串行（同仓 push + 全局 env 的固有约束）。落点 loop/orchestrator + loop/sim_user + run.py + user/session_store + loop/live。
+summary: "Change user sessions in the closed-loop stage a from serial execution to ThreadPoolExecutor parallelism: the concurrency unit is an entire session (workspace + Harness subprocess + client + run_session as one package), while the envelope's internal ordering remains unchanged; correspondingly fix shared state (one client instance per session, move workspace provisioning earlier, lock SessionStore/live), and degrade a single-session failure without invalidating the entire round. Stages d/b remain serial due to inherent constraints (same-repository push + global env). Locations: loop/orchestrator + loop/sim_user + run.py + user/session_store + loop/live."
 tasks:
   - id: T1
-    title: 存储与观测投影加锁
+    title: "Lock storage and observation projections"
     status: done
     priority: P1
     tags: []
@@ -18,10 +18,10 @@ tasks:
       - backend/ahe_beta/loop/live.py
       - backend/tests/user/test_session_store.py
       - backend/tests/loop/test_live.py
-    scope: SessionStore 挂实例级 threading.Lock，save 全程持锁（先写全量后追加索引的顺序不变，锁只消并发丢条目竞态）；live.py 加模块级一把锁，包住 update_agent/append_agent_log/archive_agent/update_live_run/clear_live 的读-改-写全程——mkstemp 原子写只防撕裂写，不防两个写者基于同一旧快照互相覆盖（丢更新）。锁粒度=单文件操作全程，持锁期内无网络/子进程等待，无死锁面。
-    acceptance: 多线程并发 save N 局后 index.json 恰好 N 条、sessions 目录 N 个全量文件（竞态回归测试）；多线程并发 update_agent 不同 agent_id 后 agents.json 各槽位全部保留；append_agent_log 并发追加不丢行；现有单线程测试全绿。
+    scope: "Give SessionStore an instance-level threading.Lock, with save holding the lock throughout (the order of writing the full record and then appending to the index remains unchanged; the lock only eliminates the concurrent lost-entry race); add one module-level lock to live.py, covering the full read-modify-write operations of update_agent/append_agent_log/archive_agent/update_live_run/clear_live—mkstemp atomic writes prevent torn writes but do not prevent two writers based on the same old snapshot from overwriting each other (lost updates). Lock granularity = the entire single-file operation; no network or subprocess waits occur while holding the lock, so there is no deadlock surface."
+    acceptance: "After N concurrent save operations across multiple threads, index.json contains exactly N entries and the sessions directory contains N complete files (concurrency regression test); concurrent update_agent calls for different agent_id values preserve every slot in agents.json; concurrent append_agent_log calls do not lose lines; all existing single-threaded tests remain green."
   - id: T2
-    title: client 每局一实例（工厂注入）
+    title: "One client instance per session (factory injection)"
     status: done
     priority: P1
     tags: []
@@ -32,10 +32,10 @@ tasks:
       - backend/ahe_beta/loop/sim_user.py
       - backend/tests/loop/test_sim_user.py
       - backend/tests/user/sim/test_workspace.py
-    scope: 'make_sim_run_session_fn 的 client 参数改为 client_factory: Callable[[], PersonaClient]（破坏性改签名，调用方为 run.py 与 test_sim_user/test_workspace 两个测试）；run() 内每局 client = client_factory() 后再守卫式 bind_session（仅具 bind_session 的实现调用）。底层 ApiPersonaClient 无会话态可全局共享，工厂只新建 AgenticPersonaClient 外壳。杜绝并发下后 bind 覆盖先 bind 的串台。'
-    acceptance: 注入记录型 fake factory 的单测断言：每局获得独立 client 实例、各自 bind 的 persona/workspace 互不覆盖；两个并发会话（线程模拟）产出的 TurnLog 归属正确不串台；现有 sim_user 测试改造后全绿。
+    scope: "Change the client parameter of make_sim_run_session_fn to client_factory: Callable[[], PersonaClient] (a breaking signature change; callers are run.py and the two tests test_sim_user/test_workspace); inside run(), create client = client_factory() for each session and then guard bind_session (call it only for implementations that have bind_session). The underlying ApiPersonaClient has no session state and can be shared globally; the factory only creates a new AgenticPersonaClient wrapper. Prevent cross-session contamination under concurrency, where a later bind overwrites an earlier bind."
+    acceptance: "Unit-test assertions using a recording fake factory: each session receives an independent client instance, and each session's bound persona/workspace does not overwrite another's; two concurrent sessions (simulated with threads) produce correctly owned TurnLogs without cross-session contamination; all existing sim_user tests remain green after migration."
   - id: T3
-    title: a 段并行化 + 并发度旋钮
+    title: "Parallelize stage a + concurrency knob"
     status: done
     priority: P1
     tags: []
@@ -48,10 +48,10 @@ tasks:
       - backend/ahe_beta/loop/orchestrator.py
       - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/tests/loop/test_orchestrator.py
-    scope: run_round a 段拆两阶段：阶段一串行 prepare（materialize_workspace + ensure_deps / mkdtemp，规避 git clone 缓存并发竞争）；阶段二 ThreadPoolExecutor(max_workers=min(n, max_parallel_users)) 并行 launch + run_session_fn，as_completed 收割，单会话异常记日志跳过不废整轮。Orchestrator 构造新增 max_parallel_users 参数；run.py 读 MAX_PARALLEL_USERS 环境变量（默认 roster 用户数）传入，并把 client 侧接成 T2 工厂。a 段全部汇齐后才进 d/b 段（维持串行）。
-    acceptance: FakeHarness+Scripted 下 max_workers=4 跑 8 局：全部落盘、d/b 段在 a 汇齐后才执行；单会话 launch 抛异常时其余会话正常完成、轮不中断；max_parallel_users=1 与旧串行行为等价（回归基线）；现有 orchestrator 测试全绿。
+    scope: "Split run_round stage a into two phases: phase one is serial preparation (materialize_workspace + ensure_deps / mkdtemp, avoiding concurrent git clone cache contention); phase two uses ThreadPoolExecutor(max_workers=min(n, max_parallel_users)) to run launch + run_session_fn in parallel, harvesting with as_completed; log and skip a single-session exception without invalidating the entire round. Add a max_parallel_users parameter to the Orchestrator constructor; run.py reads the MAX_PARALLEL_USERS environment variable (defaulting to the number of roster users) and passes it in, while connecting the client side to the T2 factory. Proceed to stages d/b only after all stage-a sessions have been collected (preserving serial execution)."
+    acceptance: "With FakeHarness+Scripted and max_workers=4, run 8 sessions: all are persisted, and stages d/b execute only after stage a has been collected; when one session's launch raises an exception, the remaining sessions complete normally and the round is not interrupted; max_parallel_users=1 is equivalent to the old serial behavior (regression baseline); all existing orchestrator tests remain green."
   - id: T4
-    title: 并发端到端回归测试
+    title: "Concurrent end-to-end regression tests"
     status: done
     priority: P2
     tags: []
@@ -61,10 +61,10 @@ tasks:
     parallel: false
     files:
       - backend/tests/loop/test_parallel_sessions.py
-    scope: 新增本组 e2e 专测（全 Fake，不依赖真 LLM/Gitea）：①并发正确性——8 局并发后 sessions 目录 8 个全量文件、index.json 恰 8 条、live history 按轮归档完整；②慢会话注入——fake harness 延迟回复，断言快会话先完成、慢会话不阻塞收割、轮末全部汇齐；③崩溃注入——send 抛 RuntimeError，断言会话内 [harness error] 信号路径在并发下仍成立且不影响同批其他会话。
-    acceptance: 三类专测全绿；断言为精确计数（index 条数/文件数/live 槽位数），可捕获竞态丢更新回归；pytest 全套通过。
+    scope: "Add dedicated e2e tests for this group (all Fake, with no dependency on a real LLM/Gitea): ① Concurrency correctness—after 8 concurrent sessions, the sessions directory contains 8 complete files, index.json contains exactly 8 entries, and live history is fully archived by round; ② Slow-session injection—delay replies in the fake harness and assert that fast sessions finish first, the slow session does not block result collection, and all results are collected by the end of the round; ③ Crash injection—make send raise RuntimeError and assert that the in-session [harness error] signal path still works under concurrency and does not affect other sessions in the same batch."
+    acceptance: "All three categories of dedicated tests pass; assertions use exact counts (index entries/file count/live slot count) to catch regressions involving lost updates due to races; the full pytest suite passes."
   - id: T5
-    title: harness checkout 并发安全
+    title: "harness checkout concurrency safety"
     status: done
     priority: P0
     tags: []
@@ -74,10 +74,10 @@ tasks:
     files:
       - backend/ahe_beta/harness/launcher.py
       - backend/tests/harness/test_launcher.py
-    scope: 生产实跑踩中的审计漏项：并行会话同轮同 SHA → 同一 checkout dest，_checkout 的 check-then-extract 无锁——多线程同时通过存在性检查后并发 extractall 同一目录（params.yaml 被两条 tar 流叠写出重复 entry 键/乱字节），或 A 半解压时 B 见「目录非空」复用残缺副本。修法双保险：① launcher 实例级 threading.Lock 包住存在性检查+归档+解压全程（进程内互斥，首线程干活其余命中缓存）；② 解压到 runs_root 下唯一临时目录（mkdtemp）后原子 rename 占位——半解压目录绝不可能以 dest 之名存在，进程崩溃只留无害 tmp 孤儿不污染缓存；rename 因 dest 已就位而失败（跨进程输者）则弃 tmp 复用 dest。生产第二轮追加：模块级共享 ruamel YAML 单例（_yaml）非线程安全，并行 launch 并发 _read_params 会搅乱解析器内部状态 → 删单例、每次解析新建 YAML 实例（构造开销微不足道）。
-    acceptance: 屏障齐射 8 线程并发 _checkout 同一 ref：全部返回同一目录、runs_root 无 tmp 残留、params.yaml 可被 safe YAML 整洁解析（重复键即 DuplicateKeyError 回归）；现有 launcher 全部测试不回归（复用 marker / 内容变更失效缓存语义不变）。追加：屏障齐射并发 _read_params 同一 params.yaml，全部结果完好一致；模块级不再存在共享 YAML 实例。
+    scope: "An audit gap exposed by a production run: parallel sessions in the same round at the same SHA → the same checkout dest, while _checkout's check-then-extract sequence has no lock—multiple threads pass the existence check simultaneously and run extractall concurrently into the same directory (two tar streams overwrite params.yaml, producing duplicate entry keys/garbled bytes), or B sees a “nonempty directory” while A is halfway through extraction and reuses an incomplete copy. Two safeguards for the fix: ① A launcher-instance-level threading.Lock covers the entire existence check+archive+extraction sequence (in-process mutual exclusion: the first thread does the work and the others hit the cache); ② Extract into a unique temporary directory (mkdtemp) under runs_root, then atomically rename it into place—a partially extracted directory can never exist under the name dest, and a process crash leaves only harmless orphaned tmp directories without contaminating the cache; if rename fails because dest is already in place (the loser across processes), discard tmp and reuse dest. Addition from the second production round: the shared module-level ruamel YAML singleton (_yaml) is not thread-safe, and concurrent _read_params calls during parallel launch corrupt the parser's internal state → remove the singleton and create a new YAML instance for each parse (construction overhead is negligible)."
+    acceptance: "Release 8 threads simultaneously from a barrier to call _checkout concurrently on the same ref: all return the same directory, no tmp directories remain under runs_root, and params.yaml parses cleanly with safe YAML (duplicate keys trigger DuplicateKeyError to catch regressions); all existing launcher tests pass without regressions (marker reuse / cache invalidation on content changes retain the same semantics). Addition: release concurrent _read_params calls on the same params.yaml simultaneously from a barrier; all results are intact and identical; no shared YAML instance remains at module level."
   - id: T6
-    title: tracker HTTP 会话线程安全
+    title: "tracker HTTP session thread safety"
     status: done
     priority: P1
     tags: []
@@ -87,91 +87,91 @@ tasks:
     files:
       - backend/ahe_beta/tracker/gitea.py
       - backend/tests/tracker/test_gitea.py
-    scope: 全仓共享实例线程安全审计（生产第二轮发现）落点之一：GiteaTracker 单 requests.Session 被所有会话线程共享，requests 官方不承诺 Session 线程安全，且 Gitea 会回 Set-Cookie（cookiejar 并发变异真实存在）。改为 thread-local Session：_session 变 property，每线程惰性新建带全 header 的独立 Session；setter 保留整体注入口（override 覆盖所有线程，单线程测试语义不变）。_label_ids 缓存不加锁——_create_label 已内置 409/422 竞态回退（他处已建则 refresh 复用），且 run.py 开跑前已预热 bug/feature。openai 客户端（httpx 底座）官方线程安全，共享保持不动。
-    acceptance: 不同线程取 _session 得到不同 Session 实例且各自带全 Authorization header；同线程复用同一实例；测试注入 override 后所有线程读到注入对象；现有 GiteaTracker 全部单测不回归。
+    scope: "One finding from the repository-wide thread-safety audit of shared instances (discovered in the second production round): a single requests.Session in GiteaTracker is shared by all session threads; requests officially makes no guarantee that Session is thread-safe, and Gitea returns Set-Cookie (so concurrent cookiejar mutation actually occurs). Switch to thread-local Session: make _session a property that lazily creates an independent Session with all headers for each thread; retain the setter as a global injection point (override applies to all threads, preserving single-threaded test semantics). Do not lock the _label_ids cache—_create_label already has built-in fallback for 409/422 races (if created elsewhere, refresh and reuse), and run.py prewarms bug/feature before starting. The openai client (backed by httpx) is officially thread-safe; keep it shared."
+    acceptance: "Different threads accessing _session receive different Session instances, each with the full Authorization header; the same thread reuses the same instance; after a test injects an override, all threads read the injected object; all existing GiteaTracker unit tests pass without regressions."
 ---
 
-# 0017 · 多用户会话并行化：a 段线程池 + 共享状态加锁
+# 0017 · Parallel Multi-user Sessions: Phase a Thread Pool + Shared-state Locking
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level rust-RFC overview in 9 sections. -->
 
 ## Summary
 
-把闭环一轮 a 段（用户会话）从顺序执行改为 **ThreadPoolExecutor 并行**：并发单元 = **整局会话**
-（共享工作区 + harness 子进程 + persona client + `run_session` 一整包），控制信封内部的单线程
-确定性时序一根线程都不动。配套三件事：① persona client 从跨局复用单实例改为**每局一实例**
-（工厂注入，根治 `bind_session` 串台）；② 工作区供给（materialize + ensure_deps）**前移到并行段
-之前串行完成**（规避 git clone 缓存并发竞争）；③ 共享状态加锁（`SessionStore.save` 的
-index.json 读-改-写、`live.py` 观测投影的读-改-写）。N 个用户的 a 段 wall-clock 从 ~ΣTᵢ 降到
-~max(Tᵢ)，且**并发不改变任何信号语义**。d（architect）/ b（developer）段维持串行，是明确的
-Non-goal（多 dev 直推同一 main 必然 push 冲突 + `SANDBOX_WORK_DIR` 全局 env 变异，串行是纯
-trunk 模型的固有约束）。
+Change phase a (user sessions) of a closed-loop round from sequential execution to **ThreadPoolExecutor parallelism**: the concurrency unit is **an entire session**
+(the complete bundle of shared workspace + harness subprocess + persona client + `run_session`), without changing any threads in the single-threaded,
+deterministic timing within the control envelope. Three supporting changes: ① change the persona client from a single instance reused across sessions to **one instance per session**
+(factory injection, eliminating `bind_session` cross-session interference at its root); ② **move workspace provisioning (materialize + ensure_deps) ahead of the parallel phase
+and complete it sequentially** (avoiding concurrent contention over the git clone cache); ③ lock shared state (the
+index.json read-modify-write in `SessionStore.save` and the observation projection read-modify-write in `live.py`). Phase a wall-clock time for N users drops from ~ΣTᵢ to
+~max(Tᵢ), and **concurrency does not change any signal semantics**. Phases d (architect) / b (developer) remain sequential; parallelizing them is an explicit
+Non-goal (multiple devs pushing directly to the same main inevitably cause push conflicts + `SANDBOX_WORK_DIR` mutates global env; sequential execution is an inherent
+constraint of the pure trunk model).
 
 ## Motivation
 
-**现状（就地复述，本 spec 自包含）。** `orchestrator.run_round` 的 a 段是一个顺序 for 循环：
-对固定集里每个 (persona, scenario) 配对，串行走完「materialize 工作区 → `launcher.launch(sha)`
-起 harness 子进程 → `run_session` ≤12 轮对话 → 落盘/提 issue」全程。roster 默认 3 用户，每局
-动辄数分钟（外层每轮 1-2 次 persona LLM 调用 + 内层 ≤4 步工具循环 + harness 自己的 LLM/bash，
-单轮 harness 回复最坏 ~16 分钟），a 段耗时随用户数**线性增长**，是整轮 wall-clock 的主要成分。
-要扩 persona 覆盖面（更多锚点用户）就要么等更久、要么减少轮数——两头都伤训练信号的密度。
+**Current state (restated here to keep this spec self-contained).** Phase a in `orchestrator.run_round` is a sequential for loop:
+for each (persona, scenario) pair in the fixed set, it sequentially completes the entire flow: “materialize workspace → `launcher.launch(sha)`
+starts a harness subprocess → `run_session` conducts ≤12 dialogue turns → persist to disk/file issues.” The roster defaults to 3 users, and each session
+can easily take several minutes (1-2 persona LLM calls per outer turn + an inner tool loop of ≤4 steps + the harness's own LLM/bash calls;
+a single harness reply can take ~16 minutes in the worst case). Phase a duration **grows linearly** with the number of users and accounts for most of the round's wall-clock time.
+Expanding persona coverage (more anchor users) means either waiting longer or reducing the number of turns—both hurt training signal density.
 
-而用户会话之间**天然完全隔离**：各自独立的工作区目录（orchestrator 每局 materialize/mkdtemp
-一份）、各自的 harness 子进程（launcher 一句柄一进程一会话）、各自的 client 绑定、互不通信、
-无共享可写状态（除了三个明确的汇聚点：SessionStore、live 观测投影、issue tracker）。这是最理想
-的并行对象。
+User sessions, however, are **naturally fully isolated**: each has its own workspace directory (the orchestrator materializes/creates one with mkdtemp
+per session), its own harness subprocess (one launcher handle, one process, one session), and its own client binding; they do not communicate
+and have no shared writable state (except three explicit aggregation points: SessionStore, the live observation projection, and the issue tracker). This makes them ideal
+candidates for parallelism.
 
-**为什么现在做（前提已被 0012/0013 解决）。** 并发的生存前提是「单会话的挂死/崩溃不能拖垮
-worker 池」。这在旧基线上不成立（launcher 的 `readline` 无超时、异常直接炸整条 run），但
-0012/0013 已就地解决：launcher `begin/poll` 拆分片轮询（进程死了没回完整行 → 精确判死锁上抛；
-1800s 绝对上限防活锁），loop 侧 `route`/`_supervise_send` 把一切 harness 异常转成
-`[harness error]` 文本回填给 persona 当观测（会话不炸、坏 commit 产生梯度）。因此本 spec
-**不再包含任何超时/异常转译工作**，只做编排层并行化与共享状态收口。
+**Why now (the prerequisites were resolved by 0012/0013).** A prerequisite for concurrency is that “a single session hanging/crashing must not bring down
+the worker pool.” This did not hold in the old baseline (the launcher's `readline` had no timeout, and exceptions crashed the entire run), but
+0012/0013 have already resolved this in place: launcher `begin/poll` polls in slices (if the process dies without returning a complete line → precisely detects the deadlock and raises it;
+a 1800s absolute limit prevents livelock), and loop-side `route`/`_supervise_send` convert all harness exceptions into
+`[harness error]` text fed back to the persona as observations (the session does not crash, and bad commits produce gradients). Therefore, this spec
+**does not include any further timeout/exception translation work**; it only parallelizes the orchestration layer and consolidates shared-state access.
 
 ## Guide-level explanation
 
-对运行者：`./run.sh` 行为不变，但 a 段里 N 个用户卡片在看板上**同时呼吸**（本就每 agent 一槽、
-roster 即房间容量，这是看板"本该有"的样子）。新旋钮 `MAX_PARALLEL_USERS` 环境变量（默认 =
-roster 用户数）控制并发度；设 1 即退化为今天的串行行为。一轮的形状变为：
+For operators: `./run.sh` behavior is unchanged, but the N user cards in phase a **pulse simultaneously** on the dashboard (there is already one slot per agent,
+and the roster defines room capacity; this is how the dashboard “should have looked”). A new control, the `MAX_PARALLEL_USERS` environment variable (default =
+number of users in the roster), controls concurrency; setting it to 1 restores today's sequential behavior. A round now has this shape:
 
 ```
 round K:
-  ┌─ a 段（并行，≤max_parallel_users 线程）──┐
-  │  user1: launch → run_session → 落盘      │  ← 每局独立进程树+工作区+client
-  │  user2: launch → run_session → 落盘      │
-  │  user3: launch → run_session → 落盘      │
-  └───────── as_completed 全部汇齐 ──────────┘
-  d 段（architect，串行）→ b 段（developer，串行）→ c 段（回灌 main HEAD SHA）
+  ┌─ Phase a (parallel, ≤max_parallel_users threads) ─┐
+  │  user1: launch → run_session → persist to disk    │  ← Separate process tree + workspace + client per session
+  │  user2: launch → run_session → persist to disk    │
+  │  user3: launch → run_session → persist to disk    │
+  └────────── Collect all with as_completed ──────────┘
+  Phase d (architect, serial) → Phase b (developer, serial) → Phase c (feed back main HEAD SHA)
 ```
 
-对信号消费者（设计师/metrics/看板）：**并发只改 wall-clock，不改信号语义**——体感分布、issue
-产出、TurnLog 内容与串行基线一致；单会话意外失败（如 launch 崩溃）记录日志后跳过，不废整轮、
-不阻塞其他会话。
+For signal consumers (designers/metrics/dashboard): **concurrency changes only wall-clock time, not signal semantics**—experience score distributions, issue
+output, and TurnLog contents remain consistent with the sequential baseline; an unexpected failure in a single session (such as a launch crash) is logged and skipped, without invalidating the entire round
+or blocking other sessions.
 
 ## Reference-level explanation
 
-### 并发单元与不变量
+### Concurrency unit and invariants
 
-并发单元 = 一局会话的完整包：`(persona, scenario, workspace_dir, harness_handle, client)`。
-信封内部（`run_session` 循环、`_supervise_send` 心跳、内层 tool-loop）保持单线程确定性时序，
-每局内的行为与串行完全一致。launcher 句柄内部本就有一个在途读线程（0013 的 `begin/poll`），
-它是句柄私有的，与本 spec 的会话级并行正交。
+Concurrency unit = the complete bundle for one session: `(persona, scenario, workspace_dir, harness_handle, client)`.
+Inside the envelope (the `run_session` loop, `_supervise_send` heartbeats, and the inner tool-loop), single-threaded deterministic timing is preserved,
+and behavior within each session is identical to sequential execution. The launcher handle already has an in-flight reader thread (`begin/poll` from 0013);
+it is private to the handle and orthogonal to the session-level parallelism in this spec.
 
-### T2：client 每局一实例（头号地雷）
+### T2: One client instance per session (the primary hazard)
 
-`AgenticPersonaClient` 是会话级有状态的：`bind_session(persona, workspace_dir)` 写
-`self._persona/_workspace_dir`（persona_client.py:447-453），当前 run.py 单实例顺序复用，
-并发下必串台（后 bind 覆盖先 bind）。修法：`make_sim_run_session_fn(client=...)` 改为
-`client_factory: Callable[[], PersonaClient]`，`run()` 内每局 `client = client_factory()` 后再
-守卫式 `bind_session`。底层 `ApiPersonaClient.complete` 无会话态（纯函数式补全 + 429 退避），
-openai SDK 客户端线程安全，**全部会话共享同一个 `ApiPersonaClient` 实例**、只是各自新建外壳：
-`client_factory = lambda: AgenticPersonaClient(shared_api.complete)`。破坏性改签名，调用方为
-run.py（随 T3 一起改）与 test_sim_user / test_workspace 两个测试。
+`AgenticPersonaClient` has session-level state: `bind_session(persona, workspace_dir)` writes
+`self._persona/_workspace_dir` (persona_client.py:447-453). Currently, run.py reuses one instance sequentially;
+concurrency will inevitably cause cross-session interference (a later bind overwrites an earlier bind). Fix: change `make_sim_run_session_fn(client=...)` to
+`client_factory: Callable[[], PersonaClient]`; inside `run()`, perform `client = client_factory()` for each session, then
+conditionally call `bind_session` with a guard. The underlying `ApiPersonaClient.complete` has no session state (purely functional completion + 429 backoff),
+and the openai SDK client is thread-safe. **All sessions share the same `ApiPersonaClient` instance**, each creating only a new wrapper:
+`client_factory = lambda: AgenticPersonaClient(shared_api.complete)`. This is a breaking signature change; callers are
+run.py (updated together with T3) and the two tests test_sim_user / test_workspace.
 
-### T3：a 段两阶段拆分 + 线程池
+### T3: Split phase a into two stages + thread pool
 
 ```python
-# 阶段一（串行，快）：工作区供给前移——规避 sources/git.py 共享 clone 缓存的并发竞争
+# Phase one (serial, fast): provision workspaces up front to avoid concurrent access races in the shared clone cache in sources/git.py
 prepared = []
 for persona, scenario in self._fixed_set:
     ws = materialize_workspace(scenario.workspace) if scenario.workspace else mkdtemp(...)
@@ -180,7 +180,7 @@ for persona, scenario in self._fixed_set:
     prepared.append((persona, scenario, ws))
 
 
-# 阶段二（并行）：launch + 会话
+# Phase two (parallel): launch + session
 def _one(persona, scenario, ws):
     harness = self._launcher.launch(sha, workspace_dir=ws)
     return self._run_session(persona, scenario, harness, workspace_dir=ws)
@@ -191,122 +191,122 @@ with ThreadPoolExecutor(max_workers=min(len(prepared), self._max_parallel_users)
     for fut in as_completed(futs):
         try:
             fut.result()
-        except Exception:  # 0012 后会话内异常已转信号；此处只剩 launch 类意外
-            log.exception(...)  # 单会话失败不废整轮，其余会话照常汇齐
+        except Exception:  # Since 0012, exceptions within sessions are converted to signals; only unexpected failures such as launch errors remain here
+            # A single session failure does not invalidate the entire round; collect the remaining sessions as usual.
+            log.exception(...)
 ```
 
-- `max_parallel_users` 经 Orchestrator 构造参数注入；run.py 读 `MAX_PARALLEL_USERS` 环境变量，
-  默认 = roster 用户数。
-- launch 放进线程（而非前移）：checkout 按 SHA 目录缓存复用，但**缓存写入侧必须并发安全（T5）**。
-  初版此处误判「并发首轮各自解包只是浪费不冲突（同内容覆盖）」——生产实跑打脸：同轮所有会话同
-  SHA 同 dest，无锁 check-then-extract 下多线程并发 `extractall` 同一目录会交错叠写同一批文件
-  （params.yaml 出现重复 entry 键/乱字节），且 A 半解压时 B 的「目录非空」检查会把残缺副本当
-  完整缓存复用。T5 修法：launcher 实例锁包住检查+解压全程 + 解压到唯一临时目录后原子 rename
-  占位（半成品绝无 dest 之名，崩溃只留无害 tmp 孤儿）。
-- a 段全部汇齐（`as_completed` 循环走完）后才进 d/b 段，轮边界语义与 checkpoint（spec-0004，
-  轮粒度）不受影响。
+- `max_parallel_users` is injected through an Orchestrator constructor parameter; run.py reads the `MAX_PARALLEL_USERS` environment variable,
+  defaulting to the number of users in the roster.
+- Put launch in the thread (rather than moving it earlier): checkout reuses directories cached by SHA, but **cache writes must be concurrency-safe (T5)**.
+  The initial version incorrectly assumed that “each session unpacking independently on the first concurrent round only wastes work and causes no conflict (overwrites with identical content)”—production runs disproved this: all sessions in the same round use the same
+  SHA and dest. With unlocked check-then-extract, multiple threads concurrently running `extractall` on the same directory interleave writes to the same files
+  (params.yaml develops duplicate entry keys/garbled bytes), and while A is halfway through extraction, B's “directory is nonempty” check treats the incomplete copy as
+  a complete cache entry and reuses it. T5 fix: hold a launcher instance lock throughout the check + extraction + extract to a unique temporary directory and atomically rename it
+  into place (an incomplete result never has the dest name; a crash leaves only a harmless orphan tmp directory).
+- Enter phases d/b only after all of phase a has completed (the `as_completed` loop finishes); round-boundary semantics and checkpoints (spec-0004,
+  at round granularity) are unaffected.
 
-### T1：共享状态加锁（全量审计表）
+### T1: Shared-state locking (complete audit table)
 
-| 共享点 | 现状 | 判决 |
+| Shared point | Current state | Decision |
 |---|---|---|
-| `SessionStore.save`（index.json 读-改-写） | docstring 自认「单进程 MVP 不处理并发写竞态」 | **加锁**：实例级 `threading.Lock`，save 全程持锁（先全量后索引的顺序不变） |
-| `live.py` agents/history/run.json | mkstemp 原子写只防撕裂写；`update_agent` 等仍是读-改-写，并发丢更新 | **加锁**：模块级一把锁包住 update_agent / append_agent_log / archive_agent / update_live_run / clear_live 的读-改-写全程 |
-| `sources/git.py` clone 缓存 | 同仓并发 provision 撞缓存目录 | **前移规避**（T3 阶段一），不加锁 |
-| `HarnessLauncher._checkout`（同 SHA 共享缓存目录） | check-then-extract 无锁：并发解压叠写 params.yaml（重复键/乱字节）、半解压目录被误判完整复用——初版审计漏项，生产实跑踩中 | **T5 加锁 + 临时目录原子 rename** |
-| `GiteaTracker`（共享 `requests.Session`） | requests 官方不承诺 Session 线程安全，且 Gitea 会回 Set-Cookie（cookiejar 并发变异）——初判「留观察」被生产第二轮推翻 | **T6 thread-local Session**（每线程一个，setter 保测试注入口）；`_label_ids` 缓存靠既有 409/422 竞态回退，不加锁 |
-| `launcher._yaml`（模块级共享 ruamel YAML 实例） | ruamel YAML 实例非线程安全（解析器内部状态跨调用共享），并行 launch 并发 load 互相搅乱——生产第二轮发现 | **T5 追加：每次解析新建实例**（构造开销微不足道） |
-| `ApiPersonaClient.client`（共享 openai 客户端） | httpx 底座，官方文档承诺线程安全 | 无需改 |
-| `os.environ` | 用户段不碰（launcher 显式传 env dict 给 Popen）；dev/architect 段才设全局 env | d/b 串行，天然无冲突（Non-goal 的依据之一） |
-| run.py `current["round"]` | a 段内只读（round 游标只在轮边界写） | 无需改 |
+| `SessionStore.save` (index.json read-modify-write) | The docstring acknowledges that “the single-process MVP does not handle concurrent write races” | **Add locking**: instance-level `threading.Lock`; hold the lock throughout save (preserving the order: full data first, then index) |
+| `live.py` agents/history/run.json | mkstemp atomic writes only prevent torn writes; `update_agent` and others remain read-modify-write operations, losing updates under concurrency | **Add locking**: one module-level lock around the entire read-modify-write operation in update_agent / append_agent_log / archive_agent / update_live_run / clear_live |
+| `sources/git.py` clone cache | Concurrent provision calls for the same repository collide on the cache directory | **Avoid by moving earlier** (T3 stage one), without locking |
+| `HarnessLauncher._checkout` (shared cache directory for the same SHA) | Unlocked check-then-extract: concurrent extractions interleave writes to params.yaml (duplicate keys/garbled bytes), and partially extracted directories are incorrectly treated as complete and reused—missed in the initial audit, encountered in production runs | **T5 locking + atomic rename of a temporary directory** |
+| `GiteaTracker` (shared `requests.Session`) | requests does not officially guarantee Session thread safety, and Gitea returns Set-Cookie (concurrent cookiejar mutation)—the initial “monitor for now” decision was disproved by the second production round | **T6 thread-local Session** (one per thread; setter preserves the test injection point); the `_label_ids` cache relies on the existing 409/422 race fallback, without locking |
+| `launcher._yaml` (module-level shared ruamel YAML instance) | ruamel YAML instances are not thread-safe (internal parser state is shared across calls); concurrent load calls during parallel launch interfere with one another—discovered in the second production round | **T5 addition: create a new instance for each parse** (construction overhead is negligible) |
+| `ApiPersonaClient.client` (shared openai client) | Built on httpx; official documentation guarantees thread safety | No change needed |
+| `os.environ` | Untouched in the user phase (launcher explicitly passes an env dict to Popen); global env is set only in the dev/architect phases | d/b are sequential, so there is inherently no conflict (one basis for the Non-goal) |
+| run.py `current["round"]` | Read-only within phase a (the round cursor is written only at round boundaries) | No change needed |
 
-### Task DAG 与文件分配
+### Task DAG and file allocation
 
 ```
-T1（存储/投影加锁）──┐
-                      ├──> T3（a 段并行化 + 旋钮）──> T4（并发端到端回归）
-T2（client 工厂）────┘
-T5（checkout 并发安全，无依赖——生产实跑踩中审计漏项后补）
+T1 (storage/projection locking)───┐
+                                  ├──> T3 (parallelize section a + knobs) ──> T4 (concurrent end-to-end regression)
+T2 (client factory)───────────────┘
+T5 (checkout concurrency safety, no dependencies—added after a production run exposed an audit omission)
 ```
 
-| Task | files（互斥） |
+| Task | files (mutually exclusive) |
 |---|---|
 | T1 | `backend/ahe_beta/user/session_store.py`, `backend/ahe_beta/loop/live.py`, `backend/tests/user/test_session_store.py`, `backend/tests/loop/test_live.py` |
 | T2 | `backend/ahe_beta/loop/sim_user.py`, `backend/tests/loop/test_sim_user.py` |
 | T3 | `backend/ahe_beta/loop/orchestrator.py`, `backend/ahe_beta/experiment/controllers/ordinary.py`, `backend/tests/loop/test_orchestrator.py` |
-| T4 | `backend/tests/loop/test_parallel_sessions.py`（新增，本组 e2e） |
+| T4 | `backend/tests/loop/test_parallel_sessions.py` (new, this group's e2e) |
 | T5 | `backend/ahe_beta/harness/launcher.py`, `backend/tests/harness/test_launcher.py` |
 
-e2e 验证路径：`backend/tests/loop/test_parallel_sessions.py`（全 Fake，不依赖真 LLM/Gitea）。
-另有一项**不进 CI 的真实小规模验证**：3 用户 × 1 轮，并行 vs 串行基线对比体感分布与 issue
-数量级，确认无系统性偏移（并发只该改 wall-clock）。
+e2e verification path: `backend/tests/loop/test_parallel_sessions.py` (all Fake, with no dependency on real LLM/Gitea).
+There is also a **small-scale real-world verification excluded from CI**: 3 users × 1 round, comparing parallel execution against the sequential baseline for experience score distribution and issue
+count magnitude, confirming no systematic shift (concurrency should change only wall-clock time).
 
-### 前端影响（审计结论：零改动）
+### Frontend impact (audit conclusion: zero changes)
 
-已核查前端全链路，本 spec 不含任何前端任务，依据如下：
+The full frontend flow has been checked. This spec includes no frontend tasks, for the following reasons:
 
-- **PERSONA_LIMIT（覆盖面）与 max_parallel_users（并发度）解耦对前端零影响**：房间展示
-  实际跟的是「run 里出现了几个 agent 槽」（`App.tsx` 按 role 过滤 `/api/agents`），并非任何
-  配置值——`/api/config` 的 roster 管道虽已铺好（api.ts `getConfig` + `Roster` 类型），但前端
-  **无任何调用点**（既有死代码，不属本 spec）。并发度对前端天然不可见，两旋钮独立、互不需要
-  对方感知。
-- **运行中卡片顺序不受并发影响**：`live.read_agents` 服务端按 `(role, agent_id)` 字典序排序
-  （`user-SR-001 < user-SR-002 < …`），与写入/更新先后无关，任何时刻轮询到的列序都稳定。
-- **「+已完成」轮内顺序语义变化（接受，不改）**：history 为 append-only、轮内按归档先后展示；
-  串行时归档序=固定集序（SR 序），并行后=**完成先后**（谁先跑完谁在前，每次 run 可不同）。
-  判定为可接受的真实语义（先完成先归档，顺带反映快慢）；若将来要确定性，前端轮内按 label
-  排序一行即可，留给前端主线。
-- 多卡同时 running 本就受支持：每槽独立 status/`started_at` 计时，3s 轮询无顺序假设；数据层
-  竞态由 T1 的 live 锁消除。
+- **Decoupling PERSONA_LIMIT (coverage) from max_parallel_users (concurrency) has zero frontend impact**: the room display
+  actually follows “how many agent slots appear in the run” (`App.tsx` filters `/api/agents` by role), rather than any
+  configuration value—the roster pipeline for `/api/config` is already in place (api.ts `getConfig` + the `Roster` type), but the frontend
+  **has no call sites** (existing dead code, outside this spec). Concurrency is inherently invisible to the frontend; the two controls are independent and do not need
+  awareness of each other.
+- **Card order during a run is unaffected by concurrency**: the `live.read_agents` server sorts lexicographically by `(role, agent_id)`
+  (`user-SR-001 < user-SR-002 < …`), independent of write/update order; column order remains stable whenever polled.
+- **Within-round ordering semantics for “+Completed” change (accepted, no change)**: history is append-only and displays entries within a round in archive order;
+  under sequential execution, archive order = fixed-set order (SR order); under parallel execution, it becomes **completion order** (whoever finishes first appears first, potentially differing between runs).
+  This is considered acceptable, truthful semantics (first completed, first archived, also reflecting relative speed); if determinism is needed later, the frontend can sort within a round by label
+  in one line, left to the frontend mainline.
+- Multiple cards running simultaneously are already supported: each slot has independent status/`started_at` timing, and 3s polling makes no ordering assumptions; data-layer
+  races are eliminated by T1's live lock.
 
 ## Drawbacks
 
-- **LLM 网关压力放大**：N 并发用户 ×（外层 ≤12 轮 + 心跳唤醒 + 内层 ≤4 步）的调用并发化，
-  429 概率上升；`ApiPersonaClient` 已有退避，跨会话信号量先不做（Unresolved #1）。
-- **进程数放大**：每局 = 1 个 harness Python 进程 + 其 bash/sandbox 子进程；3-4 并发本地十几个
-  进程无压力，但更高并发需关注。
-- **日志交错**：多会话 stderr/print 交错，排查单局问题需按 session_id/agent 槽过滤（看板已按
-  agent 分槽，影响有限）。
-- 线程池吞异常的路径若处理不当会静默丢会话——靠 T3 的 as_completed 收割 + 显式日志约束。
+- **Amplified LLM gateway pressure**: calls from N concurrent users × (≤12 outer turns + heartbeat wakeups + ≤4 inner steps) execute concurrently,
+  increasing the probability of 429 responses; `ApiPersonaClient` already has backoff, and a cross-session semaphore is deferred for now (Unresolved #1).
+- **Increased process count**: each session = 1 harness Python process + its bash/sandbox subprocesses; 3-4 concurrent sessions mean a dozen or so
+  local processes, which is manageable, but higher concurrency needs attention.
+- **Interleaved logs**: stderr/print output from multiple sessions interleaves; troubleshooting a single session requires filtering by session_id/agent slot (the dashboard already separates
+  agents into slots, limiting the impact).
+- Improper handling of exception-swallowing paths in the thread pool could silently drop sessions—prevented by T3's as_completed collection + explicit logging requirements.
 
 ## Rationale and alternatives
 
-**三选项判决（工作负载：一局会话 ~100% 是阻塞等待，全程释放 GIL——persona LLM 网络 IO +
-harness 管道 IO 是两个大头）：**
+**Decision among three options (workload: a session spends ~100% of its time in blocking waits, releasing the GIL throughout—persona LLM network IO +
+harness pipe IO are the two main components):**
 
-| 方案 | 判决 | 理由 |
+| Approach | Decision | Rationale |
 |---|---|---|
-| **线程池** | ✅ 采用 | 现有同步代码零重写，只改编排层；GIL 非瓶颈（纯等待型负载）；NexAU 自身 subagent_manager 同一判断 |
-| asyncio | ❌ | 需重写 run_session / persona_client（AsyncOpenAI）/ launcher（异步管道）整条链路；信封的确定性单线程时序是设计资产；并发规模仅 3~10，协程收益用不上——违背奥卡姆 |
-| 多进程 | ❌ | 隔离已存在于正确位置——每局重活本就在独立子进程（harness=Popen 进程树），编排线程只是等管道；再套多进程徒增 on_turn 回调跨进程、Session pickle、live 写复杂化，零收益 |
+| **Thread pool** | ✅ Adopt | No rewrites to existing synchronous code; only the orchestration layer changes; the GIL is not a bottleneck (a workload consisting entirely of waiting); NexAU's own subagent_manager makes the same judgment |
+| asyncio | ❌ | Requires rewriting the entire run_session / persona_client（AsyncOpenAI）/ launcher (asynchronous pipes) chain; the envelope's deterministic single-threaded ordering is a design asset; concurrency is only 3~10, so coroutine benefits would go unused—violates Occam's razor |
+| Multiprocessing | ❌ | Isolation already exists in the right place—the heavy work for each session already runs in an independent subprocess (harness=Popen process tree), while orchestration threads only wait on pipes; adding multiprocessing would merely complicate cross-process on_turn callbacks, Session pickling, and live writes, with zero benefit |
 
-**备选：维持串行、靠减 persona 数换轮数**——被否：persona 多样性正是体感信号的分布基础
-（观测指标一节明说 issue 过早归零 = persona 多样性不足），缩覆盖面与目标背道而驰。
+**Alternative: retain serial execution and trade fewer personas for more rounds**—rejected: persona diversity is precisely the distributional foundation of user experience signals
+(the observability metrics section explicitly states that issues dropping to zero too early = insufficient persona diversity); reducing coverage runs counter to the goal.
 
 ## Prior art
 
-- **NexAU `subagent_manager`**：多 subagent 并行用 ThreadPoolExecutor，同样的「阻塞 IO 型
-  agent 负载 + 线程池」判断，本仓运行时的既有先例。
-- **0012/0013（本 spec 的鲁棒性基线，要点就地复述）**：launcher `begin/poll/control` 把一轮
-  send 拆成分片轮询（进程活着=合法长任务不盲杀、进程死了没回完整行=精确判死锁、1800s 绝对上限
-  防活锁、`start_new_session`+`killpg` 整组回收孤儿）；loop 侧一切 harness 异常转
-  `[harness error]` 回填 persona 当观测，会话不炸、崩溃产生体感+issue 梯度。没有这些，挂死
-  harness 在串行时"卡住能看见"，并发时是"worker 池静默耗干"。
-- **spec-0004 HarborRunner**：checkpoint 粒度是轮，轮内如何并行对 runner 透明——本 spec 与
-  Harbor 模式正交兼容。
+- **NexAU `subagent_manager`**: uses ThreadPoolExecutor for parallel subagents, applying the same judgment of “blocking IO agent workload + thread pool”; an existing precedent in this repository's runtime.
+- **0012/0013 (this spec's robustness baseline, with key points restated here)**: launcher `begin/poll/control` splits a send round
+  into polling slices (process alive = legitimate long-running task, no blind termination; process dead without returning a complete line = precise deadlock detection; 1800s absolute limit
+  prevents livelock; `start_new_session`+`killpg` reclaims orphans as a group); on the loop side, all harness exceptions are converted to
+  `[harness error]` and fed back to the persona as observations, so the session does not crash and crashes generate user experience + issue gradients. Without these, a hung
+  harness is “visibly stuck” during serial execution but “silently exhausts the worker pool” during concurrent execution.
+- **spec-0004 HarborRunner**: checkpoints are at round granularity; how execution is parallelized within a round is transparent to the runner—this spec is
+  orthogonal to and compatible with Harbor mode.
 
 ## Unresolved questions
 
-1. **跨会话 LLM 并发信号量**：是否需要 `threading.Semaphore(MAX_LLM_CONCURRENCY)` 包住
-   `ApiPersonaClient._create`？先不做，跑起来观察网关 429 频率再决定（退避已有）。
-   （原第 2 条「GiteaTracker Session 留观察」已被生产第二轮推翻，转为 T6 修复，见审计表。）
+1. **Cross-session LLM concurrency semaphore**: is `threading.Semaphore(MAX_LLM_CONCURRENCY)` needed around
+   `ApiPersonaClient._create`? Defer for now; observe gateway 429 frequency during execution before deciding (backoff already exists).
+   (The original item 2, “Keep observing GiteaTracker Session,” was disproved by the second production round and converted into the T6 fix; see the audit table.)
 
 ## Future possibilities
 
-- **b 段并行**：多 dev agent 各在独立 worktree 改 + rebase 后串行 push（需要冲突处理设计，
-  另立 spec）。
-- **跨会话协作场景**：多个 persona 共用一个 harness（结对/接力），信封需要会话间通信原语。
-- **并发度自适应**：按网关 429 率动态收缩 max_parallel_users。
-- **Harbor 多 task 分片**：a 段按 persona 分片到多个 harbor task（沙盒级并行），checkpoint
-  聚合语义需扩展。
+- **Parallel phase b**: multiple dev agents each make changes in independent worktrees + rebase, then push serially (requires a conflict-handling design;
+  create a separate spec).
+- **Cross-session collaboration scenarios**: multiple personas share one harness (pairing/relay); the envelope needs inter-session communication primitives.
+- **Adaptive concurrency**: dynamically reduce max_parallel_users based on the gateway 429 rate.
+- **Harbor multi-task sharding**: shard phase a by persona across multiple harbor tasks (sandbox-level parallelism); checkpoint
+  aggregation semantics need to be extended.
 

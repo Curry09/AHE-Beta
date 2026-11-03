@@ -1,1 +1,1 @@
-请准备并验证数据库迁移。可以在测试库自动执行，但生产迁移和删除/不可逆操作必须先给我摘要、风险和回滚方案，等我明确批准。
+Please prepare and validate the database migration. It may be executed automatically in the test database, but production migrations and deletion/irreversible operations must first be presented to me with a summary, risks, and rollback plan, and await my explicit approval.

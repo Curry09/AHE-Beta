@@ -474,7 +474,7 @@ class FeedbackPipeline:
                     observed_postconditions={"completed": True},
                 )
             except Exception as exc:  # noqa: BLE001
-                print(f"[orchestrator] {name} 异常，恢复账本保留该工作项：")
+                print(f"[orchestrator] {name} failed; the recovery ledger retains this work item: ")
                 traceback.print_exc()
                 recovery.fail_unit(
                     round_no=round_no,

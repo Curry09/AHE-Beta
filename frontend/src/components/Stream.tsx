@@ -2,10 +2,10 @@ import { useState } from "react";
 import type { LogEntry, Turn } from "../types";
 import { fmtTime } from "../lib/format";
 
-// 过程流：status/assistant/tool/tool_result/tool_error 分型渲染，
-// 重建「assistant 发言 → 工具调用 → 结果」的完整工作过程。
+// Process stream: render status/assistant/tool/tool_result/tool_error by type,
+// reconstructing the full workflow of assistant message → tool call → result.
 export function ProcessStream({ log }: { log: LogEntry[] }) {
-  if (log.length === 0) return <div className="empty">暂无过程记录</div>;
+  if (log.length === 0) return <div className="empty">No process records yet</div>;
   return (
     <div className="stream">
       {log.map((e, i) => {
@@ -23,18 +23,18 @@ export function ProcessStream({ log }: { log: LogEntry[] }) {
   );
 }
 
-// 折叠预览：取首个非空行，截断到 ~100 字。
+// Collapsed preview: use the first nonempty line, truncated to ~100 characters.
 function previewLine(text: string): string {
   const line = text.split("\n").find((l) => l.trim()) ?? text;
   return line.length > 100 ? `${line.slice(0, 100)}…` : line;
 }
 
-// 用户会话 transcript：user 消息全展开；harness 回复默认只展开最后一轮，
-// 更早的折叠成预览、点一下展开。overrides 记录用户手动切换，未手动的跟随「是否最后一轮」
-// —— live 流式新回复进来时，最新一轮自动成为展开项、旧的自动收起（除非用户已钉住）。
+// User session transcript: user messages are fully expanded; only the last harness reply is expanded by default,
+// with earlier replies collapsed into clickable previews. overrides stores manual toggles; untouched items follow whether they are last.
+// As new live replies stream in, expand the latest turn and collapse older ones unless the user has pinned them.
 export function Turns({ turns }: { turns: Turn[] }) {
   const [overrides, setOverrides] = useState<Record<number, boolean>>({});
-  if (turns.length === 0) return <div className="empty">暂无对话</div>;
+  if (turns.length === 0) return <div className="empty">No conversation yet</div>;
 
   let lastHarness = -1;
   turns.forEach((t, i) => {
@@ -49,7 +49,7 @@ export function Turns({ turns }: { turns: Turn[] }) {
         if (t.role === "user") {
           return (
             <div key={i} className="turn user">
-              <div className="who">用户</div>
+              <div className="who">User</div>
               <div className="prose">{t.content}</div>
             </div>
           );
@@ -61,14 +61,14 @@ export function Turns({ turns }: { turns: Turn[] }) {
             <button className="who toggle" onClick={() => toggle(i)}>
               <span className="caret">{open ? "▾" : "▸"}</span>
               harness
-              {steps.length > 0 && <span className="steps-count">{steps.length} 步</span>}
-              {i === lastHarness && <span className="latest">最新</span>}
+              {steps.length > 0 && <span className="steps-count">{steps.length} steps</span>}
+              {i === lastHarness && <span className="latest">Latest</span>}
             </button>
             {open ? (
               <>
                 {steps.length > 0 && (
                   <details className="inner-steps">
-                    <summary>内层过程（{steps.length} 步）</summary>
+                    <summary>Internal process ({steps.length} steps)</summary>
                     <ProcessStream log={steps} />
                   </details>
                 )}
@@ -86,9 +86,9 @@ export function Turns({ turns }: { turns: Turn[] }) {
   );
 }
 
-// commit diff：行级着色（+ 绿 / - 红 / @@ 蓝 / 文件头灰）。
+// Commit diff: color lines (+ green / - red / @@ blue / file headers gray).
 export function Diff({ diff }: { diff: string }) {
-  if (!diff) return <div className="empty">无 diff 内容</div>;
+  if (!diff) return <div className="empty">No diff available</div>;
   const cls = (line: string) => {
     if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("diff ") || line.startsWith("index "))
       return "meta-line";

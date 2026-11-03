@@ -65,14 +65,14 @@ export interface OpenAgentsSnapshot {
 }
 
 function apiSource<T extends { connected: boolean }>(response: T | null, label: string): SourceState {
-  if (response === null) return { status: "loading", label: `读取 ${label}…` };
-  if (!response.connected) return { status: "disconnected", label: `${label} 未连接` };
+  if (response === null) return { status: "loading", label: `Loading ${label}…` };
+  if (!response.connected) return { status: "disconnected", label: `${label} disconnected` };
   return { status: "ready", label: `${label} connected` };
 }
 
 function stateSource(state: RunState | null): SourceState {
   return state === null
-    ? { status: "loading", label: "读取 run state…" }
+    ? { status: "loading", label: "Loading run state…" }
     : { status: "ready", label: "Run state ready" };
 }
 
@@ -152,10 +152,10 @@ function isRoundAnchor(commit: Commit, roundShas: string[]): boolean {
 }
 
 function currentRoundLabel(state: RunState | null, selectedRound: "all" | number): string {
-  if (selectedRound !== "all") return `第 ${selectedRound} 轮`;
-  if (state === null) return "连接中";
-  if (state.round <= 0) return "未运行";
-  return `第 ${state.round}/${state.total_rounds} 轮`;
+  if (selectedRound !== "all") return `Round ${selectedRound}`;
+  if (state === null) return "Connecting";
+  if (state.round <= 0) return "Not running";
+  return `Round ${state.round}/${state.total_rounds}`;
 }
 
 function selectedRoundSha(state: RunState | null, selectedRound: "all" | number): string | null {
@@ -175,9 +175,9 @@ function filteredPullSource(
 ): SourceState {
   const source = apiSource(delivery, "/api/delivery");
   if (source.status !== "ready" || selectedRound === "all") return source;
-  if (issues === null) return { status: "loading", label: "读取 issue 轮次关联…" };
+  if (issues === null) return { status: "loading", label: "Loading issue-to-round links…" };
   if (!issues.connected) {
-    return { status: "unavailable", label: "issue 轮次关联不可用" };
+    return { status: "unavailable", label: "Issue-to-round links unavailable" };
   }
   return source;
 }
@@ -190,9 +190,9 @@ function filteredCommitSource(
 ): SourceState {
   const source = apiSource(commits, "/api/commits");
   if (source.status !== "ready" || selectedRound === "all") return source;
-  if (state === null) return { status: "loading", label: "读取 round SHA…" };
+  if (state === null) return { status: "loading", label: "Loading round SHA…" };
   if (roundSha === null) {
-    return { status: "unavailable", label: `第 ${selectedRound} 轮缺少 round SHA` };
+    return { status: "unavailable", label: `Round ${selectedRound} is missing its SHA` };
   }
   return source;
 }

@@ -1,4 +1,4 @@
-# Spec-0047/T2：ExperimentConfig fail-closed 单测。
+# Spec-0047/T2: ExperimentConfig fail-closed unit tests.
 from __future__ import annotations
 
 from pathlib import Path
@@ -53,7 +53,7 @@ def test_invalid_ids_fail_closed() -> None:
 
 
 def test_secret_fields_rejected() -> None:
-    with pytest.raises(ConfigError, match="密钥"):
+    with pytest.raises(ConfigError, match="API key"):
         ExperimentConfig.from_mapping(_cfg(models={"api_key": "sk-secret"}))
 
 
@@ -65,7 +65,7 @@ def test_latest_image_rejected() -> None:
 def test_path_escape_fail_closed(tmp_path: Path) -> None:
     root = tmp_path / "experiments"
     root.mkdir()
-    with pytest.raises(ConfigError, match="越出"):
+    with pytest.raises(ConfigError, match="go beyond"):
         ensure_under_root(root=root, path=Path("/etc/passwd"))
     nested = experiment_paths(experiment_id="glm-evolution-e0", root=root)
     assert nested["root"].is_relative_to(root)

@@ -73,7 +73,7 @@ describe("buildIssueTimelineView", () => {
           id: "transition-1",
           created_at: "2026-08-09T10:02:00Z",
           actor: "designer",
-          title: "标签完整性异常",
+          title: "Label integrity anomaly",
           added: ["needs-human"],
           removed: ["ready", "from-architect", "P1", "round-1"],
           before: state(),
@@ -99,7 +99,7 @@ describe("buildIssueTimelineView", () => {
   it("fails visibly when timeline is unavailable", () => {
     const view = buildIssueTimelineView(issue, undefined);
     expect(view.available).toBe(false);
-    expect(view.unavailableReason).toContain("未提供");
+    expect(view.unavailableReason).toContain("does not provide a label timeline");
     expect(view.transitions).toEqual([]);
   });
 });

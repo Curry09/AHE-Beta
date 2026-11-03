@@ -1,4 +1,4 @@
-# Spec-0050/T2：round_gate 终态判定，不打真 Gitea。
+# Spec-0050/T2: round_gate terminal state judgment, does not write actual Gitea.
 """Hermetic tests for wait_round_delivery."""
 
 from __future__ import annotations

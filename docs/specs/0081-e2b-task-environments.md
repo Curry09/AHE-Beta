@@ -1,12 +1,12 @@
 ---
 number: "0081"
-title: 研究任务材料与 Docker 环境迁入统一入口
+title: "Migrate research task materials and Docker environments to the unified entry point"
 issue: 0
 slug: e2b-task-environments
-summary: 复用已有 Docker 工作区，将原 32 任务材料、服务收尾和环境恢复迁入统一入口，提供 U8 mixed/direct、U16、U32 四组六轮公开配置。
+summary: "Reuse existing Docker workspaces to migrate the original 32 tasks' materials, service finalization, and environment recovery to the unified entry point, providing four public six-round configurations: U8 mixed/direct, U16, and U32."
 tasks:
   - id: T1
-    title: 容器任务包与环境能力合同
+    title: "Container task packages and environment capability contract"
     status: done
     priority: P1
     tags: []
@@ -22,10 +22,10 @@ tasks:
       - backend/tests/test_experiment_environment_config.py
       - backend/ahe_beta/experiment/schemas/experiment-v2.json
       - backend/tests/test_experiment_grading_task_materials.py
-    scope: 增加 container 任务包 v3，在解析层归一化能力、来源、输入、服务和既有 artifact 声明；保留旧任务身份。
-    acceptance: 未知字段/版本/能力及目标冲突可拒绝；非 Python 任务无需伪造 setup/venv；v1/v2 原文、默认值和 digest 不变，无 task ID 或 benchmark 特判。
+    scope: "Add container task package v3, normalizing capabilities, sources, inputs, services, and existing artifact declarations at the parsing layer; preserve old task identities."
+    acceptance: "Unknown fields/versions/capabilities and target conflicts can be rejected; non-Python tasks need not fabricate setup/venv; v1/v2 original text, defaults, and digests remain unchanged, with no task ID or benchmark special cases."
   - id: T2
-    title: 原始材料导出、下载与冻结
+    title: "Original material export, download, and freezing"
     status: done
     priority: P1
     tags: []
@@ -39,10 +39,10 @@ tasks:
       - tools/dev/export-evolution-task-materials.py
       - tools/dev/README.md
       - backend/tests/test_experiment_environment_materials.py
-    scope: 核对原始 payload/镜像/输入来源并提供发布工具；获取不可变材料、校验缓存和配方，纳入现有 manifest。
-    acceptance: 下载/本地缓存同样校验 hash/inventory；失败或缺 pristine 材料不落 PREPARED、不从完成态补造；镜像 digest/转换来源可查，不需原个人模板。
+    scope: "Verify original payload/image/input sources and provide publishing tools; obtain immutable materials, validate caches and recipes, and incorporate them into the existing manifest."
+    acceptance: "Downloads and local caches both undergo hash/inventory validation; failures or missing pristine materials must not result in PREPARED or be reconstructed from completed states; image digests/conversion sources are traceable, without requiring the original personal templates."
   - id: T3
-    title: Docker 环境、受管服务与工作区运行时
+    title: "Docker environments, managed services, and workspace runtime"
     status: done
     priority: P1
     tags: []
@@ -87,10 +87,10 @@ tasks:
       - backend/tests/user/sim/test_tools.py
       - backend/tests/user/sim/test_workspace.py
       - backend/tests/test_reusable_persona_sessions.py
-    scope: 复用 DockerWorkspaceRuntime 接入 container source，按所属 attempt 管理容器/服务及 Actor 停止、finalize、artifact 导出。
-    acceptance: 同路径/端口并发隔离；工具、Harness 与导出同环境；真实流及中断可用；KV 不被普通 quiesce 误杀；冻结失败即使空 exports 也非 COMPLETE，管理 handle 不越界。
+    scope: "Reuse DockerWorkspaceRuntime to integrate container source, managing containers/services and Actor stopping, finalize, and artifact export by owning attempt."
+    acceptance: "Concurrent sessions using the same paths/ports are isolated; tools, Harness, and exports use the same environment; real streaming and interruption work; ordinary quiesce does not accidentally kill KV; freezing failures do not result in COMPLETE even with empty exports, and management handles stay within their ownership boundaries."
   - id: T4
-    title: 统一生命周期、恢复与归档接入
+    title: "Unified lifecycle, recovery, and archive integration"
     status: done
     priority: P1
     tags: []
@@ -116,10 +116,10 @@ tasks:
       - backend/ahe_beta/experiment/batch_config.py
       - backend/ahe_beta/experiment/batch_store.py
       - backend/tests/test_experiment_environment_batch.py
-    scope: backend 提供 Docker/资源能力，controller 只装配环境；接通 check/prepare/run、持久归属、stop/resume/collect/destroy 与 continuation。
-    acceptance: 仅所属资源可回收；丢失/初始化/收尾/收集失败不污染反馈或推进下一轮；完成 Session 不重复，公共归档可继承配方，旧路径和已有冻结 run 保持合同。
+    scope: "The backend provides Docker/resource capabilities, and the controller only assembles environments; connect check/prepare/run, persistent ownership, stop/resume/collect/destroy, and continuation."
+    acceptance: "Only owned resources can be reclaimed; loss/initialization/finalization/collection failures must not contaminate feedback or advance to the next round; completed Sessions are not repeated, public archives support recipe inheritance, and old paths and existing frozen runs retain their contracts."
   - id: T5
-    title: 32 任务材料与四组六轮公开示例
+    title: "32 tasks' materials and four public six-round examples"
     status: done
     priority: P1
     tags: []
@@ -235,10 +235,10 @@ tasks:
       - examples/tasks/evolution32/M04/recipes/prepare.py
       - examples/tasks/evolution32/M04/recipes/readiness.py
       - examples/tasks/evolution32/M04/recipes/collect_pilot.py
-    scope: 发布完整真实任务定义/环境材料清单、原 persona 配对与 U8 mixed/direct、U16、U32 六轮配置、批次和双语教程。
-    acceptance: 32 真实任务材料可获取且逐项有 hash；6/2、0/8、12/4、25/7 配对及轮序正确；公开四组并发显式 4，原运行差异说明；U8 除交互与派生身份外条件一致，唯一入口可启动。
+    scope: "Publish complete real task definitions/environment material inventories, original persona pairings, six-round U8 mixed/direct, U16, and U32 configurations, batches, and bilingual tutorials."
+    acceptance: "Materials for 32 real tasks are obtainable, with a hash for each item; 6/2, 0/8, 12/4, and 25/7 pairings and round order are correct; all four public groups explicitly set concurrency to 4, with differences from the original runs explained; U8 conditions match except for interaction and derived identities, and can be launched through the sole entry point."
   - id: T6
-    title: 真实材料、服务、恢复及演化链路验收
+    title: "Acceptance of real materials, services, recovery, and the evolution chain"
     status: in-progress
     priority: P1
     tags: []
@@ -251,72 +251,72 @@ tasks:
       - backend/scripts/e2e-spec-0081-e2b-task-environments.sh
       - backend/tests/test_experiment_environment_contract.py
       - .github/workflows/experiment-contract.yml
-    scope: 验证现有路径回归、32 项 readiness、源码/文件/服务真实环境、并发与恢复及公开入口两轮交付链路，记录发布验收证据。
-    acceptance: 三类真实任务、至少两同路径端口会话、KV finalize/产物/清理通过；两轮链路含实际需求交付和末轮只试用；所有测试层次与四组正式六轮分别记录，无替身或探针冒充完成。
+    scope: "Verify regression coverage for existing paths, readiness of all 32 items, real source/file/service environments, concurrency and recovery, and the two-round delivery chain through the public entry point; record release acceptance evidence."
+    acceptance: "Three types of real tasks, at least two sessions using the same paths and ports, and KV finalize/artifacts/cleanup pass verification; the two-round chain includes actual requirements delivery and a trial-only final round; all test levels and the four groups' formal six-round runs are recorded separately, with no substitutes or probes presented as completion."
 ---
 
-# 0081 · 研究任务材料与 Docker 环境迁入统一入口
+# 0081 · Migrating Research Task Materials and Docker Environments to a Unified Entry Point
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level rust-RFC nine-section overview. -->
 
 ## Summary
 
-将已有 U8 mixed、U8 direct、U16、U32 的原始任务材料与 Docker 环境配方迁入统一实验入口。首批沿用一个实验一个 E2B 沙箱、沙箱内每个 session/attempt 创建独立 Docker 任务环境的方式；复用现有编排、用户交互、OpenAgents 交付、恢复和归档。
+Migrate the existing raw task materials and Docker environment recipes for U8 mixed, U8 direct, U16, and U32 to a unified experiment entry point. The initial release retains the approach of one E2B sandbox per experiment and a separate Docker task environment for each session/attempt within the sandbox; it reuses the existing orchestration, user interaction, OpenAgents delivery, recovery, and archiving.
 
-公开交付包括可获取且有校验和的 32 任务材料、版本化环境声明、四份六轮实验配置、批次列表和中英文启动教程。任务内容、环境运行和角色编排分别维护；通用层通过工作区及环境能力接口协作。
+The public deliverables include accessible task materials for all 32 tasks with checksums, versioned environment declarations, four six-round experiment configurations, a batch list, and startup tutorials in Chinese and English. Task content, environment execution, and role orchestration are maintained separately; the shared layer coordinates through workspace and environment capability interfaces.
 
-本设计已经审阅批准，当前实现进度由 frontmatter 的 Task 状态维护。材料发布、完整任务就绪与真实演化链路的验收结果独立记录，不能从代码已实现推断实验已完成。
+This design has been reviewed and approved; current implementation progress is maintained in the frontmatter Task statuses. Acceptance results for material publication, complete task readiness, and the real evolution chain are recorded independently; experiment completion cannot be inferred from implemented code.
 
 ## Motivation
 
-原实验已经有任务材料。任务清单保存 agent/grader payload 的坐标和 SHA-256；执行环境从 E2B 模板中的原始压缩包、项目源码、数据库、工作簿及 Docker 镜像恢复输入。额外的 root_supervisor、round_environment、n16_environment、task_runtime 等实验脚本负责每轮环境重建和容器连接，再调用当时冻结的主仓 Orchestrator、用户会话、需求角色及交付设施。
+The original experiments already have task materials. The task list stores the locations and SHA-256 hashes of agent/grader payloads; the execution environment restores inputs from original archives, project source code, databases, workbooks, and Docker images in E2B templates. Additional experiment scripts such as root_supervisor, round_environment, n16_environment, and task_runtime handle environment reconstruction and container connections for each round, then invoke the main repository's Orchestrator, user sessions, requirements roles, and delivery facilities as frozen at the time.
 
-尚未完成的是材料分发和环境接入：新用户不能仅 clone 仓库、填写凭证，就通过当前 experiment.py 重建这些环境。旧模板名、本地 Docker image ID、/opt/hse-run 等坐标不是可移植的材料身份；完成过任务的工作区也不是原始输入。
+Material distribution and environment integration remain incomplete: a new user cannot reconstruct these environments through the current experiment.py merely by cloning the repository and providing credentials. Old template names, local Docker image IDs, and locations such as /opt/hse-run are not portable material identities; workspaces in which tasks have already been completed are not original inputs either.
 
-现有公开入口已经支持 schema 2 实验、任务列表、persona 复用、direct/simulated_user、六轮及末轮只试用、local/E2B、batch、归档追加与独立评分。任务包 v1/v2 支持源码/依赖配方，v2 已有 benchmark 来源和 artifacts 声明；WorkspaceRuntime 已提供命令、文件、Harness 执行及产物边界。当前缺少原研究任务的容器/服务生命周期，不需要重写这些已具备的功能。
+The existing public entry point already supports schema 2 experiments, task lists, persona reuse, direct/simulated_user, six rounds with trial-only operation in the final round, local/E2B, batch, archive appends, and independent scoring. Task packages v1/v2 support source/dependency recipes, and v2 already has benchmark source and artifacts declarations; WorkspaceRuntime already provides command, file, Harness execution, and artifact boundaries. The missing piece is the container/service lifecycle for the original research tasks; these existing capabilities do not need to be rewritten.
 
-旧环境桥接还使用过私有注册表覆盖、inspect.getsource 后字符串替换、固定宿主路径和内网模型地址。直接复制会使任务内容、资源管理和编排混在一起。本次提取它们已经验证过的准备、重置、服务及收集语义，以正式接口接入。
+The old environment bridge also used private registry overrides, string replacement after inspect.getsource, fixed host paths, and internal model addresses. Copying it directly would mix task content, resource management, and orchestration. This design extracts its validated preparation, reset, service, and collection semantics and integrates them through formal interfaces.
 
-旧版本文提出自建 namespace/root 的实现，面向两组五轮及固定旧 seed；本次设计替换为现有 Docker 执行边界及四组六轮示例。2026-10-04 的 namespace 短时探针仅是历史可行性证据，不计为本方案 Docker 环境或完整实验验收。
+An earlier version of this document proposed a custom namespace/root implementation for two groups of five rounds with a fixed old seed; this design replaces it with the existing Docker execution boundary and four six-round examples. The short namespace probe on 2026-10-04 is only historical feasibility evidence and does not count as acceptance of this design's Docker environment or a complete experiment.
 
 ## Guide-level explanation
 
-### 用户操作
+### User operations
 
-凭证继续使用 examples/experiment.env.example；新用户选择四份配置之一，使用同一个公开入口：
+Credentials continue to use examples/experiment.env.example; a new user selects one of four configurations and uses the same public entry point:
 
 ```bash
 uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
 chmod 600 .env.experiment
-# 填写模型、E2B、Gitea.com 凭证。
+# Fill in model, E2B, and Gitea.com credentials.
 CONFIG=examples/experiments/u32-mixed-e2b.json
 uv run --locked --extra experiments python backend/scripts/experiment.py check --config "$CONFIG" --offline
 uv run --locked --extra experiments python backend/scripts/experiment.py run --config "$CONFIG" --secrets-file .env.experiment
 ```
 
-run --config 仍是 prepare 后启动；也可分别 prepare、核对冻结结果、run RUN_ID。status、logs、stop、resume、collect、destroy、batch 和 continuation 沿用现有入口。用户不需要寻找个人快照、手动上传旧镜像、拷贝其他 checkout 的环境或执行研究启动器。
+run --config still starts a run after prepare; users can also run prepare separately, check the frozen results, and then run RUN_ID. status, logs, stop, resume, collect, destroy, batch, and continuation continue to use the existing entry point. Users do not need to find personal snapshots, manually upload old images, copy environments from another checkout, or execute a research launcher.
 
-### 四组示例
+### Four example groups
 
-| 项目 | U8 mixed | U8 direct | U16 mixed | U32 mixed |
+| Item | U8 mixed | U8 direct | U16 mixed | U32 mixed |
 | --- | --- | --- | --- | --- |
-| 轮数 / 每轮会话 | 6 / 8 | 6 / 8 | 6 / 16 | 6 / 32 |
+| Rounds / sessions per round | 6 / 8 | 6 / 8 | 6 / 16 | 6 / 32 |
 | simulated_user / direct | 6 / 2 | 0 / 8 | 12 / 4 | 25 / 7 |
 | Triager / Architect / Divergent | 4 / 1 / 1 | 4 / 1 / 1 | 8 / 1 / 1 | 16 / 1 / 1 |
-| Developer 并发 | 4 | 4 | 4 | 4 |
+| Developer concurrency | 4 | 4 | 4 | 4 |
 | Owner / grouping | mechanical / false | mechanical / false | mechanical / false | mechanical / false |
-| 用户与 Harness / 需求与交付模型 | Flash / 完整版 | Flash / 完整版 | Flash / 完整版 | Flash / 完整版 |
-| 逐轮独立评分 | 默认关闭 | 默认关闭 | 默认关闭 | 默认关闭 |
-| R1–R5 / R6 | 反馈与交付 / 仅试用 | 反馈与交付 / 仅试用 | 反馈与交付 / 仅试用 | 反馈与交付 / 仅试用 |
+| User and Harness / requirements and delivery models | Flash / full version | Flash / full version | Flash / full version | Flash / full version |
+| Independent scoring per round | Disabled by default | Disabled by default | Disabled by default | Disabled by default |
+| R1–R5 / R6 | Feedback and delivery / trial only | Feedback and delivery / trial only | Feedback and delivery / trial only | Feedback and delivery / trial only |
 
-四组默认使用当前 builtin seed；prepare 冻结实际源码、版本和模型参数。历史固定起点通过已有 harness.source=archive 加 SHA-256 显式选择，不把新示例称为历史运行的逐字节复现。模型名公开使用可替换的 glm-5.3-flash / glm-5.3，地址和凭证来自模型角色配置。原 persona 库直接复用，重复 persona 由 slot/session 区分。
+All four groups use the current builtin seed by default; prepare freezes the actual source, versions, and model parameters. A historical fixed starting point is explicitly selected through the existing harness.source=archive plus SHA-256; the new examples are not described as byte-for-byte reproductions of historical runs. Public model names use the replaceable glm-5.3-flash / glm-5.3; addresses and credentials come from the model role configuration. The original persona library is reused directly, with repeated personas distinguished by slot/session.
 
-四组公开示例的 max_parallel_users 统一显式设为 4，作为共享 8 GiB 沙箱的起始运行设置，E2B 默认 4 CPU/8192 MiB；它不同于部分旧运行的初始并发，需在示例说明中直接列出。用户可在 prepare 前修改资源和并发；程序检查配置与实际能力，不静默改写调度。用户并发和 Developer 并发是两个不同参数，不能将其中之一宣传成总资源保证。
+All four public examples explicitly set max_parallel_users to 4 as the starting runtime setting for a shared 8 GiB sandbox; the E2B default is 4 CPU/8192 MiB. This differs from the initial concurrency of some old runs and must be stated directly in the example documentation. Users can modify resources and concurrency before prepare; the program checks configuration against actual capabilities and does not silently rewrite scheduling. User concurrency and Developer concurrency are distinct parameters; neither may be presented as a total resource guarantee.
 
-示例固定配置不重演历史运行中的模型换址、输出额度切换和并发调整。模型 limits 中的 reserved_output_tokens 是容量预留，不是实际 max_tokens 开关；实际输出上限来自选定 seed 和已有运行参数，应随冻结配置公开列出。环境迁移不新增模型预算或早停策略。
+The fixed example configurations do not replay model endpoint changes, output quota switches, or concurrency adjustments from historical runs. reserved_output_tokens in model limits is a capacity reservation, not the actual max_tokens switch; the actual output limit comes from the selected seed and existing runtime parameters and should be publicly listed with the frozen configuration. Environment migration does not add a model budget or early stopping policy.
 
-### 材料与源码位置
+### Material and source locations
 
 ```text
 examples/
@@ -324,204 +324,204 @@ examples/
   experiments/u16-mixed-e2b.json、u32-mixed-e2b.json
   batches/evolution-four-e2b.json
   tasks/evolution32/
-    manifest.json             # 版本、原始来源、文件 hash、公开获取地址
+    manifest.json             # version, original source, file hash, public retrieval URL
     README.md、README.zh-CN.md
     <task-key>/task.json、instruction.md
-  personas/library.json       # 沿用现有主库
+  personas/library.json       # reuse the existing master library
 ```
 
-源码仓保存可审阅的任务定义、指令、环境声明和配方；较大输入/配方附件放版本化 Release，镜像放 registry 并使用 digest。每项材料同时支持带 SHA-256 的本地文件或下载地址，离线镜像/文件缓存可重用。任务集清单提供材料身份和校验信息，不成为第二套任务调度配置；编排仍以 experiment 的 task_packages 与 interaction_plan 为准。
+The source repository stores reviewable task definitions, instructions, environment declarations, and recipes; larger inputs/recipe attachments are placed in a versioned Release, and images are placed in a registry and referenced by digest. Each material supports either a local file or a download URL with SHA-256; offline image/file caches can be reused. The task set manifest provides material identities and verification information, but does not become a second task scheduling configuration; orchestration continues to use the experiment's task_packages and interaction_plan.
 
-本次固定材料发布于主仓 `evolution32-task-materials-v1` Release，37 项运行输入及锁文件、校验清单、README 分别核验。主仓公开前以身份下载并将已验证字节放入独立缓存，匿名材料下载待公开后验证；通用材料模块不增加 GitHub 认证分支。原始任务指令及 M04 固定配方按发布字节保存，不自动格式化，身份由任务 hash、文件 inventory 和 Release 锁文件检查；本仓维护的运行时与其他新配方继续接受常规 lint/format。
+The fixed materials for this release are published in the main repository's `evolution32-task-materials-v1` Release; the 37 runtime inputs, lock file, checksum manifest, and README are verified separately. Before the main repository becomes public, download using an identity and place the verified bytes in a separate cache; anonymous material downloads are to be verified after publication. The shared materials module does not add a GitHub authentication branch. Original task instructions and the fixed M04 recipe are preserved as published bytes and are not automatically formatted; identity is checked using task hashes, file inventory, and the Release lock file. The runtime and other new recipes maintained in this repository continue to undergo normal lint/format checks.
 
 ## Reference-level explanation
 
-### 1. 分层与依赖方向
+### 1. Layers and dependency direction
 
-| 层 | 输入与职责 | 接口边界 |
+| Layer | Inputs and responsibilities | Interface boundary |
 | --- | --- | --- |
-| 任务定义与材料 | 指令、来源、初始数据、镜像、环境配方、服务、产物声明 | 定义需要什么，不读角色/轮次状态 |
-| task_environments | 获取并核验材料，创建容器与服务，检查就绪，收尾、导出和清理 | 只消费规范化环境定义及 bound attempt 身份 |
-| local/E2B backend | 实验级 Docker/沙箱能力、Gitea、网络及总体资源生命周期 | 提供执行能力和实际资源事实 |
-| controller/Orchestrator | 装配工作区，运行用户、反馈、交付和恢复 | 通过 workspace/runtime 使用任务，不分支判断 task ID 或 suite |
+| Task definitions and materials | Instructions, sources, initial data, images, environment recipes, services, artifact declarations | Defines what is needed; does not read role/round state |
+| task_environments | Acquires and verifies materials, creates containers and services, checks readiness, finalizes, exports, and cleans up | Consumes only normalized environment definitions and bound attempt identities |
+| local/E2B backend | Experiment-level Docker/sandbox capabilities, Gitea, networking, and overall resource lifecycle | Provides execution capabilities and actual resource facts |
+| controller/Orchestrator | Assembles workspaces and runs users, feedback, delivery, and recovery | Uses tasks through workspace/runtime without branching on task ID or suite |
 
-新增模块集中于 experiment/task_environments/{contract,materials,docker}.py；user/sim/sources/container.py 是接入既有 SeedSource 的薄适配。contract 负责声明、能力和资源身份，materials 负责材料解析/获取/冻结，docker 负责已登记的具体 Docker 资源与服务。首次只实现 Docker 能力，不引入通用 workflow/DAG、任意 Python import 插件或每个 benchmark 一套 manager。模块按任务属性扩展；未来需要另一种环境驱动时沿用相同能力合同。
+New modules are concentrated in experiment/task_environments/{contract,materials,docker}.py; user/sim/sources/container.py is a thin adapter integrating with the existing SeedSource. contract handles declarations, capabilities, and resource identities; materials handles material resolution/acquisition/freezing; docker handles registered concrete Docker resources and services. The initial implementation provides only Docker capability, without introducing a general workflow/DAG, arbitrary Python import plugins, or a separate manager for each benchmark. Modules are extended according to task attributes; a future environment driver should use the same capability contract.
 
-contract 不依赖 Docker/E2B SDK、角色或评分器；Docker 实现依赖基础 workspace/runtime 能力，基础 user/sim/runtime 不反向导入 experiment 的具体管理器。backend/controller 通过明确的工厂/上下文装配 container source，不靠 import 时覆盖全局实例。共用 artifact collector 只调用 runtime 的有界文件/服务导出能力，不导入 Docker 管理器；环境能力的实现与评分消费分开。
+contract does not depend on the Docker/E2B SDK, roles, or scorers; the Docker implementation depends on basic workspace/runtime capabilities, and the basic user/sim/runtime does not import concrete experiment managers in the reverse direction. backend/controller assembles the container source through an explicit factory/context rather than overriding a global instance at import time. The shared artifact collector calls only the runtime's bounded file/service export capabilities and does not import the Docker manager; environment capability implementations are separate from scoring consumption.
 
-环境模块不导入 Triager、Architect、Divergent、Owner、OpenAgents 调度或 Harbor Index profile；controller 不解释 KV/Excel/某 benchmark 的准备命令。既有 evaluation/Harbor 留出评测独立，环境模块不绑定 Harbor 版本、任务名单或评分器。Gitea 证据 publisher/reader 及 OpenAgents 交付合同继续沿用。
+The environment module does not import Triager, Architect, Divergent, Owner, OpenAgents scheduling, or Harbor Index profile; the controller does not interpret preparation commands for KV/Excel/a particular benchmark. The existing evaluation/Harbor preserves evaluation independence; the environment module is not bound to a Harbor version, task list, or scorer. The Gitea evidence publisher/reader and OpenAgents delivery contract continue unchanged.
 
-### 2. 任务包版本和规范化
+### 2. Task package versions and normalization
 
-experiment 继续使用 schema_version=2。现有 task-package-v1/v2 的原始文档、默认行为、目录/venv 路径、冻结 hash 和已准备 run 身份保持不变；不向这些包注入 environment 默认字段。新增 task-package-v3 专门表达 container 环境，避免要求非 Python 任务伪造源码目录、setup.sh 或 requirements.lock。
+experiment continues to use schema_version=2. The original documents, default behavior, directory/venv paths, frozen hashes, and prepared run identities of existing task-package-v1/v2 packages remain unchanged; no environment default fields are injected into those packages. The new task-package-v3 specifically expresses container environments, avoiding the need for non-Python tasks to fabricate source directories, setup.sh, or requirements.lock.
 
-v3 共同字段为 id、真实 kind/benchmark 来源、instruction_file、interaction、environment，以及已有语义的 execution/artifacts。environment.kind=container，字段包括固定 image、workdir、输入映射、初始化/就绪/收尾配方、有限服务声明和资源/能力要求。SWE 任务保留真实 Git repo/revision 元数据及原始基线；非 Git 任务明确声明 patch 不适用，使用真实文件/服务产物。ordinary 仍需明确 not_in_benchmark=true，benchmark 来源不能被转换成普通任务绕过校验。
+Common v3 fields are id, the actual kind/benchmark source, instruction_file, interaction, environment, and execution/artifacts with their existing semantics. environment.kind=container, with fields including a fixed image, workdir, input mappings, initialization/readiness/finalization recipes, limited service declarations, and resource/capability requirements. SWE tasks retain actual Git repo/revision metadata and the original baseline; non-Git tasks explicitly declare that patch is not applicable and use actual file/service artifacts. ordinary still requires an explicit not_in_benchmark=true; a benchmark source cannot be converted into an ordinary task to bypass validation.
 
-版本差异在任务解析和材料编译层收敛为规范化环境定义、冻结任务记录及 prepared workspace 描述。下游根据环境能力选择 runtime，不按 task-package 版本到处加判断。输入中的原始 package 仍用于身份/审计，规范化执行描述不得反向改变旧包的 hash。工作区能力未知时拒绝启动，禁止伪装成 prebuilt。
+Version differences converge in the task parsing and material compilation layers into normalized environment definitions, frozen task records, and prepared workspace descriptions. Downstream components select a runtime based on environment capabilities rather than adding task-package version checks everywhere. The original package from the input is still used for identity/audit, and the normalized execution description must not retroactively change old package hashes. Startup is rejected when workspace capabilities are unknown; it must not be disguised as prebuilt.
 
-v3 直接复用现有 artifacts.version=1、workspace/managed_service、artifact id、required/max_bytes 及 receipt 定义。输入映射负责初始材料，artifacts 负责终态输出，服务声明负责运行资源；三者不重复维护另一份 outputs/collect 清单。受管服务由 handle 引用已登记的服务输出，不由用户提供任意宿主读取路径。
+v3 directly reuses the existing artifacts.version=1, workspace/managed_service, artifact id, required/max_bytes, and receipt definitions. Input mappings handle initial materials, artifacts handle final outputs, and service declarations handle runtime resources; these do not maintain a duplicate outputs/collect list. Managed services reference registered service outputs by handle; users do not provide arbitrary host read paths.
 
-### 3. 材料导出、获取和冻结
+### 3. Material export, acquisition, and freezing
 
-tools/dev/export-evolution-task-materials.py 是材料发布工具，只导出和校验原始任务输入及环境配方，不启动用户、需求或交付角色。它根据逐任务清单读取原始 agent payload、pristine 源码、工作簿/数据库、基线镜像及服务配方，并保存来源、原 SHA-256、文件 inventory 和必要的格式转换记录。缺项、原始 hash 不符或找不到未解题基线时报告具体缺口，不能从完成过任务的 workspace、R6 输出或其他题目补齐。
+tools/dev/export-evolution-task-materials.py is a material publication tool that only exports and verifies original task inputs and environment recipes; it does not start user, requirements, or delivery roles. It reads the original agent payload, pristine source, workbooks/databases, baseline images, and service recipes according to per-task manifests, and records provenance, original SHA-256, file inventory, and necessary format conversion records. If items are missing, original hashes do not match, or an unsolved baseline cannot be found, it reports the specific gaps; it must not fill them from a workspace where the task was completed, R6 output, or another task.
 
-已有 Docker image ID 只用于核对来源。发布镜像应可由冻结配方重建，或先从经核验的原始镜像导出后发布为不可变 registry digest，并明确区分可重建与仅可获取；不把个人模板 alias 当长期材料入口。运行时不需要原 E2B 账户的历史模板。agent 输入不包含 grader、gold patch、隐藏断言或原实验答案；管理侧服务材料按角色放置，不能整个历史沙箱复制给任务。
+Existing Docker image IDs are used only to verify provenance. Published images should be rebuildable from frozen recipes, or first exported from verified original images and then published as immutable registry digests, with a clear distinction between rebuildable and merely obtainable; personal template aliases are not treated as long-term material entry points. The runtime does not need historical templates from the original E2B account. Agent inputs do not include grader, gold patch, hidden assertions, or original experiment answers; management-side service materials are placed according to role, and an entire historical sandbox must not be copied to a task.
 
-check --offline 只检查本地元数据、指令、材料引用及 hash 格式、目标路径、能力组合和配对；对于声明了远端来源但本地未缓存的输入，明确列出待下载项，不声称已经核验实体或 provider。prepare 下载至内容寻址缓存，核对归档 hash 与文件 inventory，原子发布缓存，冻结 image digest、配方、服务、指令、artifact 声明和源码身份。下载失败保留已验证缓存及明确阶段，不落 PREPARED；可断点重试，但不能缓存未通过验证的半包。
+check --offline only checks local metadata, instructions, material references and hash formats, target paths, capability combinations, and pairings; for inputs with declared remote sources that are not cached locally, it explicitly lists pending downloads and does not claim that the actual content or provider has been verified. prepare downloads to a content-addressed cache, verifies archive hashes and file inventories, atomically publishes the cache, and freezes image digests, recipes, services, instructions, artifact declarations, and source identities. Download failures preserve verified cache entries and an explicit stage without entering PREPARED; retries can resume, but partially downloaded packages that have not passed verification must not be cached.
 
-prepare 维持冻结输入/准备工具链的职责，不隐式开始正式用户会话或创建 Gitea 仓。需要的 E2B 工具链模板按固定配方准备；真实 Docker/内核/权限能力在 run 创建所属沙箱后、模型调用前探测。任务容器按并发名额逐 attempt 创建并检查 readiness；完整 32 任务环境探针属于发布验收，不要求每次运行额外执行一轮 32 个模型任务。
+prepare retains responsibility for freezing inputs and preparing the toolchain; it does not implicitly start formal user sessions or create Gitea repositories. Required E2B toolchain templates are prepared from fixed recipes; actual Docker/kernel/permission capabilities are probed after run creates its sandbox and before model calls. Task containers are created per attempt according to concurrency slots and checked for readiness; a complete 32-task environment probe is part of release acceptance and does not require an additional round of 32 model tasks on every run.
 
-输入目标拒绝遍历、链接逃逸、管理路径和重叠冲突；安全解压保留经声明的文件类型/模式，不能沿用旧脚本的任意 fully_trusted 解压。无论缓存还是远端下载，都经过相同 hash/inventory 校验。命令以 argv 和显式 cwd/超时表达，环境准备脚本是锁定材料，不是 Agent 临时生成的工具指令。
+Input targets reject traversal, link escapes, management paths, and overlapping conflicts; safe extraction preserves declared file types/modes and must not reuse the old scripts' arbitrary fully_trusted extraction. Both cached and remotely downloaded content undergo the same hash/inventory verification. Commands are expressed as argv with explicit cwd/timeout; environment preparation scripts are locked materials, not tool instructions generated on the fly by an Agent.
 
-### 4. Docker 任务环境与工作区接入
+### 4. Docker task environments and workspace integration
 
-首批 E2B 路径是一个实验一个沙箱，沙箱内提供已验证的 Docker daemon；各 session/attempt 创建独立任务容器、可写输入、临时目录和所属网络/卷。local 现有路径保持可用；同一环境驱动可使用本地 Docker，但富任务只有在本地相同能力验收通过后才声明支持，不静默落回宿主目录。
+The initial E2B path uses one sandbox per experiment, with a verified Docker daemon available inside the sandbox; each session/attempt creates a separate task container, writable inputs, temporary directories, and its own network/volumes. The existing local path remains available; the same environment driver can use local Docker, but rich tasks are declared supported locally only after acceptance of equivalent local capabilities, and must not silently fall back to a host directory.
 
-环境管理器使用 frozen task digest、recipe digest 以及 run/config/round/slot/session/attempt 身份创建资源。相同 persona、同路径 /app、同端口并发不共享可写卷或服务网络。Docker image 实际身份与声明 digest 的映射、资源限制和就绪结果写入 receipt。总 CPU/内存与并发资源需求可核对；无法满足的组合明确阻断，不自动降低并发、变更镜像或重写任务指令。
+The environment manager creates resources using the frozen task digest, recipe digest, and run/config/round/slot/session/attempt identities. Concurrent instances with the same persona, the same /app path, and the same port do not share writable volumes or service networks. The mapping between actual Docker image identity and declared digest, resource limits, and readiness results are recorded in the receipt. Total CPU/memory and concurrent resource requirements can be checked; combinations that cannot be satisfied are explicitly blocked, without automatically reducing concurrency, changing images, or rewriting task instructions.
 
-container source 通过现有公开注册方式接入，不覆盖 prebuilt 或修改私有 _REGISTRY；参数显式传入，不从某个固定 /opt 目录、实验别名或全局可变 env 猜测 run。ContainerTaskRuntime 复用现有 DockerWorkspaceRuntime 的命令、文件及 stdio 实现，以环境句柄封装生命周期，避免复制整份运行时。只有确有需要的公共能力钩子进入 WorkspaceRuntime；旧 Local/Docker 默认行为不变。
+The container source is connected through the existing public registry mechanism; it does not override prebuilt or modify the private _REGISTRY. Parameters are passed explicitly; run is not inferred from a fixed /opt directory, experiment alias, or globally mutable env. ContainerTaskRuntime reuses the command, file, and stdio implementations of the existing DockerWorkspaceRuntime, encapsulates the lifecycle with an environment handle, and avoids duplicating the entire runtime. Only genuinely necessary public capability hooks may enter WorkspaceRuntime; existing Local/Docker default behavior remains unchanged.
 
-用户的文件/命令工具、按 persona 进行的修改、Harness、公开 diff 和任务产物均进入同一个 task runtime。Harness 的当前 JSONL 请求、进度、回复及 status/termination_reason 语义保持不变，stdout/stderr 即时流动，不能等待完成后回放；中断和超时作用于所属执行进程。模型连接和凭证由既有角色/网络层提供，任务包和 runtime 适配器不硬编码或改写某个内网 endpoint。
+The user's file/command tools, persona-based modifications, Harness, public diff, and task artifacts all enter the same task runtime. The Harness's current JSONL request, progress, reply, and status/termination_reason semantics remain unchanged; stdout/stderr flow immediately and must not be replayed after completion; interruption and timeout apply to the execution process they belong to. Model connections and credentials are provided by the existing role/network layers; the task bundle and runtime adapter must not hard-code or rewrite any internal network endpoint.
 
-环境只注入运行 Harness 所需的固定工具链和 staging 内容，不挂整个 controller checkout、角色记录、所有任务 payload、Docker socket、Gitea/provider 凭证或其他会话目录。源码/依赖准备保留真实工具版本，不强迫所有任务使用控制器的 Python。普通任务不需要 Git 时，patch/export capability 明确为不适用，不能因缺 .git 把合法非代码产物误判为冻结失败。
+The environment injects only the fixed toolchain and staging content required to run the Harness. It does not mount the entire controller checkout, role records, all task payloads, the Docker socket, Gitea/provider credentials, or other session directories. Source/dependency preparation retains real tool versions and does not force every task to use the controller's Python. When ordinary tasks do not require Git, patch/export capability is explicitly not applicable; the absence of .git must not cause valid non-code artifacts to be misclassified as a freeze failure.
 
-### 5. 服务、Actor 冻结与产物
+### 5. Services, Actor Freeze, and Artifacts
 
-environment.services 是有限的固定服务清单：id、主任务容器内或 companion 的 placement、固定 image/argv、依赖、readiness、启动及 finalize 上限、日志和允许导出的 handle。服务不是模型子 Agent，也不允许任意动态编排。KV 的目标进程和负载生成器分别按原任务合同运行；只有目标环境具有该任务要求的 ptrace 等能力，管理侧 companion、测量原记录与代码不通过任务卷暴露。
+environment.services is a finite, fixed service list: id, placement in the main task container or a companion, fixed image/argv, dependencies, readiness, startup and finalize limits, logs, and handles permitted for export. Services are not model sub-Agents and do not permit arbitrary dynamic orchestration. The KV target process and load generator each run according to the original task contract; only the target environment has capabilities such as ptrace required by that task. The management-side companion, measurement records, and code are not exposed through the task volume.
 
-复用既有 quiesce → finalize_task → artifact collection 调用点，服务型 runtime 的阶段语义为：
+Reuse the existing quiesce → finalize_task → artifact collection call sites. The phase semantics for a service runtime are:
 
 ```text
-Actor 停止继续修改
-    → 任务要求保留的服务按配方完成采样/finalize
-    → 关闭写入并冻结文件和服务输出
-    → 共用采集函数保存 artifact receipt 与管理记录
-    → close 清理所属执行资源
+Actor stops further edits
+    → Services required by the task complete sampling/finalize per the recipe
+    → Stop writes and freeze files and service outputs
+    → The shared collector saves the artifact receipt and management records
+    → close cleans up owned execution resources
 ```
 
-不能直接沿用当前普通 Docker runtime 的容器内进程全清理规则，提前杀掉 KV server/loadgen。新 runtime 必须区分 Actor 执行树、受管服务和其他写进程，服务收尾后才确认 frozen。初始化和测量收尾具有独立的明确上限，遵守原任务测量时点；Actor 任务截止后只允许既定测量/收集，不额外授予继续解题时间。
+The current ordinary Docker runtime's rule for fully cleaning up processes inside the container cannot be reused directly, because it would kill the KV server/loadgen prematurely. The new runtime must distinguish the Actor execution tree, managed services, and other writing processes, and confirm frozen only after service finalization. Initialization and measurement finalization have separate explicit limits and must follow the original task measurement points; after an Actor task deadline, only the established measurement/collection operations are permitted, with no additional time granted to continue solving the task.
 
-workspace 文件通过所属 runtime 的有界导出收集；managed_service 通过环境管理器核对 handle 的 run/session/attempt 和已封存输出，再走已有 artifact receipt。评分器只消费冻结产物，不在环境层执行官方判分；既有逐轮 assessment-worker 和事后 grade 继续独立。任务环境迁移不等于已经补齐 KV/TUA 等所有官方验收合同。
+Workspace files are collected through bounded export by their owning runtime; managed_service verifies the handle's run/session/attempt and sealed outputs through the environment manager, then proceeds through the existing artifact receipt. The scorer consumes only frozen artifacts and does not perform official grading at the environment layer; the existing per-round assessment-worker and post hoc grade remain independent. Migrating the task environment does not mean that all official acceptance contracts such as KV/TUA have already been completed.
 
-freeze/finalize 失败时，receipt.complete 必须 false，即使 exports 为空；记录失败阶段，不把 all([]) 当冻结成功。必需产物缺失/超限或收集失败保留可诊断资源，不能先删容器再宣称完整。管理原记录与可供用户/需求角色读取的安全投影分别保存，隐藏评分数据不流入反馈。
+When freeze/finalize fails, receipt.complete must be false even if exports is empty; record the failed phase, and do not treat all([]) as a successful freeze. If required artifacts are missing/exceed limits or collection fails, retain diagnosable resources; do not delete containers first and then claim completeness. Management records and safe projections readable by users/requirement roles are stored separately; hidden scoring data must not flow into feedback.
 
-### 6. 恢复、清理与统一归档
+### 6. Recovery, Cleanup, and Unified Archiving
 
-任务环境使用一个持久资源登记文件，复用现有 run 资源身份和 recovery attempt，在副作用前记录创建意图，成功后登记容器/网络/卷/服务的实际 ID、所有权、状态及采集回执。连接、收集和清理都核对实际资源 labels 与 run/config/session/attempt/recipe；进程另记 PID 与启动身份，不能仅凭名称或 PID 存活复用。操作应可对账、可重试；不再增加独立的实验 checkpoint 或重放控制器。
+The task environment uses one persistent resource registry file, reuses the existing run resource identity and recovery attempt, records the creation intent before side effects, and after success registers the actual IDs, ownership, status, and collection receipts of containers/networks/volumes/services. Connections, collection, and cleanup all verify the actual resource labels against run/config/session/attempt/recipe; processes additionally record the PID and launch identity and cannot be reused as live processes based only on name or PID. Operations should support reconciliation and retry; do not add a separate experiment checkpoint or replay controller.
 
-| 情形 | 行为 |
+| Situation | Behavior |
 | --- | --- |
-| 同一创建操作重试 | 对账本次 attempt 的已登记资源，防止重复容器/Actor |
-| 已完成会话恢复 | 复用封存 Session、产物及报告收据，不重跑或重发 Issue |
-| 未完成环境仍存活 | 通过既有恢复语义核对并连接，或先封存/停止后建立新 attempt |
-| 环境/服务已丢失 | 记录基础设施失败并等待恢复；新 attempt 从 pristine 输入创建，不冒充原进程续跑 |
-| 收尾/收集失败 | 保留阶段及资源身份，恢复收尾/收集，不因缺日志重跑已完成 Actor |
-| stop/destroy | 仅处理所有权匹配的资源；无权归属或无法确认清理时停止后续推进 |
+| Retry of the same creation operation | Reconcile resources already registered for this attempt to prevent duplicate containers/Actors |
+| Recovery of a completed session | Reuse the sealed Session, artifacts, and report receipts; do not rerun or resend the Issue |
+| An incomplete environment is still alive | Verify and connect through the existing recovery semantics, or seal/stop it first and then establish a new attempt |
+| Environment/service has been lost | Record an infrastructure failure and wait for recovery; create a new attempt from pristine inputs, without pretending to resume the original process |
+| Finalization/collection failure | Retain the phase and resource identity, and resume finalization/collection; do not rerun a completed Actor because logs are missing |
+| stop/destroy | Process only resources with matching ownership; stop further progress when ownership is unauthorized or cleanup cannot be confirmed |
 
-不执行 docker rm 全部容器、全局网络 prune、按进程名 kill 或依据资源名称猜测归属。任务准备/服务/采集的基础设施失败不能包装为负体感、任务不通过或改进 Issue 后继续下一轮；正常解题失败仍是有效使用反馈，不能借环境机制淘汰候选 Harness。
+Do not execute docker rm on all containers, perform a global network prune, kill by process name, or infer ownership from resource names. Infrastructure failures in task preparation/services/collection must not be wrapped as negative user experience, task failure, or an improvement Issue followed by continuation to the next round; ordinary task-solving failure remains valid usage feedback and must not be used to eliminate candidate Harnesses through environment mechanisms.
 
-collect 沿用既有归档器，保留冻结材料身份、各轮 Harness、用户交互、需求/设计/交付记录、Gitea 快照及任务产物/环境回执；不递归打包 Docker graph、依赖缓存、整个 E2B VM 或凭证。完整性由本次实际状态决定。单 run 成功终态收集后的自动清理、batch 的监督收集、Gitea 保留规则继续沿用。
+collect continues to use the existing archiver and preserves the identity of frozen materials, each round's Harness, user interactions, requirement/design/delivery records, Gitea snapshots, and task artifact/environment receipts; it does not recursively package the Docker graph, dependency caches, the entire E2B VM, or credentials. Completeness is determined by the actual state in this run. Automatic cleanup after collection of a successful terminal state for a single run, supervised collection for batches, and Gitea retention rules continue to apply.
 
-continuation 继承公开输入和完整环境配方，在子 run 创建新的环境资源；父终态文件与管理测量作为历史证据保留，不自动变成新一轮初态。旧冻结 run 仍使用原源码，不原地升级工作区或伪造其具备服务能力。
+A continuation inherits the public inputs and complete environment recipe, and creates new environment resources in the child run; the parent's terminal-state files and management measurements are retained as historical evidence and do not automatically become the initial state of the new round. Old frozen runs continue to use their original source code; their workspaces are not upgraded in place, nor are they falsely represented as having service capabilities.
 
-### 7. 32 任务和四组配置的来源合同
+### 7. Provenance Contract for the 32 Tasks and Four Configurations
 
-材料集依据本次研究的原始 tasks/personas 清单与 payload hash，32 项有序 task key 为：O03、O09、O14、M03、O01、kv-live-surgery、tinydb、M01、O05、O06、vf2-speedup-networkx、pretrain-shard-corruption、091-add-receipts-bookkeeping、flask-restful、M05、M09、O02、O04、astroid-1030、sqlfluff-3608、marshmallow-2123、payments-pipeline-fix、wal-recovery-ordering、vba-userform-port、react-lead-form、080-convert-novel-epub、cookiecutter、tqdm、M02、M04、M07、M10。元数据保留实际 benchmark task ID，不能只靠这些短 key 推断来源。
+The material set is based on the original tasks/personas list and payload hash for this study. The 32 ordered task keys are: O03, O09, O14, M03, O01, kv-live-surgery, tinydb, M01, O05, O06, vf2-speedup-networkx, pretrain-shard-corruption, 091-add-receipts-bookkeeping, flask-restful, M05, M09, O02, O04, astroid-1030, sqlfluff-3608, marshmallow-2123, payments-pipeline-fix, wal-recovery-ordering, vba-userform-port, react-lead-form, 080-convert-novel-epub, cookiecutter, tqdm, M02, M04, M07, M10. Metadata retains the actual benchmark task IDs; provenance must not be inferred from these short keys alone.
 
-U8 取前八项，U16 取前十六项，U32 使用全部；各组按原配对复用 public persona 主库。原任务没有交互 persona 的 direct 槽位，明确使用既有 sr-15-swyx 作终态评阅画像，不声称存在另一位实际参与的用户。轮次内的有序计划显式写入 interaction_plan，保留原实验按轮移动任务起始槽位的次序，不依靠新的隐式轮转推测配对。
+U8 takes the first eight items, U16 takes the first sixteen, and U32 uses all items; each group reuses the public persona master library according to the original pairings. For direct slots whose original tasks have no interactive persona, the existing sr-15-swyx is explicitly used as the terminal-state review persona, without claiming that another user actually participated. The ordered plan within each round is explicitly written to interaction_plan, preserving the original experiment's sequence of shifting the starting task slot by round, rather than inferring pairings through a new implicit rotation.
 
-U8 mixed 与 direct 的原始输入、环境、画像、seed、模型、容量/任务预算、资源、并发、角色和排程全部一致，仅六个 interaction 字段及派生身份不同。通过 workload.interaction_overrides 显式按 task ID 覆盖交互模式；U8 direct 只覆盖六个原 simulated_user 任务，未知 task ID 或模式拒绝，继承父 workload 时不允许覆盖。任务指令、材料与环境对象只有一份；配对检查忽略 interaction 后比较实际 source/input/image/recipe/persona 身份，必须发现任何额外差异。任务集材料是来源清单，任务绑定仍只有一份冻结 catalog/session plan。
+The original inputs, environments, personas, seeds, models, capacity/task budgets, resources, concurrency, roles, and scheduling for U8 mixed and direct are all identical; only the six interaction fields and derived identities differ. Interaction modes are explicitly overridden by task ID through workload.interaction_overrides; U8 direct overrides only the six original simulated_user tasks. Unknown task IDs or modes are rejected, and overrides are not allowed when inheriting the parent workload. There is only one copy of the task instructions, materials, and environment objects; pairing checks compare the actual source/input/image/recipe/persona identities after ignoring interaction, and must detect any additional differences. Task-set materials serve as the provenance manifest; there is still only one frozen catalog/session plan for task bindings.
 
-四组默认 6 轮，R1–R5 走既有完整反馈交付，R6 仅用户及显式开启的独立验收；不将旧五轮与新六轮混写。正式任务预算来自固定元数据或显式 operator quota，来源冲突应报告；不将旧脚本 outer_timeout_seconds 自动升级为官方任务时限。prepare/拉镜像/准备文件的时间与解题预算分别记录。
+All four groups default to 6 rounds. R1–R5 use the existing full feedback delivery process, while R6 includes only the user and explicitly enabled independent acceptance; the old five-round setup and the new six-round setup must not be conflated. Official task budgets come from fixed metadata or an explicit operator quota, and conflicts between sources must be reported; outer_timeout_seconds from old scripts must not be automatically promoted to the official task time limit. Time spent on prepare/image pulling/file preparation is recorded separately from the problem-solving budget.
 
-### 8. Task DAG 与验收
+### 8. Task DAG and Acceptance
 
 ```mermaid
 flowchart LR
-  T1[任务与环境合同] --> T2[材料获取与冻结]
-  T1 --> T3[Docker 与服务运行时]
+  T1[Task and environment contracts] --> T2[Material retrieval and freezing]
+  T1 --> T3[Docker and service runtime]
   T2 --> T3
-  T2 --> T4[生命周期与归档接入]
+  T2 --> T4[Lifecycle and archive integration]
   T3 --> T4
-  T2 --> T5[32任务与四组示例]
+  T2 --> T5[32 tasks and four example configurations]
   T4 --> T5
-  T4 --> T6[真实验收]
+  T4 --> T6[Live acceptance verification]
   T5 --> T6
 ```
 
-| Task | 文件归属与交付 |
+| Task | File Ownership and Deliverables |
 | --- | --- |
-| T1 | 任务 schema/contract、配置/工作负载解析及相应测试 |
-| T2 | 材料导出/获取/冻结，来源与缓存校验及相应测试 |
-| T3 | Docker、container source、服务收尾与共用产物导出接入及相应测试 |
-| T4 | backend、controller 装配、现有 recovery/collect/continuation 接入及相应测试 |
-| T5 | 32 任务定义/配方、四份配置、batch、双语文档与配对检查 |
-| T6 | 可重跑验收脚本、真实运行证据及 CI 合同回归 |
+| T1 | Task schema/contract, configuration/workload parsing, and corresponding tests |
+| T2 | Material export/retrieval/freezing, provenance and cache validation, and corresponding tests |
+| T3 | Docker, container source, service finalization and shared artifact export integration, and corresponding tests |
+| T4 | backend and controller assembly, integration with existing recovery/collect/continuation, and corresponding tests |
+| T5 | 32 task definitions/recipes, four configurations, batch, bilingual documentation, and pairing checks |
+| T6 | Rerunnable acceptance scripts, real execution evidence, and CI contract regression tests |
 
-每个文件的唯一 Task 归属以 frontmatter 为准。共享 artifact 采集文件中，本组 T3 负责 runtime 受管导出端口、finalize 失败传播和现有 receipt 分发；0083 的评分计划、适配器和原环境验收仍由评分侧维护，不能另复制一份容器管理或收尾实现。0083 中依赖环境能力的未完成验收保持原状态；本组不要求先实现所有 benchmark 官方评分器，也不据此把其他 spec 的 Task 自动标 done。端到端入口为 backend/scripts/e2e-spec-0081-e2b-task-environments.sh。
+The unique Task ownership of each file is determined by its frontmatter. Within shared artifact collection files, this group's T3 is responsible for the runtime-managed export port, finalize failure propagation, and existing receipt distribution; the scoring plans, adapters, and original-environment acceptance in 0083 remain maintained by the scoring side, and a separate copy of container management or finalization must not be implemented. Unfinished acceptance in 0083 that depends on environment capabilities retains its original status; this group does not require all official benchmark scorers to be implemented first, nor does it automatically mark Tasks in other specs as done on that basis. The end-to-end entry point is backend/scripts/e2e-spec-0081-e2b-task-environments.sh.
 
-| 验收层次 | 必须观察的结果 |
+| Acceptance level | Required observable results |
 | --- | --- |
-| 配置与旧路径回归 | v1/v2 原包 hash 不变，U1/U4 local/E2B、direct/simulated、batch 与 continuation 保持可用；版本未知拒绝 |
-| 材料可分发性 | 新目录/新 E2B 账户可通过锁定的公开来源准备材料；缓存损坏、半下载、镜像漂移和原始输入缺失可诊断 |
-| 基础三类任务 | 原始源码任务、真实 Excel/数据库任务、真实 KV 服务分别完成 prepare/readiness/执行/产物收集 |
-| 32 任务 readiness | 所有原任务逐项校验文件、镜像/工具、服务、工作目录及来源；不以 toy 或名称相同的别题替换 |
-| 并发与跨轮重置 | 至少两个同路径/同端口会话不串数据；原数据基线 hash 一致，上一轮或失败 attempt 的改动不进入下一轮 |
-| 用户及 Harness 执行 | direct 和真实 persona 工具交互使用同一 runtime；JSONL、实时输出、中断、失败状态与进程终止可核对 |
-| 服务收尾与测量 | KV 目标与 loadgen 按原合同就绪；冻结不误杀测量；服务失败/超时保持失败，空导出不能掩盖 finalize 错误 |
-| 产物与恢复 | 真实工作簿/数据库/文件/服务产物保存 bytes/hash；丢失/重启/收集失败恢复不重复已完成 Actor，归属外资源不受影响 |
-| 完整演化链路 | 通过公开入口至少完成一组两轮真实任务运行，第一轮有实际需求处理及至少一次交付，第二轮仅用户；演练 stop/resume、collect、归档检查和清理 |
-| 四组配置与文档 | 六轮、角色、配对、资源、模型/seed 来源明确，U8 对照仅交互模式变化，用户可复制文档命令启动 |
+| Configuration and legacy-path regression | The original v1/v2 package hashes remain unchanged; U1/U4 local/E2B, direct/simulated, batch, and continuation remain usable; unknown versions are rejected |
+| Material distributability | Materials can be prepared in a new directory or new E2B account from locked public sources; corrupted caches, partial downloads, mirror drift, and missing original inputs are diagnosable |
+| Three basic task types | Original source-code tasks, real Excel/database tasks, and real KV services each complete prepare/readiness/execution/artifact collection |
+| Readiness of 32 tasks | Every original task is individually checked for files, images/tools, services, working directory, and provenance; no substitution with toy tasks or different tasks bearing the same name |
+| Concurrency and cross-round reset | At least two sessions using the same paths/ports do not leak data between them; original data baseline hashes match, and changes from a previous round or failed attempt do not carry into the next round |
+| User and Harness execution | direct and real persona tool interactions use the same runtime; JSONL, live output, interruptions, failure states, and process termination can be verified |
+| Service finalization and measurement | The KV target and loadgen are ready under the original contract; freezing does not inadvertently terminate measurement; service failures/timeouts remain failures, and an empty export cannot mask finalize errors |
+| Artifacts and recovery | Real workbook/database/file/service artifacts are saved with bytes/hash; recovery from loss/restart/collection failure does not repeat completed Actors, and resources outside the ownership scope are unaffected |
+| Complete evolution chain | Complete at least one set of two rounds of real task runs through the public entry point, with actual requirement handling and at least one delivery in the first round and only the user in the second round; exercise stop/resume, collect, archive inspection, and cleanup |
+| Four configurations and documentation | Six rounds, roles, pairings, resources, and model/seed sources are explicit; the U8 control changes only the interaction mode; users can copy documentation commands to launch runs |
 
-离线测试、32 任务 readiness、有界模型探针、两轮链路与四组完整六轮研究运行分别记录。T6 可以按上述真实链路与材料验收完成；它不等于四组六轮都已重跑。只有各组实际全部轮次完成且终态归档完整，才可单独发布该组“六轮完成”凭据。开发验收在仓外生成单独两轮配置，不用短测试覆盖或改写公开六轮 example。
+Record offline tests, readiness of the 32 tasks, bounded model probes, the two-round chain, and the four complete six-round research runs separately. T6 can be completed based on acceptance of the real chain and materials described above; it does not mean that all four six-round runs have been rerun. A separate “six rounds completed” credential may be published for a group only after all of its rounds have actually completed and its final-state archive is complete. For development acceptance, generate a separate two-round configuration outside the repository; do not overwrite or rewrite the public six-round example with a short test.
 
-用户接受且产生零 Issue 是合法结果，不能为凑交付覆盖编造投诉或向主记录塞入技术票。两轮验收应选择本任务集中能真实暴露问题的场景；若未发生实际需求和交付，仅记录已通过的会话/环境链路，不声称完成了要求的交付验收。独立技术 canary 可验证接口，但必须单列，不能冒充自然反馈。
+User acceptance with zero Issues is a valid outcome; do not fabricate complaints to satisfy delivery coverage or insert technical issues into the main record. The two-round acceptance should select scenarios in this task set that can genuinely expose problems; if no actual requirements or deliveries occur, record only the session/environment chain that passed, and do not claim that the required delivery acceptance was completed. An independent technical canary may verify interfaces, but it must be listed separately and must not be presented as natural feedback.
 
 ## Drawbacks
 
-Docker、镜像发布和服务生命周期比源码/venv 任务复杂，也增加首次下载及磁盘占用。用一个有界环境模块集中承担这些成本，配方按内容缓存并展示准备阶段；通用角色/编排不承担任务细节。
+Docker, image publication, and service lifecycles are more complex than source/venv tasks and also increase initial download time and disk usage. One bounded environment module centrally bears these costs, caches recipes by content, and displays the preparation stage; generic roles/orchestration do not handle task details.
 
-一个 E2B 沙箱内的任务共享总 CPU/内存、Docker daemon 和内核；各任务独立容器不等于独立 E2B VM。四组并发显式固定，资源不足应暴露为配置/运行事实。本方案不宣称任意恶意代码或跨账户 VM 无损迁移保证。
+Tasks within one E2B sandbox share total CPU/memory, the Docker daemon, and the kernel; a separate container for each task is not the same as a separate E2B VM. Concurrency for the four groups is explicitly fixed, and resource shortfalls should be exposed as configuration/runtime facts. This proposal does not claim guarantees for arbitrary malicious code or lossless cross-account VM migration.
 
-为 container 增加任务包 v3 需要在解析/冻结处处理新形态，但避免让非 Python 环境依赖虚假的 venv 配方。现有包与已冻结 run 保持各自原合同，实施需要用回归防止版本归一化改写旧身份。
+Adding task package v3 for container requires handling the new form at parsing/freezing, but avoids making non-Python environments depend on fictitious venv recipes. Existing packages and frozen runs retain their respective original contracts; implementation requires regression tests to prevent version normalization from rewriting legacy identities.
 
-旧快照部分材料可能只有二进制或本地镜像。公开可获取性与完全可重建性需要分别举证；查清材料缺口是实施前置，不能因为已有清单就宣称全部已独立导出。
+Some materials in old snapshots may exist only as binaries or local images. Public availability and full reconstructibility require separate evidence; identifying material gaps is a prerequisite for implementation, and an existing inventory is not grounds to claim that everything has already been independently exported.
 
 ## Rationale and alternatives
 
-选择现有 Docker 边界，是因为原研究已经用每任务 Docker 环境运行，仓内也已有 DockerWorkspaceRuntime、工作区供给和产物冻结接口。迁移集中在材料、服务生命周期和统一入口接入，保留相同的模型/用户/需求/交付编排。
+The existing Docker boundary was chosen because the original research already ran with per-task Docker environments, and the repository already has DockerWorkspaceRuntime, workspace provisioning, and artifact freezing interfaces. Migration focuses on materials, service lifecycles, and integration with the unified entry point, while retaining the same model/user/requirement/delivery orchestration.
 
-| 备选 | 取舍 |
+| Alternative | Trade-off |
 | --- | --- |
-| 继续发布专用启动脚本和个人快照 alias | 能维持已有机器上的运行，但新用户不能独立取得初态，且重复维护恢复/归档，不能完成统一入口目标 |
-| 自建 mount/PID/network namespace 和新的 root 协议 | 重复实现 Docker 已有边界、进程通道和清理能力；本次不采用，旧探针不作为新验收 |
-| 每个任务新开独立 E2B 沙箱 | 可提供更独立的 VM 资源，但会改变当前部署和成本/调度条件；保留为后续环境驱动扩展 |
-| 把所有演化任务改成 Harbor task | 会将用户使用环境与独立留出评测绑定，并改变部分任务的运行语义；本次保留各自任务来源和评分边界 |
-| 统一为源码加 setup 的旧任务外形 | 适合现有 Python 任务，但会要求 Excel/数据库/运行服务伪造源码/venv；使用明确的 container 包形态 |
+| Continue publishing dedicated launch scripts and personal snapshot aliases | Can keep runs working on existing machines, but new users cannot independently obtain the initial state, and recovery/archive maintenance is duplicated; cannot meet the unified-entry-point goal |
+| Build custom mount/PID/network namespaces and a new root protocol | Reimplements Docker's existing boundaries, process channels, and cleanup capabilities; not adopted for this work, and old probes do not count toward the new acceptance |
+| Start a separate E2B sandbox for each task | Can provide more independent VM resources, but changes current deployment and cost/scheduling conditions; retained as a future environment-driver extension |
+| Convert all evolution tasks to Harbor tasks | Would bind the user environment to independent held-out evaluation and change the runtime semantics of some tasks; this work retains each task's source and scoring boundary |
+| Standardize on the old source-plus-setup task form | Suits existing Python tasks, but would require Excel/database/running-service tasks to fake source/venv; use an explicit container package form |
 
-环境管理器接收环境声明和 bound attempt，不接收完整角色配置；task ID 和 benchmark suite 只用于 provenance。材料、输入、产物和资源身份各有单一事实来源，禁止再建一套任务调度计划、评分结果或实验状态机。
+The environment manager receives environment declarations and bound attempts, not complete role configurations; task ID and benchmark suite are used only for provenance. Materials, inputs, artifacts, and resource identities each have a single source of truth; do not create another task scheduling plan, set of scoring results, or experiment state machine.
 
 ## Prior art
 
-本仓的 SeedSource/WorkspaceRuntime、DockerWorkspaceRuntime 和统一 controller 已将用户工具与 Harness 的执行位置汇合；现有 artifact 采集提供停止 Actor、finalize、封存和 receipt 的调用点。普通文件分支已工作，managed_service 目前明确未支持，本组接通该预留端口。
+The repository's SeedSource/WorkspaceRuntime, DockerWorkspaceRuntime, and unified controller have already brought user tools and Harness execution into the same location; existing artifact collection provides call sites for stopping Actors, finalize, sealing, and receipt. The ordinary file branch already works; managed_service is currently explicitly unsupported, and this work connects that reserved port.
 
-原四组实验的任务清单、payload SHA-256、每轮 Docker 重建脚本、readiness 及环境回执提供任务材料和行为依据。它们是迁移输入，不是另一套继续维护的公开入口。原材料、当前整理配方和新运行结果应能逐项对账。
+The original four experiment groups' task inventories, payload SHA-256 values, per-round Docker rebuild scripts, readiness checks, and environment receipts provide the basis for task materials and behavior. They are migration inputs, not another publicly maintained entry point. Original materials, currently curated recipes, and new run results should be reconcilable item by item.
 
-既有统一入口已负责 Gitea.com、需求/交付隔离、轮次封口、资源检查、归档与 continuation。本组复用这些职责，仅补足任务环境合同和证据，独立 Harbor 评测仍由 evaluation/ 维护。
+The existing unified entry point already handles Gitea.com, requirement/delivery isolation, round sealing, resource checks, archiving, and continuation. This work reuses those responsibilities and adds only task environment contracts and evidence; independent Harbor evaluation remains maintained by evaluation/.
 
 ## Unresolved questions
 
-本次范围、部署方式和模块边界按已确认方案固定，已获审阅批准并进入实施。没有需要由实现者自行选择的隔离方案或第二启动入口。
+The scope, deployment method, and module boundaries for this work are fixed according to the confirmed plan, which has been approved in review and has entered implementation. There is no isolation scheme or second launch entry point for the implementer to choose.
 
-具体 Release/registry 坐标、32 项材料实际可导出性和工具链可重建性是实施时必须核验并写入锁定清单的产物，不以占位地址启动。发现原始输入缺失或预算来源冲突时保留缺口，不能通过替换任务、使用完成态或静默改变条件解除阻断。
+Specific Release/registry coordinates, the actual exportability of the 32 materials, and toolchain reconstructibility are deliverables that must be verified during implementation and recorded in the locked manifest; do not launch with placeholder addresses. When original inputs are missing or budget sources conflict, retain the gap; do not resolve the blocker by substituting tasks, using a completed state, or silently changing conditions.
 
-2026-11-01 操作者确认 M02 的原始工作区本来就只有委托书和 CI 启动器，要求保持原样作为不完整输入的鲁棒性测试。该项保留原指令和原包字节，不补候选源码、回归测试、API 占位或解法；材料清单记录此决定，不再以恢复这些文件作为发布前置条件。原包可校验、可导出与原委托是否完整可解分别记录，不因此放宽通用材料哈希、归档安全或环境就绪检查，也不在运行时新增 M02 特判。
+On 2026-11-01, the operator confirmed that M02's original workspace contained only the assignment brief and CI launcher, and requested that it remain unchanged as a robustness test for incomplete input. Retain the original instructions and original package bytes for this item; do not add candidate source code, regression tests, API placeholders, or a solution. Record this decision in the materials manifest; restoring these files is no longer a prerequisite for release. Record package verifiability, exportability, and whether the original assignment is complete enough to be solvable separately. This does not relax general material hash, archive safety, or environment readiness checks, and does not add an M02 special case at runtime.
 
 ## Future possibilities
 
-可为同一个环境合同增加每任务独立 E2B 或其他执行驱动，并按能力验收扩大 local 富任务支持；可补充新的任务集和服务配方，不修改角色或按 benchmark 分支的 controller。
+The same environment contract could gain a per-task independent E2B or other execution driver, and local support for rich tasks could be expanded through capability-based acceptance; new task sets and service recipes could be added without modifying roles or branching the controller by benchmark.
 
-独立评分框架可消费本组已冻结的服务/非代码产物，按各 benchmark 原验收合同补齐适配。新增评分不改变任务初始化，也不把已用于演化的任务重新宣称为 held-out。
+An independent scoring framework could consume the service/non-code artifacts frozen by this work and add adapters according to each benchmark's original acceptance contract. New scoring does not change task initialization or recharacterize tasks already used for evolution as held-out.
 
-四组完整六轮研究运行、资源/并发对照和额外模型输出预算实验单独记录，不作为材料迁移验收的隐含已完成结果。
+The four complete six-round research runs, resource/concurrency comparisons, and additional model output budget experiments are recorded separately and are not implicitly completed outcomes of materials migration acceptance.
 

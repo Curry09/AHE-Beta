@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Spec-0049/T5：冻结 demand 调用离线重放（只喂 input.prompt，diff structured）。
+# Spec-0049/T5: freeze demand calls for offline replay (only feed input.prompt, diff structured).
 """Replay frozen demand-side role invocations against a replacement agent_def.
 
 Skips implementer / replayable=false records and never starts Gitea or vigil.

@@ -1,14 +1,14 @@
-"""spec 数据层：Task / Overview / Metadata / Group 模型与 **markdown 单文件** round-trip 读写。
+"""spec data layer: Task / Overview / Metadata / Group models with **markdown single-file** round-trip read/write.
 
-issue #69 rust-RFC 形态（总览先行 + 单 spec 自包含）：
-一个 spec 组 = 一个 markdown 文件 `docs/specs/NNNN-slug.md`：
-- **YAML frontmatter**（机器读）：组元数据 number/title/issue/slug/summary + tasks 列表
-  （结构化字段 + scope/acceptance；`files` = 单一 writer 所有权声明，为 issue #71 留源）。
-- **Markdown 正文**（人/agent 读）：组级 rust-RFC 9 段总览（Summary…Future possibilities），
-  feature 全貌自包含地讲一遍，DAG + 文件分配收进 Reference-level；不再有 per-Task 小节。
+issue #69 rust-RFC form (overview-first + self-contained single spec):
+One spec group = one markdown file `docs/specs/NNNN-slug.md`:
+- **YAML frontmatter** (machine-read): group metadata number/title/issue/slug/summary + tasks list
+  (structured fields + scope/acceptance; `files` = single-writer ownership declaration, reserved for issue #71).
+- **Markdown body** (human/agent read): group-level rust-RFC 9-section overview (Summary…Future possibilities),
+  feature scope self-contained in narrative, DAG + file allocation moved into Reference-level; no per-Task subsections.
 
-只懂 docs/specs/ 源数据结构的纯模块（理念 10 解耦），不感知 git / GitHub。
-per-task 版本历史机制退役（决策 D3），历史交给 git + dated 设计文档，Group.history 恒为空。
+Pure module that understands only docs/specs/ source data structure (principle 10 decoupling), unaware of git / GitHub.
+Per-task version history mechanism retired (decision D3), history delegated to git + dated design docs, Group.history always empty.
 """
 
 from __future__ import annotations
@@ -22,16 +22,16 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
-# 统一的 YAML round-trip 实例（用于 frontmatter）。
+# Unified YAML round-trip example (for frontmatter).
 _yaml = YAML()
 _yaml.preserve_quotes = True
 _yaml.width = 4096
 _yaml.indent(mapping=2, sequence=4, offset=2)
 
-# frontmatter 里每个 Task 的结构化字段顺序（yaml_key, attr）。dump 一律按此序，键序稳定。
-# 注意：version/lineage/change-reason 等随历史机制退役（决策 D3），不再进 frontmatter。
-# issue #69：scope/acceptance 由正文 prose 改为 frontmatter 短字段（Task 退化成工作分解行，
-# 重 prose 上移到组级 Overview）。
+# Structured field order for each Task in frontmatter (yaml_key, attr). dump always follows this order, key order stable.
+# Note: version/lineage/change-reason etc. retired with history mechanism (decision D3), no longer in frontmatter.
+# issue #69: Tasks are work-breakdown rows, with short scope/acceptance fields in frontmatter;
+# the design narrative belongs in the group-level Overview.
 _TASK_FM_ORDER: tuple[tuple[str, str], ...] = (
     ("id", "id"),
     ("title", "title"),
@@ -46,8 +46,8 @@ _TASK_FM_ORDER: tuple[tuple[str, str], ...] = (
     ("acceptance", "acceptance"),
 )
 
-# issue #69：组级正文 = rust-RFC 9 段总览（markdown 标题, Overview 属性），dump 按此序。
-# 一个 spec 单独可读、总览先行：feature 全貌在这 9 段讲一遍，Task 只是 frontmatter 工作分解行。
+# issue #69: group-level body = rust-RFC 9-section overview (markdown heading, Overview attribute), dump follows this order.
+# Single spec self-contained and readable, overview-first: feature scope covered in these 9 sections, Tasks are only frontmatter work-breakdown rows.
 _OVERVIEW_SECTIONS: tuple[tuple[str, str], ...] = (
     ("Summary", "summary"),
     ("Motivation", "motivation"),
@@ -61,48 +61,48 @@ _OVERVIEW_SECTIONS: tuple[tuple[str, str], ...] = (
 )
 _SECTION_BY_HEADING = {heading: attr for heading, attr in _OVERVIEW_SECTIONS}
 
-# 正文切分用：组级段标题 `## Summary` / `## Reference-level explanation` …
+# Body section delimiters: group-level section headers `## Summary` / `## Reference-level explanation` …
 _SECTION_HEADING_RE = re.compile(r"^##\s+(.+?)\s*$")
 
-# spec new 脚手架占位：非空（让段标题成型），但 _strip_placeholder 归一为空串。
-_PLACEHOLDER = "<!-- 待填 -->"
+# spec new scaffold placeholder: non-empty (to form section headings), but _strip_placeholder normalizes to empty string.
+_PLACEHOLDER = "<!-- TODO -->"
 
 
 @dataclass(frozen=True)
 class RelatesTo:
-    """非阻塞的跨 feature 关联（render 里画虚线）。"""
+    """Non-blocking cross-feature association (render draws dashed lines)."""
 
-    # 跨组限定 ID，如 "0012/T2"
+    # Cross-group scoped ID, e.g., "0012/T2"
     ref: str
-    # 关联类型 extends | supersedes | note
+    # Association type extends | supersedes | note
     type: str
 
 
 @dataclass
 class Task:
-    """A single spec Task —— DAG + 文件分配的工作分解行（issue #69 后退化为结构化为主）。
+    """A single spec Task —— work-breakdown row for DAG + file allocation (primarily structured fields after issue #69).
 
-    结构化字段（status/priority/depends-on/files…）放 frontmatter、可机器校验；
-    issue #69 起，feature 设计叙述上移到组级 Overview，Task 只留两个一行短 prose
-    （scope/acceptance），且二者也放 frontmatter——`files` 是单一 writer 所有权声明
-    （理念 6 / issue #71 运行期 owner 检查的结构化源）。
+    Structured fields (status/priority/depends-on/files…) go in frontmatter, machine-verifiable;
+    from issue #69 onward, feature design narrative moves to group-level Overview, Task retains only two short one-line prose
+    (scope/acceptance), and both also go in frontmatter—`files` is single-writer ownership declaration
+    (principle 6 / issue #71 runtime owner check structured source).
 
-    version/lineage 字段保留在数据类里（带默认值）以最小化 render 改动（决策 D2），
-    但历史机制退役后不再由 frontmatter 写入、Group.history 恒空。
+    version/lineage fields preserved in data class (with defaults) to minimize render changes (decision D2),
+    but after history mechanism retirement no longer populated from frontmatter, Group.history always empty.
     """
 
-    # ── 身份与状态 ──
+    # ── Identity and status ──
     id: str
     title: str
     status: str
     priority: str
     tags: list[str] = field(default_factory=list)
-    # ── 关系 ──
+    # ── Relations ──
     depends_on: list[str] = field(default_factory=list)
     relates_to: list[RelatesTo] = field(default_factory=list)
     parallel: bool = False
     files: list[str] = field(default_factory=list)
-    # ── 演化 / 血缘（保留默认值，决策 D3 后不活跃）──
+    # ── Evolution / lineage (defaults preserved, decision D3 inactive after retirement) ──
     version: int = 1
     updated: str = ""
     change_reason: str = ""
@@ -110,17 +110,17 @@ class Task:
     split_from: str | None = None
     merged_from: list[str] = field(default_factory=list)
     derived_from: list[str] = field(default_factory=list)
-    # ── 工作分解短 prose（进 frontmatter；重设计叙述见组级 Overview）──
+    # ── Work-breakdown short prose (goes in frontmatter; design narrative moves to group-level Overview) ──
     scope: str = ""
     acceptance: str = ""
 
 
 @dataclass(frozen=True)
 class Overview:
-    """组级 rust-RFC 9 段总览（issue #69）—— feature 全貌的自包含叙述，放 markdown 正文。
+    """Group-level rust-RFC 9-section overview (issue #69) —— self-contained narrative of feature scope, placed in markdown body.
 
-    单 spec 自包含：读完这 9 段即理解本 feature，无需打开其它 spec；DAG + 文件分配
-    收进 reference_level。字段名与 `_OVERVIEW_SECTIONS` 的 attr 一一对应。
+    Single spec self-contained: reading these 9 sections fully explains the feature, no need to open other specs;
+    DAG + file allocation moved into reference_level. Field names correspond one-to-one with attr in `_OVERVIEW_SECTIONS`.
     """
 
     summary: str = ""
@@ -136,28 +136,28 @@ class Overview:
 
 @dataclass(frozen=True)
 class Metadata:
-    """组级元数据（一个 spec 组 = 一个 issue/feature）。"""
+    """Group-level metadata (one spec group = one issue/feature)."""
 
     title: str
     issue: int
     slug: str
-    # Spec-0015：组级人话 TL;DR（整个 feature 的「是啥/为什么/产出什么」）。
-    # 默认空串兼容旧调用点；非空由 validate 的 _summary_checks 强制。
+    # Spec-0015: group-level human-readable TL;DR (entire feature's "what/why/what we produce").
+    # Defaults to empty string for backward compatibility; non-empty enforced by validate's _summary_checks.
     summary: str = ""
 
 
 @dataclass(frozen=True)
 class Group:
-    """一个 spec 组的全部源数据。markdown 形态下 history 恒为空（决策 D3）。"""
+    """All source data for one spec group. history always empty in markdown form (decision D3)."""
 
-    # 四位编号 "0009"（与旧 RFC 编号 1:1 兼容）
+    # Four-digit number "0009" (1:1 compatible with legacy RFC numbers)
     number: str
     metadata: Metadata
-    # 当前版 Task 快照（status 含 done，做完不离开快照）
+    # Current version Task snapshot (status includes done; completed work remains in snapshot)
     tasks: list[Task]
-    # issue #69：组级 rust-RFC 9 段总览（feature 全貌，放正文）
+    # issue #69: group-level rust-RFC 9-section overview (feature scope, placed in body)
     overview: Overview = field(default_factory=Overview)
-    # 退役：保留字段让 render/validate 无需改动，恒为空 dict
+    # Retired: fields preserved so render/validate need no changes, always empty dict
     history: dict[str, list[Task]] = field(default_factory=dict)
 
 
@@ -167,15 +167,15 @@ def qualified_id(*, group: str, task_id: str) -> str:
 
 
 def group_path(*, specs_root: Path, number: str, slug: str) -> Path:
-    """组 markdown 文件路径 docs/specs/NNNN-slug.md。"""
+    """Assemble markdown file path for a spec group: docs/specs/NNNN-slug.md."""
     return specs_root / f"{number}-{slug}.md"
 
 
 def load_group(*, path: Path) -> Group:
     """Load one spec group from a markdown file (frontmatter + body).
 
-    frontmatter 提供组元数据与各 Task 结构化字段；正文按 `## <rust 段名>` 切出组级
-    Overview 9 段（issue #69）。
+    Frontmatter provides group metadata and structured Task fields; body is split by RFC section headings into a group-level
+    Overview with 9 sections (issue #69).
     """
     text = path.read_text(encoding="utf-8")
     meta, body = _split_frontmatter(text=text)
@@ -196,8 +196,8 @@ def load_group(*, path: Path) -> Group:
 def load_all(*, specs_root: Path) -> list[Group]:
     """Load every spec group markdown file under specs_root (sorted by number).
 
-    只认组文件 `NNNN-slug.md`（slug 以字母起，排除 dated 设计文档 `YYYY-MM-DD-*.md`
-    与 OVERVIEW.md / ARCHITECTURE.md / README.md）；空仓库返回 []。
+    Only recognize group files `NNNN-slug.md` (slug starts with letter, excluding dated design docs `YYYY-MM-DD-*.md`
+    and OVERVIEW.md / ARCHITECTURE.md / README.md); return [] for empty repository.
     """
     if not specs_root.is_dir():
         return []
@@ -232,8 +232,8 @@ def render_group(*, group: Group) -> str:
     head = (
         f"---\n{fm_text}---\n\n"
         f"# {group.number} · {title}\n\n"
-        "<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），"
-        "正文为组级 rust-RFC 9 段总览。 -->\n"
+        "<!-- Maintained by the spec tool: frontmatter is the structured source (including the Task DAG); "
+        "the body is the group-level, nine-section RFC overview. -->\n"
     )
     body = _render_body(group=group)
     return head + ("\n" + body if body else "") + "\n"
@@ -273,7 +273,7 @@ def task_from_mapping(*, data: object) -> Task:
 
 
 def _task_frontmatter(*, task: Task) -> CommentedMap:
-    """Task → frontmatter CommentedMap（仅结构化字段，固定键序）。"""
+    """Task → frontmatter CommentedMap (structured fields only, fixed key order)."""
     out = CommentedMap()
     for yaml_key, attr in _TASK_FM_ORDER:
         value = getattr(task, attr)
@@ -287,9 +287,9 @@ def _task_frontmatter(*, task: Task) -> CommentedMap:
 
 
 def _render_body(*, group: Group) -> str:
-    """组级 rust-RFC 9 段总览（issue #69）：永远输出全部 `## <段名>`，空段填占位。
+    """Group-level rust-RFC 9-section overview (issue #69): output all section headings and fill empty sections with placeholders.
 
-    始终成型 9 段既给作者脚手架（spec new），又让「总览先行」结构稳定可断言/可校验。
+    Always materialize all 9 sections to provide scaffolding for authors (spec new) and keep "overview-first" structure stable for assertions and validation.
     """
     chunks: list[str] = []
     for heading, attr in _OVERVIEW_SECTIONS:
@@ -299,7 +299,7 @@ def _render_body(*, group: Group) -> str:
 
 
 def _split_frontmatter(*, text: str) -> tuple[dict, str]:
-    """拆出 YAML frontmatter（首段 --- … ---）与其后正文。无 frontmatter 则返回 ({}, text)。"""
+    """Extract YAML frontmatter (first block --- … ---) and body text following it. Return ({}, text) if no frontmatter."""
     if not text.startswith("---"):
         return {}, text
     lines = text.split("\n")
@@ -317,7 +317,7 @@ def _split_frontmatter(*, text: str) -> tuple[dict, str]:
 
 
 def _parse_body(*, body: str) -> Overview:
-    """正文 → 组级 Overview（issue #69）。按 `## <rust 段名>` 切段；占位段归一为空串。"""
+    """Body → group-level Overview (issue #69). Split by RFC section headings; placeholder sections normalize to empty string."""
     sections: dict[str, str] = {}
     current_attr: str | None = None
     buffer: list[str] = []
@@ -339,20 +339,20 @@ def _parse_body(*, body: str) -> Overview:
 
 
 def _strip_placeholder(*, text: str) -> str:
-    """占位 `<!-- 待填 -->`-only 的段归一为空串（spec new 脚手架与真实空段等价）。"""
+    """Normalize the English scaffold placeholder to an empty section."""
     return "" if text.strip() == _PLACEHOLDER else text
 
 
 def _is_group_file(*, name: str) -> bool:
-    """文件名是否组文件 `NNNN-slug.md`（四位数字 + '-' + 字母起的 slug）。
+    """Is filename a group file `NNNN-slug.md` (four digits + '-' + slug starting with letter)?
 
-    排除 dated 设计文档 `YYYY-MM-DD-*.md`（第 6 位是数字）与生成物/README。
+    Exclude dated design docs `YYYY-MM-DD-*.md` (digit at position 6) and generated/README files.
     """
     return bool(re.match(r"^\d{4}-[A-Za-z][^/]*\.md$", name))
 
 
 def _str_list(*, value: object) -> list[str]:
-    """列表字段统一成 list[str]；None → []。"""
+    """Normalize list fields to list[str]; None → []."""
     if value is None:
         return []
     return [str(item) for item in value]

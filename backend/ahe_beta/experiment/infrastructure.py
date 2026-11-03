@@ -1,4 +1,4 @@
-# Spec-0047/T3：每实验独立 Compose 栈；按 label + manifest 资源 ID 认领，不按同名复用。
+# Spec-0047/T3: Per-experiment independent Compose stack; claim by label + manifest resource ID, not by name reuse.
 """Provision, stop, and destroy experiment infrastructure via Compose project."""
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ def render_stack(
         compose_src += "\n  runner_data:\n    labels: *ownership\n"
         compose_src += "\n  ci_docker_data:\n    labels: *ownership\n"
     if "container_name:" in compose_src:
-        raise InfrastructureError("compose 模板禁止 container_name")
+        raise InfrastructureError("compose templates must not set container_name")
     (dest / "docker-compose.yml").write_text(compose_src, encoding="utf-8")
     (dest / "egress-proxy.conf").write_text(
         EGRESS_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8"
@@ -82,7 +82,7 @@ def render_stack(
         encoding="utf-8",
     )
     if "TOKEN=" in env_path.read_text(encoding="utf-8") and vigil_image.startswith("sk-"):
-        raise InfrastructureError("compose.env 含密钥")
+        raise InfrastructureError("compose.env contains secrets")
     return dest / "docker-compose.yml"
 
 
@@ -116,7 +116,7 @@ def provision(
     argv = compose_argv(dest=dest, project=project, extra=["up", "-d"])
     result = runner(argv, capture_output=True, text=True)
     if getattr(result, "returncode", 1) != 0:
-        raise InfrastructureError(f"compose up 失败：{getattr(result, 'stderr', '')[:300]}")
+        raise InfrastructureError(f"compose up failed: {getattr(result, 'stderr', '')[:300]}")
     return {
         "compose_project": project,
         "experiment_id": experiment_id,
@@ -132,7 +132,7 @@ def stop_stack(
     argv = compose_argv(dest=dest, project=project, extra=["stop"])
     result = runner(argv, capture_output=True, text=True)
     if getattr(result, "returncode", 1) != 0:
-        raise InfrastructureError(f"compose stop 失败：{getattr(result, 'stderr', '')[:300]}")
+        raise InfrastructureError(f"compose stop failed: {getattr(result, 'stderr', '')[:300]}")
 
 
 def destroy_stack(
@@ -145,17 +145,19 @@ def destroy_stack(
     run: RunFn | None = None,
 ) -> None:
     if confirm != experiment_id:
-        raise InfrastructureError("destroy 必须 --confirm 完整 experiment_id")
+        raise InfrastructureError("destroy requires --confirm with the complete experiment_id")
     owned = labels.get(LABEL_EXPERIMENT, "")
     sha = labels.get(LABEL_MANIFEST, "")
     if owned != experiment_id or sha != manifest_sha:
-        raise InfrastructureError("label 与 manifest 不一致，拒绝跨实验销毁")
+        raise InfrastructureError(
+            "Labels and manifest do not match; refusing to destroy another experiment"
+        )
     project = compose_project(experiment_id=experiment_id, cfg_hash=manifest_sha)
     runner = run or subprocess.run
     argv = compose_argv(dest=dest, project=project, extra=["down", "--volumes", "--remove-orphans"])
     result = runner(argv, capture_output=True, text=True)
     if getattr(result, "returncode", 1) != 0:
-        raise InfrastructureError(f"compose down 失败：{getattr(result, 'stderr', '')[:300]}")
+        raise InfrastructureError(f"compose down failed: {getattr(result, 'stderr', '')[:300]}")
 
 
 def parse_compose_template() -> str:

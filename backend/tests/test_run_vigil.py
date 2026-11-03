@@ -1,8 +1,6 @@
-# Spec-0032/T5 + 0033/T2 + 0040/T1：vigil 接线单测——配置落盘、rfc=agent、keep-alive、
-# 双模式预检与启停（mock docker/Popen，不触真容器）。
-"""验证 run.py 的交付面接线：openagents.yml 内容与 stages 定稿一致、token 不落盘、
-VIGIL_MODE 双模式（container 缺省围堵盒 / subprocess 显式联调）各自的预检、启停与 env 注入。
-Spec-0040/T1：stages.rfc=agent。Spec-0050/T4：VIGIL_KEEP_ALIVE 缺省拆盒。"""
+# Spec-0032/T5 + 0033/T2 + 0040/T1: vigil wiring unit test—config persisted to disk, rfc=agent, keep-alive,
+# dual-mode pre-flight and startup/shutdown (mock docker/Popen, no real container invocation).
+"""Verify run.py delivery-side wiring: openagents.yml content matches finalized stages, token not persisted to disk, VIGIL_MODE dual modes (container default sandboxing / subprocess explicit integration-test) pre-flight, startup/shutdown, and env injection respectively. Spec-0040/T1: stages.rfc=agent. Spec-0050/T4: VIGIL_KEEP_ALIVE default sandbox removal."""
 
 from __future__ import annotations
 
@@ -29,7 +27,7 @@ def _load_yaml(path: Path):
 
 
 # --------------------------------------------------------------------------------------------------
-# 声明式配置落盘（两模式共用 write_openagents_config）。
+# Declarative config persisted to disk (shared write_openagents_config for both modes).
 # --------------------------------------------------------------------------------------------------
 
 
@@ -45,7 +43,7 @@ def test_write_openagents_config_matches_stage_finalization(tmp_path: Path) -> N
         "repo": "harness",
         "token_env": "GITEA_TOKEN",
     }
-    # Spec-0040/T1：stages 定稿 triage/ci/e2e=skip、rfc/conflict/review/merge=agent。
+    # Spec-0040/T1: stages finalized triage/ci/e2e=skip, rfc/conflict/review/merge=agent.
     assert data["stages"] == {
         "triage": "skip",
         "rfc": "agent",
@@ -56,14 +54,15 @@ def test_write_openagents_config_matches_stage_finalization(tmp_path: Path) -> N
         "merge": "agent",
     }
     assert data["release"] == "manual"
-    assert data["defaults"]["labels"] == ["openagents"]  # Owner 交接令牌 = vigil 发现标签
+    # Owner handoff token = vigil discovered label
+    assert data["defaults"]["labels"] == ["openagents"]
     assert data["defaults"]["base"] == "main"
-    # token 本体绝不落盘（只声明 env 名，由 vigil 进程/容器 env 提供）。
+    # Token itself never persisted to disk (only declare env name, vigil process/container env provides it).
     assert "secret-token" not in path.read_text(encoding="utf-8")
 
 
 def test_ci_stage_env_override(tmp_path: Path, monkeypatch) -> None:
-    # Spec-0032/T6：act_runner 验证在跑后，VIGIL_CI_STAGE=agent 开启 ci 闸；非法值忽略回落 skip。
+    # Spec-0032/T6: after act_runner validation runs, VIGIL_CI_STAGE=agent enables ci gate; invalid values ignored, fall back to skip.
     monkeypatch.setenv("VIGIL_CI_STAGE", "agent")
     data = _load_yaml(run.write_openagents_config(repo=tmp_path, gitea=_GITEA))
     assert data["stages"]["ci"] == "agent"
@@ -88,20 +87,20 @@ def test_write_openagents_config_is_idempotent(tmp_path: Path) -> None:
 
 
 def test_remote_tag_refs_skips_peeled_entries() -> None:
-    # 实证修复：附注 tag 的 peeled 行（^{}）不是真 ref，push 删除会以 128 崩掉复位流程。
+    # Empirical fix: peeled line (^{}) with annotated tag is not a real ref; push deletion exits with 128 and resets process failure.
     ls = "aaa\trefs/tags/v1\nbbb\trefs/tags/v1^{}\nccc\trefs/tags/v2\nddd\trefs/heads/main\n"
     assert run._remote_tag_refs(ls) == ["refs/tags/v1", "refs/tags/v2"]
     assert run._remote_tag_refs("") == []
 
 
 # --------------------------------------------------------------------------------------------------
-# 模式解析与预检。
+# Mode parsing and pre-flight.
 # --------------------------------------------------------------------------------------------------
 
 
 def test_vigil_mode_defaults_to_container(monkeypatch) -> None:
     monkeypatch.delenv("VIGIL_MODE", raising=False)
-    assert run.vigil_mode() == "container"  # 围堵形态是缺省（Spec-0033）
+    assert run.vigil_mode() == "container"  # Sandboxing mode is default (Spec-0033)
 
 
 def test_vigil_keep_alive_defaults_off(monkeypatch) -> None:
@@ -172,17 +171,18 @@ def test_container_prereqs_require_claude_credential(monkeypatch) -> None:
     )
     for key in run._CLAUDE_CRED_ENVS:
         monkeypatch.delenv(key, raising=False)
-    with pytest.raises(SystemExit, match="claude 凭证"):
+    with pytest.raises(SystemExit, match="Claude credentials"):
         run._ensure_vigil_container_prereqs()
-    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "long-lived")  # 订阅 token 也算
-    run._ensure_vigil_container_prereqs()  # 不抛
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "long-lived")  # Subscription tokens also count
+    run._ensure_vigil_container_prereqs()  # Do not raise
     monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
-    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "bearer-x")  # 网关 Bearer 也算（三选一）
-    run._ensure_vigil_container_prereqs()  # 不抛
+    # Gateway Bearer also counts (one of three)
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "bearer-x")
+    run._ensure_vigil_container_prereqs()  # Do not raise
 
 
 # --------------------------------------------------------------------------------------------------
-# container 模式：docker run 参数形状 / 内网配置 / 启停。
+# Container mode: docker run parameter shape / internal network config / start/stop.
 # --------------------------------------------------------------------------------------------------
 
 
@@ -201,7 +201,7 @@ class _FakeProc:
 
 
 def _container_rig(monkeypatch, tmp_path: Path) -> dict:
-    """container 模式打桩：docker 预检放行、subprocess.run/Popen 记录、staging 重定向 tmp。"""
+    """Container mode stubbing: docker preflight allowlist, subprocess.run/Popen recording, staging redirect to tmp."""
     calls: dict = {"runs": []}
     monkeypatch.setenv("VIGIL_MODE", "container")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
@@ -210,7 +210,8 @@ def _container_rig(monkeypatch, tmp_path: Path) -> dict:
     monkeypatch.delenv("OPENAGENTS_PERMISSION_MODE", raising=False)
     monkeypatch.delenv("AHE_BETA_RUN_ID", raising=False)
     monkeypatch.delenv("ROLE_RUNS_DIR", raising=False)
-    for key in run._CLAUDE_CONFIG_ENVS:  # 清宿主可能设的 base_url/模型，避免污染断言
+    # Clear host-set base_url/model to avoid polluting assertions
+    for key in run._CLAUDE_CONFIG_ENVS:
         monkeypatch.delenv(key, raising=False)
     monkeypatch.delenv("CLAUDE_CODE_SUBAGENT_MODEL", raising=False)
     monkeypatch.delenv("CLAUDE_CODE_SUBAGENT_MODEL_FORCE", raising=False)
@@ -233,7 +234,8 @@ def _container_rig(monkeypatch, tmp_path: Path) -> dict:
 def test_container_start_shapes_docker_run(tmp_path: Path, monkeypatch) -> None:
     calls = _container_rig(monkeypatch, tmp_path)
     handle = run.start_vigil(
-        repo=tmp_path / "unused-host-repo",  # container 模式不碰宿主仓（零挂载自 clone）
+        # Container mode does not touch host repo (zero mounts, self-clone)
+        repo=tmp_path / "unused-host-repo",
         parallel=2,
         gitea=_GITEA,
         log_path=tmp_path / "data" / "vigil.log",
@@ -241,29 +243,30 @@ def test_container_start_shapes_docker_run(tmp_path: Path, monkeypatch) -> None:
     docker_run = next(argv for argv in calls["runs"] if argv[:2] == ["docker", "run"])
     joined = " ".join(docker_run)
     assert handle.mode == "container"
-    assert f"--network {run._VIGIL_NETWORK}" in joined  # internal 网络（直连外网物理不通）
-    assert "/config:ro" in joined and "/entrypoint.sh:ro" in joined  # 两处只读挂载
-    assert "/role_runs" not in joined  # 未设 ROLE_RUNS_DIR 时不挂 delivery
+    # Internal network (direct connection to external network physically unavailable)
+    assert f"--network {run._VIGIL_NETWORK}" in joined
+    assert "/config:ro" in joined and "/entrypoint.sh:ro" in joined  # Two read-only mounts
+    assert "/role_runs" not in joined  # Do not mount delivery when ROLE_RUNS_DIR is not set
     assert "sessions" not in joined and "/demand" not in joined
     # Inspect container destinations, not incidental words in the host checkout name.
     mounts = [docker_run[i + 1] for i, value in enumerate(docker_run) if value == "-v"]
     assert {value.rsplit(":", 2)[-2] for value in mounts} == {"/config", "/entrypoint.sh"}
-    assert "GITEA_TOKEN=secret-token" in joined  # 凭证只经容器 env
+    assert "GITEA_TOKEN=secret-token" in joined  # Credentials only via container env
     assert "GITEA_USER=harness" in joined
     assert "ANTHROPIC_API_KEY=sk-test" in joined
-    assert f"HTTPS_PROXY={run._VIGIL_PROXY_URL}" in joined  # 出网只走 egress 代理
-    # 盒内 claude 必须 bypass（否则 headless git 被权限门拒）；围堵由容器承担。
+    assert f"HTTPS_PROXY={run._VIGIL_PROXY_URL}" in joined  # Outbound traffic only via egress proxy
+    # Claude inside container must bypass (otherwise headless git rejected by permission gate); containment is container's responsibility.
     assert "OPENAGENTS_PERMISSION_MODE=bypassPermissions" in joined
     assert "VIGIL_PARALLEL=2" in joined
-    # clone 地址是容器内网视角（服务名），带凭证、不落任何宿主盘文件。
+    # Clone address is from container's internal network perspective (service name), includes credentials, no host disk files.
     assert "VIGIL_REPO_URL=http://harness:secret-token@gitea:3000/harness/harness.git" in joined
-    assert calls["popen"][:3] == ["docker", "logs", "-f"]  # 日志跟随器
-    # 宿主仓不被写入（零挂载：配置只进 staging）。
+    assert calls["popen"][:3] == ["docker", "logs", "-f"]  # Log follower
+    # Host repo not written to (zero mounts: config only goes to staging).
     assert not (tmp_path / "unused-host-repo" / ".openagents").exists()
 
 
 def test_container_passes_through_claude_config_envs(tmp_path: Path, monkeypatch) -> None:
-    # 第三方 Anthropic 协议网关：base_url + 模型覆盖（含小/快模型）须透传进容器，缺则 claude 走官方默认。
+    # Third-party Anthropic protocol gateway: base_url + model overrides (including small/fast models) must be passed through to container; if absent, claude uses official default.
     calls = _container_rig(monkeypatch, tmp_path)
     monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://gw.example.top")
     monkeypatch.setenv("ANTHROPIC_MODEL", "vendor/Model-Pro")
@@ -296,7 +299,7 @@ def test_container_maps_explicit_harness_glm_envs_to_product_client_names(
 
 
 def test_container_omits_unset_claude_config_envs(tmp_path: Path, monkeypatch) -> None:
-    # 未设的配置 env 不透传（官方 claude 场景零噪声，不注入空值）。
+    # Unset config env vars are not passed through (official claude scenario zero noise, no empty values injected).
     calls = _container_rig(monkeypatch, tmp_path)
     for key in run._CLAUDE_CONFIG_ENVS:
         monkeypatch.delenv(key, raising=False)
@@ -325,7 +328,8 @@ def test_container_config_uses_internal_gitea_url(tmp_path: Path, monkeypatch) -
         repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
     )
     data = _load_yaml(tmp_path / "staging" / ".openagents" / "openagents.yml")
-    assert data["gitea"]["base_url"] == "http://gitea:3000"  # 容器视角，非宿主 localhost
+    # From container perspective, not host localhost
+    assert data["gitea"]["base_url"] == "http://gitea:3000"
 
 
 def test_container_internal_url_overridable(tmp_path: Path, monkeypatch) -> None:
@@ -358,7 +362,7 @@ def test_container_keep_alive_does_not_remove_container(tmp_path: Path, monkeypa
     assert handle.keep_alive is True
     run.stop_vigil(handle)
     assert ["docker", "rm", "-f", run._VIGIL_CONTAINER] not in calls["runs"]
-    assert calls.get("terminated") and calls.get("waited")  # 只拆日志跟随器
+    assert calls.get("terminated") and calls.get("waited")  # Only parse log follower
 
 
 def test_container_reuses_running_instance(tmp_path: Path, monkeypatch) -> None:
@@ -465,7 +469,7 @@ def test_container_refuses_foreign_experiment_attach(tmp_path: Path, monkeypatch
         return subprocess.CompletedProcess(argv, 0, "container-id", "")
 
     monkeypatch.setattr(run.subprocess, "run", _fake_run)
-    with pytest.raises(SystemExit, match="拒绝 attach"):
+    with pytest.raises(SystemExit, match="Refusing to attach"):
         run.start_vigil(
             repo=tmp_path / "r", parallel=1, gitea=_GITEA, log_path=tmp_path / "d" / "v.log"
         )
@@ -527,7 +531,7 @@ def test_reset_to_initial_leaves_role_runs(tmp_path: Path, monkeypatch) -> None:
 
 
 # --------------------------------------------------------------------------------------------------
-# subprocess 模式（显式 opt-in 联调）：既有行为保留。
+# Subprocess mode (explicit opt-in for co-debug): existing behavior preserved.
 # --------------------------------------------------------------------------------------------------
 
 
@@ -556,12 +560,14 @@ def test_subprocess_start_spawns_with_token_env_and_cwd(tmp_path: Path, monkeypa
     assert handle.mode == "subprocess"
     assert calls["argv"] == ["openagents", "vigil", "--parallel", "3"]
     assert calls["cwd"] == str(repo)
-    assert calls["env"]["GITEA_TOKEN"] == "secret-token"  # token 只经子进程 env，不落配置
+    # Token only via child process env, not in config
+    assert calls["env"]["GITEA_TOKEN"] == "secret-token"
     assert calls["env"]["CLAUDE_CODE_SUBAGENT_MODEL"] == "vendor/Model-Pro"
     assert calls["env"]["CLAUDE_CODE_SUBAGENT_MODEL_FORCE"] == "1"
     assert calls["env"]["AUTO_DESIGNER_RUN_ID"] == "current-run"
     assert calls["env"]["AUTO_DESIGNER_ROUND"] == "3"
-    assert (repo / ".openagents" / "openagents.yml").is_file()  # 联调模式配置写进宿主仓（既有行为）
+    # Co-debug mode config written to host repo (existing behavior)
+    assert (repo / ".openagents" / "openagents.yml").is_file()
 
     run.stop_vigil(handle)
     assert calls.get("terminated") and calls.get("waited")

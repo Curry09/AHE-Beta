@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""探针：超时 harness × 真用户 agent → SessionStore → 真设计师（看它怎么判）。
+"""Probe: timeout harness × real user agent → SessionStore → real architect (watch how it judges).
 
-用法（仓根）：
+Usage (repo root):
   PYTHONPATH=backend .venv/bin/python -m tools.dev.probes.probe_timeout_to_architect
 
-凭证通过 --secrets-file 显式提供，或预先注入环境变量。
-harness 是脚本化「一直超时 + 0 步」——不启真 nexau 子进程，专测信号链路。
+Credentials provided explicitly via --secrets-file or pre-injected in environment.
+harness is scripted "always timeout + 0 steps"—does not spawn real nexau subprocess, tests signal chain only.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ ARCHITECT_DEF = ROOT / "agent_defs" / "architect"
 
 
 class TimeoutHarness:
-    """脚本化 harness：每轮都超时，且 last_steps=[]（0 步轮）——模拟「预算太紧/内层空转」。"""
+    """Scripted harness: every round times out, last_steps=[] (zero-step round)—simulate "budget too tight / inner empty loop"."""
 
     def __init__(self) -> None:
         self._n = 0
@@ -40,8 +40,8 @@ class TimeoutHarness:
         if self._closed:
             raise RuntimeError("closed")
         self._n += 1
-        self.last_steps = []  # 关键：内层零过程流
-        # 轻微墙钟，让用户侧感知到「等了一会儿才失败」（非真 120s，探针要跑得完）
+        self.last_steps = []  # Key: zero process flow in inner layer
+        # Mild wall-clock delay, let user side perceive "waited a while before failing" (not truly 120s, probe must finish running)
         time.sleep(1.2)
         return (
             f"[harness error] call timeout after 120s "
@@ -92,7 +92,7 @@ def main() -> int:
     shutil.copytree(TEMPLATE, harness_repo)
     print(f"work dir: {work}")
 
-    # 专家用户：会核验、会提 issue——超时场景下最可能留下强信号
+    # Expert users: will validate and file issues—timeout scenario most likely to leave strong signals
     sim_p = finalize_persona(
         SimPersona(
             persona_id="P-PROBE-TIMEOUT",
@@ -146,25 +146,25 @@ def main() -> int:
         on_turn=on_turn,
     )
 
-    print("\n=== A｜用户 agent × TimeoutHarness ===")
+    print("\n=== A｜User agent × TimeoutHarness ===")
     t0 = time.monotonic()
     session = run_fn(display, scenario, TimeoutHarness())
-    print(f"会话耗时 {time.monotonic() - t0:.1f}s  session_id={session.session_id}")
+    print(f"Session duration {time.monotonic() - t0:.1f}s  session_id={session.session_id}")
     print(f"feeling={session.feeling.score}/4 — {session.feeling.reason}")
     print(f"issues={session.issue_refs}  open={len(tracker.list_open_issues())}")
-    # 把 sim 侧细节也打出来（若 make_sim 里拿不到 SessionResult，至少看 transcript）
+    # Print sim side details too (if SessionResult unavailable from make_sim, at least see transcript)
     print("\n--- transcript ---")
     for i, turn in enumerate(session.transcript.turns):
         steps_n = len(turn.steps)
         print(f"  [{i}] {turn.role} steps={steps_n}: {turn.content[:100]!r}")
 
-    print("\n=== 运行时聚合（喂设计师前先看一眼）===")
+    print("\n=== Runtime aggregate (inspect before providing it to Architect)===")
     agg_text = format_runtime_agg(
         aggregate_runtime(store=store, harness_repo=harness_repo, recent_n=50)
     )
     print(agg_text)
 
-    print("\n=== D｜设计师 agent ===")
+    print("\n=== D｜Architect agent ===")
 
     def on_status(*, running: bool, status: str, **kw) -> None:
         detail = kw.get("detail")
@@ -185,16 +185,16 @@ def main() -> int:
     )
     t1 = time.monotonic()
     outcome = architect.propose_once()
-    print(f"设计师耗时 {time.monotonic() - t1:.1f}s  proposals={outcome.proposal_numbers}")
+    print(f"Architect duration {time.monotonic() - t1:.1f}s  proposals={outcome.proposal_numbers}")
 
-    print("\n=== 最终 backlog ===")
+    print("\n=== Final backlog ===")
     for issue in tracker.list_open_issues():
         print(f"\n#{issue.number} [{','.join(issue.labels)}] {issue.title}")
         print(issue.body[:800])
         if len(issue.body) > 800:
             print("…")
 
-    print(f"\n(工件目录保留：{work})")
+    print(f"\n(Artifact directory retained：{work})")
     return 0
 
 

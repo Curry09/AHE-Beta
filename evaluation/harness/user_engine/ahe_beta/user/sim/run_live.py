@@ -1,14 +1,14 @@
 """
 run_live.py
-实测: 我编排的 harness 轨迹(scenarios.SplitBillHarness)对阵 *真实 Nex 用户 agent*
-(ApiPersonaClient, 走 repo .env 的 NexAU 网关)。
+Live test: an authored harness trajectory (scenarios.SplitBillHarness) against a *real Nex user agent*
+(ApiPersonaClient, using the NexAU gateway from the repository .env).
 
   uv run python -m ahe_beta.user.sim.run_live shallow
   uv run python -m ahe_beta.user.sim.run_live expert
 
-两个 persona 走同一条 harness 轨迹, 看能力分叉(纯主观, 无 oracle):
-  shallow -> 跑常规用例就接受 -> 丢分钱的 bug 逃逸(低体感才暴露不出, 高体感接受)
-  expert  -> 构造 100/3 边界, 文本里读到 sum=99.99 -> 逼证据到耐心耗尽 -> file_issue
+Both personas follow the same harness trajectory to observe capability differences (purely subjective, no oracle):
+  shallow -> accepts after standard test cases -> the lost-cent bug escapes (the poor experience is not surfaced; accepted with a positive experience)
+  expert  -> constructs the 100/3 edge case, reads sum=99.99 in the text -> demands evidence until patience runs out -> file_issue
 """
 
 from __future__ import annotations

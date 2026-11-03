@@ -1,4 +1,4 @@
-# Spec-0049/T5：冻结调用重放单测（不启 Gitea / vigil / 真模型）。
+# Spec-0049/T5: Frozen call replay unit test (do not start Gitea / vigil / real models).
 """Replay skips implementer records and diffs structured output."""
 
 from __future__ import annotations

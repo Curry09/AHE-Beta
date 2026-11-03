@@ -1,10 +1,11 @@
 /* ============================================================================
- * 设计 token 层（Spec-0026/T2）：浅色为基准（:root），深色经 prefers-color-scheme
- * 与 [data-theme] 覆盖。组件一律走 token，不写死 hex。四角色强调色对齐闭环
- * a → d1(triage) → d2(architect) → b：user 青 · triager 翠 · architect 紫 · developer 琥珀。
+ * Design token layer (Spec-0026/T2): light mode is the baseline (:root); dark mode
+ * overrides it via prefers-color-scheme and [data-theme]. Components always use
+ * tokens, never hardcoded hex values. Role accent colors follow the loop
+ * a → d1(triage) → d2(architect) → b: user cyan · triager emerald · architect purple · developer amber.
  * ========================================================================== */
 :root {
-  /* —— 中性表面/文字（浅色基准）—— */
+  /* —— Neutral surfaces/text (light baseline) —— */
   --bg: #f4f6f9;
   --surface: #ffffff;
   --surface-2: #eef1f5;
@@ -14,7 +15,7 @@
   --text-dim: #56616f;
   --text-faint: #97a1b0;
 
-  /* —— 语义色 —— */
+  /* —— Semantic colors —— */
   --accent: #3068e0;
   --green: #1f9a57;
   --red: #d1495b;
@@ -22,18 +23,18 @@
   --orange: #c2600c;
   --sky: #2f74d0;
 
-  /* —— 四角色强调色 —— */
+  /* —— Four role accent colors —— */
   --role-user: #0e8fb0;
   --role-triager: #0f9068;
   --role-architect: #6d51cf;
   --role-divergent: #bd3d8b;
   --role-developer: #b0770c;
 
-  /* —— 阴影（浅色：柔和冷灰投影）—— */
+  /* —— Shadows (light mode: soft, cool gray) —— */
   --shadow-1: 0 1px 2px rgba(24, 39, 65, 0.06);
   --shadow-2: 0 6px 20px rgba(24, 39, 65, 0.1);
 
-  /* —— 非色比例尺（主题无关）—— */
+  /* —— Non-color scales (theme-independent) —— */
   --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --radius-sm: 4px;
   --radius: 6px;
@@ -51,7 +52,7 @@
   --fs-lg: 16px;
 }
 
-/* 深色：柔和深蓝灰（非纯黑）。prefers 供首帧无 JS 时也成体系；data-theme 覆盖它。 */
+/* Dark mode: soft dark blue-gray rather than pure black. prefers supports the first frame without JS; data-theme overrides it. */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0f141b;
@@ -78,7 +79,7 @@
   }
 }
 
-/* 用户显式选择 → 打在 <html data-theme>，压过系统偏好（两向都要赢）。 */
+/* Explicit user choice → apply to <html data-theme>, overriding the system preference in either direction. */
 :root[data-theme="light"] {
   --bg: #f4f6f9;
   --surface: #ffffff;
@@ -137,7 +138,7 @@ body,
   margin: 0;
 }
 
-/* 页面 body 永不横向滚动（宽内容在各自容器里 overflow-x）。 */
+/* The page body never scrolls horizontally; wide content uses overflow-x within its own container. */
 html,
 body {
   overflow-x: hidden;
@@ -151,7 +152,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* 主题切换的柔和过渡（尊重 reduced-motion）。 */
+/* Gentle theme transitions, respecting reduced-motion. */
 body,
 .column,
 .card,
@@ -188,7 +189,7 @@ a:focus-visible,
   border-radius: var(--radius-sm);
 }
 
-/* ============ 布局：顶栏 + 概览 + 五区板 ============ */
+/* ============ Layout: top bar + overview + five-area board ============ */
 .app {
   height: 100vh;
   display: flex;
@@ -295,12 +296,12 @@ a:focus-visible,
 .role-dot.owner { background: var(--amber); }
 .role-dot.developer { background: var(--role-developer); }
 
-/* 角色列头左侧一根细强调条，扫视即知这一列是谁。 */
+/* A thin accent strip on each role column header identifies the role at a glance. */
 .column-head .role-dot {
   box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 0%, transparent);
 }
 
-/* ============ 顶栏 ============ */
+/* ============ Top bar ============ */
 .topbar {
   flex: none;
   display: flex;
@@ -344,7 +345,7 @@ a:focus-visible,
   color: var(--text-faint);
 }
 
-/* 主题开关 */
+/* Theme toggle */
 .theme-toggle {
   display: inline-flex;
   align-items: center;
@@ -367,7 +368,7 @@ a:focus-visible,
   height: 15px;
 }
 
-/* 状态点：运行中呼吸 */
+/* Status dot: pulse while running */
 .dot {
   width: 7px;
   height: 7px;
@@ -389,7 +390,7 @@ a:focus-visible,
   .dot.on { animation: none; }
 }
 
-/* 过滤器：分段控件 + 轮次下拉 */
+/* Filters: segmented control + round dropdown */
 .seg {
   display: flex;
   border: 1px solid var(--border);
@@ -421,7 +422,7 @@ a:focus-visible,
   font-size: 12px;
 }
 
-/* ============ 概览曲线区（Spec-0026/T3 Charts 挂载点） ============ */
+/* ============ Overview curves (Spec-0026/T3 Charts mount point) ============ */
 .overview {
   flex: none;
   display: flex;
@@ -472,7 +473,7 @@ a:focus-visible,
   font-size: 12px;
 }
 
-/* ============ 卡片 ============ */
+/* ============ Cards ============ */
 .card {
   text-align: left;
   width: 100%;
@@ -487,7 +488,7 @@ a:focus-visible,
   box-shadow: var(--shadow-1);
 }
 
-/* 卡片左缘按角色着色（强调色成套）。 */
+/* Color card left edges by role, using the matching accent palette. */
 .card.role-user { border-left-color: var(--role-user); }
 .card.role-triager { border-left-color: var(--role-triager); }
 .card.role-architect { border-left-color: var(--role-architect); }
@@ -517,7 +518,7 @@ a:focus-visible,
   white-space: nowrap;
 }
 
-/* 用户卡副行：persona 的 水平·领域（Spec-0026/T4） */
+/* User card subtitle: persona level · domain (Spec-0026/T4) */
 .card .subline {
   font-size: var(--fs-sm);
   color: var(--text-faint);
@@ -548,7 +549,7 @@ a:focus-visible,
   flex: 1;
 }
 
-/* 轮次分组分隔 */
+/* Round group divider */
 .round-divider {
   display: flex;
   align-items: center;
@@ -603,7 +604,7 @@ a:focus-visible,
 .score.s3 { color: var(--amber); }
 .score.s4 { color: var(--green); }
 
-/* ============ 公司大楼视图 ============ */
+/* ============ Office building view ============ */
 .building-layout {
   flex: 1;
   min-height: 0;
@@ -1386,7 +1387,7 @@ a:focus-visible,
   white-space: nowrap;
 }
 
-/* ============ 第五栏：Issues + Main / 详情 ============ */
+/* ============ Fifth column: Issues + Main / details ============ */
 .side-section-head {
   display: flex;
   align-items: center;
@@ -1461,7 +1462,7 @@ a:focus-visible,
   text-decoration-color: var(--border-strong);
 }
 
-/* ============ 详情视图 ============ */
+/* ============ Detail view ============ */
 .detail {
   display: flex;
   flex-direction: column;
@@ -1801,7 +1802,7 @@ a:focus-visible,
   color: var(--text-dim);
 }
 
-/* ---- Markdown 渲染（react-markdown，issue 正文/评论）---- */
+/* ---- Markdown rendering (react-markdown, issue bodies/comments) ---- */
 .md {
   font-size: 12.5px;
   line-height: 1.65;
@@ -1837,7 +1838,7 @@ a:focus-visible,
 
 .md h1 { font-size: 15px; }
 .md h2 { font-size: 14px; }
-/* schema_render 的 `### <label>` 分节：做成小节标题，带角色强调色左标 */
+/* Style schema_render's `### <label>` sections as subsection headings with a role-colored left accent. */
 .md h3 {
   font-size: 12px;
   letter-spacing: 0.04em;
@@ -1930,7 +1931,7 @@ a:focus-visible,
   text-align: left;
 }
 
-/* 内联可点引用（issue #N / commit sha / vK tag → 交叉跳转） */
+/* Inline clickable references (issue #N / commit sha / vK tag → cross-navigation) */
 .link {
   font-family: var(--mono);
   font-size: var(--fs-sm);
@@ -1942,7 +1943,7 @@ a:focus-visible,
   text-decoration: underline;
 }
 
-/* ---- 对话 transcript（用户会话） ---- */
+/* ---- Conversation transcript (user session) ---- */
 .turns {
   display: flex;
   flex-direction: column;
@@ -1977,7 +1978,7 @@ a:focus-visible,
 
 .turn.harness .who { color: var(--text-faint); }
 
-/* harness 回复可折叠：who 行做成整宽点击热区，收起态显示单行预览。 */
+/* Harness replies collapse: make the who row a full-width click target; show a single-line preview when collapsed. */
 .turn .who.toggle {
   display: flex;
   align-items: center;
@@ -2014,7 +2015,7 @@ a:focus-visible,
   margin-left: auto;
 }
 
-/* 内层迭代过程：展开态里再套一层默认收起的 disclosure。 */
+/* Inner iteration process: nest another disclosure, collapsed by default, inside the expanded view. */
 .inner-steps {
   margin-bottom: var(--sp-2);
   border: 1px solid var(--border);
@@ -2059,7 +2060,7 @@ a:focus-visible,
 
 .prose.preview:hover { color: var(--text); }
 
-/* ---- 过程流（dev/architect 的完整工作过程）：签名元素 ---- */
+/* ---- Process stream (full dev/architect workflow): signature elements ---- */
 .stream {
   display: flex;
   flex-direction: column;
@@ -2125,7 +2126,7 @@ a:focus-visible,
   padding-left: 11px;
 }
 
-/* ---- 评论时间线 ---- */
+/* ---- Comment timeline ---- */
 .comment {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -2147,7 +2148,7 @@ a:focus-visible,
   font-size: var(--fs-xs);
 }
 
-/* ---- diff 渲染 ---- */
+/* ---- Diff rendering ---- */
 .diff {
   font-family: var(--mono);
   font-size: var(--fs-sm);
@@ -2202,7 +2203,7 @@ a:focus-visible,
   border-color: color-mix(in srgb, var(--amber) 42%, transparent);
 }
 
-/* ============ OpenAgents 交付面 demo ============ */
+/* ============ OpenAgents delivery demo ============ */
 .openagents-layout {
   flex: 1;
   min-height: 0;
@@ -2715,7 +2716,7 @@ a:focus-visible,
   color: var(--text-faint);
 }
 
-/* ============ 响应式：窄屏板改横向滚动，卡列保持可读最小宽 ============ */
+/* ============ Responsive: scroll narrow boards horizontally while preserving readable card-column minimum widths ============ */
 @media (max-width: 1100px) {
   .board {
     grid-template-columns: repeat(4, minmax(200px, 1fr)) minmax(340px, 1.4fr);
@@ -2783,7 +2784,7 @@ a:focus-visible,
   }
 }
 
-/* ---- 用户心智轨迹（简洁版）：每 turn 折叠，展开后看 Judge / Intent / Act 三阶段 ---- */
+/* ---- User thought process (compact): collapse each turn; expand to see the Judge / Intent / Act stages ---- */
 .mind-trace {
   display: flex;
   flex-direction: column;

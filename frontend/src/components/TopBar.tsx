@@ -19,37 +19,37 @@ export function TopBar(props: {
   const running = state?.running ?? false;
   const chip = state
     ? state.round > 0
-      ? `第 ${state.round}/${state.total_rounds} 轮`
-      : "未运行"
-    : "连接中…";
+      ? `Round ${state.round}/${state.total_rounds}`
+      : "Not running"
+    : "Connecting…";
 
   return (
     <header className="topbar">
       <div className="title">
-        AHE-Beta <span>{props.historical ? "历史快照" : "观测看板"}</span>
+        AHE-Beta <span>{props.historical ? "Historical snapshot" : "Dashboard"}</span>
       </div>
       <div className="run-chip">
         {/* Spec-0071/T5: preserve the observed state without suggesting a live run. */}
         <span className={!props.historical && running ? "dot on" : "dot"} />
         {props.historical
-          ? `当时状态 ${props.snapshot?.status ?? (state ? (running ? "RUNNING" : "未运行") : "读取中…")} · ${chip}`
-          : running ? `运行中 · ${chip}` : chip}
+          ? `Recorded state ${props.snapshot?.status ?? (state ? (running ? "RUNNING" : "Not running") : "Loading…")} · ${chip}`
+          : running ? `Running · ${chip}` : chip}
       </div>
       <div className="spacer" />
-      <div className="seg" role="group" aria-label="视图切换">
+      <div className="seg" role="group" aria-label="View switcher">
         <button
           className={view === "dashboard" ? "active" : ""}
           aria-pressed={view === "dashboard"}
           onClick={() => onView("dashboard")}
         >
-          看板
+          Dashboard
         </button>
         <button
           className={view === "building" ? "active" : ""}
           aria-pressed={view === "building"}
           onClick={() => onView("building")}
         >
-          大楼
+          Building
         </button>
         <button
           className={view === "openagents" ? "active" : ""}
@@ -61,37 +61,37 @@ export function TopBar(props: {
       </div>
       {view === "openagents" ? (
         <select
-          aria-label="OpenAgents 轮次筛选"
+          aria-label="OpenAgents Round filter"
           value={round === "all" ? "all" : String(round)}
           onChange={(e) => onRound(e.target.value === "all" ? "all" : Number(e.target.value))}
         >
-          <option value="all">全部轮次</option>
+          <option value="all">All rounds</option>
           {rounds.map((r) => (
             <option key={r} value={r}>
-              第 {r} 轮
+              Round {r}
             </option>
           ))}
         </select>
       ) : (
         <>
-          <div className="seg" role="group" aria-label="状态筛选">
+          <div className="seg" role="group" aria-label="Status filter">
             <button className={showDone ? "" : "active"} onClick={() => onShowDone(false)}>
-              运行中
+              Running
             </button>
             <button className={showDone ? "active" : ""} onClick={() => onShowDone(true)}>
-              + 已完成
+              + Completed
             </button>
           </div>
           {showDone && (
             <select
-              aria-label="轮次筛选"
+              aria-label="Round filter"
               value={round === "all" ? "all" : String(round)}
               onChange={(e) => onRound(e.target.value === "all" ? "all" : Number(e.target.value))}
             >
-              <option value="all">全部轮次</option>
+              <option value="all">All rounds</option>
               {rounds.map((r) => (
                 <option key={r} value={r}>
-                  第 {r} 轮
+                  Round {r}
                 </option>
               ))}
             </select>

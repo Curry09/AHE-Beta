@@ -1,6 +1,7 @@
 """Probe isolation, producer authority, and explicit-checkout CLI boundaries."""
 
 import gzip
+import hashlib
 import json
 import subprocess
 import sys
@@ -10,9 +11,37 @@ import pytest
 
 import check_gitea_evidence_transport as live
 from ahe_beta.demand.delivery_evidence import build_package
+from ahe_beta.execution_contract import build_execution_evidence
 from check_observation_contract import load_reader, synthetic_store
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_shared_execution_fixture_binds_actual_public_file_bytes():
+    package = json.loads(
+        (ROOT / "backend/tests/fixtures/execution_evidence_contract.json").read_text()
+    )["package"]
+    wire = package["execution_evidence"]
+    assert (
+        build_execution_evidence(
+            issue=wire["issue"],
+            contracts=wire["execution_contracts"],
+            summaries=wire["assessment_summaries"],
+        )
+        == wire
+    )
+    sessions = {session["session_id"]: session for session in package["sessions"]}
+    for contract in wire["execution_contracts"]:
+        session = sessions[contract["session_id"]]
+        files = session["files"]
+        entries = {
+            entry["path"]: entry["sha256"] for entry in json.loads(files["manifest.json"])["files"]
+        }
+        for ref in contract["public_refs"]:
+            session_id, path = ref["path"].split("/", 1)
+            assert session_id == session["session_id"]
+            actual = hashlib.sha256(files[path].encode("utf-8")).hexdigest()
+            assert actual == entries[path] == ref["sha256"]
 
 
 def test_synthetic_probe_preserves_history_without_granting_other_session(tmp_path, monkeypatch):

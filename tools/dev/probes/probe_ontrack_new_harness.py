@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""探针：新 harness 契约下 expert vs blind 的 ON-TRACK 等待表现。
+"""Probe: ON-TRACK wait behavior under new harness contract, expert vs blind.
 
-模拟进化后 harness：MANUAL 含 `/status` slash（message 通道）；interrupt 走外窗口。
-只跑 ON-TRACK × {expert, blind}（Spec-0022/0023 three）。
+Simulate evolved harness: MANUAL includes `/status` slash (message channel); interrupt uses external window.
+Run only ON-TRACK × {expert, blind} (Spec-0022/0023 three).
 
-用法（仓根）：
+Usage (repo root):
   PYTHONPATH=backend .venv/bin/python -m tools.dev.probes.probe_ontrack_new_harness
 """
 
@@ -32,7 +32,7 @@ def _manual() -> str:
 
 
 class NewHarnessContract:
-    """对齐进化 harness：progress 条 + `/status` via emit_message；interrupt 收工。"""
+    """Align evolved harness: progress bar + `/status` via emit_message; interrupt wraps up."""
 
     def __init__(self, *, activities: list[list[str]], reply: str = "done.") -> None:
         self._activities = activities
@@ -89,7 +89,7 @@ class NewHarnessContract:
         pass
 
 
-# ON-TRACK：多拍进度，给足几次心跳做 send_message(/status) / keep_waiting / interrupt
+# ON-TRACK: multi-shot progress, sufficient heartbeats to send_message(/status) / keep_waiting / interrupt
 ON_TRACK: list[list[str]] = [
     ["🔧 read_file: billing/core.py"],
     [
@@ -143,7 +143,9 @@ def _run_one(*, d1: object) -> None:
         )
     )
     client = ApiPersonaClient()
-    harness = NewHarnessContract(activities=ON_TRACK, reply="done.\n\n## 验证证据\n3 passed")
+    harness = NewHarnessContract(
+        activities=ON_TRACK, reply="done.\n\n## Verification evidence\n3 passed"
+    )
     task = (
         "Please add split_bill(total, n) to billing/core.py and run a quick smoke test. "
         "Only touch billing — do not refactor unrelated packages or hit the network."

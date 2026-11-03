@@ -1,12 +1,12 @@
 ---
 number: "0080"
-title: 同一 persona 的独立会话编排
+title: "Independent Session Orchestration for the Same Persona"
 issue: 0
 slug: reusable-persona-sessions
-summary: 以现有 round/slot/session 身份区分并发会话，允许复用同一 persona 和配对，保持冻结计划、恢复及追加归档一致，不复制 persona 卡片。
+summary: "Distinguish concurrent sessions using existing round/slot/session identities, allowing reuse of the same persona and pairings while keeping frozen plans, recovery, and continuation archives consistent, without duplicating persona cards."
 tasks:
   - id: T1
-    title: 配置与配对编译器允许画像复用
+    title: "Allow persona reuse in configuration and the pairing compiler"
     status: done
     priority: P1
     tags: []
@@ -18,10 +18,10 @@ tasks:
       - backend/ahe_beta/experiment/workload.py
       - backend/tests/test_experiment_config_v2.py
       - backend/tests/test_experiment_workload.py
-    scope: 放开会话数量和配对中的 persona 唯一限制，保留选择集合唯一及原序列化、哈希算法。
-    acceptance: 一张画像的不同任务与重复完整配对均可编译；未知 ID/错误长度/重复库 ID 仍拒绝；旧 N1/N4 输出和哈希不变。
+    scope: "Remove persona uniqueness restrictions on session counts and pairings, while preserving uniqueness in the selection set and the existing serialization and hashing algorithms."
+    acceptance: "Different tasks for one persona and repeated complete pairings can both be compiled; unknown IDs/incorrect lengths/duplicate library IDs are still rejected; existing N1/N4 outputs and hashes remain unchanged."
   - id: T2
-    title: 独立会话执行与部分失败恢复
+    title: "Independent session execution and partial failure recovery"
     status: done
     priority: P1
     tags: []
@@ -34,10 +34,10 @@ tasks:
       - backend/tests/loop/test_orchestrator.py
       - backend/tests/loop/test_recovery.py
       - backend/tests/test_reusable_persona_sessions.py
-    scope: Orchestrator 按既有 round/slot 完整 binding 核验和执行，去掉 persona 级去重，验证 client/工作区/Issue 归属。
-    acceptance: 相同画像与完整配对的两个并发 slot 有不同 key/session/client/工作区；故障仅重跑失败局、报告幂等，乱序或重复 slot 仍拒绝。
+    scope: "Orchestrator verifies and executes the complete binding using the existing round/slot, removes persona-level deduplication, and verifies client/workspace/Issue ownership."
+    acceptance: "Two concurrent slots with the same persona and complete pairing have distinct keys/sessions/clients/workspaces; failures rerun only the failed session, reports are idempotent, and out-of-order or duplicate slots are still rejected."
   - id: T3
-    title: 重复配对的归档及继承往返
+    title: "Archive and inheritance round trip for repeated pairings"
     status: done
     priority: P1
     tags: []
@@ -52,10 +52,10 @@ tasks:
       - backend/tests/test_experiment_continuation_contract.py
       - backend/tests/test_experiment_continuation_export.py
       - backend/tests/test_experiment_continuation_source.py
-    scope: 继承 preview 使用画像唯一集合；末轮重复配对完整导出、核验、投影和新增轮编译。
-    acceptance: collect 到 child 的往返保持全部 slot 顺序和数量，画像卡只冻结一次；父归档字节不变、未知画像/摘要矛盾仍拒绝。
+    scope: "The inheritance preview uses the unique persona set; repeated pairings in the final round are fully exported, verified, projected, and compiled for new rounds."
+    acceptance: "The round trip from collect to child preserves the order and number of all slots, and each persona card is frozen only once; parent archive bytes remain unchanged, and unknown personas/digest inconsistencies are still rejected."
   - id: T4
-    title: 文档及独立会话验收
+    title: "Documentation and independent session acceptance"
     status: done
     priority: P1
     tags: []
@@ -70,29 +70,29 @@ tasks:
       - docs/tutorials/multi-user-experiment.md
       - docs/tutorials/multi-user-experiment.zh-CN.md
       - backend/scripts/e2e-spec-0080-reusable-persona-sessions.sh
-    scope: 更新画像选择与执行列表语义，并记录恢复/观测/归因验收及 direct 评阅范围。
-    acceptance: 中英文不再要求同轮画像唯一；live/report/L1 保留独立 session，脚本核验重复画像并发/恢复/继承，不能把复用画像当独立真人样本。
+    scope: "Update the semantics of persona selection and execution lists, and document recovery/observation/attribution acceptance and the scope of direct review."
+    acceptance: "The Chinese and English documentation no longer require personas to be unique within a round; live/report/L1 retain independent sessions, and scripts verify concurrent execution/recovery/inheritance with repeated personas. Reused personas must not be treated as independent human samples."
 ---
 
-# 0080 · 同一 persona 的独立会话编排
+# 0080 · Independent session orchestration for the same persona
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level overview in nine rust-RFC sections. -->
 
 ## Summary
 
-允许同一 persona 在一轮中对应多个独立会话，包括同一任务的重复试用。persona 表示不可变画像，现有 `round_no + slot` 表示会话位置；继续以包含完整 binding 的 operation key 派生 session ID。放开画像复用限制，不增加 participant 表、卡片别名、运行开关或另一套编排。
+Allow the same persona to correspond to multiple independent sessions in a round, including repeated trials of the same task. A persona represents an immutable profile, while the existing `round_no + slot` represents a session position; continue deriving the session ID from the operation key containing the complete binding. Relax the restriction on profile reuse without adding a participant table, card aliases, runtime switches, or another orchestration system.
 
 ## Motivation
 
-当前配置要求 `sessions_per_round <= len(persona_ids)`，普通与继承的计划编译器及 Orchestrator 又分别拒绝同轮重复 persona。实际工作区、恢复 unit、live、SessionStore 和证据已经以 session ID 区分，画像唯一约束比执行身份需要更强。
+The current configuration requires `sessions_per_round <= len(persona_ids)`, and the regular and inherited plan compilers and Orchestrator each reject duplicate personas within a round. Actual workspaces, recovery units, live, SessionStore, and evidence already distinguish sessions by session ID; the profile uniqueness constraint is stronger than execution identity requires.
 
-历史 N8 的八个任务并不对应八张不同画像：pvlib 与 astroid 都使用 `sr-15-swyx`；排程和 TinyDB 的 direct 路径也回退到这张画像。Excel、KV、SQLFluff、Superset 分别使用 kellan、xe-iaso、ronacher、kenton-varda，因此八个会话使用五张画像。为了做只改变交互方式的对照，不应新增三张不同画像，也不应复制画像并修改 ID。
+The eight tasks in historical N8 do not correspond to eight distinct profiles: pvlib and astroid both use `sr-15-swyx`; the direct paths for scheduling and TinyDB also fall back to this profile. Excel, KV, SQLFluff, and Superset use kellan, xe-iaso, ronacher, and kenton-varda respectively, so the eight sessions use five profiles. A comparison that changes only the interaction mode should not require three new profiles or copies of profiles with modified IDs.
 
-统一入口已经冻结 slot、task、persona、interaction 和 task digest。采用已有会话身份放开重复，可以在不改既有序列化形状和哈希算法的情况下恢复原配对，并支持同画像同任务的独立复测。
+The unified entry point already freezes slot, task, persona, interaction, and task digest. Allowing duplicates through the existing session identity can restore the original pairings without changing the existing serialization shape or hashing algorithm, and support independent repeat trials of the same profile and task.
 
 ## Guide-level explanation
 
-`workload.persona_ids` 仍是所选画像的唯一集合；persona 库的 ID 也必须唯一。每轮 `interaction_plan` 是有序会话列表，允许重复 persona 或完整配对，例如：
+`workload.persona_ids` remains the unique set of selected profiles; IDs in the persona library must also be unique. `interaction_plan` in each round is an ordered session list that allows duplicate personas or complete pairings, for example:
 
 ```json
 {
@@ -106,70 +106,70 @@ tasks:
 }
 ```
 
-这是配置片段，完整定义仍须提供后端、材料、角色和模型。三个位置分别是 slot 0/1/2，即使 slot 0 和 2 的配对完全相同，也会产生不同 session ID、恢复 unit 和工作区。默认轮转允许画像库小于每轮会话数；仍检查每轮长度、所选 ID、slot 顺序和并发上限。
+This is a configuration fragment; a complete definition must still provide the backend, materials, roles, and models. The three positions are slots 0/1/2. Even if slots 0 and 2 have identical pairings, they produce different session IDs, recovery units, and workspaces. Default rotation allows the profile library to be smaller than the number of sessions per round; round length, selected IDs, slot order, and concurrency limits are still checked.
 
-报告与看板显示画像和独立 session/slot，不能把画像相同当成同一会话，也不能把复用画像解释为多个独立真人样本。多个反馈是否有共同机制仍由现有需求角色判断，不在入口按 persona 自动合并。
+Reports and dashboards display the profile and independent session/slot. They must not treat matching profiles as the same session or interpret reused profiles as multiple independent human samples. Whether multiple feedback items share a common mechanism remains a judgment for the existing requirements role; the entry point does not automatically merge them by persona.
 
-N8 混合及全 direct 两组显式使用相同有序配对。direct 仍是一条冻结任务消息加结束后一次 persona 评阅，过程中不发追问、heartbeat、转向或接受消息；现有 direct 代码会提交报告，即使终态 verdict 为 accept。本组不改变报告生成、评分或验收口径。
+The N8 mixed and all-direct groups explicitly use the same ordered pairings. direct still consists of one frozen task message followed by one persona review after completion, with no follow-up questions, heartbeat, redirection, or acceptance messages during execution; the existing direct code submits a report even when the terminal verdict is accept. This group does not change report generation, scoring, or acceptance criteria.
 
 ## Reference-level explanation
 
-### 输入与身份
+### Inputs and identity
 
-修改 `config.load_config_v2`，移除“会话数不能超过画像数”的限制；保持 schema 对 `persona_ids` 的 uniqueItems、非空库、未知字段、round count、并发及所有材料检查。
+Modify `config.load_config_v2` to remove the restriction that the number of sessions cannot exceed the number of profiles; retain the schema's uniqueItems constraint on `persona_ids`, the nonempty library requirement, unknown-field checks, round count, concurrency, and all material checks.
 
-`workload.interaction_plan` 不再对 persona 去重。`compile_session_plan` 的继承分支也按有序 pair 保留重复，继续验证 task/persona 存在、task digest 与 interaction 一致。每个 binding 的六个字段保持不变，slot 必须等于其列表位置，不接受乱序、缺位、重复编号或 bool 冒充整数。
+`workload.interaction_plan` no longer deduplicates personas. The inheritance branch of `compile_session_plan` also preserves duplicates as ordered pairs, continuing to validate that task/persona exist and that task digest and interaction are consistent. The six fields of each binding remain unchanged. slot must equal its list position; out-of-order slots, missing slots, duplicate numbers, or bool values masquerading as integers are not accepted.
 
-Orchestrator `_logical_plan` 同步取消 persona 唯一检查，保留其他结构检查。会话 key 继续使用 `operation_key(run_id, "users", binding)`；binding 的 slot 已经确保重复配对的 key 不同。Session provenance、UsageContext、client 创建和 task runtime 的归属沿用原实现，不增加对 persona 卡片的可变状态。
+Orchestrator `_logical_plan` likewise removes the persona uniqueness check while retaining the other structural checks. The session key continues to use `operation_key(run_id, "users", binding)`; the slot in the binding already ensures different keys for duplicate pairings. Session provenance, UsageContext, client creation, and task runtime ownership retain their original implementations, with no added mutable state on persona cards.
 
-只放宽新配置可接受的配对范围。旧有效输入经过新的默认编译器，产生与原来完全相同的 plan、config hash、binding hash 和 session key。已准备 run 继续使用其冻结 controller，不原地更新。
+Only the range of pairings accepted by new configurations is expanded. Previously valid inputs processed by the new default compiler produce exactly the same plan, config hash, binding hash, and session key as before. Prepared runs continue to use their frozen controller and are not updated in place.
 
-### 执行、恢复与归档
+### Execution, recovery, and archiving
 
-每个 slot 建独立 client、工作区和 attempt；线程之间只共享不可变画像。失败恢复只重跑未完成的 session unit；不因同 persona 另一个 slot 已完成而跳过，也不把它的 Issue 或文件作为本 slot 的结果。
+Create a separate client, workspace, and attempt for each slot; threads share only immutable profiles. Failure recovery reruns only incomplete session units; it neither skips a slot because another slot with the same persona has completed nor uses that slot's Issue or files as this slot's results.
 
-SessionStore 与 live 按 session ID 保存；角色证据授权和 grouped architect 按来源 session/报告处理。不对 persona 计数重新解释 Metrics，也不添加画像级执行去重。
+SessionStore and live store data by session ID; role evidence authorization and grouped architect process data by source session/report. Do not reinterpret Metrics based on persona counts or add profile-level execution deduplication.
 
-continuation export 按 slot 保留全部末轮配对，source 以 session ID 验证完成用户集；画像材料只冻结有序唯一的卡片集合。继承 preview 的 `persona_ids` 改为从 `source.personas` 获取，而非从每个 pair 重复列出。父重复配对按原顺序编入每个新增轮，禁止通过画像去重缩短边界或改变 session 数。
+continuation export preserves all final-round pairings by slot, and source verifies the set of completed users by session ID; profile materials freeze only the ordered unique set of cards. In the inherited preview, `persona_ids` is obtained from `source.personas` instead of being listed repeatedly from each pair. Duplicate parent pairings are compiled into each added round in their original order; profile deduplication must not shorten boundaries or change the session count.
 
-### 对照与验收
+### Comparison and acceptance
 
-改变 interaction 会改变 task digest、catalog/plan hash 及 session key，这是身份正确派生的结果。配对审计比较源码、指令、环境、模型、初始 Harness、画像卡和有序 slot；只允许 interaction 及其派生身份、各 run 坐标不同。不能要求两组共享 session ID，不能复用一组已完成会话。
+Changing interaction changes the task digest, catalog/plan hash, and session key; this is the result of correctly deriving identity. The pairing audit compares source code, instructions, environment, models, initial Harness, profile cards, and ordered slots; only interaction and its derived identities, plus each run's coordinates, may differ. The two groups must not be required to share session IDs, and completed sessions from one group must not be reused.
 
-四个任务分别承担配置/编译、执行/恢复、归档/继承及文档/验收，文件分配以 frontmatter 为准。端到端脚本为 `backend/scripts/e2e-spec-0080-reusable-persona-sessions.sh`。不把旧实验产物的转调脚本作为公开入口。
+The four tasks cover configuration/compilation, execution/recovery, archiving/inheritance, and documentation/acceptance respectively; file assignments follow the frontmatter. The end-to-end script is `backend/scripts/e2e-spec-0080-reusable-persona-sessions.sh`. Do not use forwarding scripts from old experiment artifacts as public entry points.
 
-| 验收 | 必须观察的结果 |
+| Acceptance | Required observations |
 | --- | --- |
-| 新配置 | 一张画像三个 slot 可校验；库中重复 ID、未知 ID、错误计划长度和乱序 slot 仍拒绝 |
-| 旧输入 | 既有 N1/N4 编译输出、哈希和 key 不变 |
-| 独立执行 | 相同 persona/任务的两个并发 slot 各有 client、session ID、attempt 和可写工作区，文件修改不串局 |
-| 故障恢复 | 一个 slot 完成、另一个中断，只重跑后者；Issue 幂等且来源 session 不混淆 |
-| 归档往返 | 末轮重复配对 collect→source→子 run 保留顺序和数量，画像卡只冻结一次，父字节不变 |
-| 反馈与观测 | live/L1/report 关联多个不同 session；direct 终态评阅不变，不把报告数当作投诉数或官方通过率 |
+| New configuration | One profile with three slots passes validation; duplicate library IDs, unknown IDs, incorrect plan lengths, and out-of-order slots are still rejected |
+| Old inputs | Existing N1/N4 compilation outputs, hashes, and keys remain unchanged |
+| Independent execution | Two concurrent slots with the same persona/task each have their own client, session ID, attempt, and writable workspace; file modifications do not leak across sessions |
+| Failure recovery | When one slot completes and another is interrupted, only the latter is rerun; Issues are idempotent and source sessions are not confused |
+| Archive round trip | Final-round duplicate pairings retain their order and count through collect→source→child run; profile cards are frozen only once, and parent bytes remain unchanged |
+| Feedback and observability | live/L1/report associate multiple distinct sessions; direct terminal review remains unchanged, and report counts are not treated as complaint counts or official pass rates |
 
 ## Drawbacks
 
-同一画像的多次会话相关性更高，不能按独立用户样本计算统计显著性。入口展示执行归属，但实验分析仍需说明画像与任务的重复结构。
+Multiple sessions with the same profile are more correlated and cannot be treated as independent user samples when calculating statistical significance. The entry point displays execution ownership, but experiment analysis must still explain the repetition structure of profiles and tasks.
 
-放宽约束会让之前被拒绝的配置可运行，因此必须同步修改所有后续去重检查，避免 prepare 成功后在执行或继承阶段才失败。
+Relaxing the constraint makes previously rejected configurations runnable, so all subsequent deduplication checks must be updated together to avoid successful preparation followed by failure during execution or inheritance.
 
 ## Rationale and alternatives
 
-选择现有 slot 作为执行位置，因为当前哈希、恢复和工作区已经以它区分会话。新增 participant 模型会重复已有概念并扩大 Session/provenance/归档契约，当前无需引入。
+Use the existing slot as the execution position because current hashing, recovery, and workspaces already use it to distinguish sessions. Adding a participant model would duplicate existing concepts and expand the Session/provenance/archive contracts; it is not currently needed.
 
-不复制 persona 卡片或给卡片加别名。复制会伪造“不同用户”，并使对照多出画像身份差异；相同画像的复用应如实保留在来源记录中。
+Do not copy persona cards or add aliases to them. Copying would fabricate “different users” and introduce profile identity differences into the comparison; reuse of the same profile should be faithfully preserved in provenance records.
 
-不增加 allow_duplicate_persona 开关：唯一画像不是执行安全前提，保留一个默认拒绝的开关会让相同机制出现两套语义。选择集合保持唯一，执行列表可重复，边界已经清晰。
+Do not add an allow_duplicate_persona switch: unique profiles are not a prerequisite for safe execution, and retaining a switch that rejects duplicates by default would give the same mechanism two sets of semantics. The selection set remains unique while the execution list permits duplicates; the boundary is already clear.
 
 ## Prior art
 
-当前 Orchestrator 的完整 binding key、prebuilt 的 session/attempt 目录、不可变 SimPersona、session ID live 标签及 continuation 的 slot/session 校验已提供所需执行身份。历史 direct runner 采用所选 simulated persona 的首张画像，其 N8 实际取值是 `sr-15-swyx`；两组新配置将该回退显式冻结。
+The current Orchestrator's complete binding key, prebuilt session/attempt directories, immutable SimPersona, session ID live labels, and continuation slot/session validation already provide the required execution identity. The historical direct runner uses the first profile among the selected simulated personas, whose actual value in N8 is `sr-15-swyx`; the two new configurations explicitly freeze this fallback.
 
 ## Unresolved questions
 
-接口设计已确定：画像选择集合唯一，会话列表可重复，不新增运行实体或开关。富任务环境属于单独环境方案；本组完成不能单独证明原 N8 的文件、服务和环境已经恢复，也不能据此启动不具备环境验收记录的八场景实验。
+The interface design is settled: the profile selection set is unique, the session list allows duplicates, and no runtime entities or switches are added. Rich task environments belong to a separate environment proposal; completion of this group alone cannot establish that the original N8 files, services, and environments have been restored, nor justify launching an eight-scenario experiment without environment acceptance records.
 
 ## Future possibilities
 
-可在分析界面增加按画像、任务及 slot 展示重复试用的视图。独立统计重复次数或随机种子应在有明确实验需求时单独设计，不在本组附带修改评分、报告策略或抽样方法。
+The analysis interface could add views showing repeated trials by profile, task, and slot. Independent statistical repetition counts or random seeds should be designed separately when there is a clear experimental need; this group does not include incidental changes to scoring, reporting policies, or sampling methods.
 

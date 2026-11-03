@@ -1,5 +1,5 @@
-# Spec-0029/T8（Spec-0032/T4 调整）：roster 编制解析——developer 语义改为交付面并发 K。
-"""验证 load_roster：默认 user3/triager1/architect1/divergent0/owner0/developer1；各 N_* 覆盖。"""
+# Spec-0029/T8 (Spec-0032/T4 adjustment): roster composition parsing—developer semantics changed to delivery-side concurrency K.
+"""Verify load_roster: default user3/triager1/architect1/divergent0/owner0/developer1; each N_* override."""
 
 from __future__ import annotations
 
@@ -24,19 +24,20 @@ def test_defaults(monkeypatch) -> None:
         "architect": 1,
         "divergent": 0,
         "owner": 0,
-        "developer": 1,  # Spec-0032：交付面并发 K（vigil --parallel），保守默认串行
+        # Spec-0032: delivery-side concurrency K (vigil --parallel), conservative default serial
+        "developer": 1,
     }
     assert DEFAULT_ROSTER["owner"] == 0
 
 
 def test_triager_override(monkeypatch) -> None:
     monkeypatch.setenv("N_TRIAGERS", "2")
-    assert load_roster()["triager"] == 2  # 分片数
+    assert load_roster()["triager"] == 2  # Shard count
 
 
 def test_zero_owner_disables_admission_review(monkeypatch) -> None:
     monkeypatch.setenv("N_OWNERS", "0")
-    assert load_roster()["owner"] == 0  # 0 合法：模型评审跳过、全部提案 hold
+    assert load_roster()["owner"] == 0  # 0 valid: model review skipped, all proposals held
 
 
 def test_zero_triagers_allowed(monkeypatch) -> None:
@@ -47,7 +48,7 @@ def test_zero_triagers_allowed(monkeypatch) -> None:
 def test_invalid_falls_back(monkeypatch) -> None:
     for raw in ("abc", "-1", "1.5"):
         monkeypatch.setenv("N_OWNERS", raw)
-        assert load_roster()["owner"] == 0  # 非法/负值回落默认
+        assert load_roster()["owner"] == 0  # Invalid / negative falls back to default
 
 
 def test_all_roles_overridable(monkeypatch) -> None:

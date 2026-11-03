@@ -1,12 +1,12 @@
 ---
 number: "0023"
-title: 等待环事件化钉死 · 废弃 one/two 与遗留信号
+title: "Finalize the event-driven waiting loop · retire one/two and legacy signals"
 issue: 0
 slug: event-driven-wait-cleanup
-summary: 钉死 AwaitEvent 等待环（主 loop 吃 reply、心跳一次性、动作前 try_reply）；统一 [+Ns] history（已删 wait_cost）；废弃 decide/waiting 的 one|two 与合并 builder；清死常量与无消费者 MAIN_GAP；探针对齐 0022 菜单。
+summary: "Finalize the AwaitEvent waiting loop (main loop consumes replies, one-shot heartbeat, try_reply before actions); standardize [+Ns] history (wait_cost already removed); retire one|two in decide/waiting and the combined builders; remove dead constants and MAIN_GAP with no consumers; align probes with the 0022 menu."
 tasks:
   - id: T1
-    title: loop：只留 three · 清 MAIN_GAP/死常量/stalled
+    title: "loop: retain only three · remove MAIN_GAP/dead constants/stalled"
     status: done
     priority: P1
     tags: []
@@ -21,10 +21,10 @@ tasks:
       - backend/ahe_beta/user/sim/loop.py
       - backend/tests/user/sim/test_loop.py
       - backend/tests/user/sim/test_heartbeat.py
-    scope: run_session/_main_decide/_heartbeat_once 删除 one|two 分支与 mode 参数（或恒 three 且拒非 three）；gap 一律 WAIT_GAP；删 _TURN_WAIT_BUDGET_SEC 与 stalled 别名；保留 AwaitEvent+try_reply abort 与单测（含 abort give_up/interrupt）。
-    acceptance: 无 decide_mode/waiting_mode=one|two 调用路径；MAIN_GAP 零出现；_TURN_WAIT_BUDGET_SEC 删除；test_heartbeat/test_loop 全绿且含 try_reply abort 用例。
+    scope: "Remove one|two branches and mode parameters from run_session/_main_decide/_heartbeat_once (or always use three and reject non-three); use WAIT_GAP for all gaps; remove _TURN_WAIT_BUDGET_SEC and the stalled alias; retain AwaitEvent+try_reply abort and unit tests (including abort give_up/interrupt)."
+    acceptance: "No call paths with decide_mode/waiting_mode=one|two; zero occurrences of MAIN_GAP; _TURN_WAIT_BUDGET_SEC removed; test_heartbeat/test_loop all pass and include try_reply abort cases."
   - id: T2
-    title: prompt：删除 one/two 合并 builder · 单测改打 three
+    title: "prompt: remove one/two combined builders · change unit tests to exercise three"
     status: done
     priority: P1
     tags: []
@@ -37,10 +37,10 @@ tasks:
     files:
       - backend/ahe_beta/user/sim/prompt.py
       - backend/tests/user/sim/test_prompt.py
-    scope: 删除 build_user_turn、build_main_judge_intent_turn、build_waiting_judge_intent_turn；确认无 wait_cost/wait_sec；test_prompt 改为断言 build_main_* / build_waiting_* 契约。
-    acceptance: 上述三个 builder 符号不存在；test_prompt 覆盖 main/waiting three 跳关键标签；无 wait_cost 字符串。
+    scope: "Remove build_user_turn, build_main_judge_intent_turn, and build_waiting_judge_intent_turn; confirm there is no wait_cost/wait_sec; change test_prompt to assert the build_main_* / build_waiting_* contracts."
+    acceptance: "The three builder symbols above do not exist; test_prompt covers the key tags in the main/waiting three stages; no wait_cost string."
   - id: T3
-    title: 探针：去掉 two 臂与 peek-via-control 心智
+    title: "Probes: remove the two arm and the peek-via-control mental model"
     status: done
     priority: P2
     tags: []
@@ -55,10 +55,10 @@ tasks:
       - tools/dev/probes/probe_peek_decision_trace.py
       - tools/dev/probes/probe_persona_wait_matrix.py
       - tools/dev/probes/probe_ontrack_new_harness.py
-    scope: 探针只跑 three + 0022 菜单（send_message/interrupt/give_up）；删除或改写 waiting_mode two 对比与 control peek/status 假设；fixture 字符串不含 invoke_control。
-    acceptance: 所列脚本不再传 waiting_mode=two；不再示范用户经 control 做 peek/status；文档字符串与 0022 菜单一致。
+    scope: "Probes run only three + the 0022 menu (send_message/interrupt/give_up); remove or rewrite waiting_mode two comparisons and control peek/status assumptions; fixture strings do not contain invoke_control."
+    acceptance: "The listed scripts no longer pass waiting_mode=two; they no longer demonstrate users performing peek/status via control; docstrings are consistent with the 0022 menu."
   - id: T4
-    title: launcher.try_reply 非阻塞契约（已落地）
+    title: "launcher.try_reply nonblocking contract (implemented)"
     status: done
     priority: P1
     tags: []
@@ -71,47 +71,47 @@ tasks:
     parallel: false
     files:
       - backend/ahe_beta/harness/launcher.py
-    scope: HarnessLauncher.try_reply：非阻塞取出已缓冲终态 reply；供心跳动作执行前确认。用户 sim 经此避免 give_up 丢回复。
-    acceptance: try_reply 存在且无 reply 时返回 None；有 reply 时返回正文且不阻塞；与 poll 共享队列排空约定。
+    scope: "HarnessLauncher.try_reply: nonblocking retrieval of a buffered terminal reply, used for confirmation before executing a heartbeat action. The user sim uses this to prevent give_up from losing replies."
+    acceptance: "try_reply exists and returns None when no reply is available; when a reply is available, it returns the body without blocking; it shares the queue-draining convention with poll."
 ---
 
-# 0023 · 等待环事件化钉死 · 废弃 one/two 与遗留信号
+# 0023 · Lock Down the Event-Driven Wait Loop · Retire one/two and Legacy Signals
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level, nine-section rust-RFC overview. -->
 
 ## Summary
 
-把用户侧「EMIT 后等待 harness」钉成单一事件环，并清掉与之并行的遗留旋钮：
+Lock the user-side process of “waiting for the harness after EMIT” into a single event loop, and remove the legacy knobs that coexist with it:
 
-1. **AwaitEvent**——`poll`：`reply` 交主 loop 决定；`timer` 触发**一次性**心跳（judge→intent→act），动作做完即回 AwaitEvent，不在心跳内嵌套再等。
-2. **动作前确认**——心跳 LLM 返回后、执行 `send_message`/`interrupt`/`give_up`/`keep_waiting` 副作用之前，非阻塞 `try_reply`；有 reply 则**作废该等待动作**，写入 history 说明，交回主 loop 读回复（避免 `give_up` 永不 poll 丢回复）。
-3. **时间轴唯一**——会话相对时间统一为 history 的 `[+Ns]`；已删除主 decide 的 `<wait_cost>` / `wait_sec` 双通道。
-4. **决策分层只保留 three**——主 loop 与心跳默认且唯一为 judge→intent→act；废弃 `decide_mode`/`waiting_mode` 的 `one`/`two` 与对应合并 builder。
-5. **信号收敛**——等待与主路径的 intent–action 缺口统一记 `WAIT_GAP`（去掉无消费者的 `MAIN_GAP`）；删除从未读取的 `_TURN_WAIT_BUDGET_SEC`。
-6. **探针对齐**——旧 peek-via-control / two-vs-three 探针改写或删除，避免教错 IO 边界。
+1. **AwaitEvent**——`poll`: `reply` is handed to the main loop for a decision; `timer` triggers a **one-shot** heartbeat (judge→intent→act). Once the action finishes, return to AwaitEvent without nesting another wait inside the heartbeat.
+2. **Confirmation before action**——After the heartbeat LLM returns and before executing the side effects of `send_message`/`interrupt`/`give_up`/`keep_waiting`, perform a nonblocking `try_reply`; if a reply is available, **invalidate that waiting action**, record an explanation in history, and return control to the main loop to read the reply (preventing `give_up` from losing the reply by never polling).
+3. **Single timeline**——Use history's `[+Ns]` consistently for session-relative time; the main decide's dual `<wait_cost>` / `wait_sec` channels have been removed.
+4. **Keep only three for decision layering**——The default and only layering for the main loop and heartbeat is judge→intent→act; retire `one`/`two` for `decide_mode`/`waiting_mode` and the corresponding merged builders.
+5. **Consolidate signals**——Record the intent–action gap on both the waiting and main paths as `WAIT_GAP` (remove `MAIN_GAP`, which has no consumers); delete `_TURN_WAIT_BUDGET_SEC`, which is never read.
+6. **Align probes**——Rewrite or delete old peek-via-control / two-vs-three probes to avoid teaching incorrect IO boundaries.
 
-内外窗口与等待菜单形状仍以既有 IO 边界为准：内=`message`（含 in-flight `emit_message`），外=`interrupt` + 会话收场；菜单 `keep_waiting|send_message|interrupt|give_up`。
+The inner/outer windows and waiting menu shape still follow the existing IO boundaries: inner=`message` (including in-flight `emit_message`), outer=`interrupt` + session closure; menu `keep_waiting|send_message|interrupt|give_up`.
 
 ## Motivation
 
-**当时状态。** 心跳与开放 intent 菜单落地后，主路径已事件化，但仍残留多套并行物：① 主 decide 曾用 `<wait_cost>` 再报一轮墙钟秒，与 history `[+Ns]` 双轴；② `run_session` 暴露 `decide_mode`/`waiting_mode`∈{one,two,three}，生产调用从不传、恒为 three，one/two 与 `build_user_turn` / `*_judge_intent_turn` 仅服务旧测与探针；③ `_TURN_WAIT_BUDGET_SEC` 常量无读者；④ act 自报 gap 时主路径写 `MAIN_GAP:`、等待写 `WAIT_GAP:`，看板与规格语言只认后者；⑤ 部分 `probe_*.py` 仍假设 control 旁路 peek 或 two 模式。
+**State at the time.** After the heartbeat and open intent menu were implemented, the main path was already event-driven, but several parallel mechanisms remained: ① the main decide previously used `<wait_cost>` to report wall-clock seconds again, creating a second axis alongside history's `[+Ns]`; ② `run_session` exposed `decide_mode`/`waiting_mode`∈{one,two,three}, which production calls never passed and which always defaulted to three; one/two and `build_user_turn` / `*_judge_intent_turn` served only old tests and probes; ③ the `_TURN_WAIT_BUDGET_SEC` constant had no readers; ④ when act self-reported a gap, the main path wrote `MAIN_GAP:` while waiting wrote `WAIT_GAP:`, but dashboards and specification terminology recognized only the latter; ⑤ some `probe_*.py` still assumed a control-side peek bypass or two mode.
 
-**要改什么。** 契约上只承认一条等待环与一条决策分层；代码与探针不得再提供第二套时间轴、第二套 mode、第二套 gap 前缀。已删的 `wait_cost` 不得回归；动作前 `try_reply` 成为硬步骤而非可选优化。
+**What needs to change.** The contract recognizes only one wait loop and one decision layering scheme; code and probes must no longer provide a second timeline, a second set of modes, or a second gap prefix. The deleted `wait_cost` must not return; `try_reply` before action becomes a mandatory step rather than an optional optimization.
 
-**为何现在做。** 事件环与 abort-before-act 已在实现侧可用；若不立刻废弃 one/two 与死信号，文档与探针会继续把实验旋钮当成活设计，训练信号与体感解释再次分叉。
+**Why now.** The event loop and abort-before-act are already available in the implementation; unless one/two and dead signals are retired immediately, documentation and probes will continue treating experimental knobs as active design, causing training signals and user experience explanations to diverge again.
 
 ## Guide-level explanation
 
-- 用户对 harness **发一条需等待的 message**（主 loop EMIT）→ 进入 AwaitEvent。
-- **先到 reply**：主 loop 看见内容再 judge/intent/act（与心跳同构的三跳）。
-- **先到 timer**：跑一轮心跳三跳；若决定插话则 `emit_message` 后**继续 AwaitEvent**（下一笔 reply 仍归主 loop）；若 interrupt/give_up 则按外窗口/收场结束等待。
-- 心跳思考期间 reply 可能已进缓冲：框架在动手前偷看一眼；有则告诉 history「本想 X，但回复已到，未执行，回主 loop」。
-- 观察者只看 history 的 `[+Ns]` 与 `WAIT_GAP` / 耐心曲线；不必再找 `wait_cost` 或 `MAIN_GAP`。
-- 写探针或单测时：**不要**再传 `waiting_mode="two"` / `decide_mode="one"`；Fake/Scripted 无 begin/poll 则仍走阻塞 `send`（能力叉，非第二套等待语义）。
+- The user **sends the harness a message that requires waiting** (main loop EMIT) → enter AwaitEvent.
+- **Reply arrives first**: the main loop sees the content before judge/intent/act (three stages structurally identical to the heartbeat).
+- **Timer fires first**: run one round of the three-stage heartbeat; if it decides to interject, **continue AwaitEvent** after `emit_message` (the next reply still belongs to the main loop); if interrupt/give_up is chosen, end waiting according to the outer-window/closure rules.
+- A reply may have entered the buffer while the heartbeat was thinking: the framework takes a quick look before acting; if one is present, tell history “intended to do X, but the reply had arrived, so the action was not executed; return to the main loop.”
+- Observers need only look at history's `[+Ns]` and `WAIT_GAP` / patience curve; they no longer need to look for `wait_cost` or `MAIN_GAP`.
+- When writing probes or unit tests: **do not** pass `waiting_mode="two"` / `decide_mode="one"` anymore; Fake/Scripted implementations without begin/poll still use blocking `send` (a capability branch, not a second set of waiting semantics).
 
 ## Reference-level explanation
 
-### 事件环（契约）
+### Event loop (contract)
 
 ```text
 begin(message)
@@ -120,7 +120,7 @@ loop AwaitEvent:
   if kind == reply:
     return to main decide(val)
   # timer → HeartbeatOnce
-  action, msg, gap = judge → intent → act   # 仅 three
+  action, msg, gap = judge → intent → act   # three only
   if try_reply() is Some(ready):
     stamp history: aborted before acting (action) …
     return to main decide(ready)
@@ -131,82 +131,82 @@ loop AwaitEvent:
     keep_waiting → continue AwaitEvent
 ```
 
-- `HarnessLauncher.try_reply`：非阻塞排空/窥视 stdout 队列中已到的终态 reply；无则 `None`。
-- Fake/Scripted：无 `begin/poll/emit_message/control` → 不进入本环，`route`→阻塞 `send`（测试确定性）。
-- 放弃三层仍保留且职责不同：persona 选 `give_up`；`patience<=0`；`_MAX_HEARTBEATS` 硬顶。
+- `HarnessLauncher.try_reply`: nonblocking drain/peek of terminal replies already present in the stdout queue; `None` if none are available.
+- Fake/Scripted: no `begin/poll/emit_message/control` → do not enter this loop; `route`→blocking `send` (test determinism).
+- All three abandonment layers remain, with distinct responsibilities: persona chooses `give_up`; `patience<=0`; `_MAX_HEARTBEATS` imposes a hard cap.
 
-### 决策分层（唯一）
+### Decision layering (the only scheme)
 
-| 位置 | 分层 | 产出 |
+| Location | Layering | Output |
 |---|---|---|
-| 主 loop | judge → intent → act | `verdict`（写状态）+ 开放 intent + `action_space` 动作 + `gap`→`WAIT_GAP` |
-| 心跳 | 同构三跳 | `judgment` + 开放 intent + 等待菜单 + `gap`→`WAIT_GAP` |
+| Main loop | judge → intent → act | `verdict` (writes state) + open intent + `action_space` action + `gap`→`WAIT_GAP` |
+| Heartbeat | Structurally identical three stages | `judgment` + open intent + waiting menu + `gap`→`WAIT_GAP` |
 
-废弃：`decide_mode`/`waiting_mode` 参数；`build_user_turn`；`build_main_judge_intent_turn`；`build_waiting_judge_intent_turn`。`run_session` 不再接受 mode 旋钮（或接受但非法即报错——实现取删除参数）。
+Retire: the `decide_mode`/`waiting_mode` parameters; `build_user_turn`; `build_main_judge_intent_turn`; `build_waiting_judge_intent_turn`. `run_session` no longer accepts mode knobs (or accepts them but errors on invalid values—the implementation chooses to delete the parameters).
 
-### 时间与信号
+### Time and signals
 
-- History：`_SessionClock` 统一 `[+Ns]`（含 waiting 记忆与 abort 说明）。
-- 禁止：`<wait_cost>`、`wait_sec` 注入主上下文。
-- Gap：一律 `WAIT_GAP: intent=… action=…`；删除 `MAIN_GAP:`。
-- 删除未使用的 `_TURN_WAIT_BUDGET_SEC`；修正仍指向 `build_user_turn` 的过时注释。
-- `stalled`→`unclear` 别名：随 one/two 一并删除（prompt 已不教 stalled）。
+- History: `_SessionClock` consistently uses `[+Ns]` (including waiting memories and abort explanations).
+- Prohibited: injecting `<wait_cost>` or `wait_sec` into the main context.
+- Gap: always `WAIT_GAP: intent=… action=…`; delete `MAIN_GAP:`.
+- Delete the unused `_TURN_WAIT_BUDGET_SEC`; fix outdated comments that still point to `build_user_turn`.
+- `stalled`→`unclear` alias: delete along with one/two (the prompt no longer teaches stalled).
 
-### DAG 与文件分配
+### DAG and file allocation
 
 ```mermaid
 graph LR
-  T1[T1 loop 钉死 three + 信号清理]
-  T2[T2 prompt 删合并 builder]
-  T3[T3 探针对齐]
-  T4[T4 launcher try_reply 契约]
+  T1[T1 lock loop to three + signal cleanup]
+  T2[T2 Remove merged prompt builders]
+  T3[T3 probe alignment]
+  T4[T4 launcher try_reply contract]
   T1 --> T2
   T1 --> T3
   T4 -.-> T1
 ```
 
-| Task | 职责 | files（组内互斥） |
+| Task | Responsibility | files (mutually exclusive within the group) |
 |---|---|---|
-| T1 | `run_session`/`_main_decide`/`_heartbeat_once` 只留 three；清 `MAIN_GAP`、预算常量、`stalled`；单测改默认调用 | `loop.py`, `test_loop.py`, `test_heartbeat.py` |
-| T2 | 删除 one/two builder；prompt 单测改打 `build_main_*` / `build_waiting_*` | `prompt.py`, `test_prompt.py` |
-| T3 | 探针去掉 two 对比与 peek-via-control 心智；保留 three + 0022 菜单 | 下列 `probe_*.py` |
-| T4 | `try_reply` 非阻塞契约（已落地，快照钉死） | `launcher.py` |
+| T1 | Keep only three in `run_session`/`_main_decide`/`_heartbeat_once`; remove `MAIN_GAP`, budget constants, and `stalled`; change unit tests to default calls | `loop.py`, `test_loop.py`, `test_heartbeat.py` |
+| T2 | Delete one/two builders; change prompt unit tests to target `build_main_*` / `build_waiting_*` | `prompt.py`, `test_prompt.py` |
+| T3 | Remove two comparisons and the peek-via-control mental model from probes; keep three + the 0022 menu | `probe_*.py` listed below |
+| T4 | `try_reply` nonblocking contract (implemented, locked down in the snapshot) | `launcher.py` |
 
-e2e / 探针路径：`tools/dev/probes/probe_wait_progress.py`（改写或删 two 臂）、`probe_peek_decision_trace.py`、`probe_persona_wait_matrix.py`、`probe_ontrack_new_harness.py`、`probe_wait_signals_to_evolution.py`。
+e2e / probe paths: `tools/dev/probes/probe_wait_progress.py` (rewrite or delete the two arm), `probe_peek_decision_trace.py`, `probe_persona_wait_matrix.py`, `probe_ontrack_new_harness.py`, `probe_wait_signals_to_evolution.py`.
 
-### 与相邻活快照的关系（复述要点）
+### Relationship to adjacent active snapshots (key points restated)
 
-- **IO 边界**：内 message / 外 interrupt / 菜单四项 / 开放 intent+gap——本组不改菜单形状，只改等待时序与遗留旋钮。
-- **等待体感**：有条件耗心、progress/prior_activity、任务量耐心——本组不改衰减公式，只保证事件环与之兼容。
-- **旁路 progress**：stdout 非 reply 仍可进 `last_progress`；用户不得经 control 做 peek。
+- **IO boundaries**: inner message / outer interrupt / four-item menu / open intent+gap—this group does not change the menu shape, only waiting timing and legacy knobs.
+- **Waiting user experience**: conditional patience depletion, progress/prior_activity, task-volume-based patience—this group does not change the decay formula; it only ensures event-loop compatibility with it.
+- **Side-channel progress**: stdout content other than replies can still enter `last_progress`; users must not perform peek via control.
 
 ## Drawbacks
 
-- 丢掉 one/two 后，少一次「合并 judge+intent 省 LLM 调用」的现成 A/B 旋钮；若以后要压调用量需新开实验叉，而不是复活公共 API。
-- 探针改写有短期成本；不改则继续误导。
-- `try_reply` 与随后 `poll` 对同一缓冲的竞态依赖 launcher 单线程排空约定；多读者未在范围内。
+- Removing one/two eliminates a ready-made A/B knob for “merging judge+intent to save LLM calls”; reducing call volume in the future will require a new experimental fork rather than reviving the public API.
+- Rewriting probes has a short-term cost; leaving them unchanged would continue to mislead.
+- The race between `try_reply` and the subsequent `poll` over the same buffer relies on the launcher's single-threaded draining convention; multiple readers are out of scope.
 
 ## Rationale and alternatives
 
-- **唯一 three + AwaitEvent**：与「主 loop 拥有 reply、心跳只拥有 timer」的职责划分一致；one/two 破坏同构且生产未用。
-- **动作前 try_reply 而非推送中断**：物理上仍是 poll 驱动；逻辑上回复归属主 loop。备选「LLM 中可取消」成本高、与现 launcher 队列模型不合。
-- **统一 WAIT_GAP**：备选保留 MAIN_GAP 并改看板——多一个前缀无收益。
-- **保留 Fake 阻塞 send**：备选让 Fake 也实现 begin/poll——增加测试面，对体感真实性无帮助。
+- **Only three + AwaitEvent**: consistent with the division of responsibility in which “the main loop owns replies, and the heartbeat owns only the timer”; one/two break structural equivalence and are unused in production.
+- **try_reply before action rather than push interruption**: physically, the mechanism remains poll-driven; logically, replies belong to the main loop. The alternative, “cancellation during the LLM call,” is costly and incompatible with the current launcher queue model.
+- **Standardize on WAIT_GAP**: the alternative is to retain MAIN_GAP and change the dashboard—an extra prefix offers no benefit.
+- **Keep Fake's blocking send**: the alternative is to make Fake implement begin/poll too—this increases the testing surface without improving user experience realism.
 
 ## Prior art
 
-- 用户侧 IO 边界与等待菜单（内外窗口、四项菜单、开放 intent）。
-- 等待体感心跳底座（progress、有条件耗心）。
-- launcher 旁路 progress 与 control wire 兼容。
-- UI/agent 事件环：timer 心跳 + 完成事件归主状态机（常见于长任务客户端）。
+- User-side IO boundaries and waiting menu (inner/outer windows, four-item menu, open intent).
+- Heartbeat foundation for the waiting user experience (progress, conditional patience depletion).
+- Launcher side-channel progress and control wire compatibility.
+- UI/agent event loops: timer heartbeats + completion events owned by the main state machine (common in clients for long-running tasks).
 
 ## Unresolved questions
 
-（无强制留题；实现时若发现生产仍依赖 `waiting_mode=` 外部调用再开例外——当前仓内生产路径未传。）
+(No mandatory open questions; if implementation reveals that production still depends on external calls to `waiting_mode=`, open an exception then—the current in-repository production paths do not pass it.)
 
 ## Future possibilities
 
-- 若 LLM 费用成为瓶颈，另开「实验 fork」探针仓内对比合并跳，不回流 `run_session` 公共参数。
-- 心跳 prompt 内的「本请求已等 Ns」散文若与 `[+Ns]` 混淆，可再收成单一数字源。
-- 0012 正文若仍写「或 two 合并」，随本组落地改一句对齐（跨组文档追随，非本组文件）。
+- If LLM costs become a bottleneck, create a separate “experimental fork” probe to compare merged stages within the repository, without feeding this back into the public parameters of `run_session`.
+- If prose in the heartbeat prompt such as “this request has already waited Ns” causes confusion with `[+Ns]`, consolidate it further into a single numeric source.
+- If the 0012 body still says “or merge with two,” update that sentence when this group lands to align it (a cross-group documentation follow-up, not a file in this group).
 

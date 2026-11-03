@@ -1,4 +1,4 @@
-# Spec-0047/T2：manifest 原子创建与 journal 追加。
+# Spec-0047/T2: atomic manifest creation and journal append.
 from __future__ import annotations
 
 import json
@@ -20,7 +20,7 @@ def test_create_is_exclusive(tmp_path: Path) -> None:
     path = tmp_path / "manifest.json"
     create_manifest(path=path, data={"id": "a", "pin": "sha"})
     assert read_manifest(path=path)["id"] == "a"
-    with pytest.raises(ManifestError, match="已存在"):
+    with pytest.raises(ManifestError, match="already exists"):
         create_manifest(path=path, data={"id": "b"})
     assert read_manifest(path=path)["id"] == "a"
 
@@ -45,7 +45,7 @@ def test_journal_appends_and_manifest_stays(tmp_path: Path) -> None:
     assert json.loads(lines[0])["seq"] == 1
     assert json.loads(lines[1])["seq"] == 2
     assert_immutable(path=manifest, expected=frozen)
-    with pytest.raises(ManifestError, match="漂移"):
+    with pytest.raises(ManifestError, match="drift"):
         assert_immutable(path=manifest, expected={"experiment_id": "other"})
 
 

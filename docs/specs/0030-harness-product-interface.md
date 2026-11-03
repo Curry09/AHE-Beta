@@ -1,12 +1,12 @@
 ---
 number: "0030"
-title: harness 产品化边界：/help 用户说明、平台侧接口与 connector 适配
+title: "harness productization boundary: /help user documentation, platform-side interfaces, and connector adaptation"
 issue: 0
 slug: harness-product-interface
-summary: 把 harness 收敛为真人可运行产品：harness 模板内只保留 HELP.md 作为 /help 内容源、RUNTIME.md 作为维护说明；README/USER/MANUAL 不再作为模板文档，INTERFACE 归 AHE-Beta 平台侧；connector 适配 sim-user 到真人接口；launcher/template 支持 stdio-jsonl-v1 并兼容 legacy。
+summary: "Refine harness into a product that real users can run: retain only HELP.md as the /help content source and RUNTIME.md as maintenance guidance in the harness template; README/USER/MANUAL are no longer template documents, and INTERFACE belongs on the AHE-Beta platform side; connector adapts sim-user to the human-facing interface; launcher/template support stdio-jsonl-v1 and remain compatible with legacy."
 tasks:
   - id: T1
-    title: 写 0030 活快照
+    title: "Write the 0030 living snapshot"
     status: done
     priority: P1
     tags: []
@@ -15,10 +15,10 @@ tasks:
     parallel: false
     files:
       - docs/specs/0030-harness-product-interface.md
-    scope: 明确 harness=真人可运行产品、ahe-beta=训练/观测平台、connector=sim-user 到 human-facing interface adapter；用户帮助由 /help 读取 HELP.md；平台接口文档归 ahe-beta；不把 persona/feeling/issue/round/triage/sim_trace/user simulator 放进 harness。
-    acceptance: spec validate 通过；正文含 Summary/Motivation/Reference-level explanation/Rationale and alternatives；任务按 HELP/RUNTIME、平台侧接口、connector/protocol、边界分配清楚。
+    scope: "Define harness as a product that real users can run, ahe-beta as the training/observation platform, and connector as the adapter from sim-user to the human-facing interface; user help is read from HELP.md by /help; platform interface documentation belongs in ahe-beta; do not put persona/feeling/issue/round/triage/sim_trace/user simulator in harness."
+    acceptance: "spec validate passes; the body contains Summary/Motivation/Reference-level explanation/Rationale and alternatives; tasks are clearly allocated across HELP/RUNTIME, platform-side interfaces, connector/protocol, and boundaries."
   - id: T2
-    title: harness_template 精简为 HELP/RUNTIME/scripts/deps
+    title: "Streamline harness_template to HELP/RUNTIME/scripts/deps"
     status: done
     priority: P1
     tags: []
@@ -34,10 +34,10 @@ tasks:
       - backend/harness_template/scripts/run.sh
       - backend/harness_template/scripts/smoke.sh
       - backend/harness_template/scripts/check.sh
-    scope: harness 模板内只保留 HELP.md 作为 /help 内容源、RUNTIME.md 作为维护说明、env/deps/scripts 作为自包含运行套件；不保留 README.md、USER.md、MANUAL.md、INTERFACE.md。
-    acceptance: 新模板 checkout 后可通过 HELP/RUNTIME/scripts/env/deps 理解和运行；HELP 与 RUNTIME 分工清晰；模板文档不出现 persona/feeling/issue/round/triage/sim_trace/user simulator 等平台概念。
+    scope: "Retain only HELP.md as the /help content source, RUNTIME.md as maintenance guidance, and env/deps/scripts as a self-contained runtime suite in the harness template; do not retain README.md, USER.md, MANUAL.md, or INTERFACE.md."
+    acceptance: "After checkout, the new template can be understood and run using HELP/RUNTIME/scripts/env/deps; HELP and RUNTIME have clearly separated responsibilities; template documentation does not contain platform concepts such as persona/feeling/issue/round/triage/sim_trace/user simulator."
   - id: T3
-    title: /help slash 与模板自测
+    title: "/help slash command and template self-tests"
     status: done
     priority: P1
     tags: []
@@ -49,10 +49,10 @@ tasks:
       - backend/harness_template/entry.py
       - backend/harness_template/agents/main.md
       - backend/harness_template/tests/test_smoke.py
-    scope: 新增 /help slash：读取 HELP.md、返回帮助文本且不结束会话；/exit 和 /quit 仍结束会话；清理 entry.py / agents/main.md 平台词；模板自测覆盖 HELP 存在、/help 行为、scripts shebang、禁入平台词。
-    acceptance: 在 backend/harness_template 根下运行 python3 -m unittest discover -s tests -p 'test_*.py' 通过；/help 返回 HELP.md 内容且会话继续；/exit|/quit 仍退出；默认自测不依赖真实 LLM 网络。
+    scope: "Add the /help slash command: read HELP.md and return the help text without ending the session; /exit and /quit still end the session; remove platform terminology from entry.py / agents/main.md; template self-tests cover the presence of HELP, /help behavior, scripts shebangs, and prohibited platform terminology."
+    acceptance: "Running python3 -m unittest discover -s tests -p 'test_*.py' from the backend/harness_template root passes; /help returns the contents of HELP.md and the session continues; /exit|/quit still exit; default self-tests do not depend on real LLM network access."
   - id: T4
-    title: 产品提交边界：拒绝密钥与运行态
+    title: "Product commit boundary: reject secrets and runtime state"
     status: done
     priority: P1
     tags: []
@@ -63,10 +63,10 @@ tasks:
     files:
       - backend/ahe_beta/guards/harness_boundary.py
       - backend/tests/guards/test_harness_boundary.py
-    scope: guards/harness_boundary 使用产品提交拒绝清单：拒绝 .env、.env.*（.env.example 例外）和顶层 .openagents；正常产品代码、文档与配置可提交。
-    acceptance: HELP/RUNTIME/docs/src 与 .env.example 可提交；.env、.env.local 和 .openagents 被拒；本地钩子与 seed smoke 规则一致。
+    scope: "guards/harness_boundary uses a product commit denylist: reject .env, .env.* (except .env.example), and top-level .openagents; normal product code, documentation, and configuration may be committed."
+    acceptance: "HELP/RUNTIME/docs/src and .env.example may be committed; .env, .env.local, and .openagents are rejected; local hooks and seed smoke rules are consistent."
   - id: T6
-    title: connector 与 stdio-jsonl-v1 协议适配
+    title: "connector and stdio-jsonl-v1 protocol adaptation"
     status: done
     priority: P1
     tags: []
@@ -85,27 +85,27 @@ tasks:
       - backend/tests/harness/test_launcher.py
       - backend/harness_template/params.yaml
       - backend/ahe_beta/harness/INTERFACE.md
-    scope: connector 作为平台侧 adapter，把 sim-user 的 send/interrupt/shutdown 映射到真人接口；launcher 根据 params.yaml protocol/interface 选择 stdio-jsonl-v1 或 legacy wire；模板声明 v1 并双读 legacy/v1；平台侧 INTERFACE.md 记录 connector/launcher 协议。
-    acceptance: connector 满足 HarnessInterface；interrupt/give_up 走 connector 命名 API；launcher v1 fake entry 的 message/progress/reply/error/interrupt 测试通过且 legacy 继续通过；sim_user 离线跑通；平台侧 INTERFACE.md 存在并记录 v1/legacy。
+    scope: "connector serves as a platform-side adapter, mapping sim-user's send/interrupt/shutdown to the human-facing interface; launcher selects stdio-jsonl-v1 or legacy wire based on params.yaml protocol/interface; the template declares v1 and reads both legacy and v1; platform-side INTERFACE.md documents the connector/launcher protocol."
+    acceptance: "connector satisfies HarnessInterface; interrupt/give_up use the connector's named API; launcher v1 fake entry tests for message/progress/reply/error/interrupt pass, and legacy continues to pass; sim_user runs successfully offline; platform-side INTERFACE.md exists and documents v1/legacy."
 ---
 
-# 0030 · harness 产品化边界：/help 用户说明、平台侧接口与 connector 适配
+# 0030 · Harness productization boundary: /help user guidance, platform-side interface, and connector adaptation
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level rust-RFC nine-section overview. -->
 
 ## Summary
 
-旧内置 Developer 收尾中间件及其配置接线（原 T5）已退役；HELP.md 的平台读取行为仍由 T6 的 launcher 与接口测试覆盖。
+The old built-in Developer wrap-up middleware and its configuration wiring (the original T5) have been retired; platform-side reading of HELP.md remains covered by T6's launcher and interface tests.
 
-本组把 harness 从“ahe-beta 闭环里的被测对象片段”收敛为“真人可运行产品”的种子：harness 模板内只保留 `HELP.md` 作为 `/help` 内容源、`RUNTIME.md` 作为维护者说明，配合 `.env.example` / `requirements.txt` / `scripts/` / `tests/` 支撑独立运行和自测；`README.md`、`USER.md`、`MANUAL.md` 不再作为模板文档，`INTERFACE.md` 归 AHE-Beta 平台侧。
+This group refines harness from “a fragment of the system under test in the ahe-beta closed loop” into a seed for “a product that real users can run”: the harness template retains only `HELP.md` as the content source for `/help` and `RUNTIME.md` as maintainer guidance, together with `.env.example` / `requirements.txt` / `scripts/` / `tests/` to support independent operation and self-testing; `README.md`, `USER.md`, and `MANUAL.md` are no longer template documents, and `INTERFACE.md` belongs on the AHE-Beta platform side.
 
-同时，平台侧新增 `HarnessConnector` 作为 sim-user 到真人接口的 adapter，并让 launcher/template 支持 `stdio-jsonl-v1`：新模板通过 `params.yaml` 声明 v1，旧 wire 仍兼容。harness 不接收 persona、feeling、issue、round、triage、sim_trace 等训练/观测概念。
+At the same time, the platform side adds `HarnessConnector` as an adapter from sim-user to the human-facing interface, and enables launcher/template to support `stdio-jsonl-v1`: the new template declares v1 through `params.yaml`, while the old wire remains compatible. harness does not accept training/observation concepts such as persona, feeling, issue, round, triage, or sim_trace.
 
 ## Motivation
 
-“自包含 harness”的重点不是堆文档，而是让真人或维护者只看 harness 仓就知道如何使用和维护这个产品，同时让 AHE-Beta 平台通过 connector 适配它。此前 README / USER / MANUAL / INTERFACE 同时存在，职责重叠且容易把平台接缝文档塞进 harness 本体；这会让被进化目标混入训练平台概念，削弱边界。
+The point of a “self-contained harness” is not to pile up documentation, but to let real users or maintainers understand how to use and maintain the product by looking only at the harness repo, while allowing the AHE-Beta platform to adapt to it through connector. Previously, README / USER / MANUAL / INTERFACE coexisted with overlapping responsibilities, making it easy to put platform integration documentation into harness itself; this would mix training platform concepts into the target of evolution and weaken the boundary.
 
-本组将用户帮助收敛到产品内 `/help`，将协议说明移到平台侧，并用 connector 把模拟用户动作适配成人类会对 harness 做的动作。这样 harness 是产品，ahe-beta 是训练/观测平台，connector/launcher 是接缝。
+This group consolidates user help in the in-product `/help`, moves protocol documentation to the platform side, and uses connector to adapt simulated user actions into actions a human would perform on harness. Thus harness is the product, ahe-beta is the training/observation platform, and connector/launcher form the integration boundary.
 
 ## Guide-level explanation
 
@@ -114,68 +114,68 @@ AHE-Beta
   user simulator / feeling / issue / triage / metrics / orchestrator
           │
           ▼
-  HarnessConnector + HarnessLauncher（平台侧接缝）
+  HarnessConnector + HarnessLauncher (platform-side integration seam)
           │  stdio-jsonl-v1 / legacy
           ▼
 harness repo
   entry.py + HELP.md + RUNTIME.md + agents/tools/scripts/tests
 ```
 
-harness repo 内只有两类文字说明：
+There are only two types of textual guidance in the harness repo:
 
-- `HELP.md`：给真人用户看的 `/help` 内容源，说明能做什么、怎么退出、怎么打断、工作区语义。
-- `RUNTIME.md`：给维护者看的运行边界，说明 harness 仓、workspace、NexAU、session/timeout/interrupt 等维护约束。
+- `HELP.md`: the `/help` content source for real users, describing what the product can do, how to exit, how to interrupt, and workspace semantics.
+- `RUNTIME.md`: runtime boundaries for maintainers, describing maintenance constraints for the harness repo, workspace, NexAU, session/timeout/interrupt, and so on.
 
-程序接口说明不放在 harness 模板内，放在 `backend/ahe_beta/harness/INTERFACE.md`，因为它服务 connector/launcher 维护者。
+The programmatic interface documentation is not placed in the harness template; it is placed in `backend/ahe_beta/harness/INTERFACE.md` because it serves connector/launcher maintainers.
 
 ## Reference-level explanation
 
-### Harness template 文件职责
+### Harness template file responsibilities
 
-`LICENSE` 随独立 seed Harness 分发，保留项目 MIT 许可；它不作为 `/help` 内容。
+`LICENSE` is distributed with the standalone seed Harness and retains the project's MIT license; it is not content for `/help`.
 
-| 文件 | 职责 |
+| File | Responsibility |
 |------|------|
-| `backend/harness_template/HELP.md` | `/help` 返回内容，用户能力说明 |
-| `backend/harness_template/RUNTIME.md` | 维护者 runtime 边界 |
-| `backend/harness_template/.env.example` | `LLM_MODEL` / `LLM_BASE_URL` / `LLM_API_KEY` / `SANDBOX_WORK_DIR` 模板 |
-| `backend/harness_template/requirements.txt` | harness 自身最小依赖清单 |
-| `backend/harness_template/scripts/*.sh` | 运行、自测、统一 check |
-| `backend/harness_template/tests/*` | harness 自身自测，不放任务项目测试 |
+| `backend/harness_template/HELP.md` | Content returned by `/help`, describing user capabilities |
+| `backend/harness_template/RUNTIME.md` | Runtime boundaries for maintainers |
+| `backend/harness_template/.env.example` | `LLM_MODEL` / `LLM_BASE_URL` / `LLM_API_KEY` / `SANDBOX_WORK_DIR` template |
+| `backend/harness_template/requirements.txt` | Minimal dependency list for harness itself |
+| `backend/harness_template/scripts/*.sh` | Run, self-test, and unified check |
+| `backend/harness_template/tests/*` | Self-tests for harness itself; no task project tests |
 
-模板不再包含 `README.md`、`USER.md`、`MANUAL.md`、`INTERFACE.md`。
+The template no longer contains `README.md`, `USER.md`, `MANUAL.md`, or `INTERFACE.md`.
 
 ### Slash help
 
-`/help` 是普通 message 内的产品命令：
+`/help` is a product command inside an ordinary message:
 
 ```text
 message: /help
-→ entry.py 读取 HELP.md
-→ 输出 reply
-→ 会话继续
+→ entry.py reads HELP.md
+→ outputs reply
+→ session continues
 ```
 
-`/exit` 和 `/quit` 仍输出 reply 后结束会话。未知 slash 仍交给 agent 作为普通用户消息处理。
+`/exit` and `/quit` still end the session after outputting a reply. Unknown slash commands are still passed to the agent as ordinary user messages.
 
-### Connector 与协议
+### Connector and protocol
 
-`HarnessConnector` 提供平台侧语义 API：
+`HarnessConnector` provides a platform-side semantic API:
 
-- `send_user_message(text)` / `send(text)`：只转发人类可输入文本。
-- `interrupt()`：打断当前请求。
-- `shutdown()`：结束当前 harness 过程。
+- `send_user_message(text)` / `send(text)`: forward only text that a human can enter.
+- `interrupt()`: interrupt the current request.
+- `shutdown()`: end the current harness process.
 
-训练/观测数据不穿过 connector 进入 harness。
+Training/observation data does not pass through connector into harness.
 
-`HarnessLauncher` 根据 `params.yaml`：
+`HarnessLauncher` uses `params.yaml` as follows:
 
-- `protocol: stdio-jsonl-v1` → 发送 `{"type":"message","text":...}` / `{"type":"interrupt"}` / `{"type":"shutdown"}`，读取 `type=progress/reply/error`。
-- 缺失或 `legacy` → 旧 `{"message"}` / `{"control"}` 与 `{"reply"}` / `{"progress"}`。
+- `protocol: stdio-jsonl-v1` → send `{"type":"message","text":...}` / `{"type":"interrupt"}` / `{"type":"shutdown"}`, read `type=progress/reply/error`.
+- Missing or `legacy` → old `{"message"}` / `{"control"}` and `{"reply"}` / `{"progress"}`.
 
 ### Boundary
 
-当前提交边界采用拒绝清单：正常产品代码、文档和配置可提交；拒绝 `.env`、`.env.*`（`.env.example` 例外）及顶层 `.openagents`。不再按固定产品文件名限制合法扩展。
+The current commit boundary uses a denylist: normal product code, documentation, and configuration may be committed; reject `.env`, `.env.*` (except `.env.example`), and top-level `.openagents`. Legitimate extensions are no longer restricted to fixed product filenames.
 
 ### DAG / file allocation
 
@@ -185,14 +185,14 @@ T1 ─┬→ T2 ─┬→ T3
     │      └→ T6
 ```
 
-- T1 写 spec。
-- T2 收敛模板文档/脚本/依赖。
-- T3 实现 `/help` 并加自测。
-- T4 维护产品提交拒绝清单。
-- 原 T5 的旧收尾检查接线已退役；平台读取 HELP.md 由 T6 维护。
-- T6 connector 与 v1/legacy 协议适配。
+- T1 writes the spec.
+- T2 consolidates template documentation/scripts/dependencies.
+- T3 implements `/help` and adds self-tests.
+- T4 maintains the product commit denylist.
+- The old wrap-up check wiring from the original T5 has been retired; platform-side reading of HELP.md is maintained by T6.
+- T6 handles connector and v1/legacy protocol adaptation.
 
-### E2E 验证路径
+### E2E verification path
 
 ```bash
 ./tools/spec-driven-development/spec validate
@@ -203,44 +203,44 @@ uv run pytest backend/tests/user/sim/test_heartbeat.py backend/tests/harness/tes
 
 ## Drawbacks
 
-- v1 与 legacy 双栈会短期共存，直到确认不需要旧 wire。
-- 删除 README/USER/MANUAL 会让人类直接浏览仓时入口更少，依赖 `/help` 与 `RUNTIME.md` 的分工。
+- The v1 and legacy stacks will coexist in the short term, until the old wire is confirmed to be unnecessary.
+- Removing README/USER/MANUAL leaves fewer entry points for people browsing the repo directly, making them dependent on the division of responsibilities between `/help` and `RUNTIME.md`.
 
 ## Rationale and alternatives
 
-### 为什么用 HELP.md 而不是 USER.md / MANUAL.md
+### Why HELP.md instead of USER.md / MANUAL.md
 
-用户帮助是产品能力，最自然的入口是 `/help`。`HELP.md` 作为 `/help` 内容源比 `USER.md` / `MANUAL.md` 更贴近 CLI 产品习惯，也避免旧文档名和平台读取属性混淆。
+User help is a product capability, and the most natural entry point is `/help`. `HELP.md` as the content source for `/help` is closer to CLI product conventions than `USER.md` / `MANUAL.md`, and also avoids confusion between old document names and platform-side reading behavior.
 
-### 为什么 INTERFACE 不在 harness_template
+### Why INTERFACE is not in harness_template
 
-协议细节服务 AHE-Beta connector/launcher 维护者，不是给真人用户看的能力说明。把它放在平台侧能避免 harness 模板承担接缝文档职责。
+Protocol details serve AHE-Beta connector/launcher maintainers, not as capability documentation for real users. Placing them on the platform side prevents the harness template from taking on responsibility for integration documentation.
 
-### 为什么不保留 README
+### Why not retain README
 
-当前 seed 已由 `HELP.md`、`RUNTIME.md`、scripts 和 tests 提供使用/维护入口。README 会与 HELP 重叠，增加模板重量。若未来需要独立发行，可另开 spec 重新引入极薄 README。
+The current seed already provides entry points for usage and maintenance through `HELP.md`, `RUNTIME.md`, scripts, and tests. README would overlap with HELP and add weight to the template. If standalone distribution is needed in the future, a separate spec can reintroduce a minimal README.
 
-### 为什么保留 legacy
+### Why retain legacy
 
-历史 harness refs 与现有测试仍使用 legacy wire。v1 通过 `params.yaml` 显式启用，旧 ref 默认 legacy，降低迁移风险。
+Historical harness refs and existing tests still use the legacy wire. v1 is explicitly enabled through `params.yaml`, while old refs default to legacy, reducing migration risk.
 
 ## Prior art
 
-- 0013：harness present protocol，reply/progress/steps/interrupt 基础语义。
-- 0019：launcher 接受非 reply sideband。
-- 0022：内外通道、interrupt 与 slash 语义。
-- 0023：事件化等待环与 try_reply。
-- 0014：dev 侧提交纪律与用户可见帮助同步硬闸。
-- 0015：harness 提交边界与过拟合泄漏隔离。
+- 0013: harness present protocol, basic reply/progress/steps/interrupt semantics.
+- 0019: launcher accepts non-reply sideband.
+- 0022: internal and external channels, interrupt and slash semantics.
+- 0023: event-driven wait loop and try_reply.
+- 0014: dev-side commit discipline and a hard gate for synchronizing user-visible help.
+- 0015: harness commit boundary and isolation from overfitting leakage.
 
 ## Unresolved questions
 
-- legacy wire 何时退场。
-- 是否未来允许 `harness/` 作为产品源码生长目录；本组不处理。
+- When to retire the legacy wire.
+- Whether to allow `harness/` as a directory for product source growth in the future; this group does not address it.
 
 ## Future possibilities
 
-- launcher 进一步拆成 protocol codec + process transport + connector factory。
-- connector 成为 `HarnessLauncher.launch()` 的默认返回对象，避免上层重复 wrap。
-- legacy wire 退场后删除 `control()` 公共方法，只保留 `interrupt()/shutdown()` 语义 API。
-- 如果未来证明需要独立发行，再引入极薄 README 或 package manifest。
+- Further split launcher into protocol codec + process transport + connector factory.
+- Make connector the default return object of `HarnessLauncher.launch()`, avoiding repeated wrapping by upper layers.
+- After the legacy wire is retired, remove the `control()` public method and retain only the `interrupt()/shutdown()` semantic API.
+- If standalone distribution proves necessary in the future, reintroduce a minimal README or package manifest.

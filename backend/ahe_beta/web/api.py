@@ -1,8 +1,9 @@
-"""前端观测看板的只读 HTTP 层（FastAPI）。
+"""Read-only HTTP layer for frontend observation dashboard (FastAPI).
 
-复用既有 Metrics/SessionStore/IssueTracker 的只读路径，序列化为 JSON 供前端 SPA 消费。
-不新增存储、不写任何状态、不引入 benchmark。端点为同步 def（读本地文件，避免阻塞 event loop 的
-ASYNC 告警）。create_app 注入依赖（测试传 Fake，运行时传真），便于无网络单测。
+Reuses existing read paths from Metrics/SessionStore/IssueTracker, serialized as JSON for frontend SPA consumption.
+No new storage, no state writes, no benchmark introduction. Endpoints are synchronous def (read local files,
+avoiding ASYNC blocking warnings on event loop). create_app injects dependencies (Fake for testing, real on runtime),
+enabling offline unit tests.
 """
 
 from __future__ import annotations
@@ -40,9 +41,9 @@ from ahe_beta.web.issue_timeline import build_issue_timeline, unavailable_timeli
 
 
 class _SPAStaticFiles(StaticFiles):
-    """托管 SPA：真实文件（index.html / assets/*）照常返回；其余路径（前端路由如 /agentboard、
-    /sessions/:id 的深链/刷新）回退到 index.html，交给 BrowserRouter 客户端路由。/api/* 由更早注册的
-    路由优先匹配，不会落到这里。"""
+    """Host SPA: real files (index.html / assets/*) returned as-is; other paths (frontend routes like /agentboard,
+    deep links/refreshes for /sessions/:id) fall back to index.html, delegated to BrowserRouter client routing.
+    /api/* matched by earlier-registered routes takes priority and does not reach here."""
 
     async def get_response(self, path: str, scope: Scope) -> Response:
         try:
@@ -54,7 +55,7 @@ class _SPAStaticFiles(StaticFiles):
 
 
 def _open_issue_count(*, tracker: IssueTracker | None) -> int | None:
-    """当前 open issue 数；无 tracker 或读取失败时降级为 None（不抛 500）。"""
+    """Current open issue count; degrades to None if no tracker or read fails (no 500 raised)."""
     if tracker is None:
         return None
     try:
@@ -64,7 +65,7 @@ def _open_issue_count(*, tracker: IssueTracker | None) -> int | None:
 
 
 def _summarize(*, store: SessionStore, row: dict) -> dict[str, object]:
-    """index 行 + 从全量补 persona_identity 与截断后的 scenario，组装列表摘要 DTO。"""
+    """Index row + supplement persona_identity and truncated scenario from full data, assemble list summary DTO."""
     # Spec-0073/T5: project provenance from the full authoritative session.
     session = store.load(row["session_id"])
     scenario = session.scenario.description
@@ -84,16 +85,17 @@ def _summarize(*, store: SessionStore, row: dict) -> dict[str, object]:
 
 
 def _annotate_issues(*, issues: list[dict]) -> None:
-    """就地给每条 issue 附平台层派生字段（Spec-0029/T9，纯标签/正文解析、无新存储）：
+    """In-place attach platform-layer derived fields to each issue (Spec-0029/T9, pure label/body parsing, no new storage):
 
-    - `plane`——report/proposal/ready（三平面投影，旧标签经映射；终态/无平面为 None）；
-    - `provenance`——from-triage/from-architect/from-divergent（提案来源，无则 None）；
-    - `kind` / `round` / `priority`——同 0025/T7 投影；
-    - `triage_status`——旧口径单值投影（旧数据前端展示兼容；新数据以 plane 为准）；
-    - `reject_reason`——declined（及旧 rejected/needs-info）关闭原因；DTO 带 `reason` 时透出，
-      权威原因见详情端点的评论；
-    - `covers: list[int]`——body covers 机器行声明的票号（issue_schema 单一真源解析，任何票都解）；
-    - `covered_by: int | None`——被哪张 **open** 带 covers 的票（提案/工作项）覆盖，多票取号最小。
+    - `plane`—report/proposal/ready (three-plane projection, old labels mapped; end state/no plane is None);
+    - `provenance`—from-triage/from-architect/from-divergent (proposal origin, None if absent);
+    - `kind` / `round` / `priority`—same projection as 0025/T7;
+    - `triage_status`—old-convention single-value projection (for legacy data frontend compatibility; new data uses plane);
+    - `reject_reason`—declined (and legacy rejected/needs-info) closure reason; DTO includes `reason` when present,
+      authoritative reason in detail endpoint comments;
+    - `covers: list[int]`—issue numbers declared in body covers machine line (issue_schema single source of truth,
+      parsed for any issue);
+    - `covered_by: int | None`—which **open** issue with covers (proposal/work item) covers this one, smallest number if multiple.
     """
     covered_by: dict[int, int] = {}
     for it in issues:
@@ -118,15 +120,15 @@ def _annotate_issues(*, issues: list[dict]) -> None:
 
 
 def _list_issues(*, tracker: IssueTracker | None, board_url: str | None) -> dict[str, object]:
-    """Gitea 看板整合：列全状态 issue（含正文/时间戳）+ 看板链接；无 tracker 或读取失败时
-    connected=False。tracker 无 list_issues 观测能力（Fake）时回落 open issue 列表。"""
+    """Gitea dashboard integration: list all-state issues (including body/timestamps) + dashboard link; connected=False
+    if no tracker or read fails. Tracker without list_issues observation capability (Fake) falls back to open issue list."""
     if tracker is None:
         return {"connected": False, "board_url": board_url, "issues": []}
     fetch_all = getattr(tracker, "list_issues", None)
     try:
         if callable(fetch_all):
             issues = fetch_all(state="all")
-        else:  # Fake 等仅协议实现：回落 open 集（正文仍有，时间戳缺省）
+        else:  # Fake protocol-only implementation: fall back to open set (body present, timestamp defaults)
             issues = [
                 {
                     "number": i.number,
@@ -147,7 +149,7 @@ def _list_issues(*, tracker: IssueTracker | None, board_url: str | None) -> dict
 
 
 def _issue_detail(*, tracker: IssueTracker | None, number: int) -> dict[str, object]:
-    """单条 issue 全量 + 评论 + 标签演进。timeline 单独失败不拖断 issue/comments。"""
+    """Single issue in full + comments + label evolution. Timeline failure alone does not break issue/comments."""
     get_issue = getattr(tracker, "get_issue", None)
     list_comments = getattr(tracker, "list_comments", None)
     if tracker is None or not callable(get_issue) or not callable(list_comments):
@@ -182,7 +184,7 @@ def _issue_detail(*, tracker: IssueTracker | None, number: int) -> dict[str, obj
 
 
 def _commit_detail(*, tracker: IssueTracker | None, sha: str) -> dict[str, object]:
-    """单个 commit 全量（message 全文/stats/files/diff）。不存在抛 404；无能力/读失败 connected=False。"""
+    """Single commit in full (complete message/stats/files/diff). Raises 404 if not found; connected=False if capability absent or read fails."""
     fetch = getattr(tracker, "get_commit_detail", None)
     if tracker is None or not callable(fetch):
         return {"connected": False, "commit": None}
@@ -195,14 +197,14 @@ def _commit_detail(*, tracker: IssueTracker | None, sha: str) -> dict[str, objec
     return {"connected": True, "commit": commit}
 
 
-# Spec-0032/T7：交付面「卡人」标签（OpenAgents 的 needs-human 终态）——无人值守环里唯一要人清的死票。
+# Spec-0032/T7: delivery-layer "blocking" label (OpenAgents' needs-human end state)—the only dead ticket requiring manual clearing in unattended loops.
 _NEEDS_HUMAN = "needs-human"
 
 
 def _delivery(*, tracker: IssueTracker | None) -> dict[str, object]:
-    """交付面观测（Spec-0032/T7）：open PR 列表 + needs-human 积压计数（PR 与 issue 双源）。
+    """Delivery-layer observation (Spec-0032/T7): open PR list + needs-human backlog count (dual-sourced from PR and issue).
 
-    tracker 无 list_pulls 观测能力（Fake）或读失败时 connected=False（前端降级为占位，不抛 500）。
+    connected=False if tracker lacks list_pulls observation capability (Fake) or read fails (frontend degrades to placeholder, no 500).
     """
     fetch = getattr(tracker, "list_pulls", None)
     if tracker is None or not callable(fetch):
@@ -219,8 +221,8 @@ def _delivery(*, tracker: IssueTracker | None) -> dict[str, object]:
 
 
 def _list_commits(*, tracker: IssueTracker | None, commits_url: str | None) -> dict[str, object]:
-    """main 分支更新：列 harness 仓最近 commit + vK tag。tracker 无该读能力（Fake）或读取失败时
-    connected=False（前端降级为占位，不抛 500）。"""
+    """Main branch updates: list recent commits on harness repo + vK tags. connected=False if tracker lacks this read capability (Fake)
+    or read fails (frontend degrades to placeholder, no 500)."""
     fetch = getattr(tracker, "list_recent_commits", None)
     if tracker is None or not callable(fetch):
         return {"connected": False, "commits_url": commits_url, "commits": []}
@@ -297,14 +299,15 @@ def create_app(
 
     @app.get("/api/overview")
     def overview() -> dict[str, object]:
-        metrics = Metrics(tracker, store)  # tracker 仅 open_issue_count 用，trend/curve 不触
+        # tracker only used for open_issue_count, trend/curve not triggered
+        metrics = Metrics(tracker, store)
         return {
             "open_issue_count": _open_issue_count(tracker=tracker),
             "session_count": len(store.index()),
             "feeling_trend": metrics.feeling_trend(),
             "feedback_counts": metrics.feedback_counts(),
             "issue_curve": metrics.issue_curve(),
-            "funnel": metrics.funnel(),  # Spec-0029/T9：三平面漏斗当前量（report/proposal/ready）
+            "funnel": metrics.funnel(),  # Spec-0029/T9: current three-plane funnel quantities (report/proposal/ready)
         }
 
     @app.get("/api/issues")
@@ -313,7 +316,7 @@ def create_app(
 
     @app.get("/api/delivery")
     def delivery() -> dict[str, object]:
-        # Spec-0032/T7：交付面观测——open PR + needs-human 积压（vigil 的工作切面，只读）。
+        # Spec-0032/T7: delivery-layer observation—open PR + needs-human backlog (vigil work cross-section, read-only).
         return _delivery(tracker=tracker)
 
     @app.get("/api/issues/{number}")
@@ -330,22 +333,22 @@ def create_app(
 
     @app.get("/api/state")
     def state() -> dict[str, object]:
-        # 整条 run 的运行态（data/live/run.json）：running/当前轮/总轮数/各轮 main SHA。
+        # Running state for entire run (data/live/run.json): running/current round/total rounds/each round main SHA.
         return read_live_run(data_dir=live_root)
 
     @app.get("/api/history")
     def history() -> dict[str, object]:
-        # 按轮归档的已完成工作项（data/live/history.json），前端按 round 分组回看。
+        # Completed work items archived by round (data/live/history.json), frontend groups by round for historical review.
         return {"items": read_history(data_dir=live_root)}
 
     @app.get("/api/config")
     def config() -> dict[str, object]:
-        # 编制（单一真源，与后端 run.py 同一份 roster）：前端据此定三个房间的容量。
+        # Roster (single source of truth, same file as backend run.py): frontend uses this to configure the capacity of three rooms.
         return {"roster": roster if roster is not None else load_roster()}
 
     @app.get("/api/agents")
     def agents() -> dict[str, object]:
-        # 多 agent 活动注册表（data/live/agents.json，与 data/sessions 同级），跑闭环时各 agent 实时更新。
+        # Multi-agent activity registry (data/live/agents.json, at same level as data/sessions); each agent updates in real time during closed-loop runs.
         return {"agents": read_agents(data_dir=live_root)}
 
     @app.get("/api/sessions")
@@ -440,7 +443,7 @@ def create_app(
     def session_usage(session_id: str) -> dict[str, object]:
         return usage_store.summary(session_id=session_id)
 
-    # 构建过前端则由 FastAPI 直接托管 SPA（开发期 dist 不存在，跳过）。
+    # If frontend has been built, FastAPI serves the SPA directly (during development dist does not exist, skip).
     dist = Path(__file__).resolve().parents[3] / "frontend" / "dist"
     if dist.is_dir():
         app.mount("/", _SPAStaticFiles(directory=str(dist), html=True), name="static")
@@ -454,7 +457,7 @@ def _default_store() -> SessionStore:
 
 
 def _default_tracker() -> IssueTracker | None:
-    """有 Gitea 环境变量则接真 tracker，否则 None（open 数显示 —）。"""
+    """If Gitea environment variables are set, use real tracker; otherwise None (open count displays —)."""
     base_url = os.environ.get("GITEA_URL")
     owner = os.environ.get("OWNER")
     repo = os.environ.get("REPO")
@@ -467,7 +470,7 @@ def _default_tracker() -> IssueTracker | None:
 
 
 def _default_board_url() -> str | None:
-    """Gitea 看板地址：{GITEA_URL}/{OWNER}/{REPO}/issues，环境不全则 None。"""
+    """Gitea board address: {GITEA_URL}/{OWNER}/{REPO}/issues; None if environment is incomplete."""
     base_url = os.environ.get("GITEA_URL")
     owner = os.environ.get("OWNER")
     repo = os.environ.get("REPO")
@@ -477,7 +480,7 @@ def _default_board_url() -> str | None:
 
 
 def _default_repo_url() -> str | None:
-    """Gitea 仓地址：{GITEA_URL}/{OWNER}/{REPO}，环境不全则 None（commit 列表降级为空）。"""
+    """Gitea repository address: {GITEA_URL}/{OWNER}/{REPO}; None if environment is incomplete (commit list degrades to empty)."""
     base_url = os.environ.get("GITEA_URL")
     owner = os.environ.get("OWNER")
     repo = os.environ.get("REPO")

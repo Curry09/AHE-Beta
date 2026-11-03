@@ -1,10 +1,13 @@
-# Spec-0042/T5：Architect 在规范化 ProposalView 上形成结构提案。
-"""Architect 驱动器。
+# Spec-0042/T5: Architect forms structural proposals on normalized ProposalView.
+"""Architect driver.
 
-该角色读取 ready queue、开放 ProposalView、体验趋势，按需检索会话/制品观测证据并只读检查
-harness 现状。输出写入 proposal 平面并标记 from-architect。`covers` 是 Architect 对来源提案
-的吸收决定。PM 路线不进入本角色的提案、ready 输入或证据授权，直接交给 Owner。
-Owner 协调双轨交接并保留独立验收。RFC 标签和 submit_rfcs 工具属于提案协议。
+This role reads the ready queue, open ProposalView, experience trends, retrieves session/artifact
+observation evidence as needed, and performs read-only checks on harness status. Output is written
+to the proposal plane and marked from-architect. `covers` represents the Architect's absorption
+decision for source proposals. PM-track proposals do not enter this role's proposals, ready input,
+or evidence authorization; they are passed directly to Owner. Owner coordinates the dual-track
+handoff and retains independent acceptance. RFC labels and submit_rfcs tool belong to the proposal
+protocol.
 """
 
 from __future__ import annotations
@@ -40,7 +43,7 @@ from ahe_beta.tracker.base import IssueTracker
 from ahe_beta.usage import current_usage_context
 from ahe_beta.user.session_store import SessionStore
 
-# 一次 propose_once 是多轮工具调用（读文件 + 综合 + 按需 timeline/beat/step 渐进下钻）；给足墙钟防挂死。
+# A single propose_once involves multiple tool calls (reading files + synthesis + progressive drill-down through timeline/beat/step as needed); allow sufficient wall-clock time to prevent hangs.
 _SYNTHESIS_TIMEOUT = 3600
 
 StatusFn = Callable[..., None]
@@ -48,7 +51,7 @@ StatusFn = Callable[..., None]
 
 @dataclass
 class SynthesisOutcome:
-    """一次 propose_once 的结果：产出的结构提案与被吸收来源。"""
+    """Result of a single propose_once: the structural proposal produced and the source proposals absorbed."""
 
     proposal_numbers: list[int] = field(default_factory=list)
     merged_numbers: list[int] = field(default_factory=list)
@@ -63,7 +66,7 @@ class SynthesisOutcome:
 
 @dataclass(frozen=True)
 class _Proposal:
-    """解析后的结构提案：标题、规范化字段和 Architect 的吸收决定。"""
+    """Parsed structural proposal: title, normalized fields, and the Architect's absorption decision."""
 
     title: str
     artifact: dict
@@ -71,12 +74,12 @@ class _Proposal:
 
 
 def _parse_covers(raw: object) -> tuple[int, ...]:
-    """提案的 covers 字段 → 去重正整数元组；非列表/非法元素静默丢弃（宽进严出）。"""
+    """The covers field of a proposal → deduplicated positive integer tuple; non-list or invalid elements are silently discarded (liberal input, strict output)."""
     if not isinstance(raw, list):
         return ()
     out: list[int] = []
     for x in raw:
-        # bool 是 int 子类，需显式排除（True 会被当 #1）。
+        # bool is a subclass of int and must be explicitly excluded (True would be treated as #1).
         if isinstance(x, bool) or not isinstance(x, int) or x <= 0:
             continue
         if x not in out:
@@ -85,7 +88,7 @@ def _parse_covers(raw: object) -> tuple[int, ...]:
 
 
 class Architect:
-    """architect 驱动器：综合全局、创建结构提案并吸收其 covers 来源。"""
+    """Architect driver: synthesize global context, create structural proposals, and absorb their source covers."""
 
     def __init__(
         self,
@@ -99,12 +102,12 @@ class Architect:
         recovery: RecoveryStore | None = None,
     ) -> None:
         self._tracker = tracker
-        self._store = store  # 体感曲线数据源（本地 SessionStore 索引）
-        self._repo = Path(harness_repo)  # 只读 grounding：agent 看 harness 现状
+        self._store = store  # Experience curve data source (local SessionStore index)
+        self._repo = Path(harness_repo)  # Read-only grounding: agent views harness status
         self._agent_def = Path(agent_def_dir)
         self._on_status = on_status
         self._on_event = (
-            on_event  # 过程流回调 (kind, text)：assistant 发言/工具调用/结果，看板时间线用
+            on_event  # Process events (kind, text): assistant/tool/result for the timeline
         )
         self._round_provider = round_provider
         # Spec-0055/T4: set only for a single protocol-recovery call when the model
@@ -172,13 +175,13 @@ class Architect:
                         dict(item) for item in observed.get("rejected_proposals") or []
                     ],
                 )
-        # Spec-0029/T4：输入 = ready 工作队列 + 待准入提案索引（编排保证跑在本轮 triage 之后，
-        # 索引因此含本轮新升的 from-triage 提案）。提案索引兼作「勿重复提」参照。
+        # Spec-0029/T4: Input = ready work queue + pending-admission proposal index (orchestration ensures it runs after this round's triage,
+        # index thus includes from-triage proposals elevated this round). The proposal index also serves as a reference for "do not duplicate."
         ready = [i for i in backlog if plane(i.labels) == READY]
         proposals_open = [i for i in backlog if plane(i.labels) == PROPOSAL]
         self._emit(
             running=True,
-            status=f"综合中…（ready={len(ready)} · 待准入提案={len(proposals_open)}）",
+            status=f"Synthesizing… (ready={len(ready)} · awaiting admission={len(proposals_open)})",
         )
 
         if recovery_unit is not None and recovery_unit.get("output_digest"):
@@ -255,12 +258,12 @@ class Architect:
                 [item for item in [*ready, *proposals_open] if item.number in source_ids]
             )
             if source_sessions:
-                body += "\n\n## 证据引用\n\n" + "\n".join(
+                body += "\n\n## Evidence references\n\n" + "\n".join(
                     f"- session_id: {sid}" for sid in sorted(source_sessions)
                 )
             covers_line = format_covers_line(list(covers))
             if covers_line:
-                # 机器行 = Architect 吸收决定的单一真源（消费方：状态迁移、web 展示）。创建后不改写。
+                # Machine row = single source of truth for the Architect's absorption decision (consumers: state transition, web display). Not modified after creation.
                 body = f"{body}\n\n{covers_line}"
             labels = [PROPOSAL, FROM_ARCHITECT] + ([round_name] if round_name else [])
             draft = IssueDraft(title=str(prop.title), body=body, labels=labels)
@@ -288,7 +291,7 @@ class Architect:
                             else None
                         ),
                     )
-                except Exception as exc:  # noqa: BLE001  单条来源失败不废目标提案
+                except Exception as exc:  # noqa: BLE001  Single source failure does not invalidate the target proposal
                     failed_merges[source_number] = f"{type(exc).__name__}: {exc}"
                 else:
                     failed_merges.pop(source_number, None)
@@ -298,12 +301,13 @@ class Architect:
         self._emit(
             running=False,
             status=(
-                f"提了 {len(numbers)} 条结构提案，吸收 {len(merged_numbers)} 条来源（待准入）"
+                f"Created {len(numbers)} structural proposals, absorbed {len(merged_numbers)} sources (awaiting admission)"
                 if numbers
-                else "本轮无结构提案"
+                else "No structural proposals this round"
             ),
             proposals=numbers,
-            detail=(result_text or None),  # 最终报告全文（详情面板展示，不截断）
+            # Full final report (shown in detail panel, not truncated)
+            detail=(result_text or None),
         )
         result = SynthesisOutcome(
             proposal_numbers=numbers,
@@ -339,7 +343,7 @@ class Architect:
         return result
 
     def _merge_covered(self, issue, *, into: int, operation_prefix: str | None = None) -> None:
-        """按 Architect 的 covers 决定整体吸收一个仍开放的来源。"""
+        """Wholly absorb a still-open source according to the Architect's covers decision."""
         drop = {
             PROPOSAL,
             REPORT,
@@ -387,27 +391,32 @@ class Architect:
         # inferred from an earlier artifact's fields or source constants.
         del runtime
         msg = (
-            "你是 Architect。以下是 ready queue 与开放 ProposalView。只分析已有提案之间的结构关系、"
-            "共同张力和可复用机制；每条输出必须引用至少两个可见提案。体验趋势仅作"
-            "背景证据，不能替代跨提案关系。\n"
-            "若可见 ProposalView 已携带会话证据引用，可按需查阅观测文件、时间线、beat、step "
-            "验证关系；不得用这些工具脱离 proposal 重新发现单票需求。\n"
-            "结构提案不规定数据结构、协议或实施步骤。`covers` 是你对来源提案的吸收决定；"
-            "结构提案创建成功后，driver 会合并关闭其中仍开放的 report/proposal 来源。未放入"
-            "covers 的来源继续独立交付。\n\n"
-            f"## ready 工作队列（{len(ready)} 条）\n{self._format_backlog(ready, store=self._store)}\n\n"
-            f"## 开放 ProposalView（{len(proposals)} 条）\n{self._format_backlog(proposals, store=self._store)}\n\n"
-            f"## 体感曲线（时间, 1-4 分）\n{self._format_trend(trend)}\n\n"
-            "调查完成后调用 `submit_rfcs` 一次：`proposals` 为本轮 0..n 条结构 proposal（无则空数组）；"
-            "每条含 title、source_proposals、relationship、common_tension、structural_direction、"
-            "expected_leverage、solution_level、abstraction_rationale + 可选 covers（整体吸收来源）。"
-            "字段契约由工具 input_schema 强校验，不必也不要在正文里手抄 schema。"
+            "You are Architect. The ready queue and open ProposalViews follow. Analyze only "
+            "structural relationships, shared tensions, and reusable mechanisms among existing "
+            "proposals. Every output must cite at least two visible proposals. Experience trends "
+            "are background evidence, not a substitute for cross-proposal relationships.\n"
+            "If a visible ProposalView includes session evidence references, inspect observation "
+            "files, timelines, beats, or steps as needed to verify a relationship. Do not use these "
+            "tools to rediscover individual-ticket requirements outside the proposals.\n"
+            "Structural proposals do not prescribe data structures, protocols, or implementation "
+            "steps. `covers` is your decision to absorb source proposals. Once a structural "
+            "proposal is created, the driver merges and closes its listed report/proposal sources "
+            "that remain open. Sources omitted from covers remain independently deliverable.\n\n"
+            f"## Ready queue ({len(ready)})\n{self._format_backlog(ready, store=self._store)}\n\n"
+            f"## Open ProposalViews ({len(proposals)})\n{self._format_backlog(proposals, store=self._store)}\n\n"
+            f"## Experience trend (time, score 1-4)\n{self._format_trend(trend)}\n\n"
+            "After investigating, call `submit_rfcs` once. `proposals` contains 0..n structural "
+            "proposals for this round (an empty array if none), each with title, source_proposals, "
+            "relationship, common_tension, structural_direction, expected_leverage, solution_level, "
+            "abstraction_rationale, and optional covers (fully absorbed sources). The tool's "
+            "input_schema enforces the field contract. Do not copy the schema into the body."
         )
         if self._force_submit_prompt:
             msg += (
-                "\n\n【协议收尾】你刚才没有调用 submit_rfcs。现在停止读取文件和继续调查，"
-                "只调用一次 submit_rfcs 提交 0..n 条结果；没有可提交内容就提交空数组，"
-                "不要用解释文字代替工具调用。"
+                "\n\n[Protocol completion] You did not call submit_rfcs. Stop reading files and "
+                "investigating now. Call submit_rfcs exactly once to submit 0..n results; submit "
+                "an empty array if there is nothing to submit. Explanatory prose cannot replace "
+                "the tool call."
             )
         from ahe_beta.observations.grants import sessions_for_issues
         from ahe_beta.usage import current_usage_context  # noqa: PLC0415
@@ -435,9 +444,9 @@ class Architect:
         )
 
     def _feeling_trend(self) -> list[tuple[str, int, str, str]]:
-        """体感随时间：[(created_at, score, reason, session_id)]，按时间升序。
+        """Experience over time: [(created_at, score, reason, session_id)], in ascending time order.
 
-        reason = 用户末态那句「为什么」。session_id 供 get_session_timeline 按体感点取用。
+        reason = the user's final state sentence "why". session_id is for get_session_timeline to retrieve by experience point.
         """
         rows = sorted(self._store.index(include_invalid=True), key=lambda e: e["created_at"])
         return [
@@ -457,23 +466,23 @@ class Architect:
     @staticmethod
     def _format_trend(trend: list[tuple[str, int, str, str]]) -> str:
         if not trend:
-            return "（暂无体感数据）"
+            return "(No experience data yet)"
         lines = []
         for ts, score, reason, sid in trend:
             why = f" — {reason}" if reason else ""
             sid_bit = f" [session={sid}]" if sid else ""
             lines.append(
-                f"- {ts}{sid_bit}: {score if score is not None else 'unavailable (未评分)'}{why}"
+                f"- {ts}{sid_bit}: {score if score is not None else 'unavailable (unscored)'}{why}"
             )
         return "\n".join(lines)
 
     @staticmethod
     def _proposals_from_submit(text: str) -> list[_Proposal]:
-        """从 submit_rfcs 的返回（= agent.run 的返回值）解析出 _Proposal 列表。
+        """Parse a _Proposal list from the submit_rfcs return value (= the return value of agent.run).
 
-        submit_rfcs 是 stop tool，binding 返回 `{"proposals":[...]}`——nexau 已在工具层强校验
-        （title/fields 必填、fields 键锁定、covers 为 int 数组、无自创字段）。未调 submit /
-        解析失败 → 空列表（本轮 no-op），不抛错拖垮闭环。covers 仍走 _parse_covers 宽进严出。
+        submit_rfcs is a stop tool; binding returns `{"proposals":[...]}` — nexau already performs strict validation at the tool layer
+        (title/fields required, fields keys locked, covers as int array, no user-created fields). If submit is not called or
+        parsing fails → empty list (no-op this round), no error thrown to break the loop. covers still goes through _parse_covers with liberal input, strict output.
         """
         raw = read_submit(text, "proposals")
         if not raw:
@@ -492,7 +501,7 @@ class Architect:
         return proposals
 
     def _safe_comment(self, number: int, body: str, *, operation_key: str | None = None) -> None:
-        """合并审计评论 best effort；状态迁移已成功时评论失败不回滚。"""
+        """Merge audit comments on best-effort basis; comment failure does not roll back when state transition has already succeeded."""
         try:
             marker = "<!-- openagents:agent=ahe-beta -->"
             signed = body if marker in body else f"{body}\n\n{marker}"

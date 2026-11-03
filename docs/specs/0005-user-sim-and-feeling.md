@@ -1,12 +1,12 @@
 ---
 number: "0005"
-title: 用户侧重型实现：控制信封模拟器与体感评分
+title: "Heavyweight user-side implementation: control-envelope simulator and experience scoring"
 issue: 0
 slug: user-sim-and-feeling
-summary: 本组实现进化闭环 **a｜用户侧** 的重型版：以「控制信封」架构替代 spec-0001/T3 的最小桩，让 user agent 更拟真地多轮使用 harness（能力分叉、追问、绕路、放弃），并补齐 spec-0001 的训练信号 **FeelingScore（1–4 体感分）**。落点 `backend/ahe_beta/user/sim/`，与 0001 最小实现**并存、不覆盖**。
+summary: "This group implements the heavyweight version of **a｜user side** in the evolutionary closed loop: it replaces the minimal stub in spec-0001/T3 with a “control-envelope” architecture so that the user agent uses the harness more realistically over multiple turns (capability-dependent branching, follow-up questions, workarounds, abandonment), and completes the training signal **FeelingScore (1–4 experience score)** from spec-0001. Located at `backend/ahe_beta/user/sim/`, it **coexists with, rather than overwrites**, the 0001 minimal implementation."
 tasks:
   - id: T1
-    title: Persona 维度模型与文案
+    title: "Persona dimension model and wording"
     status: pending
     priority: P1
     tags: []
@@ -19,10 +19,10 @@ tasks:
       - backend/ahe_beta/user/sim/dimensions.py
       - backend/ahe_beta/user/sim/clauses.py
       - backend/tests/user/sim/test_dimensions.py
-    scope: 定义 9 维结构化 persona（D1 评估能力/D2 领域深度/D3 验收阈值/D4.1-4.3 交互/D5 自主性/D6 授权 + trust）及其确定性派生（derive_d3/derive_trust/derive_d6/finalize_persona），与维度→英文注入文案的查表（clauses）。persona 为会话级静态系数，不在循环中变化。
-    acceptance: finalize_persona 对仅给自由采样维度的 persona 产出完整不可变 persona，派生映射确定性可复现；对已显式提供 d3/trust/d6 的 persona，三者原样保留不被改写（fallback-only）；compile_block_p 对每个维度取值产出对应文案，无缺漏键。
+    scope: "Define a 9-dimensional structured persona (D1 evaluation ability/D2 domain depth/D3 acceptance threshold/D4.1-4.3 interaction/D5 autonomy/D6 authorization + trust) and its deterministic derivations (derive_d3/derive_trust/derive_d6/finalize_persona), along with a lookup table (clauses) mapping dimensions → English injection text. The persona consists of session-level static coefficients and does not change within the loop."
+    acceptance: "For a persona specifying only freely sampled dimensions, finalize_persona produces a complete immutable persona, with deterministic and reproducible derivation mappings; for a persona with explicitly provided d3/trust/d6, all three are preserved as-is without being overwritten (fallback-only); compile_block_p produces the corresponding wording for every dimension value, with no missing keys."
   - id: T2
-    title: 动作模型、动作空间与状态机
+    title: "Action model, action space, and state machine"
     status: pending
     priority: P1
     tags: []
@@ -36,10 +36,10 @@ tasks:
       - backend/ahe_beta/user/sim/state.py
       - backend/tests/user/sim/test_action_space.py
       - backend/tests/user/sim/test_state.py
-    scope: 动作目录（executor×channel×effect 五属性钉死）+ 动作空间派生（phase ∩ 能力掩码D1 ∩ 授权D6 ∪ 耐心门终止 ∪ accept）+ 自由产出归类/越权投影/channel 校验 + patience/trust 状态机（只吃主观 verdict）。本轮不实现客观真值线（objective/gold/GAP/control-plane），状态只由主观 verdict 驱动。
-    acceptance: 派生动作空间随 phase/D1/D6/patience 正确增删；resolve_action 保证结果在空间内且 channel↔message 一致；apply_verdict 仅按主观 verdict 改 patience/trust；状态演化全程不读任何客观真值。
+    scope: "Action catalog (five attributes fixed for executor×channel×effect) + action-space derivation (phase ∩ capability mask D1 ∩ authorization D6 ∪ patience-gate termination ∪ accept) + classification of freely generated output/projection of unauthorized actions/channel validation + patience/trust state machine (consumes only subjective verdicts). This round does not implement the objective ground-truth track (objective/gold/GAP/control-plane); state is driven solely by subjective verdicts."
+    acceptance: "The derived action space correctly adds/removes actions according to phase/D1/D6/patience; resolve_action ensures that the result is within the space and that channel↔message is consistent; apply_verdict changes patience/trust only according to subjective verdicts; state evolution never reads any objective ground truth."
   - id: T3
-    title: 提示装配与 persona LLM 后端
+    title: "Prompt assembly and persona LLM backends"
     status: pending
     priority: P1
     tags: []
@@ -52,10 +52,10 @@ tasks:
       - backend/ahe_beta/user/sim/prompt.py
       - backend/ahe_beta/user/sim/persona_client.py
       - backend/tests/user/sim/test_prompt.py
-    scope: system（BLOCK-G 固定 + BLOCK-P persona 实例，KV-cache 友好）+ 每轮 user 消息 + 会话末自评请求 build_rating_turn。PersonaClient 协议双后端：ApiPersonaClient（OpenAI 兼容网关）/ ScriptedPersonaClient（离线脚本，含自评分支）。后续可收敛到 0003/T2 nexau_runtime。
-    acceptance: build_system 前缀稳定；build_rating_turn 产出要求 {score,reason} 的 JSON 指令；ScriptedPersonaClient 对 <rate_experience> 返回 1–4 自评；_parse_json 容错（剥 fence/抽首个 {}）解析失败不崩。
+    scope: "system (fixed BLOCK-G + BLOCK-P persona instance, KV-cache friendly) + per-turn user message + end-of-session self-rating request via build_rating_turn. The PersonaClient protocol has two backends: ApiPersonaClient (OpenAI-compatible gateway) / ScriptedPersonaClient (offline script, including a self-rating branch). Can later converge on 0003/T2 nexau_runtime."
+    acceptance: "The build_system prefix is stable; build_rating_turn produces an instruction requiring {score,reason} JSON; ScriptedPersonaClient returns a 1–4 self-rating for <rate_experience>; _parse_json is tolerant (strip fences/extract the first {}) and does not crash on parse failure."
   - id: T4
-    title: 体感评分（两路并出）
+    title: "Experience score (both paths emitted)"
     status: pending
     priority: P1
     tags: []
@@ -70,10 +70,10 @@ tasks:
     files:
       - backend/ahe_beta/user/sim/feeling.py
       - backend/tests/user/sim/test_feeling.py
-    scope: 把控制信封会话末态产出对齐 spec-0001 的训练信号 FeelingScore（1–4 + reason，构造期断言越界、可双向序列化）。两路并出：① parse_feeling_llm 解析 persona LLM 会话末自评（spec-0001/T3 产出方式）；② derive_feeling 从主观末态（end_reason/failed_blame_harness 次数/trust）确定性聚合，作交叉校验与 LLM 解析失败兜底。全程不读客观真值（gold held-out）。
-    acceptance: FeelingScore 越界(0/5)构造期断言失败、to_dict/from_dict round-trip 一致；parse_feeling_llm 对合法 {score,reason} 产出 FeelingScore，缺字段/非整数/越界返回 None；derive_feeling 对 accepted→4(摩擦多降3)/max_turns,issue_filed→2/abandoned→1；两路均不依赖 gold。
+    scope: "Align the end-of-session output of the control envelope with the training signal FeelingScore in spec-0001 (1–4 + reason, with construction-time range assertions and bidirectional serialization). Emit both paths: ① parse_feeling_llm parses the persona LLM's end-of-session self-rating (the spec-0001/T3 output method); ② derive_feeling deterministically aggregates from the subjective end state (end_reason/failed_blame_harness count/trust), for cross-checking and as a fallback when LLM parsing fails. Never read objective ground truth (gold held-out) throughout."
+    acceptance: "Out-of-range FeelingScore (0/5) causes a construction-time assertion failure, and to_dict/from_dict round-trip consistently; parse_feeling_llm produces a FeelingScore for valid {score,reason}, and returns None for missing fields/non-integers/out-of-range values; derive_feeling maps accepted→4 (reduced to 3 with substantial friction)/max_turns, issue_filed→2/abandoned→1; neither path depends on gold."
   - id: T5
-    title: 会话主循环引擎
+    title: "Session main-loop engine"
     status: pending
     priority: P1
     tags: []
@@ -91,10 +91,10 @@ tasks:
     files:
       - backend/ahe_beta/user/sim/loop.py
       - backend/tests/user/sim/test_loop.py
-    scope: 控制信封主循环（≈ spec-0001/T3 UserAgent.run 的重型实现）：每轮 派生动作空间→persona 三层决策(perceive/verdict/action/message)→resolve→状态写回→终止判定；SessionResult 聚合 turns/signals/issue_artifact + 会话末两路体感（feeling=LLM自评 主信号 / feeling_derived=框架派生）。本轮不实现客观真值线（无 gold/GAP/control-plane 硬覆盖）；harness 回复只取文本。逐轮真人对话自立协议（不走 harbor 批接口）。
-    acceptance: 给定 persona+client+harness+task 跑出 SessionResult；自判终止与 MAX_TURNS 兜底均生效；会话末 feeling 与 feeling_derived 均为合法 FeelingScore（LLM 解析失败时 feeling 回落 derived）；体感与状态全程只依赖主观信号，不读客观真值。
+    scope: "Control-envelope main loop (≈ the heavy implementation of spec-0001/T3 UserAgent.run): each turn derives the action space→makes three-layer persona decisions (perceive/verdict/action/message)→resolves→writes state back→checks termination; SessionResult aggregates turns/signals/issue_artifact + the two end-of-session experience scores (feeling=LLM self-rating as the primary signal / feeling_derived=framework-derived). This round does not implement an objective ground-truth path (no gold/GAP/control-plane hard override); harness replies are text only. Each turn uses a standalone live-dialogue protocol (does not use the harbor batch API)."
+    acceptance: "Given persona+client+harness+task, run to produce a SessionResult; both self-determined termination and the MAX_TURNS fallback take effect; at session end, both feeling and feeling_derived are valid FeelingScore values (when LLM parsing fails, feeling falls back to derived); experience scores and state depend only on subjective signals throughout and never read objective ground truth."
   - id: T6
-    title: harness 桩与运行入口
+    title: "Harness stubs and run entry points"
     status: pending
     priority: P2
     tags: []
@@ -108,207 +108,201 @@ tasks:
       - backend/ahe_beta/user/sim/demo.py
       - backend/ahe_beta/user/sim/run_live.py
       - backend/tests/user/sim/test_harness_adapter.py
-    scope: "脚本化 harness（ScriptedHarness/SplitBillHarness）直接实现 HarnessInterface（send/reset/close）：send→str\n按预设轨迹演示能力分叉场景，bug 仅以回复文本体现（send 不回 gold/exit_code，对齐本轮无客观线、harness 只输出\ntext）；reset 重置脚本步进、close 幂等空操作。demo（离线脚本后端，无 key 可跑）与 run_live（真实 NexAU 网关）\n两个运行入口，并排打印两路体感分与行为信号。生产中此适配层替换为真实 CLI harness（同样实现 HarnessInterface，\n归 0003/T1 launcher）。"
-    acceptance: ScriptedHarness/SplitBillHarness 满足 HarnessInterface（isinstance 通过、send/reset/close 齐备）；与 FakeHarness 行为一致：close 后再 send/reset 抛 RuntimeError、重复 close 幂等不抛；demo 无 key 用 ScriptedPersonaClient 跑通两 persona 并打印 llm-rated/derived 两路体感；run_live 在配好网关时可对真实 user-agent 跑；harness 桩对'要求运行/探边界'分支产出预期文本轨迹。
+    scope: "The scripted harnesses (ScriptedHarness/SplitBillHarness) directly implement HarnessInterface (send/reset/close): send→str\nDemonstrate capability-branching scenarios along preset trajectories, with bugs represented only in reply text (send does not return gold/exit_code, aligning with this round's lack of an objective path, and the harness outputs\ntext only); reset resets script progression, and close is an idempotent no-op. Provide two run entry points: demo (offline scripted backend, runs without a key) and run_live (real NexAU gateway),\nprinting both experience scores and behavior signals side by side. In production, replace this adapter layer with a real CLI harness (also implementing HarnessInterface,\nowned by the 0003/T1 launcher)."
+    acceptance: "ScriptedHarness/SplitBillHarness satisfy HarnessInterface (isinstance passes, with send/reset/close all present); behavior matches FakeHarness: sending or resetting after close raises RuntimeError, repeated close calls are idempotent and do not raise; demo runs both personas with ScriptedPersonaClient without a key and prints llm-rated/derived experience scores; run_live can run against a real user-agent when the gateway is configured; harness stubs produce the expected text trajectories for the 'request execution/probe edge cases' branches."
 ---
 
-# 0005 · 用户侧重型实现：控制信封模拟器与体感评分
+# 0005 · Heavyweight User-Side Implementation: Control Envelope Simulator and Experience Score
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is structured source data (including the tasks DAG), and the body is a nine-section group-level rust-RFC overview. -->
 
 ## Summary
 
-本组实现进化闭环 **a｜用户侧** 的重型版：以「控制信封」架构替代 spec-0001/T3 的最小桩，让 user agent
-更拟真地多轮使用 harness（能力分叉、追问、绕路、放弃），并补齐 spec-0001 的训练信号
-**FeelingScore（1–4 体感分）**。落点 `backend/ahe_beta/user/sim/`，与 0001 最小实现**并存、不覆盖**。
+This group implements the heavyweight version of the evolution loop **a | user side**: replacing the minimal stub spec-0001/T3 with a “control envelope” architecture, so the user agent can use the harness over multiple turns more realistically (capability branching, follow-up questions, detours, giving up), and adding the training signal spec-0001
+**FeelingScore (experience score, 1–4)**. The implementation lives in `backend/ahe_beta/user/sim/` and **coexists with, rather than replacing**, the 0001 minimal implementation.
 
-数据流脊柱（贯穿 T1…T6）：
+Data-flow backbone (spanning T1…T6):
 
 ```
-Persona 维度(T1) ─► 动作空间/状态机(T2) ◄─ 提示装配 + LLM 后端(T3)
-                              │  每轮 persona 三层决策
-                              ▼
-                    会话主循环引擎(T5) ⇄ harness 桩(T6)
-                              │  会话末
-                              ▼
-                  体感评分 两路并出(T4) ─► FeelingScore 1–4（训练信号）
+Persona dimensions (T1) ─► Action space/state machine (T2) ◄─ Prompt + LLM backend (T3)
+                                             │  Three-layer persona decision each turn
+                                             ▼
+                                 Session main loop (T5) ⇄ Harness stubs (T6)
+                                             │  End of session
+                                             ▼
+                             Dual experience scores (T4) ─► FeelingScore 1–4 (training signal)
 ```
 
-读图即读任务：**T1** 定 persona 静态系数；**T2** 定每轮「能做什么 + 情绪如何演化」（纯主观状态机）；
-**T3** 把上下文喂 LLM 并取结构化判断、含会话末自评请求；**T5** 把它们编排成「跑一局」；**T4** 在会话末
-产出训练信号（LLM 自评为主 + 框架派生兜底/校验）；**T6** 提供离线可跑的 harness 桩与运行入口。
+Read the diagram as a task map: **T1** defines static persona coefficients; **T2** defines “what can be done each turn + how emotions evolve” (a purely subjective state machine);
+**T3** feeds context to the LLM and obtains structured judgments, including a self-rating request at the end of the session; **T5** orchestrates these into “running a session”; **T4**
+produces a training signal at the end of the session (primarily LLM self-rating + framework-derived fallback/validation); **T6** provides an offline-runnable harness stub and execution entry point.
 
-**本轮纯主观（客观线不实现）**：本组只取用户体感作训练信号；客观真值线（gold / GAP / ESCAPED_BUG /
-control-plane）整体推迟，不写 state、不进体感、harness 桩只回文本。能力分叉改由「persona 能力 + 文本感知」
-驱动，bug 直接体现在 harness 回复文本里。这与项目「训练信号=用户体感、benchmark held-out」一致；客观真值
-线的观测留待后续 spec。
+**This iteration is purely subjective (the objective line is not implemented)**: this group uses only user experience as a training signal; the objective ground-truth line (gold / GAP / ESCAPED_BUG /
+control-plane) is deferred in its entirety. It is not written to state, does not enter the experience score, and the harness stub returns text only. Capability branching is instead driven by “persona capability + text perception,”
+and bugs are reflected directly in harness response text. This is consistent with the project principle “training signal = user experience, benchmark held-out”; observation of the objective ground-truth
+line is deferred to a later spec.
 
-**与 0001 及闭环的关系**：本组是 0001 用户侧(a) 的重型实现/演进。真正接入闭环所需的契约并轨
-（引擎 `run_session` ↔ 0001/T4、harness 桩 ↔ 0001/T2 `HarnessInterface`、9 维 Persona 与
-`FeelingScore` 与 `models` 并轨、LLM 后端收敛 0003/T2 `nexau_runtime`、`issue_artifact` → `IssueDraft`）
-集中记在各 Task 的 open-questions，归后续 Task/组。
+**Relationship to 0001 and the loop**: This group is the heavyweight implementation/evolution of 0001 user side (a). The contract alignment needed for actual integration into the loop
+(engine `run_session` ↔ 0001/T4, harness stub ↔ 0001/T2 `HarnessInterface`, alignment of the 9-dimensional Persona with
+`FeelingScore` and `models`, LLM backend convergence 0003/T2 `nexau_runtime`, `issue_artifact` → `IssueDraft`)
+is documented in the open questions of the relevant Tasks and belongs to later Tasks/groups.
 
 ## Motivation
 
-训练信号的可信度取决于 persona 扮演的拟真度：自由文本 persona 难以稳定驱动能力分叉（同一 harness
-轨迹下浅层用户接受、专家识破），因此 T1 将 persona 收敛为 9 维结构化模型 + 确定性派生，使其可复现、
-可采样、可 codegen，把「能感知什么」「验收到什么程度」量化为可被动作空间与状态机消费的系数。在此
-基础上，T2 把「用户这一轮能做什么、做完情绪怎么变」从 LLM 自由发挥收敛为可控、可复现的纯代码机制：
-能力掩码防止低能力 persona 越级核查（不违反 G1「不偷看真值」），耐心/信任状态机把情绪积分成可终止
-的轨迹。
+The credibility of training signals depends on how realistically the persona is played: free-text personas cannot reliably drive capability branching (under the same harness
+trajectory, a novice user accepts while an expert sees through it). Therefore, T1 converges the persona into a 9-dimensional structured model with deterministic derivation, making it reproducible,
+sampleable, and amenable to codegen, and quantifying “what can be perceived” and “to what extent it is verified” as coefficients consumable by the action space and state machine. On this
+foundation, T2 converges “what the user can do this turn and how their emotions change afterward” from unconstrained LLM behavior into a controllable, reproducible, pure-code mechanism:
+capability masks prevent low-capability personas from performing out-of-scope checks (without violating G1, “do not peek at ground truth”), while the patience/trust state machine integrates emotions into a terminable
+trajectory.
 
-persona 的主观判断终究要由 LLM 在角色内产生，其输出还须能被框架结构化消费，这是 T3 提示装配与双
-LLM 后端存在的理由：分层提示把稳定前缀（角色/铁律/输出契约）与善变状态分离以节省 token，双后端
-（真实网关 / 离线脚本）使无 key 环境（CI、demo）也能跑通整条 loop，把真实推理与框架编排解耦；T3
-的会话末自评请求同时是体感分的入口。
+The persona’s subjective judgments ultimately need to be generated by the LLM in character, and its output must also be consumable by the framework in structured form. This is why T3 provides prompt assembly and dual
+LLM backends: layered prompts separate the stable prefix (role/ground rules/output contract) from the changing state to save tokens, while the two backends (real gateway / offline script) let the entire loop run
+in environments without keys (CI, demo), decoupling real inference from framework orchestration; T3’s end-of-session self-rating request is also the entry point for the experience score.
 
-控制信封引擎此前只产生结构化 verdict 与终止原因，与 spec-0001 训练信号契约（FeelingScore 1–4）
-之间的缺口正是 T4 存在的理由：LLM 自评贴近真实满意度但有噪声、可能解析失败，框架派生可复现且永远
-可得，两路并出互为校验与兜底，补齐这条信号是把控制信封接入闭环用户侧的前置条件。
+The gap between the control-envelope engine, which previously produced only structured verdicts and termination reasons, and the spec-0001 training-signal contract (FeelingScore 1–4)
+is precisely why T4 exists: LLM self-rating is close to actual satisfaction but noisy and may fail to parse, while framework derivation is reproducible and always available. Producing both provides cross-validation and a fallback,
+filling this signal gap is a prerequisite for connecting the control envelope to the user side of the closed loop.
 
-spec-0001/T3 的最小桩用「sentinel + max_turns」驱动多轮，拟真度有限；训练信号的真实性恰恰取决于
-能否刻画追问、绕路、卡顿、放弃这些真实使用行为，这是 T5 存在的理由——把 T1–T4 的分散部件总装为
-唯一的「跑一局」引擎，供用户侧(a) 与后续 dev 侧体感门禁复用。而要离线、确定性地验证这整条 loop
-（CI/demo 无 key 可跑），并演示同一 harness 轨迹下能力分叉如何产生不同体感，则需要 T6 提供的脚本化
-harness 桩与运行入口——这是把引擎讲清楚、可回归的最小载体，生产环境中再替换为真实 CLI harness。
+The minimal stub spec-0001/T3 drives multiple turns using “sentinel + max_turns,” which offers limited realism; the authenticity of training signals depends precisely on
+whether real usage behaviors such as follow-up questions, detours, getting stuck, and giving up can be represented. This is why T5 exists: it assembles the scattered T1–T4 components into
+the sole “run a session” engine, reusable by user side (a) and subsequent dev-side experience gates. To verify this entire loop offline and deterministically (runnable in CI/demo without a key),
+and to demonstrate how capability branching produces different user experiences under the same harness trajectory, T6 provides a scripted harness stub and execution entry point. This is the smallest vehicle for explaining and regression-testing the engine; in production, it will be replaced by a real CLI harness.
 
 ## Guide-level explanation
 
-控制信封以 persona 为静态系数起点：9 维模型（D1 评估能力 / D2 领域深度 / D3 验收阈值 / D4.1–4.3
-委派·监督·纠偏 / D5 自主性 / D6 授权 + 派生 trust）由 T1 定义，配一份维度→英文注入文案的确定性查表
-（clauses）。persona 在会话开始时定死、循环中不变，是 spec-0001/T1 自由文本 Persona 的结构化重型版。
+The control envelope starts with persona as its static coefficients: the 9-dimensional model (D1 evaluation capability / D2 domain depth / D3 acceptance threshold / D4.1–4.3
+delegation · supervision · correction / D5 autonomy / D6 authorization + derived trust) is defined by T1, together with a deterministic lookup table from dimensions to English injection text
+(clauses). The persona is fixed at the start of a session and remains unchanged throughout the loop. It is the structured, heavyweight version of spec-0001/T1 free-text Persona.
 
-在 persona 之上，T2 构成控制信封的确定性机制层：动作目录钉死每个动作的 executor×channel×effect
-三轴与终止原因；动作空间由「局面 ∩ 能力掩码(D1) ∩ 授权(D6) ∪ 耐心门解锁的终止动作 ∪ accept」派生；
-自由产出经归类与越权投影、channel↔message 强校验回落到合法集；patience/trust 状态机只吃主观 verdict
-演化。本轮纯主观，不含客观真值线。
+On top of the persona, T2 forms the deterministic mechanism layer of the control envelope: the action catalog fixes the three axes of executor×channel×effect and the termination reason for each action;
+the action space is derived from “state of play ∩ capability mask (D1) ∩ authorization (D6) ∪ termination actions unlocked by the patience gate ∪ accept”;
+free-form output is categorized and projected when over-privileged, with strict channel↔message validation and fallback to the legal set; the patience/trust state machine evolves only from subjective verdicts.
+This iteration is purely subjective and excludes the objective ground-truth line.
 
-T3 负责把这两层接到 LLM：system 提示由 BLOCK-G（固定角色/铁律/输出契约）与 BLOCK-P（T1 编译出的
-persona 实例）拼成，KV-cache 友好（不变前缀在前）；每轮 user 消息携带 <task><history><harness_output>
-<self_observation><action_space><mood>；会话末追加 build_rating_turn 自评请求。PersonaClient 协议
-提供两个后端：ApiPersonaClient 对接 OpenAI 兼容网关（reasoning 模型加固），ScriptedPersonaClient
-提供离线脚本（含自评分支），使整条 loop 在无 key 环境下也能确定性复现。
+T3 connects these two layers to the LLM: the system prompt is assembled from BLOCK-G (fixed role/ground rules/output contract) and BLOCK-P (the persona instance compiled by T1),
+with a KV-cache-friendly layout (the invariant prefix comes first); each turn’s user message carries <task><history><harness_output>
+<self_observation><action_space><mood>; at the end of the session, a build_rating_turn self-rating request is appended. The PersonaClient protocol
+provides two backends: ApiPersonaClient connects to an OpenAI-compatible gateway (with reasoning-model hardening), while ScriptedPersonaClient
+provides an offline script (including a self-rating branch), allowing the entire loop to be deterministically reproduced in an environment without a key.
 
-T4 在会话末把控制信封原生产出的 verdict / end_reason / signals 对齐为 spec-0001 的训练信号契约
-FeelingScore：一路是 LLM 自评（persona 在角色内按本人验收阈值打 1–4 + 理由，走 T3 的会话末请求，
-对齐 spec-0001/T3「会话末经 LLM 产出 FeelingScore」）；另一路是框架派生（从 end_reason 与主观
-verdict/trust 确定性聚合，可复现）。前者为主信号，后者作交叉校验兼 LLM 解析失败时的兜底。两路输入
-均为主观信号，客观真值（gold）全程 held-out 不参与。
+At the end of the session, T4 aligns the verdict / end_reason / signals natively produced by the control envelope with the spec-0001 training-signal contract,
+FeelingScore: one path is LLM self-rating (the persona rates 1–4 in character according to its own acceptance threshold, with a reason, using T3’s end-of-session request,
+aligned with spec-0001/T3 “produce FeelingScore via LLM at the end of the session”); the other path is framework-derived (deterministically aggregated from end_reason and subjective
+verdict/trust, and reproducible). The former is the primary signal; the latter provides cross-validation and a fallback if LLM parsing fails. Both inputs
+are subjective signals; objective truth (gold) is held out throughout and does not participate.
 
-T5 是把 T1–T4 编排成一局完整会话的主循环，是 spec-0001/T3「用户 agent 驱动器」的重型实现：每轮按
-「派生动作空间 → persona 三层决策(perceive/verdict/action/message) → resolve 归类与投影 → 状态写回
-→ 终止判定」推进；会话末两路并出体感分。本轮纯主观（不含客观真值线）；逐轮真人对话走自立协议，
-不套 harbor 的批式 episode 接口。
+T5 is the main loop that orchestrates T1–T4 into a complete session, and is the heavyweight implementation of spec-0001/T3 “user agent driver”: each turn proceeds through
+“derive action space → persona’s three-layer decision (perceive/verdict/action/message) → resolve categorization and projection → write back state
+→ termination check”; at the end of the session, both experience-score paths produce their results. This iteration is purely subjective (it excludes the objective ground-truth line); turn-by-turn human conversation uses an independent protocol,
+not harbor’s batch episode interface.
 
-最后，T6 提供脚本化 harness 桩与两个运行入口：harness_adapter.ScriptedHarness / scenarios.
-SplitBillHarness 直接实现 spec-0001/T2 的 HarnessInterface（send/reset/close，send(message) -> str），
-按预设轨迹复刻能力分叉场景（timeutils DST、split_bill 丢分钱），bug 只体现在回复文本里（如
-sum=99.99），由 persona 凭自身能力识别——本轮 send 只回文本，无 gold/exit_code（无客观线）。demo
-用离线脚本后端演示两个 persona 的分叉轨迹（无 key 可跑），run_live 接真实 NexAU 网关跑通整条 loop，
-两者都并排打印两路体感分与行为信号。
+Finally, T6 provides a scripted harness stub and two execution entry points: harness_adapter.ScriptedHarness / scenarios.
+SplitBillHarness directly implements spec-0001/T2’s HarnessInterface (send/reset/close, send(message) -> str),
+replaying capability-branching scenarios from preset trajectories (timeutils DST, split_bill lost cents). Bugs are reflected only in response text (e.g.
+sum=99.99), for the persona to identify using its own capabilities. In this iteration, send returns text only, with no gold/exit_code (no objective line). The demo
+uses the offline scripted backend to demonstrate branching trajectories for two personas (runnable without a key); run_live connects to a real NexAU gateway to run the entire loop,
+and both print the two experience scores alongside the behavioral signals.
 
 ## Reference-level explanation
 
-### 用户建模核心：persona 维度与动作空间/状态机（T1、T2）
+### User modeling core: persona dimensions, action space, and state machine (T1, T2)
 
-persona 维度分五层：A 能力底座(D1,D2)、B 验收(D3，由 D1×D2 派生)、C 交互(D4.1/4.2/4.3)、D 会话配置
-(D5,D6，半派生)、E 派生(trust = f(D1,D2))。自由采样维度由调用方给定，派生维度(d3/trust/d6) 由
-finalize_persona 填齐：derive_d3 按 D1 定基线档、D2.depth 资深+1/新手-1（枚举序内 clamp）；
-derive_trust 按 BLIND→blind、EXPERT→skeptical、其余 balanced；derive_d6 按 D5 定基线、task_risk 高
-收紧一档、collaborative+低风险放开可跑。派生遵循 **fallback-only（正交契约）**：finalize_persona
-只填「未提供」的派生维度，调用方已显式 ground 的 d3/trust/d6 原样保留，derive_* 不改写；实现以 None
-哨兵区分「未提供」与「已 ground」（d3/d6/trust 默认 None，finalize 仅填 None 的一项）。这一契约的
-动机是真实 persona 的验收/信任/授权应可被 grounded 值直接给定（维度正交，expert 可 over-trust，见
-extract-selfreport-persona 例 C），0006/T2 注入真实卡时据此保真，否则会把 grounded 真值改写成合成
-面。clauses 为每个维度取值给一句英文注入文案，compile_block_p 拼成 BLOCK-P（喂给 persona LLM，不掺
-状态数值）。
+Persona dimensions are arranged in five layers: A capability foundation (D1,D2), B acceptance (D3, derived from D1×D2), C interaction (D4.1/4.2/4.3), D session configuration
+(D5,D6, partially derived), and E derived (trust = f(D1,D2)). The caller supplies freely sampled dimensions; derived dimensions (d3/trust/d6) are filled in by
+finalize_persona: derive_d3 sets the baseline tier according to D1, then adjusts it by D2.depth (senior +1 / novice -1), clamped within the enum ordering;
+derive_trust maps BLIND→blind, EXPERT→skeptical, and all others to balanced; derive_d6 sets the baseline according to D5, tightens authorization by one tier when task_risk is high,
+and opens it up to can-run for collaborative personas with low-risk tasks. Derivation follows **fallback-only (orthogonal contract)**: finalize_persona
+fills only derived dimensions that were “not provided”; explicitly grounded d3/trust/d6 values supplied by the caller are preserved as-is, and derive_* does not overwrite them. The implementation uses a None
+sentinel to distinguish “not provided” from “already grounded” (d3/d6/trust default to None; finalize fills only the ones that are None). This contract is motivated by the fact that real-persona acceptance/trust/authorization should be directly settable to grounded values (dimensions are orthogonal; an expert can over-trust; see
+extract-selfreport-persona example C). 0006/T2 uses this to preserve fidelity when injecting real cards; otherwise, it would overwrite grounded truth with synthetic
+values. For each dimension value, clauses provides one English injection sentence; compile_block_p assembles BLOCK-P (for the persona LLM, without numeric
+state values).
 
-在 persona 之上，T2 构成动作与状态的确定性层。动作目录（actions）列出 send_task / refine_request /
+On top of the persona, T2 forms the deterministic layer for actions and state. The action catalog (actions) lists send_task / refine_request /
 give_feedback / verify_self / ask_harness_run / request_evidence / grant_autorun / accept /
-give_up / file_issue，每个钉死 executor∈{PERSONA_LOCAL,HARNESS,FRAMEWORK}、channel∈{EMIT,SILENT}、
-effect∈{ADVANCE,VERIFY,TERMINATE}，并强校验 channel↔message 一致性。动作空间（action_space）为
-LEGAL_BY_PHASE ∩ cap_mask(D1) ∩ authz(D6)，耐心 <=0 时解锁 D4.3 选定的终止动作，有可接受产物时加入
-accept；resolve_action 把 LLM 的自由或越权产出归类并投影回合法集。状态机（state）中 apply_verdict
-只按主观 verdict 改 patience/trust（satisfied 提信任、failed_blame_harness 降耐心降信任……），演化
-速率由 persona 派生系数(make_coef) 决定；客观真值不参与状态演化（本轮不实现客观线）。
+give_up / file_issue, fixing for each action executor∈{PERSONA_LOCAL,HARNESS,FRAMEWORK}, channel∈{EMIT,SILENT},
+effect∈{ADVANCE,VERIFY,TERMINATE}, and strictly validating channel↔message consistency. The action space (action_space) is
+LEGAL_BY_PHASE ∩ cap_mask(D1) ∩ authz(D6); when patience <=0, it unlocks the termination action selected by D4.3; when an acceptable artifact is available, it adds
+accept. resolve_action categorizes the LLM’s free-form or over-privileged output and projects it back into the legal set. In the state machine (state), apply_verdict
+changes patience/trust only according to subjective verdicts (satisfied increases trust, failed_blame_harness reduces patience and trust, and so on); the rate of evolution is determined by persona-derived coefficients (make_coef). Objective ground truth does not participate in state evolution (the objective line is not implemented in this iteration).
 
-**接口**
+**Interface**
 
 ```
-Persona(persona_id, d1, d2, d41, d42, d43, d5, d3=None, d6=None, trust=None)   # frozen dataclass；派生维度默认 None=未提供
-finalize_persona(p: Persona, task_risk: str = "low") -> Persona      # 仅填未提供(None)的派生维度（fallback-only，不改写已 grounded 值）
-compile_block_p(p: Persona) -> str                                   # 维度 → BLOCK-P 文案
+Persona(persona_id, d1, d2, d41, d42, d43, d5, d3=None, d6=None, trust=None)   # Frozen dataclass; None means a derived dimension was not provided
+finalize_persona(p: Persona, task_risk: str = "low") -> Persona      # Fill only missing (None) derived dimensions; preserve grounded values
+compile_block_p(p: Persona) -> str                                   # Dimensions → BLOCK-P text
 
 derive_action_space(phase, persona, state, has_artifact) -> list[str]
 resolve_action(ret: dict, space: list[str], persona) -> tuple[action_id, message]
 apply_verdict(state, verdict, coef) -> State
 ```
 
-**测试**
+**Tests**
 
-单测：
-- finalize_persona（派生）：仅给自由采样维度时，派生 d3/trust/d6 与查表一致、可复现；derive_d3
-  senior 抬一档、novice 降一档且在枚举序内 clamp（不越界）。
-- finalize_persona（fallback-only）：显式提供 d3/trust/d6 的 persona 过 finalize 后三者不变；未提供
-  者按 derive_* 填齐。
-- compile_block_p：每个维度取值都命中文案、无 KeyError；frozen persona 不可变。
-- derive_action_space：OPENING 只含 send_task；ACTIVE 随 D1 能力掩码增删 verify_self/
-  request_evidence；READ_ONLY/WRITE_NO_RUN 授权剔除 ask_harness_run/grant_autorun；patience<=0
-  解锁对应终止动作；有产物加 accept。
-- resolve_action：free → 归类到合法动作；越权 → 同 effect 投影；SILENT 清空 message、EMIT 空则兜底；
-  最终 assert_channel 通过。
-- apply_verdict：satisfied/ failed_blame_harness/ failed_blame_self/ unsure 对 patience/trust 的
-  增减符合系数；纯主观——状态机仅依赖 verdict，构造不含任何客观字段的输入即可驱动全部分支。
+Unit tests:
+- finalize_persona (derivation): given only freely sampled dimensions, derived d3/trust/d6 match the lookup table and are reproducible; derive_d3
+  moves senior up one tier and novice down one tier, clamped within the enum ordering (no out-of-bounds values).
+- finalize_persona (fallback-only): after finalize, personas with explicitly provided d3/trust/d6 retain those values; values not provided
+  are filled by derive_*.
+- compile_block_p: every dimension value resolves to text, with no KeyError; frozen persona is immutable.
+- derive_action_space: OPENING contains only send_task; ACTIVE adds or removes verify_self/
+  request_evidence according to the D1 capability mask; READ_ONLY/WRITE_NO_RUN authorization removes ask_harness_run/grant_autorun; patience<=0
+  unlocks the corresponding termination action; accept is added when an artifact is available.
+- resolve_action: free-form output → categorized as a legal action; over-privileged output → projected to an action with the same effect; SILENT clears message, EMIT uses a fallback if empty;
+  final assert_channel passes.
+- apply_verdict: changes to patience/trust for satisfied/ failed_blame_harness/ failed_blame_self/ unsure match the coefficients; purely subjective—the state machine depends only on verdict, and every branch can be driven using input constructed without any objective fields.
 
-**文件（单一 writer 所有权）**
+**Files (single-writer ownership)**
 
-| Task | 文件 |
+| Task | Files |
 |---|---|
-| T1 | `backend/ahe_beta/user/sim/dimensions.py`、`backend/ahe_beta/user/sim/clauses.py`、`backend/tests/user/sim/test_dimensions.py` |
-| T2 | `backend/ahe_beta/user/sim/actions.py`、`backend/ahe_beta/user/sim/action_space.py`、`backend/ahe_beta/user/sim/state.py`、`backend/tests/user/sim/test_action_space.py`、`backend/tests/user/sim/test_state.py` |
+| T1 | `backend/ahe_beta/user/sim/dimensions.py`, `backend/ahe_beta/user/sim/clauses.py`, `backend/tests/user/sim/test_dimensions.py` |
+| T2 | `backend/ahe_beta/user/sim/actions.py`, `backend/ahe_beta/user/sim/action_space.py`, `backend/ahe_beta/user/sim/state.py`, `backend/tests/user/sim/test_action_space.py`, `backend/tests/user/sim/test_state.py` |
 
-### 提示装配与 persona LLM 后端（T3）
+### Prompt assembly and persona LLM backends (T3)
 
-prompt 模块中，BLOCK_G 固定（ROLE / GROUND RULES G1-G5 / ACTION SEMANTICS / OUTPUT CONTRACT），
-build_system = BLOCK_G + compile_block_p(persona)；build_user_turn 拼每轮上下文，mood 仅离散标签
-（full/lowered/low/exhausted + trust）不进数值；build_rating_turn 覆盖动作契约、只要
-{"score","reason"}。persona_client 模块中，PersonaClient 协议约定 respond(system, user) -> dict：
-ApiPersonaClient 走 LLM_BASE_URL/LLM_API_KEY，enable_thinking=False 抑制 CoT、content 空回落
-reasoning_content、退避重试、容错 JSON 解析；ScriptedPersonaClient 读 system 的 D1/D3 档 + user 的
-harness_output/mood 分叉，并对 <rate_experience> 自评。make_client 在检测到网关/OPENAI_API_KEY 时用
-Api 后端，否则回落 Scripted。
+In the prompt module, BLOCK_G is fixed (ROLE / GROUND RULES G1-G5 / ACTION SEMANTICS / OUTPUT CONTRACT),
+build_system = BLOCK_G + compile_block_p(persona); build_user_turn composes the per-turn context, with mood represented only by discrete labels
+(full/lowered/low/exhausted + trust), not numeric values; build_rating_turn overrides the action contract and requests only
+{"score","reason"}. In the persona_client module, the PersonaClient protocol specifies respond(system, user) -> dict:
+ApiPersonaClient uses LLM_BASE_URL/LLM_API_KEY, enable_thinking=False suppresses CoT, empty content falls back to
+reasoning_content, with backoff retries and tolerant JSON parsing; ScriptedPersonaClient reads the D1/D3 tiers from system and
+branches on harness_output/mood from user, and self-rates for <rate_experience>. make_client uses the
+Api backend when a gateway/OPENAI_API_KEY is detected; otherwise it falls back to Scripted.
 
-**接口**
+**Interface**
 
 ```
 build_system(persona) -> str; build_user_turn(task, history, harness_output, action_space, state) -> str
 build_rating_turn(task, history, state) -> str
-PersonaClient(Protocol).respond(system: str, user: str) -> dict   # {perceive,verdict,action,message} 或 {score,reason}
+PersonaClient(Protocol).respond(system: str, user: str) -> dict   # {perceive,verdict,action,message} or {score,reason}
 make_client() -> PersonaClient
 ```
 
-**测试**
+**Tests**
 
-单测：
-- build_system 前缀稳定（同 persona 多次一致）；build_user_turn 含全部 section；build_rating_turn
-  含 1–4 指令与 {"score","reason"}。
-- ScriptedPersonaClient：开局发 send_task；<rate_experience> 返回 1–4；exhausted → file_issue/
-  give_up；能力档分叉符合预期。
-- _parse_json：剥 ```json fence、抽取首个 {...}、解析失败回落安全 dict 不抛。
+Unit tests:
+- build_system prefix is stable (consistent across repeated calls with the same persona); build_user_turn includes all sections; build_rating_turn
+  includes the 1–4 instructions and {"score","reason"}.
+- ScriptedPersonaClient: sends send_task at session start; <rate_experience> returns 1–4; exhausted → file_issue/
+  give_up; capability-tier branching behaves as expected.
+- _parse_json: strips the ```json fence, extracts the first {...}, and falls back to a safe dict on parse failure without raising.
 
-**文件（单一 writer 所有权）**
+**Files (single-writer ownership)**
 
   - `backend/ahe_beta/user/sim/prompt.py`
   - `backend/ahe_beta/user/sim/persona_client.py`
   - `backend/tests/user/sim/test_prompt.py`
 
-### 体感评分：两路并出（T4）
+### Experience scoring: two parallel outputs (T4)
 
-两路评分均在会话末产出一次，互不耦合。① LLM 自评（parse_feeling_llm）：prompt（0005/T3
-build_rating_turn）让 persona 跳出对话，按本人验收阈值(G4)给 1–4 + 一句理由，覆盖动作 OUTPUT
-CONTRACT 只要 {"score","reason"}；容错解析对缺 score / 非整数 / 越界一律返回 None（越界经
-FeelingScore.__post_init__ 断言失败被捕获），交由调用方回落派生分，不崩 loop。② 框架派生
-（derive_feeling），只吃主观末态：
+Both scores are produced once at the end of the session, independently of each other. ① LLM self-rating (parse_feeling_llm): the prompt (0005/T3
+build_rating_turn) asks the persona to step outside the conversation and assign 1–4 + a one-sentence reason according to their own acceptance threshold (G4), overriding the action OUTPUT
+CONTRACT to require only {"score","reason"}. Fault-tolerant parsing returns None for a missing score, a non-integer, or an out-of-range value (the assertion failure for an out-of-range value in
+FeelingScore.__post_init__ is caught), leaving the caller to fall back to the derived score without crashing the loop. ② Framework-derived scoring
+(derive_feeling) uses only subjective terminal state:
 
 | end_reason              | base |
 |-------------------------|------|
@@ -316,126 +310,126 @@ FeelingScore.__post_init__ 断言失败被捕获），交由调用方回落派�
 | max_turns / issue_filed | 2    |
 | abandoned               | 1    |
 
-其余 end_reason 落 2。摩擦修正：accepted 但 failed_blame_harness>=2 或末态 trust=skeptical → 降为 3。
-FeelingScore 契约对齐 spec-0001/T1：score:int(1..4) + reason，__post_init__ 越界即失败，
-to_dict/from_dict 双向序列化（from_dict 忽略未知键，前向兼容）。held-out 边界：两路输入均为主观信号
-（end_reason / verdict / trust），不读 objective 的 gold。
+All other end_reason values map to 2. Friction adjustment: accepted with failed_blame_harness>=2 or terminal trust=skeptical → reduce to 3.
+The FeelingScore contract aligns with spec-0001/T1: score:int(1..4) + reason; __post_init__ fails on out-of-range values;
+to_dict/from_dict provide bidirectional serialization (from_dict ignores unknown keys for forward compatibility). Held-out boundary: inputs to both scoring paths are subjective signals
+(end_reason / verdict / trust); neither reads objective gold.
 
-**接口**
+**Interface**
 
 ```
-FeelingScore(score: int, reason: str)            # __post_init__ 断言 1<=score<=4；to_dict/from_dict
-parse_feeling_llm(ret: dict) -> FeelingScore | None   # 解析 LLM 自评；无效（缺字段/非整数/越界）返回 None
-derive_feeling(end_reason: str, turns: list) -> FeelingScore  # turns 仅 duck-type 读 verdict/trust
+FeelingScore(score: int, reason: str)            # __post_init__ asserts 1<=score<=4; to_dict/from_dict serialization
+parse_feeling_llm(ret: dict) -> FeelingScore | None   # Parse the LLM self-rating; return None for missing fields, non-integers, or out-of-range values
+derive_feeling(end_reason: str, turns: list) -> FeelingScore  # Read only verdict/trust from turns via duck typing
 ```
 
-**测试**
+**Tests**
 
-单测：
-- FeelingScore round-trip(to_dict/from_dict) 字段级一致；越界(0/5) 构造期断言失败。
-- parse_feeling_llm：合法 {score,reason}→FeelingScore；缺 score / score 非整数 / 越界(5) → None；
-  reason 缺省空串。
-- derive_feeling：accepted+少失败→4；accepted+failed_blame_harness>=2→3；accepted+trust=skeptical→3；
-  max_turns→2；issue_filed→2；abandoned→1；未知 end_reason→2。
-- held-out：构造仅含主观字段的 turns，确认派生分不读任何 gold 字段。
+Unit tests:
+- FeelingScore round-trip(to_dict/from_dict) preserves every field; out-of-range values (0/5) trigger assertion failures during construction.
+- parse_feeling_llm: valid {score,reason}→FeelingScore; missing score / non-integer score / out-of-range value (5) → None;
+  reason defaults to an empty string.
+- derive_feeling: accepted+few failures→4; accepted+failed_blame_harness>=2→3; accepted+trust=skeptical→3;
+  max_turns→2; issue_filed→2; abandoned→1; unknown end_reason→2.
+- Held-out: construct turns containing only subjective fields and verify that the derived score reads no gold fields.
 
-**文件（单一 writer 所有权）**
+**Files (single-writer ownership)**
 
   - `backend/ahe_beta/user/sim/feeling.py`
   - `backend/tests/user/sim/test_feeling.py`
 
-### 会话主循环引擎（T5）
+### Session main-loop engine (T5)
 
-每轮流水线（turn < MAX_TURNS）：
+Pipeline for each turn (turn < MAX_TURNS):
 
 ```
-① 物理接收   harness_output (文本)                  (harness 桩, T6)
-② 派生动作空间 phase ∩ capD1 ∩ authzD6 ∪ 耐心门 ∪ accept   (T2)
-③ persona 三层 LLM → {perceive, verdict, action, message}  (T3 client；harness 文本原样喂入)
-④ resolve     归类/校验 + channel 校验                (T2)
-⑤ 状态写回    apply_verdict 只吃主观 verdict           (T2)
-⑥ 终止判定    Effect.TERMINATE → 记 end_reason 并 break
-⑦ 路由        EMIT → 驱动 harness 出下一轮；verify_self → 注入原始观察(最近 harness 文本)
+① Receive harness_output as text from the harness stub (T6)
+② Derive action space: phase ∩ capD1 ∩ authzD6 ∪ patience gate ∪ accept (T2)
+③ Three-layer persona LLM → {perceive, verdict, action, message} (T3 client; pass harness text unchanged)
+④ Resolve: classify/validate the action and validate its channel (T2)
+⑤ Write state: apply_verdict consumes only subjective verdicts (T2)
+⑥ Check termination: Effect.TERMINATE → record end_reason and break
+⑦ Route: EMIT → advance the harness to the next turn; verify_self → inject raw observations (latest harness text)
 ```
 
-会话末（循环外）：先 derive_feeling 产派生分；再发 build_rating_turn 取 LLM 自评，
-parse_feeling_llm 解析，失败回落派生分。两者分别落 SessionResult.feeling / feeling_derived。
+At session end (outside the loop): first produce the derived score with derive_feeling; then send build_rating_turn to obtain the LLM self-rating,
+parse it with parse_feeling_llm, and fall back to the derived score on failure. Store the two in SessionResult.feeling / feeling_derived, respectively.
 
-signals 为行为信号（如低能力用户无法自修而放弃），从 persona 与会话轨迹派生；本轮不含任何依赖客观
-真值的信号（GAP/ESCAPED_BUG/control-plane 推迟，见 T2 相关 Unresolved questions）。
+signals are behavioral signals (such as a low-capability user abandoning the task because they cannot fix it themselves), derived from the persona and session trajectory; this round includes no signals dependent on objective
+truth (GAP/ESCAPED_BUG/control-plane are deferred; see the related Unresolved questions in T2).
 
-感知侧不再做代码层能力过滤：原型用 perceive_filter（按缩进/关键词猜「源码行」并抹掉）+ _filter_self_obs
-（子串 Traceback/Error → 套「我跑了一次它崩了」串）机械改写喂给 LLM 的输入。这类字符串启发式脆弱——漏判
-则强模型「心算」源码越过低能力档（违反 G1），误判则删掉正常文本或凭子串伪造负向感知，二者都污染体感信号。
-本版删除两者：persona 看到原始 harness 文本，verify_self 注入原始观察，能力分叉改由 prompt(G1)+persona
-档位约束 LLM「只在本人能力内感知」来达成，而非框架机械过滤输入。
+The perception side no longer filters capabilities at the code level: the prototype used perceive_filter (which guessed “source lines” from indentation/keywords and erased them) + _filter_self_obs
+(which replaced substrings Traceback/Error with a stock “I ran it once and it crashed” string) to mechanically rewrite inputs fed to the LLM. Such string heuristics are fragile—missed detections
+allow a strong model to “mentally execute” source code beyond the low-capability tier (violating G1), while false positives delete normal text or fabricate negative perceptions based on substrings; both contaminate experience signals.
+This version removes both: the persona sees raw harness text, verify_self injects raw observations, and capability branching is achieved through prompt (G1) + persona
+tier constraints instructing the LLM to “perceive only within their own capabilities,” rather than through mechanical framework filtering of inputs.
 
-file_issue 撰写轮：当本轮 action 归类为 file_issue，主循环不拿对话内那条简短 message 当 issue 正文，
-而是在循环内追加一次专门的撰写轮——用 T3 的 build_issue_turn 让 persona 跳出对话、以本人第一人称把
-「想反馈给开发者的事」写成自包含正文（覆盖动作契约，只取 {issue}）。issue_artifact = 该第一人称正文 +
-`---` 分隔 + 机器脚注（persona_id/能力档/轮数/末轮回复症状等自动采集元数据）；不再套「### What the user
-reported」之类第三人称模板外壳，正文即用户原话，元数据明确标注为 auto-collected 脚注。
+file_issue writing turn: when the current turn's action is classified as file_issue, the main loop does not use the brief in-conversation message as the issue body.
+Instead, it adds a dedicated writing turn within the loop—using T3's build_issue_turn to have the persona step outside the conversation and write
+what they want to report to the developer as a self-contained body in their own first person (overriding the action contract to take only {issue}). issue_artifact = this first-person body +
+`---` separator + machine footnote (automatically collected metadata such as persona_id/capability tier/turn count/symptoms in the final reply); it no longer uses a third-person template wrapper such as “### What the user
+reported.” The body is the user's own words, and the metadata is explicitly labeled as an auto-collected footnote.
 
-**接口**
+**Interface**
 
 ```
 run_session(persona: Persona, client: PersonaClient, harness, task: str) -> SessionResult
 SessionResult(persona_id, end_reason, turns: list[TurnLog], signals: list[str],
               issue_artifact: str | None,
-              feeling: FeelingScore | None,          # LLM 自评（主信号）
-              feeling_derived: FeelingScore | None)  # 框架派生（交叉校验/兜底）
+              feeling: FeelingScore | None,          # LLM self-rating (primary signal)
+              feeling_derived: FeelingScore | None)  # Framework-derived score (cross-check/fallback)
 ```
 
-注：此为引擎原生签名；与 spec-0001/T4 run_session(persona, scenario, harness, user_agent,
-tracker, store) 的契约对齐留待接入闭环时做（见 Unresolved questions）。
+Note: this is the engine's native signature; alignment with the spec-0001/T4 run_session(persona, scenario, harness, user_agent,
+tracker, store) contract is deferred until closed-loop integration (see Unresolved questions).
 
-**测试**
+**Tests**
 
-单测/集成（离线 ScriptedPersonaClient + 脚本化 harness）：
-- 跑通一局：给定 persona+client+harness+task 返回 SessionResult，turns 与收发序列一致。
-- 自判终止：persona 在第 k 轮发终止动作 → 恰好 k 轮；永不终止 → 轮数达 MAX_TURNS 截断。
-- 体感两路：会话末 feeling 与 feeling_derived 均为合法 FeelingScore；LLM 自评解析失败时 feeling 回落 derived。
-- 纯主观：构造无任何客观字段的 harness 文本回复即可跑通；状态/体感不依赖 gold。
-- 能力分叉：低能力 persona 跑通常规用例即 accept（高体感）；高能力 persona 逼证据至耐心耗尽 → file_issue（低体感）。
-- 感知原样喂入：移除 perceive_filter/_filter_self_obs 后，run_session 把原始 harness 文本喂入 client，
-  verify_self 注入原始观察（不再按子串伪造「崩了/没报错」）；能力分叉不依赖框架过滤而由 prompt 承载。
-- file_issue 正文是用户口吻：file_issue 分支专门调一次 build_issue_turn，issue_artifact 正文为第一人称
-  用户原话、机器元数据降级为 `---` 后的 auto-collected 脚注（断言无第三人称模板头、有脚注且含能力档/动作）。
+Unit/integration tests (offline ScriptedPersonaClient + scripted harness):
+- Complete one session: given persona+client+harness+task, return SessionResult with turns matching the send/receive sequence.
+- Self-determined termination: the persona emits a terminal action on turn k → exactly k turns; never terminates → truncate when the turn count reaches MAX_TURNS.
+- Two experience scores: at session end, feeling and feeling_derived are both valid FeelingScore values; if LLM self-rating parsing fails, feeling falls back to derived.
+- Purely subjective: the session runs successfully with harness text replies containing no objective fields; state/experience does not depend on gold.
+- Capability branching: a low-capability persona accepts after passing a normal test case (high experience score); a high-capability persona presses for evidence until patience is exhausted → file_issue (low experience score).
+- Perception inputs passed through unchanged: after removing perceive_filter/_filter_self_obs, run_session feeds raw harness text to the client,
+  and verify_self injects raw observations (no longer fabricating “crashed/no error” based on substrings); capability branching relies on the prompt, not framework filtering.
+- file_issue body uses the user's voice: the file_issue branch calls build_issue_turn once specifically for writing; the issue_artifact body consists of the user's own first-person
+  words, with machine metadata relegated to an auto-collected footnote after `---` (assert that there is no third-person template heading, and that the footnote exists and includes capability tier/action).
 
-**文件（单一 writer 所有权）**
+**Files (single-writer ownership)**
 
   - `backend/ahe_beta/user/sim/loop.py`
   - `backend/tests/user/sim/test_loop.py`
 
-### harness 桩与运行入口（T6）
+### Harness stubs and entry points (T6)
 
-harness 桩实现 HarnessInterface（send/reset/close）：send 按预设步骤回应，仅消费 message 是否「要求
-运行 / 探不可整除边界」分叉轨迹，返回纯文本（str）；reset 把脚本步进归零；close 置已关闭标志（无真
-资源）、幂等，close 后再 send/reset 抛 RuntimeError（对齐 FakeHarness 暴露误用）。bug 体现在文本中
-（如 split_bill(100,3) -> sum=99.99），高能力 persona 读文本即可识别，低能力 persona 看常规用例
-（sum=100）即接受——分叉完全由 persona 能力 + 文本感知驱动，无需 gold。demo 用 make_client（无 key
-→ ScriptedPersonaClient）对两个 persona（SHALLOW+FEEDBACK / EXPERT+FILE_ISSUE）各跑全新 harness
-轨迹，print_result 并排打印 turns / 两路体感 / 行为信号 / issue artifact；run_live 固定
-ApiPersonaClient（走 repo .env 网关）对真实 user-agent 跑 SplitBillHarness。
+The harness stubs implement HarnessInterface (send/reset/close): send responds according to preset steps, branching the trajectory only on whether the message “requests
+execution / probes a non-evenly-divisible boundary,” and returns plain text (str); reset resets script progression to zero; close sets a closed flag (no actual
+resources) and is idempotent; send/reset after close raise RuntimeError (aligned with FakeHarness to expose misuse). Bugs appear in the text
+(e.g., split_bill(100,3) -> sum=99.99); a high-capability persona can identify them by reading the text, while a low-capability persona accepts after seeing a normal case
+(sum=100)—branching is driven entirely by persona capability + textual perception, without gold. The demo uses make_client (no key
+→ ScriptedPersonaClient) to run fresh harness trajectories for each of two personas (SHALLOW+FEEDBACK / EXPERT+FILE_ISSUE),
+and print_result prints turns / both experience scores / behavioral signals / issue artifact side by side; run_live always uses
+ApiPersonaClient (through the repo .env gateway) to run SplitBillHarness against a real user-agent.
 
-**接口**
+**Interface**
 
 ```
-ScriptedHarness / SplitBillHarness 实现 spec-0001/T2 HarnessInterface：
-  send(message: str) -> str   # 本轮只回文本(无 gold/exit_code)
-  reset() -> None             # 重置脚本步进, 幂等
-  close() -> None             # 置已关闭标志(无真资源)；幂等，close 后再 send/reset 抛 RuntimeError
-demo.main() / run_live.main()   # 两个 __main__ 运行入口
+ScriptedHarness / SplitBillHarness implement spec-0001/T2 HarnessInterface:
+  send(message: str) -> str   # Return text only in this iteration (no gold/exit_code)
+  reset() -> None             # Reset script progression; idempotent
+  close() -> None             # Mark closed (no real resources); idempotent; subsequent send/reset raises RuntimeError
+demo.main() / run_live.main()   # Two __main__ entry points
 ```
 
-**测试**
+**Tests**
 
-单测/烟测：
-- 契约对齐：isinstance(ScriptedHarness()/SplitBillHarness(), HarnessInterface) 为真；reset 后脚本从首步重来；close 后 send/reset 抛 RuntimeError、重复 close 幂等不抛（对齐 FakeHarness）。
-- harness 桩：首轮贴代码未跑；要求运行 → 回显常规用例(无报错)；探不可整除边界 → 文本暴露丢分钱/DST 错误；send 返回 str。
-- demo 无 key 跑通两 persona，输出含 llm-rated 与 derived 两路体感分；断言能力分叉（浅层 accept / 专家 file_issue）。
+Unit/smoke tests:
+- Contract alignment: isinstance(ScriptedHarness()/SplitBillHarness(), HarnessInterface) is true; after reset, the script restarts from the first step; send/reset after close raise RuntimeError, and repeated close calls are idempotent and do not raise (aligned with FakeHarness).
+- Harness stubs: the first turn pastes code without running it; request execution → echo the normal case (no error); probe a non-evenly-divisible boundary → text exposes lost cents/DST errors; send returns str.
+- The demo runs both personas without a key, and its output includes both llm-rated and derived experience scores; assert capability branching (shallow accept / expert file_issue).
 
-**文件（单一 writer 所有权）**
+**Files (single-writer ownership)**
 
   - `backend/ahe_beta/user/sim/harness_adapter.py`
   - `backend/ahe_beta/user/sim/scenarios.py`
@@ -443,140 +437,115 @@ demo.main() / run_live.main()   # 两个 __main__ 运行入口
   - `backend/ahe_beta/user/sim/run_live.py`
   - `backend/tests/user/sim/test_harness_adapter.py`
 
-依赖 DAG：`T1 → T2`，`T1 → T3`，`T2 → T3`，`0001/T1 → T4`，`T1 → T5`，`T2 → T5`，`T3 → T5`，`T4 → T5`，`T5 → T6`
+Dependency DAG: `T1 → T2`, `T1 → T3`, `T2 → T3`, `0001/T1 → T4`, `T1 → T5`, `T2 → T5`, `T3 → T5`, `T4 → T5`, `T5 → T6`
 
 ## Drawbacks
 
-本组以工程复杂度换取拟真度，代价集中在几处：9 维结构化 persona（T1）相比 spec-0001/T1 的自由文本
-五元组显著提高建模与维护成本，且需要 None 哨兵区分「未提供」与「已 grounded」的派生维度，接口不如
-自由文本直观。体感评分（T4）两路并出多消耗一次 LLM 调用与一个冗余字段（feeling_derived）。会话主
-循环（T5）把 T1–T4 总装为单一引擎后复杂度与多模块依赖显著上升；体感只在会话末产出一次，丢失「第几
-轮变差」的细粒度；感知侧从代码过滤改为纯 prompt 约束（G1 + persona 档位）后，能力分叉的真实性完全
-依赖提示质量，不再有代码层兜底，提示退化时可能出现低能力 persona 越级识破 bug 或高能力 persona 误
-判。T6 的 harness 桩为脚本化 shim，仅覆盖预设分叉轨迹，尚非真实 CLI harness，代表性有限。最根本的
-限制是本轮全程未实现客观真值线（gold/GAP/ESCAPED_BUG/control-plane）：体感与 issue 完全建立在主观
-信号之上，无法核实 persona 的判断本身是否准确，只能依赖后续多轮迭代与真实数据校准间接收敛。
+This group trades engineering complexity for realism, with costs concentrated in several areas: the 9-dimensional structured persona (T1) significantly increases modeling and maintenance costs compared with the free-text
+five-tuple in spec-0001/T1, and requires a None sentinel to distinguish “not provided” from “already grounded” derived dimensions, making the interface less
+intuitive than free text. Producing both experience scores (T4) costs an additional LLM call and a redundant field (feeling_derived). Assembling T1–T4 into a single session main-loop
+engine (T5) significantly increases complexity and dependencies across modules; experience is scored only once at session end, losing the finer detail of “which
+turn it deteriorated on.” After replacing code filtering on the perception side with pure prompt constraints (G1 + persona tier), the realism of capability branching depends entirely
+on prompt quality, with no code-level fallback; degraded prompts may let low-capability personas identify bugs beyond their tier or cause high-capability personas to make incorrect
+judgments. The harness stubs in T6 are scripted shims that cover only preset branching trajectories, not yet real CLI harnesses, so their representativeness is limited. The most fundamental
+limitation is that this round does not implement the objective ground-truth track (gold/GAP/ESCAPED_BUG/control-plane) at any point: experience and issues are based entirely on subjective
+signals, so the accuracy of the persona's own judgments cannot be verified; convergence can only be approached indirectly through subsequent rounds of iteration and calibration with real data.
 
 ## Rationale and alternatives
 
-### 用户建模核心：persona 维度与动作空间/状态机（T1、T2）
+### Core user modeling: persona dimensions and action space/state machine (T1, T2)
 
-- 9 维结构化 vs spec-0001/T1 自由文本五元组：选结构化（驱动能力分叉、可复现/可采样），代价是建模成本；
-  与 models.Persona 的并轨留待接入闭环（见 Unresolved questions）。
-- 派生维度确定性查表 vs LLM 推断：选确定性，保证可复现与可 codegen，杜绝采样噪声进入静态系数。
-- 派生 fallback-only vs 一律派生：选 fallback。真实 persona 的验收/信任/授权应可被 grounded 值直接给定（维度
-  正交，见 selfreport 例 C：expert 可 over-trust）；一律派生会把 grounded 真值改写成合成面（0006/T2 注入即失真）。
-  代价是 Persona 需用 None 哨兵区分「未提供」与「已 ground」。
-- executor×channel 双轴钉死 vs 单一 run_once 动作：选双轴，根除「自己跑 vs 让 harness 跑」的归属歧义。
-- 能力掩码 gate 动作 + 感知输入 vs 只 gate 动作：选都 gate，防强模型「心算」源码越过低能力档（G1）。
-- 本轮纯主观（不实现客观线）vs 含 gold/GAP：选纯主观。训练信号只取用户体感，客观真值线（GAP/
-  ESCAPED_BUG/control-plane）整体推迟，避免过早引入 oracle 依赖；后续如需观测再开 spec。
+- 9-dimensional structured representation vs the free-text five-tuple in spec-0001/T1: choose structured representation (to drive capability branching and enable reproducibility/sampling), at the cost of modeling effort;
+  convergence with models.Persona is deferred until closed-loop integration (see Unresolved questions).
+- Deterministic lookup tables vs LLM inference for derived dimensions: choose determinism to ensure reproducibility and codegen compatibility, preventing sampling noise from entering static coefficients.
+- Fallback-only derivation vs unconditional derivation: choose fallback. A real persona's acceptance/trust/authorization should be directly specifiable through grounded values (the dimensions
+  are orthogonal; see selfreport example C: an expert can over-trust); unconditional derivation would overwrite grounded truth with a synthetic profile (injecting 0006/T2 would immediately distort it).
+  The cost is that Persona needs a None sentinel to distinguish “not provided” from “already grounded.”
+- Fixing both executor×channel axes vs a single run_once action: choose both axes to eliminate attribution ambiguity between “run it oneself vs have the harness run it.”
+- Capability masks gating actions + perception inputs vs gating only actions: choose to gate both, preventing a strong model from “mentally executing” source code beyond the low-capability tier (G1).
+- Purely subjective this round (no objective track) vs including gold/GAP: choose purely subjective. Training signals use only user experience; the objective ground-truth track (GAP/
+  ESCAPED_BUG/control-plane) is deferred in its entirety to avoid introducing oracle dependencies prematurely; open a separate spec later if observation is needed.
 
-### 提示装配与 persona LLM 后端（T3）
+### Prompt assembly and persona LLM backend (T3)
 
-- 约定文本 OUTPUT CONTRACT vs 强制 JSON schema / tool-calling：选约定文本 + 容错解析，避免对模型形态
-  强假设（对齐「兼容多种 agent/模型」），解析失败安全降级。
-- 自带 openai client vs 收敛到 0003/T2 nexau_runtime：当前自带（sim 可独立跑）；接入闭环时收敛到单一
-  nexau 运行时（单一运行时约束），见 Unresolved questions。
+- Textual OUTPUT CONTRACT conventions vs enforced JSON schema / tool-calling: choose textual conventions + fault-tolerant parsing to avoid strong assumptions about model
+  interfaces (aligned with “compatibility with multiple agents/models”), with safe degradation on parse failure.
+- Bundled openai client vs convergence on 0003/T2 nexau_runtime: currently bundled (so sim can run independently); converge on a single
+  nexau runtime during closed-loop integration (single-runtime constraint); see Unresolved questions.
 
-### 体感评分：两路并出（T4）
+### Experience scoring: two parallel outputs (T4)
 
-- 两路并出 vs 只取一路：选并出。只取 LLM 自评则解析失败即无信号、且不可复现；只取派生则丢失 persona
-  角色内的真实满意度。并出以 LLM 为主、派生兜底兼校验，代价是多一次 LLM 调用与一个冗余字段。
-- 派生分由代码聚合 vs 让 LLM 直接打分：spec-0001/T3 字面要求 LLM 产出；但控制信封每轮已产 verdict，
-  再让 LLM 额外打 1–4 与之冗余且引入噪声。折中：保留 LLM 自评对齐 spec，同时代码派生作可复现交叉校验。
-- 复用 0001 models.FeelingScore vs sim 内自定义：当前 sim 自包含定义（零跨包耦合、可独立测）；接入闭环
-  时再改用 models.FeelingScore，见 Unresolved questions。
-- 越界处理 assert+捕获为 None vs 直接抛：选前者。既守住「越界即非法」的单一校验点（T1 __post_init__），
-  又不让一次坏自评崩掉整局。
+- Emit both paths vs select only one: emit both. Using only the LLM self-assessment yields no signal when parsing fails and is not reproducible; using only the derived score loses the persona's genuine in-character satisfaction. Emit both, with the LLM as primary and the derived score as fallback and validation, at the cost of one additional LLM call and a redundant field.
+- Aggregate the derived score in code vs have the LLM score directly: spec-0001/T3 literally requires LLM output; however, the control envelope already produces a verdict each turn, so asking the LLM to additionally assign a score of 1–4 is redundant and introduces noise. Compromise: retain the LLM self-assessment to align with the spec, while deriving a score in code for reproducible cross-validation.
+- Reuse 0001 models.FeelingScore vs define a custom type within sim: sim currently uses a self-contained definition (zero cross-package coupling, independently testable); switch to models.FeelingScore when integrating into the closed loop, as discussed in Unresolved questions.
+- Handle out-of-bounds values with assert+catch as None vs raise directly: choose the former. This preserves a single validation point for the rule “out of bounds is invalid” (T1 __post_init__) without allowing one bad self-assessment to crash the entire session.
 
-### 会话主循环引擎（T5）
+### Session main loop engine (T5)
 
-- 控制信封引擎 vs spec-0001/T3 最小桩：选引擎。最小桩仅 sentinel+max_turns，无法表达能力分叉与
-  情绪演化，训练信号失真；引擎更贴真实使用，代价是复杂度与多模块依赖。
-- 自立逐轮协议 vs 复用 harbor 批式 episode：选自立。harbor 接口粒度是 episode，套到「逐轮真人对话 +
-  用户自判终止」语义错位（与 spec-0001/T2、0004 决策一致）。
-- 体感末态产出 vs 逐轮打分：选末态一次（对齐 FeelingScore「一局一个总分」），丢失「第几轮变差」的
-  细粒度，后续若需再升级。
-- 感知能力分叉用代码过滤 vs prompt 约束：原型用 perceive_filter/_filter_self_obs 机械过滤喂给 LLM 的
-  输入，子串/缩进启发式脆弱（漏判越档违反 G1、误判删正常文本或伪造负向感知）；改为原样喂入、能力分叉
-  交由 prompt(G1)+persona 档位约束 LLM 自律，去掉脆弱的字符串规则层（代价：分叉真实性更依赖提示质量）。
+- Control envelope engine vs spec-0001/T3 minimal stub: choose the engine. The minimal stub has only sentinel+max_turns and cannot express capability branching or emotional evolution, distorting the training signal; the engine is closer to real usage, at the cost of complexity and multi-module dependencies.
+- Standalone turn-by-turn protocol vs reuse harbor batch episodes: choose standalone. The harbor interface operates at episode granularity; applying it to the semantics of “turn-by-turn human conversation + user-determined termination” would be a semantic mismatch (consistent with the decisions in spec-0001/T2 and 0004).
+- Produce a final-state experience score vs score every turn: choose one final-state score (aligned with FeelingScore's “one overall score per session”), losing the granularity of “which turn got worse”; upgrade later if needed.
+- Code filtering vs prompt constraints for perceived capability branching: the prototype mechanically filters input fed to the LLM using perceive_filter/_filter_self_obs. Its substring/indentation heuristics are brittle (false negatives allow perception beyond the persona's tier, violating G1; false positives remove normal text or fabricate negative perceptions). Switch to feeding input unchanged and rely on prompt(G1)+persona tier constraints for LLM self-discipline in capability branching, removing the brittle string-rule layer (at the cost of making branching fidelity more dependent on prompt quality).
 
-### harness 桩与运行入口（T6）
+### harness stub and run entry point (T6)
 
-- 脚本化 harness vs 真实 CLI harness：本组用脚本化（确定性、可回归、无外部依赖），但与真实接入统一实现
-  spec-0001/T2 的 HarnessInterface（send/reset/close）；真实 CLI 接入归 0003/T1 launcher。
-- send 回 str vs 回三元组(含 exit_code/gold)：选 str。本轮不实现客观线，无 gold/exit_code 消费方；
-  与 spec-0001/T2 send->str 契约一致，桩可直接喂给依赖 HarnessInterface 的消费方。
+- Scripted harness vs real CLI harness: this group uses a scripted harness (deterministic, regression-testable, and free of external dependencies), but both it and the real integration implement the same spec-0001/T2 HarnessInterface (send/reset/close); real CLI integration belongs to the 0003/T1 launcher.
+- Return str from send vs return a tuple of three (including exit_code/gold): choose str. This round does not implement the objective line, and there are no consumers of gold/exit_code; this is consistent with the spec-0001/T2 send->str contract, so the stub can be fed directly to consumers that depend on HarnessInterface.
 
 ## Prior art
 
-### 用户建模核心：persona 维度与动作空间/状态机（T1、T2）
+### User modeling core: persona dimensions and action space/state machine (T1, T2)
 
-spec-0001/T1 Persona 字段约定，spec-0001/T2 黑盒对话协议（channel 语义对齐）。CLAUDE.md：persona
-来自真实数据、不依据 benchmark 构造；benchmark held-out。extract-selfreport-persona 例 C（维度正交：
-expert×over-trust，derive_* 须可被 grounded 值覆盖）。参考实现见本组 prototype（dimensions.py /
-clauses.py / actions.py / action_space.py / state.py）。
+spec-0001/T1 Persona field conventions, spec-0001/T2 black-box conversation protocol (aligned channel semantics). CLAUDE.md: persona comes from real data, not constructed from benchmarks; benchmark held-out. extract-selfreport-persona example C (orthogonal dimensions: expert×over-trust, derive_* must be overridable by grounded values). See this group's prototype for the reference implementation (dimensions.py / clauses.py / actions.py / action_space.py / state.py).
 
-### 提示装配与 persona LLM 后端（T3）
+### Prompt assembly and persona LLM backend (T3)
 
-spec-0001/T3 LLM 后端注入为 Callable。CLAUDE.md 单一运行时 nexau（0003/T2）。
-参考实现见本组 prototype（prompt.py / persona_client.py）。
+spec-0001/T3 LLM backend injected as Callable. CLAUDE.md single runtime nexau (0003/T2).
+See this group's prototype for the reference implementation (prompt.py / persona_client.py).
 
-### 体感评分：两路并出（T4）
+### Experience scoring: emit both paths (T4)
 
-spec-0001/T1 FeelingScore 数据契约；spec-0001/T3「会话末经 LLM 产出 FeelingScore」。
-CLAUDE.md 用户侧(a)：体感评分作训练信号、benchmark held-out。参考实现见本组 prototype（feeling.py）。
+spec-0001/T1 FeelingScore data contract; spec-0001/T3 “produce FeelingScore via LLM at the end of the session”.
+CLAUDE.md user side (a): experience score as a training signal, benchmark held-out. See this group's prototype for the reference implementation (feeling.py).
 
-### 会话主循环引擎（T5）
+### Session main loop engine (T5)
 
-spec-0001/T3 用户 agent 驱动器（最小桩）、T2 黑盒对话协议、T4 会话编排 run_session。
-spec-0004 分层（harbor 只包外层 rollout，逐轮对话自立）。参考实现见本组 prototype（loop.py）。
+spec-0001/T3 user agent driver (minimal stub), T2 black-box conversation protocol, T4 session orchestration run_session.
+spec-0004 layering (harbor wraps only the outer rollout, with standalone turn-by-turn conversation). See this group's prototype for the reference implementation (loop.py).
 
-### harness 桩与运行入口（T6）
+### harness stub and run entry point (T6)
 
-spec-0001/T2 HarnessInterface + FakeHarness（send/reset/close）、spec-0003/T1 harness launcher（真实接入）。
-参考实现见本组 prototype（harness_adapter / scenarios / demo / run_live.py）。
+spec-0001/T2 HarnessInterface + FakeHarness (send/reset/close), spec-0003/T1 harness launcher (real integration).
+See this group's prototype for the reference implementation (harness_adapter / scenarios / demo / run_live.py).
 
 ## Unresolved questions
 
-### 用户建模核心：persona 维度与动作空间/状态机（T1、T2）
+### User modeling core: persona dimensions and action space/state machine (T1, T2)
 
-- 接入闭环时 9 维 Persona 与 spec-0001 models.Persona（五元组）如何并轨：扩展 models.Persona、
-  还是加 9 维↔五元组转换层？本组先自包含，留待 dev 侧对接时定。
-- 客观真值线（objective/gold/GAP/control-plane）本轮不实现，整体推迟到后续观测 spec；届时按「只走旁路、
-  不写 state/persona、不进体感」的 held-out 约束补回。
+- When integrating into the closed loop, how should the 9-dimensional Persona be aligned with spec-0001 models.Persona (five-tuple): extend models.Persona, or add a 9-dimensional↔five-tuple conversion layer? This group remains self-contained for now; the decision is deferred to dev-side integration.
+- The objective ground-truth line (objective/gold/GAP/control-plane) is not implemented this round and is deferred in full to a later observability spec; it will then be restored under the held-out constraint of “bypass only, no writes to state/persona, no inclusion in the experience score”.
 
-### 提示装配与 persona LLM 后端（T3）
+### Prompt assembly and persona LLM backend (T3)
 
-接入闭环时 PersonaClient 是否收敛到 0003/T2 nexau_runtime（单一运行时约束）：现有 ApiPersonaClient
-与 nexau_runtime.Agent 后端形态不同（respond(system,user)->dict vs run(input)->str），需一层适配，待对接时定。
+When integrating into the closed loop, should PersonaClient converge on 0003/T2 nexau_runtime (single-runtime constraint)? The existing ApiPersonaClient and nexau_runtime.Agent have different backend interfaces (respond(system,user)->dict vs run(input)->str), requiring an adapter layer; the decision is deferred until integration.
 
-### 体感评分：两路并出（T4）
+### Experience scoring: emit both paths (T4)
 
-接入闭环时是否将 sim 的 FeelingScore 收敛为复用 spec-0001 models.FeelingScore（去重、单一数据契约）？
-两路分歧时（如 1 vs 2）训练信号取 LLM 自评、派生还是融合，待 dev 侧体感门禁（0003/T4）对接时定。
-评分细则（阈值/权重）为 CLAUDE.md 待定项#1，本组给出首版粗映射，待真实数据校准。
+When integrating into the closed loop, should sim's FeelingScore converge on reuse of spec-0001 models.FeelingScore (deduplication, single data contract)?
+When the two scores disagree (e.g. 1 vs 2), whether the training signal uses the LLM self-assessment, the derived score, or a combination is to be decided during integration with the dev-side experience gate (0003/T4).
+The scoring rules (thresholds/weights) are CLAUDE.md pending item #1; this group provides an initial coarse mapping, pending calibration with real data.
 
-### 会话主循环引擎（T5）
+### Session main loop engine (T5)
 
-harness 已统一为 spec-0001/T2 HarnessInterface(send/reset/close)（本组 T6）。接入闭环仍需把引擎原生
-run_session(persona, client, harness, task) 适配为 spec-0001/T4 的 run_session(persona, scenario,
-harness, user_agent, tracker, store)：turns 投影为 Transcript、issue_artifact 转 IssueDraft 经
-IssueTracker、9 维 Persona 与 FeelingScore 与 models 并轨。此适配归后续 Task/组。
+The harness has been standardized on spec-0001/T2 HarnessInterface(send/reset/close) (this group's T6). Closed-loop integration still requires adapting the engine's native run_session(persona, client, harness, task) to spec-0001/T4's run_session(persona, scenario,
+harness, user_agent, tracker, store): project turns to Transcript, convert issue_artifact to IssueDraft through IssueTracker, and align the 9-dimensional Persona and FeelingScore with models. This adaptation belongs to a later Task/group.
 
-### harness 桩与运行入口（T6）
+### harness stub and run entry point (T6)
 
-桩已实现 HarnessInterface（send/reset/close）；真实 CLI harness 接入仍归 0003/T1 launcher。控制平面（进程
-exit_code）与客观真值线是否后续补回，归后续观测 spec，本轮不涉及。
+The stub implements HarnessInterface (send/reset/close); real CLI harness integration still belongs to the 0003/T1 launcher. Whether to restore the control plane (process exit_code) and the objective ground-truth line later belongs to a later observability spec and is out of scope this round.
 
 ## Future possibilities
 
-控制信封目前刻意搁置的几条线，是本组之后自然的延伸方向：其一是补回客观真值线（gold/GAP/
-ESCAPED_BUG/control-plane），以「只走旁路、不写 state/persona、不进体感」的方式接入，用于校验主观
-体感与真实缺陷检出率的一致性（见 Unresolved questions）；其二是把体感评分从「会话末一次」升级为逐
-轮打分，恢复「第几轮变差」的细粒度（T5 Rationale 已提及该取舍，后续若需可再升级）；其三是生产环境
-中把 T6 的脚本化 harness 桩替换为真实 CLI harness（同样实现 HarnessInterface，归 0003/T1
-launcher），覆盖比预设轨迹更广的真实缺陷分布；其四是待 0006/T2 从真实数据蒸馏出 persona 卡后，用
-真实 grounded 的 d3/trust/d6 校准 T1 当前的确定性派生查表，检验其与真实用户分布的贴合度。
+Several lines of work deliberately set aside by the control envelope are natural extensions after this group: first, restore the objective ground-truth line (gold/GAP/
+ESCAPED_BUG/control-plane), integrating it as “bypass only, no writes to state/persona, no inclusion in the experience score” to check consistency between subjective user experience and the actual defect detection rate (see Unresolved questions); second, upgrade experience scoring from “once at session end” to per-turn scoring, restoring the granularity of “which turn got worse” (the tradeoff is already mentioned in T5 Rationale and can be revisited later if needed); third, replace T6's scripted harness stub with a real CLI harness in production (also implementing HarnessInterface, belonging to the 0003/T1 launcher), covering a broader distribution of real defects than preset trajectories; fourth, once 0006/T2 distills persona cards from real data, use real grounded d3/trust/d6 values to calibrate T1's current deterministic derivation lookup table and assess its fit to the real user distribution.
 

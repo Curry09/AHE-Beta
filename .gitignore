@@ -12,10 +12,10 @@ venv/
 # Runtime artifacts (sessions, harness checkouts)
 data/
 
-# openagents 本地运行态（worktrees + state.json，本机专属）
+# Local OpenAgents runtime state (worktrees and state.json)
 .openagents/
 
-# 前端构建产物与依赖
+# Frontend build artifacts and dependencies
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
@@ -24,13 +24,13 @@ frontend/*.tsbuildinfo
 # OS
 .DS_Store
 
-# Gitea 连接信息（含 token，不入库）
+# Local Gitea connection information, including its token
 backend/deploy/gitea/.env
 
-# 本地 LLM 凭证（复用 ljh，勿入库）
+# Local model credentials
 backend/.env
 
-# dev agent 逃逸产物：编排仓下伪 origin bare 仓（见 spec-0021）
+# Escaped developer artifacts: fake origin bare repositories (see spec-0021)
 **/.canonical_origin.git/
 
 # Local credentials and experiment output (examples remain tracked)

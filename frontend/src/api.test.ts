@@ -46,22 +46,22 @@ describe("historical snapshot presentation", () => {
     const bar = renderToStaticMarkup(createElement(TopBar, {
       ...controls, historical: true, snapshot,
     }));
-    expect(picker).toContain("历史快照");
-    expect(picker).toContain("当时状态 RUNNING");
+    expect(picker).toContain("Historical snapshot");
+    expect(picker).toContain("Recorded state RUNNING");
     expect(picker).toContain("2026-09-09 13:32:43 UTC");
     expect(picker).toContain(`dateTime="${snapshot.updated_at}"`);
-    expect(bar).toContain("历史快照");
-    expect(bar).toContain("当时状态 RUNNING");
+    expect(bar).toContain("Historical snapshot");
+    expect(bar).toContain("Recorded state RUNNING");
     expect(bar).not.toContain("dot on");
-    expect(bar).not.toContain("运行中 ·");
+    expect(bar).not.toContain("Running ·");
     expect(picker + bar).not.toContain("COMPLETED");
   });
 
   it("retains live status and hides the historical picker in API mode", () => {
     const bar = renderToStaticMarkup(createElement(TopBar, controls));
-    expect(bar).toContain("运行中 · 第 3/5 轮");
+    expect(bar).toContain("Running · Round 3/5");
     expect(bar).toContain("dot on");
-    expect(bar).not.toContain("历史快照");
+    expect(bar).not.toContain("Historical snapshot");
     expect(renderToStaticMarkup(createElement(ExperimentPicker, {
       experiments: [], selected: null, onSelect: () => {},
     }))).toBe("");
@@ -71,7 +71,7 @@ describe("historical snapshot presentation", () => {
     const picker = renderToStaticMarkup(createElement(ExperimentPicker, {
       experiments: [snapshot], selected: "missing", onSelect: () => {},
     }));
-    expect(picker).not.toContain("记录时间：");
+    expect(picker).not.toContain("Recorded time: ");
   });
 });
 

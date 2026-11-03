@@ -50,7 +50,8 @@ Same domains, but pull **low-rep askers** under these tags to fill the blind/sur
 ## Scope / cautions
 
 - All Python, all library-maintenance flavored → naturally skews D5 toward these domains
-  and D1 toward `competent`/`expert`. （注意：D2 验收 / D4 信任仍默认 injected——库维护并不
-  等于本人陈述了验收线或对 agent 的信任，见本 skill 原则 4。）
+  and D1 toward `competent`/`expert`. Note: D2 acceptance / D4 trust still default to
+  injected. Maintaining a library does not mean the person has stated an acceptance
+  threshold or their trust in an agent; see principle 4 of this skill.
 - Do **not** try to source blind / vibe users here — that's the SO / forum source's
   job. This profile fills the *domain* axis, not the low end of D1.

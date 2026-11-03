@@ -1,4 +1,4 @@
-"""前端观测看板只读 API 单测：TestClient + 临时 SessionStore + FakeTracker，不触网。"""
+"""Unit test for frontend dashboard read-only API: TestClient + temporary SessionStore + FakeTracker, no network access."""
 
 from __future__ import annotations
 
@@ -24,11 +24,11 @@ from ahe_beta.web.api import create_app
 
 def _persona() -> Persona:
     return Persona(
-        identity="独立开发者",
-        level="中级",
-        domain="Python 后端",
-        goal="让慢查询快起来",
-        speaking_style="口语",
+        identity="Independent developer",
+        level="Intermediate",
+        domain="Python Backend",
+        goal="Speed up slow queries",
+        speaking_style="Conversational",
     )
 
 
@@ -38,11 +38,13 @@ def _session(*, score: int, n_issues: int) -> Session:
     ]
     return Session(
         persona=_persona(),
-        scenario=SeedScenario(description="我有个 Django 接口很慢，帮我排查优化。" * 4),
+        scenario=SeedScenario(
+            description="I have a Django Very slow API，Help me investigate and optimize it。" * 4
+        ),
         transcript=Transcript(
             turns=[Turn(role="user", content="hi"), Turn(role="harness", content="yo")]
         ),
-        feeling=FeelingScore(score=score, reason="还行"),
+        feeling=FeelingScore(score=score, reason="Fair enough"),
         issue_refs=refs,
     )
 
@@ -68,7 +70,7 @@ def test_overview_empty(tmp_path: Path) -> None:
         "feeling_trend": [],
         "feedback_counts": {},
         "issue_curve": [],
-        "funnel": {"report": 0, "proposal": 0, "ready": 0},  # Spec-0029/T9 三平面漏斗
+        "funnel": {"report": 0, "proposal": 0, "ready": 0},  # Spec-0029/T9 three-plane funnel
     }
 
 
@@ -84,7 +86,7 @@ def test_overview_with_sessions(tmp_path: Path) -> None:
     assert body["session_count"] == 2
     assert body["open_issue_count"] == 1
     assert len(body["feeling_trend"]) == 2
-    # issue_curve 现为 backlog 口径（需 Gitea 全状态读能力）；FakeTracker 无 list_issues → 空序列。
+    # issue_curve currently uses backlog scope (requires Gitea full-state read capability); FakeTracker has no list_issues → empty sequence.
     assert body["issue_curve"] == []
 
 
@@ -114,7 +116,7 @@ def test_sessions_list(tmp_path: Path) -> None:
     row = rows[0]
     assert row["score"] == 4
     assert row["n_issues"] == 0
-    assert row["persona_identity"] == "独立开发者"
+    assert row["persona_identity"] == "Independent developer"
     assert len(row["scenario"]) <= 80
     assert set(row) == {
         "session_id",
@@ -207,7 +209,7 @@ def test_usage_api_filters_and_empty_data(tmp_path: Path) -> None:
 
 def test_issues_connected(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    tracker.create_issue(IssueDraft(title="慢查询排查", body="b", labels=["bug"]))
+    tracker.create_issue(IssueDraft(title="Slow query investigation", body="b", labels=["bug"]))
     store = SessionStore(tmp_path / "sessions")
     client = TestClient(
         create_app(store=store, tracker=tracker, board_url="http://gitea/o/r/issues")
@@ -218,8 +220,8 @@ def test_issues_connected(tmp_path: Path) -> None:
     assert body["board_url"] == "http://gitea/o/r/issues"
     assert len(body["issues"]) == 1
     issue = body["issues"][0]
-    assert issue["title"] == "慢查询排查"
-    assert issue["body"] == "b"  # 正文随列表返回（详情面板完整信息）
+    assert issue["title"] == "Slow query investigation"
+    assert issue["body"] == "b"  # Body returned with list (full information for detail panel)
     assert issue["url"] == "http://gitea/o/r/issues/1"
     assert "bug" in issue["labels"]
     assert issue["state"] == "open"
@@ -237,10 +239,10 @@ def test_agents_empty_then_populated(tmp_path: Path) -> None:
         data_dir=tmp_path,
         agent_id="user-A",
         role="user",
-        label="独立开发者",
+        label="Independent developer",
         running=True,
-        status="harness 回复中…",
-        turns=[{"role": "user", "content": "在吗"}],
+        status="harness Replying…",
+        turns=[{"role": "user", "content": "Are you there"}],
     )
     update_agent(
         data_dir=tmp_path,
@@ -248,22 +250,22 @@ def test_agents_empty_then_populated(tmp_path: Path) -> None:
         role="developer",
         label="dev#1",
         running=False,
-        status="已提交 fix/issue-1",
+        status="Submitted fix/issue-1",
     )
     agents = client.get("/api/agents").json()["agents"]
-    assert [a["role"] for a in agents] == ["user", "developer"]  # 用户在前
-    assert agents[0]["turns"][0]["content"] == "在吗"
+    assert [a["role"] for a in agents] == ["user", "developer"]  # Users first
+    assert agents[0]["turns"][0]["content"] == "Are you there"
 
 
 class _CommitTracker(FakeTracker):
-    """FakeTracker + 观测 commit 读能力，用来测 /api/commits 的 connected 路径。"""
+    """FakeTracker + dashboard commit read capability, used to test the connected path of /api/commits."""
 
     def list_recent_commits(self, *, limit: int = 15):
         return [
             {
                 "sha": "abc1234def",
                 "short_sha": "abc1234",
-                "message": "feat(main): 收窄超时",
+                "message": "feat(main): Narrow the timeout",
                 "author": "dev#1",
                 "date": "2026-07-02T10:00:00Z",
                 "url": "http://gitea/o/r/commit/abc1234def",
@@ -295,7 +297,7 @@ def test_commits_no_tracker(tmp_path: Path) -> None:
 
 
 def test_commits_fake_tracker_no_capability(tmp_path: Path) -> None:
-    # FakeTracker 无 list_recent_commits → 降级 connected=False（不抛 500）。
+    # FakeTracker has no list_recent_commits → degrades to connected=False (does not throw 500).
     client = _client(tmp_path, tracker=FakeTracker())
     body = client.get("/api/commits").json()
     assert body["connected"] is False
@@ -311,8 +313,8 @@ def test_issues_no_tracker(tmp_path: Path) -> None:
 
 _ISSUE_DTO = {
     "number": 7,
-    "title": "harness 卡顿",
-    "body": "复现步骤……",
+    "title": "harness Lag",
+    "body": "Steps to reproduce……",
     "labels": ["bug"],
     "state": "closed",
     "created_at": "2026-07-01T10:00:00Z",
@@ -322,7 +324,7 @@ _ISSUE_DTO = {
 
 
 class _ObserveTracker(FakeTracker):
-    """FakeTracker + Gitea 观测读能力（全状态 issue/评论/commit 详情），测富端点连通路径。"""
+    """FakeTracker + Gitea dashboard read capability (full-state issue/comment/commit details), test rich endpoint connectivity."""
 
     def list_issues(self, *, state: str = "all", limit: int = 100):
         assert state == "all"
@@ -334,20 +336,20 @@ class _ObserveTracker(FakeTracker):
         return _ISSUE_DTO
 
     def list_comments(self, *, number: int):
-        return [{"author": "developer", "body": "已推进 main v2", "created_at": "2026-07-02"}]
+        return [{"author": "developer", "body": "Advanced main v2", "created_at": "2026-07-02"}]
 
     def get_commit_detail(self, *, sha: str):
         return {
             "sha": sha,
             "short_sha": sha[:7],
-            "message": "fix: issue #7\n\n详细说明",
+            "message": "fix: issue #7\n\nDetailed description",
             "author": "developer",
             "date": "2026-07-02T08:00:00Z",
             "url": f"http://gitea/o/r/commit/{sha}",
             "tags": ["v2"],
             "stats": {"additions": 3, "deletions": 1, "total": 4},
             "files": [{"filename": "agents/main.md", "status": "modified"}],
-            "diff": "diff --git a/agents/main.md b/agents/main.md\n+新增",
+            "diff": "diff --git a/agents/main.md b/agents/main.md\n+Added",
         }
 
 
@@ -355,8 +357,8 @@ def test_issues_full_states_via_observe_tracker(tmp_path: Path) -> None:
     client = _client(tmp_path, tracker=_ObserveTracker())
     body = client.get("/api/issues").json()
     assert body["connected"] is True
-    # 全状态 + 正文 + 时间戳原样透传；Spec-0025/T7 附加 kind/round/triage_status/priority/
-    # reject_reason 与 covers/covered_by（labels=[bug] 的普通闭票：kind=bug、其余无标签 → None/空）
+    # Full state + body + timestamp passed through as-is; Spec-0025/T7 additionally includes kind/round/triage_status/priority/
+    # reject_reason and covers/covered_by (labels=[bug] ordinary closed issues: kind=bug, rest without labels → None/empty)
     assert body["issues"] == [
         {
             **_ISSUE_DTO,
@@ -371,11 +373,11 @@ def test_issues_full_states_via_observe_tracker(tmp_path: Path) -> None:
     ]
 
 
-# ---- Spec-0025/T7：/api/issues 平台层派生字段（kind/round/triage_status/priority/驳回原因）----
+# ---- Spec-0025/T7: /api/issues platform-layer derived fields (kind/round/triage_status/priority/reject reason) ----
 
 
 class _TriageStateTracker(FakeTracker):
-    """FakeTracker + 全状态读能力，返回带 triage 标签/时间戳/reason 的 issue，测 T7 派生字段。"""
+    """FakeTracker + full-state read capability, returns issue with triage labels/timestamp/reason, tests T7 derived fields."""
 
     def __init__(self, issues: list[dict]) -> None:
         super().__init__()
@@ -403,13 +405,13 @@ def test_issues_triage_fields(tmp_path: Path) -> None:
     tracker = _TriageStateTracker(
         [
             _dto(1, labels=["bug", "triaged", "P1", "round-2"]),
-            _dto(2, labels=["RFC", "P0"], body="综合\n\ncovers: #3"),
+            _dto(2, labels=["RFC", "P0"], body="Comprehensive\n\ncovers: #3"),
             _dto(3, labels=["bug", "triaged", "superseded"], state="closed"),
             _dto(
                 4,
                 labels=["feature", "rejected", "round-1"],
                 state="closed",
-                reason="超出 harness 范围",
+                reason="Exceeded harness Scope",
             ),
             _dto(5, labels=["bug", "needs-triage", "round-3"]),
         ]
@@ -417,35 +419,37 @@ def test_issues_triage_fields(tmp_path: Path) -> None:
     client = _client(tmp_path, tracker=tracker)
     issues = {i["number"]: i for i in client.get("/api/issues").json()["issues"]}
 
-    # 1：已 triaged 的 bug，带优先级与轮号
+    # 1: Triaged bug with priority and round number
     assert (issues[1]["kind"], issues[1]["triage_status"]) == ("bug", "triaged")
     assert (issues[1]["priority"], issues[1]["round"]) == ("P1", 2)
     assert issues[1]["covered_by"] is None
-    # 2：RFC 凌驾 type（kind=rfc）、covers 声明、triage_status 不落在 triage 枚举里 → None
+    # 2: RFC overrides type (kind=rfc), declares covers, triage_status not in triage enum → None
     assert issues[2]["kind"] == "rfc"
     assert issues[2]["covers"] == [3]
     assert issues[2]["triage_status"] is None
-    # 3：被 RFC 取代——superseded 胜过 triaged；被 open RFC #2 覆盖
+    # 3: Superseded by RFC — superseded takes precedence over triaged; covered by open RFC #2
     assert issues[3]["triage_status"] == "superseded"
     assert issues[3]["covered_by"] == 2
-    # 4：驳回——带原因（reason 透出）
+    # 4: Rejected — with reason (reason exposed)
     assert issues[4]["triage_status"] == "rejected"
-    assert issues[4]["reject_reason"] == "超出 harness 范围"
+    assert issues[4]["reject_reason"] == "Exceeded harness Scope"
     assert issues[4]["round"] == 1
-    # 5：未 triage
+    # 5: Not triaged
     assert issues[5]["triage_status"] == "needs-triage"
     assert issues[5]["priority"] is None
 
 
-# ---- Spec-0020/T4：/api/issues 覆盖关系字段 covers / covered_by ----
+# ---- Spec-0020/T4: /api/issues coverage relation fields covers / covered_by ----
 
 
 def test_issues_covers_and_covered_by(tmp_path: Path) -> None:
     tracker = FakeTracker()
-    bug = tracker.create_issue(IssueDraft(title="被覆盖bug", body="x", labels=["bug"])).number
-    plain = tracker.create_issue(IssueDraft(title="无关bug", body="y", labels=["bug"])).number
+    bug = tracker.create_issue(IssueDraft(title="Overridden bug", body="x", labels=["bug"])).number
+    plain = tracker.create_issue(
+        IssueDraft(title="Irrelevant bug", body="y", labels=["bug"])
+    ).number
     design = tracker.create_issue(
-        IssueDraft(title="整合", body=f"根因\n\ncovers: #{bug}", labels=["design"])
+        IssueDraft(title="Integrate", body=f"Root cause\n\ncovers: #{bug}", labels=["design"])
     ).number
 
     client = _client(tmp_path, tracker=tracker)
@@ -457,13 +461,13 @@ def test_issues_covers_and_covered_by(tmp_path: Path) -> None:
 
 
 def test_issues_covered_by_gone_when_design_closed(tmp_path: Path) -> None:
-    """design 票 closed 后其覆盖关系消失（covered_by 只认 open design 票）。"""
+    """After a design issue closes, its coverage relations disappear (covered_by only recognizes open design issues)."""
     tracker = FakeTracker()
     bug = tracker.create_issue(IssueDraft(title="bug", body="x", labels=["bug"])).number
     design = tracker.create_issue(
-        IssueDraft(title="整合", body=f"covers: #{bug}", labels=["design"])
+        IssueDraft(title="Integrate", body=f"covers: #{bug}", labels=["design"])
     ).number
-    tracker.set_state(design, "closed", "已落地")
+    tracker.set_state(design, "closed", "Implemented")
 
     client = _client(tmp_path, tracker=tracker)
     issues = {i["number"]: i for i in client.get("/api/issues").json()["issues"]}
@@ -474,9 +478,11 @@ def test_issues_covered_by_prefers_smallest_design_number(tmp_path: Path) -> Non
     tracker = FakeTracker()
     bug = tracker.create_issue(IssueDraft(title="bug", body="x", labels=["bug"])).number
     d1 = tracker.create_issue(
-        IssueDraft(title="早提案", body=f"covers: #{bug}", labels=["design"])
+        IssueDraft(title="Early proposal", body=f"covers: #{bug}", labels=["design"])
     ).number
-    tracker.create_issue(IssueDraft(title="晚提案", body=f"covers: #{bug}", labels=["design"]))
+    tracker.create_issue(
+        IssueDraft(title="Late proposal", body=f"covers: #{bug}", labels=["design"])
+    )
 
     client = _client(tmp_path, tracker=tracker)
     issues = {i["number"]: i for i in client.get("/api/issues").json()["issues"]}
@@ -487,13 +493,13 @@ def test_issue_detail_with_comments(tmp_path: Path) -> None:
     client = _client(tmp_path, tracker=_ObserveTracker())
     body = client.get("/api/issues/7").json()
     assert body["connected"] is True
-    assert body["issue"]["title"] == "harness 卡顿"
+    assert body["issue"]["title"] == "harness Lag"
     assert body["comments"][0]["author"] == "developer"
     assert body["timeline"]["available"] is False
 
 
 def test_issue_detail_no_capability_degrades(tmp_path: Path) -> None:
-    # FakeTracker 无 get_issue/list_comments → connected=False（不抛 500）。
+    # FakeTracker has no get_issue/list_comments → connected=False (does not throw 500).
     client = _client(tmp_path, tracker=FakeTracker())
     body = client.get("/api/issues/1").json()
     assert body["connected"] is False
@@ -532,7 +538,7 @@ def test_issue_detail_timeline_connected_and_failure_isolated(tmp_path: Path) ->
 
     degraded = _client(tmp_path, tracker=_BrokenTimeline()).get("/api/issues/7").json()
     assert degraded["connected"] is True
-    assert degraded["issue"]["title"] == "harness 卡顿"
+    assert degraded["issue"]["title"] == "harness Lag"
     assert degraded["timeline"]["available"] is False
 
 
@@ -552,9 +558,11 @@ def test_commit_detail_full(tmp_path: Path) -> None:
     body = client.get("/api/commits/" + "a" * 40).json()
     assert body["connected"] is True
     commit = body["commit"]
-    assert commit["message"] == "fix: issue #7\n\n详细说明"  # 全文非首行
+    assert (
+        commit["message"] == "fix: issue #7\n\nDetailed description"
+    )  # Not in first line of full text
     assert commit["stats"]["additions"] == 3
-    assert "+新增" in commit["diff"]
+    assert "+Added" in commit["diff"]
 
 
 def test_commit_detail_no_capability_degrades(tmp_path: Path) -> None:
@@ -586,8 +594,8 @@ def test_history_grouped_source(tmp_path: Path) -> None:
         role="developer",
         label="dev#1",
         running=False,
-        status="已推进 main v1",
-        detail="完整报告",
+        status="Advanced main v1",
+        detail="Complete report",
         round_no=1,
     )
     archive_agent(
@@ -599,25 +607,27 @@ def test_history_grouped_source(tmp_path: Path) -> None:
     items = client.get("/api/history").json()["items"]
     assert len(items) == 1
     assert items[0]["kind"] == "dev_run" and items[0]["round"] == 1
-    assert items[0]["detail"] == "完整报告" and items[0]["log"]
+    assert items[0]["detail"] == "Complete report" and items[0]["log"]
 
 
 def test_issues_plane_and_provenance_fields(tmp_path: Path) -> None:
-    """Spec-0029/T9：每条 issue 附 plane（三平面投影，旧标签映射）与 provenance。"""
+    """Spec-0029/T9: Each issue includes plane (three-plane projection, legacy label mapping) and provenance."""
     from ahe_beta.demand import issue_schema as sc
 
     tracker = FakeTracker()
-    r = tracker.create_issue(IssueDraft(title="报告", body="x", labels=["bug", sc.REPORT])).number
+    r = tracker.create_issue(IssueDraft(title="Report", body="x", labels=["bug", sc.REPORT])).number
     p = tracker.create_issue(
-        IssueDraft(title="提案", body="x", labels=["bug", sc.PROPOSAL, sc.FROM_TRIAGE, "P1"])
+        IssueDraft(title="Proposal", body="x", labels=["bug", sc.PROPOSAL, sc.FROM_TRIAGE, "P1"])
     ).number
     s = tracker.create_issue(
         IssueDraft(
-            title="结构案", body=f"x\n\ncovers: #{p}", labels=[sc.PROPOSAL, sc.FROM_ARCHITECT]
+            title="Structural proposal",
+            body=f"x\n\ncovers: #{p}",
+            labels=[sc.PROPOSAL, sc.FROM_ARCHITECT],
         )
     ).number
     w = tracker.create_issue(
-        IssueDraft(title="旧triaged", body="x", labels=["bug", sc.TRIAGED])
+        IssueDraft(title="Old triaged", body="x", labels=["bug", sc.TRIAGED])
     ).number
 
     client = _client(tmp_path, tracker=tracker)
@@ -626,8 +636,8 @@ def test_issues_plane_and_provenance_fields(tmp_path: Path) -> None:
     assert issues[r]["plane"] == sc.REPORT and issues[r]["provenance"] is None
     assert issues[p]["plane"] == sc.PROPOSAL and issues[p]["provenance"] == sc.FROM_TRIAGE
     assert issues[s]["provenance"] == sc.FROM_ARCHITECT and issues[s]["covers"] == [p]
-    assert issues[p]["covered_by"] == s  # 被 open 结构案覆盖
-    assert issues[w]["plane"] == sc.READY  # 旧标签读侧映射
+    assert issues[p]["covered_by"] == s  # Covered by open architecture issue
+    assert issues[w]["plane"] == sc.READY  # Legacy label read-side mapping
 
 
 def test_issues_tracker_error(tmp_path: Path) -> None:
@@ -638,11 +648,11 @@ def test_issues_tracker_error(tmp_path: Path) -> None:
     assert body["issues"] == []
 
 
-# Spec-0032/T7：交付面观测端点 /api/delivery——open PR + needs-human 积压（PR 与 issue 双源）。
+# Spec-0032/T7: delivery-plane observation endpoint /api/delivery — open PR + needs-human backlog (both PRs and issues).
 
 
 class _PullTracker(FakeTracker):
-    """带 list_pulls 观测能力的 Fake（形状对齐 GiteaTracker.list_pulls 的 DTO）。"""
+    """Fake with list_pulls observation support (DTO shape matches GiteaTracker.list_pulls)."""
 
     def __init__(self, pulls: list[dict]) -> None:
         super().__init__()
@@ -669,18 +679,18 @@ def _pull(number: int, *, labels: list[str] | None = None, state: str = "open") 
 
 def test_delivery_lists_pulls_and_counts_needs_human(tmp_path: Path) -> None:
     tracker = _PullTracker([_pull(5), _pull(6, labels=["needs-human"])])
-    tracker.create_issue(IssueDraft(title="卡人的票", body="x", labels=["needs-human"]))
+    tracker.create_issue(IssueDraft(title="Blocking vote", body="x", labels=["needs-human"]))
     store = SessionStore(tmp_path / "sessions")
     client = TestClient(create_app(store=store, tracker=tracker))
 
     body = client.get("/api/delivery").json()
     assert body["connected"] is True
     assert [p["number"] for p in body["pulls"]] == [5, 6]
-    assert body["needs_human"] == 2  # PR#6 + 那张 issue（双源计数）
+    assert body["needs_human"] == 2  # PR#6 + that issue (counting both sources)
 
 
 def test_delivery_degrades_without_capability(tmp_path: Path) -> None:
-    # FakeTracker 无 list_pulls 观测能力 → connected=False（前端降级占位，不抛 500）。
+    # FakeTracker lacks list_pulls observation support → connected=False (frontend fallback placeholder, no 500).
     client = _client(tmp_path, tracker=FakeTracker())
     body = client.get("/api/delivery").json()
     assert body == {"connected": False, "pulls": [], "needs_human": 0}

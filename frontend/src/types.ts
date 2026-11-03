@@ -1,13 +1,13 @@
-// 数据契约：字段名与 backend/ahe_beta/web/api.py 的响应一一对应，两侧须同步修改。
+// Data contract: fields match responses from backend/ahe_beta/web/api.py one-to-one; update both sides together.
 
 export type AgentRole = "user" | "triager" | "divergent" | "architect" | "owner" | "developer";
 export type ViewMode = "dashboard" | "building" | "openagents";
 
-// Spec-0029：三平面投影与提案来源（后端 /api/issues 附带；老后端缺省由 issueMeta 按 labels 兜底）。
+// Spec-0029: three-plane projection and proposal provenance (backend /api/issues fields; issueMeta infers from labels for older backends).
 export type Plane = "report" | "proposal" | "ready";
 export type Provenance = "from-triage" | "from-architect" | "from-divergent";
 
-// Spec-0026/T1：用户 agent 活动槽可带的 persona 摘要（只读展示，缺省 null）。
+// Spec-0026/T1: optional persona summary on user agent activity slots (read-only display; defaults to null).
 export interface PersonaMeta {
   identity: string;
   level: string;
@@ -20,13 +20,13 @@ export interface PersonaMeta {
 export interface Turn {
   role: "user" | "harness";
   content: string;
-  // 仅 harness 轮：该轮内层迭代过程流（模型发言/工具调用/结果）。content 是给用户看的最终答案，
-  // steps 是观测层展开时才看的完整内层过程。缺省即无（老数据/无过程）。
+  // Harness turns only: inner iteration stream for this turn (model messages / tool calls / results). content is the final answer for the user,
+  // while steps contains the full inner process, visible when expanded in the observation view. Absent means none (old data / no process).
   steps?: LogEntry[];
 }
 
-// 过程流条目：status(状态变化) / assistant(模型发言) / tool(工具调用) / tool_result / tool_error
-// t 可选：dev/architect 的 live log 带时间戳；harness 内层 steps 无时间戳。
+// Process stream entries: status (state changes) / assistant (model messages) / tool (tool calls) / tool_result / tool_error
+// Optional t: dev/architect live logs include timestamps; harness inner steps do not.
 export interface LogEntry {
   t?: string;
   kind: string;
@@ -54,7 +54,7 @@ export interface Agent {
   running: boolean;
   status: string;
   round: number | null;
-  meta?: PersonaMeta | null; // Spec-0026：用户 agent 带 persona 摘要；其余角色/老后端为 null
+  meta?: PersonaMeta | null; // Spec-0026: user agents include a persona summary; other roles / older backends use null.
   turns: Turn[];
   detail: string | null;
   log: LogEntry[];
@@ -109,7 +109,7 @@ export interface UsageEvent {
 
 export interface UsageEventsResponse { events: UsageEvent[] }
 
-// 整条 run 的运行态（data/live/run.json）
+// Runtime state of the entire run (data/live/run.json)
 export interface RunState {
   running: boolean;
   round: number;
@@ -119,7 +119,7 @@ export interface RunState {
   updated_at: string | null;
 }
 
-// 按轮归档的已完成工作项（data/live/history.json）
+// Completed work items archived by round (data/live/history.json)
 export type HistoryKind =
   | "user_session"
   | "triager_run"
@@ -157,7 +157,7 @@ export interface HistoryResponse {
   items: HistoryItem[];
 }
 
-// triage 状态（Spec-0025/T7 后端标签投影；老后端缺省 → 由 labels 客户端兜底推导）。
+// Triage status (Spec-0025/T7 backend label projection; absent on older backends → infer from labels on the client).
 export type TriageStatus =
   | "needs-triage"
   | "triaged"
@@ -174,15 +174,15 @@ export interface Issue {
   created_at: string;
   closed_at: string | null;
   url: string;
-  // Spec-0025/T7 + 0029/T9 平台层标签投影（老后端缺省 → 前端按 labels 兜底推导，见 lib/issueMeta）：
-  kind?: string; // bug/feature/chore/document 或 rfc（RFC 凌驾 type）
-  round?: number | null; // round-N 的 N
+  // Spec-0025/T7 + 0029/T9 platform label projection (absent on older backends → infer from labels on the frontend; see lib/issueMeta):
+  kind?: string; // bug/feature/chore/document or rfc (RFC overrides type)
+  round?: number | null; // N from round-N
   triage_status?: TriageStatus | null;
   priority?: string | null; // P0-P3
-  reject_reason?: string | null; // 驳回/decline 原因（权威原因见详情评论）
-  plane?: Plane | null; // Spec-0029：三平面投影（report/proposal/ready；终态为 null）
-  provenance?: Provenance | null; // Spec-0029：提案来源（from-triage/from-architect/from-divergent）
-  // 覆盖关系：covers = RFC 声明覆盖的 triaged 票号；covered_by = 被哪张 open RFC 覆盖。
+  reject_reason?: string | null; // Rejection/decline reason (authoritative reason in detail comments)
+  plane?: Plane | null; // Spec-0029: three-plane projection (report/proposal/ready; null for terminal states)
+  provenance?: Provenance | null; // Spec-0029: proposal provenance (from-triage/from-architect/from-divergent)
+  // Coverage: covers = triaged issue numbers an RFC declares it covers; covered_by = the open RFC covering this issue.
   covers?: number[];
   covered_by?: number | null;
 }
@@ -361,27 +361,27 @@ export interface Roster {
   triager: number;
   architect: number;
   developer: number;
-  divergent?: number; // Spec-0028+：discovery 轨生成器（默认 0）
-  owner?: number; // Spec-0029：唯一准入（0=纯机械）
+  divergent?: number; // Spec-0028+: discovery-track generator (defaults to 0)
+  owner?: number; // Spec-0029: sole admission authority (0 = purely mechanical)
 }
 
 export interface ConfigResponse {
   roster: Roster;
 }
 
-// /api/overview：概览数字 + 两条曲线（Spec-0026/T3 Charts 消费）。
-// feeling_trend=[[created_at, score]]；issue_curve=[[timestamp, delta, backlog]]（0025/T7 可执行 backlog 口径）。
+// /api/overview: overview metrics + two curves (consumed by Spec-0026/T3 Charts).
+// feeling_trend=[[created_at, score]]; issue_curve=[[timestamp, delta, backlog]] (0025/T7 executable backlog definition).
 export interface OverviewResponse {
   open_issue_count: number;
   session_count: number;
   feeling_trend: [string, number][];
   feedback_counts?: Record<string, { rated: number; missing: number; invalid: number; unavailable: number }>;
   issue_curve: [string, number, number][];
-  // Spec-0029/T9：三平面漏斗当前量（老后端缺省 → 不渲染漏斗条）。
+  // Spec-0029/T9: current counts in the three-plane funnel (absent on older backends → omit the funnel bar).
   funnel?: { report: number; proposal: number; ready: number };
 }
 
-// Spec-0032/T7：交付面观测（/api/delivery）——open PR + needs-human 积压（vigil 的工作切面，只读）。
+// Spec-0032/T7: delivery observations (/api/delivery): open PR + needs-human backlog (vigil's work view, read-only).
 export interface Pull {
   number: number;
   title: string;
@@ -401,7 +401,7 @@ export interface DeliveryResponse {
   needs_human: number;
 }
 
-// 看板选中态：点谁，第四栏就展示谁的完整信息。
+// Dashboard selection: the fourth column displays full details for the selected object.
 export type Selection =
   | { type: "agent"; agentId: string }
   | { type: "history"; index: number }

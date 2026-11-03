@@ -1,8 +1,8 @@
-"""本地 SessionStore（spec-0001/T6）：一局 Session 全量落盘 + 单一总索引。
+"""Local SessionStore (spec-0001/T6): each Session is fully persisted + single master index.
 
-全量文件 root/<session_id>.json 为唯一权威；索引 root/index.json 是其派生投影（可由全量重建），
-承载体感曲线/回归基线所需最小信息及 evaluation_status。invalid 条目保留供审计，但默认 index()
-过滤，避免进入正常体感/通过率。先写全量后追加索引。
+Complete file root/<session_id>.json is the sole authority; index root/index.json is its derived projection (can be rebuilt from complete files),
+carrying minimal information needed for user experience trend / regression baseline and evaluation_status. Invalid entries are retained for audit but filtered by default in index()
+to avoid entering normal experience/pass-rate calculations. Full file is written first, then index is appended.
 """
 
 from __future__ import annotations
@@ -26,11 +26,11 @@ class SessionConflictError(RuntimeError):
 
 
 class SessionStore:
-    """把 Session 持久化到本地 root/。
+    """Persist Session to local root/.
 
-    Spec-0017/T1：save 全程持实例锁——index.json 是读-改-写追加，a 段多用户会话并行后
-    并发 save 会基于同一旧快照互相覆盖（丢条目）；锁粒度=单次 save 全程（纯本地文件 IO，
-    持锁期内无网络/子进程等待，无死锁面）。跨进程并发仍不支持（单进程内多线程即本仓形态）。
+    Spec-0017/T1: save holds instance lock throughout—index.json is read-modify-write append, and after multiple concurrent user sessions in segment a,
+    concurrent saves based on the same stale snapshot will overwrite each other (losing entries); lock granularity = entire save operation (pure local file I/O,
+    no network/subprocess waits during lock hold, no deadlock surface). Cross-process concurrency is not yet supported (single-process multi-threaded is this repo's model).
     """
 
     def __init__(self, root: str | Path) -> None:
@@ -40,7 +40,7 @@ class SessionStore:
 
     @property
     def root(self) -> Path:
-        """会话落盘根目录；live 通道据此定位同级 data/live。"""
+        """Session persistence root directory; live channel uses this to locate sibling data/live."""
         return self._root
 
     def save(self, session: Session) -> None:
@@ -53,7 +53,7 @@ class SessionStore:
     def _save_locked(self, *, session: Session) -> None:
         _validate_session_id(session.session_id)
         validate_session_provenance(session, bound_session_provenance())
-        # 先写全量文件（唯一权威），后追加索引：中途失败至多「有全量缺索引」，可重建。
+        # Write full file (sole authority) first, then append index: if failure occurs mid-way, worst case is "full file present, index missing", which can be rebuilt.
         full_path = self._root / f"{session.session_id}.json"
         body = session.to_dict()
         if full_path.exists():
@@ -82,7 +82,8 @@ class SessionStore:
     def load(self, session_id: str) -> Session:
         _validate_session_id(session_id)
         full_path = self._root / f"{session_id}.json"
-        data = json.loads(full_path.read_text(encoding="utf-8"))  # 不存在则 FileNotFoundError
+        # Does not exist raises FileNotFoundError
+        data = json.loads(full_path.read_text(encoding="utf-8"))
         return Session.from_dict(data)
 
     def reconcile(
@@ -311,11 +312,11 @@ class SessionStore:
     def index(self, *, include_invalid: bool = False) -> list[dict]:
         index_path = self._root / _INDEX_NAME
         if not index_path.exists():
-            return []  # 首次运行无索引为合法初始态
+            return []  # No index on first run is a valid initial state
         rows = json.loads(index_path.read_text(encoding="utf-8"))
         if include_invalid:
             return rows
-        # 旧索引没有该字段，按 valid 兼容；正式体感/通过率消费者不接收 evaluator-invalid。
+        # Old index does not have this field, treat as valid for compatibility; formal experience/pass-rate consumers do not accept evaluator-invalid.
         return [row for row in rows if row.get("evaluation_status", "valid") == "valid"]
 
 

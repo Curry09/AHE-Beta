@@ -1,12 +1,12 @@
 ---
 number: "0066"
-title: Provider latency 隔离与官方预算超时
+title: "Provider latency isolation and official budget timeouts"
 issue: 0
 slug: provider-latency-isolated-timeout
-summary: 保留完整 wall time，同时把模型提供方等待从机制 active-time 预算中隔离，并统一官方任务内层预算与外层加 600 秒规则。
+summary: "Preserve full wall time while isolating model provider wait from the mechanism's active-time budget, and standardize the official task's inner budget and outer budget plus 600 seconds rule."
 tasks:
   - id: T1
-    title: 统一时间账本与 provider scope
+    title: "Unified time ledger and provider scope"
     status: done
     priority: P0
     tags: [timeout, observability]
@@ -17,10 +17,10 @@ tasks:
       - backend/ahe_beta/usage.py
       - backend/ahe_beta/loop/live_tracer.py
       - backend/ahe_beta/user/sim/persona_client.py
-    scope: 记录 wall、active、provider wait、unknown 时间及模型调用事件，重叠 provider 区间按 union 计数。
-    acceptance: 每次调用有可关联 call_id；记录可重放且不含凭证；旧 usage 记录保持兼容。
+    scope: "Record wall, active, provider wait, and unknown time and model call events; overlapping provider intervals are counted by their union."
+    acceptance: "Each call has a correlatable call_id; records are replayable and contain no credentials; legacy usage records remain compatible."
   - id: T2
-    title: 角色超时分类与可恢复取消
+    title: "Timeout classification by role and recoverable cancellation"
     status: done
     priority: P0
     tags: [timeout, recovery]
@@ -33,10 +33,10 @@ tasks:
       - backend/ahe_beta/demand/agent_runtime.py
       - backend/ahe_beta/demand/grouped_architect.py
       - backend/ahe_beta/loop/sim_user.py
-    scope: 区分 mechanism、provider、infrastructure、controller timeout，并在恢复账本中保存截止证据。
-    acceptance: provider 等待不被误报为机制失败；外层 wall guard 仍有限；完成的 operation 不被 resume 重放。
+    scope: "Distinguish mechanism, provider, infrastructure, and controller timeouts, and retain deadline evidence in the recovery ledger."
+    acceptance: "Provider wait is not misreported as a mechanism failure; the outer wall guard remains bounded; completed operations are not replayed on resume."
   - id: T4
-    title: 时间分类回归验收
+    title: "Time classification regression acceptance"
     status: done
     priority: P1
     tags: [tests, docs]
@@ -47,83 +47,58 @@ tasks:
     parallel: false
     files:
       - backend/tests/test_time_accounting.py
-    scope: 保留当前 wall/active/provider-wait 分类与 timeout 回归；历史 scaling 配置传播和研究 quickstart 已归档，不作为当前启动合同。
-    acceptance: 当前时间分类测试通过，不依赖归档 launcher；历史运行记录的原 timeout policy 保持原样。
+    scope: "Retain the current wall/active/provider-wait classification and timeout regressions; historical scaling configuration propagation and research quickstart have been archived and are not part of the current startup contract."
+    acceptance: "Current time classification tests pass without relying on archived launchers; the original timeout policy in historical run records remains unchanged."
 ---
 
-# 0066 · Provider latency 隔离与官方预算超时
+# 0066 · Provider Latency Isolation and Official Budget Timeout
 
 ## Summary
 
-> 0071 清理后的当前契约：保留当前时间账本、角色取消和时间分类测试。仅服务历史 scaling 的配置/远端传播 T3 已退出 living task 列表；下文关于历史远端 run.sh、固定 scaling 配置及其 quickstart 的描述为原研究记录，不作为当前 v2 启动要求。原资料从 research/inventory.json 与冻结 checkout 追溯。
+> Current contract after 0071 cleanup: retain the current time ledger, role cancellation, and time-classification tests. Only the historical scaling configuration/remote propagation T3 has exited the living task list; the descriptions below of the historical remote run.sh, fixed scaling configuration, and its quickstart are original research records and are not current v2 launch requirements. The original materials are traced from research/inventory.json and the frozen checkout.
 
-评测必须同时保留原始 wall time 和可解释的 active time。模型服务排队、首 token
-延迟、流式读取和重试属于 provider wait；本地工具、解析、工作区操作、检查点和
-Harness 控制属于 active work。机制超时只由 active budget 判定，provider wait 和
-基础设施超时单独归类，不能伪装成任务失败。
+Evaluation must retain both the original wall time and interpretable active time. Model-serving queueing, time to first token, streaming reads, and retries are provider wait; local tools, parsing, workspace operations, checkpoints, and Harness control are active work. Mechanism timeouts are determined only by the active budget; provider wait and infrastructure timeouts are classified separately and must not be disguised as task failures.
 
-每个 task 的内层截止是官方 agent timeout；外层截止固定为
-`official_agent_timeout_seconds + 600`。无官方预算时才使用 1800 秒 fallback，并在
-manifest/receipt 中标记来源。该规则适用于 direct 和 simulated-user 两种交互。
+The inner deadline for each task is the official agent timeout; the outer deadline is fixed at `official_agent_timeout_seconds + 600`. The 1800-second fallback is used only when no official budget exists, and its source is marked in the manifest/receipt. This rule applies to both direct and simulated-user interactions.
 
 ## Contract
 
-运行时为每个 role operation 保存 `wall_elapsed`、`active_elapsed`、
-`provider_wait_ms`、`unknown_elapsed_ms`、调用次数和 timeout class。provider 请求有
-自己的 deadline；整个 task 还有外层 wall guard。外层截止发生在 provider wait 时，结果
-是 infrastructure timeout；active work 超过机制预算时才是 mechanism timeout。
+At runtime, each role operation stores `wall_elapsed`, `active_elapsed`, `provider_wait_ms`, `unknown_elapsed_ms`, the call count, and the timeout class. Provider requests have their own deadlines; the entire task also has an outer wall guard. If the outer deadline occurs during provider wait, the result is an infrastructure timeout; only when active work exceeds the mechanism budget is it a mechanism timeout.
 
-`latency_isolated_timeout.enabled` 是兼容开关。正式 E2B scaling 配置启用它，并把
-`wall_guard_grace_seconds=600` 传播到 controller、远端 bundle、receipt 和 run.sh。
-凭证仍只能通过 `.e2b`、`.boyue` 或注入环境提供。
+`latency_isolated_timeout.enabled` is a compatibility switch. The official E2B scaling configuration enables it and propagates `wall_guard_grace_seconds=600` to the controller, remote bundle, receipt, and run.sh. Credentials may still be provided only through `.e2b`, `.boyue`, or the injected environment.
 
 ## Verification
 
-变更必须通过 time-accounting、direct-session、grouped-architect、infrastructure 和
-closed-loop 回归测试；启动前 receipt 还必须绑定 config/task/template/payload SHA、
-canary evidence 和 timeout policy。详细实现约束见
-`evaluation/harness-suite-20260920/SPEC-time-accounting-provider-latency.md`。
+Changes must pass the time-accounting, direct-session, grouped-architect, infrastructure, and closed-loop regression tests; before launch, the receipt must also bind the config/task/template SHA, canary evidence, and timeout policy. Detailed implementation constraints are specified in `evaluation/harness-suite-20260920/SPEC-time-accounting-provider-latency.md`.
 
 ## Motivation
 
-现有运行时把模型服务排队、流式首 token 延迟和本地机制工作混进同一个截止时间，导致
-provider 慢被误报为 agent 失败，也让恢复时无法判断是否需要重放。0066 将时间账本和
-超时分类固定下来，供 direct、simulated-user 以及 E2B 控制面共同使用。
+The existing runtime mixes model-serving queueing, streaming time-to-first-token latency, and local mechanism work into one deadline, causing slow providers to be misreported as agent failures and making it impossible to determine during recovery whether replay is needed. 0066 fixes the time ledger and timeout classification for shared use by direct, simulated-user, and E2B control-plane workflows.
 
 ## Guide-level explanation
 
-每个 role operation 同时记录 wall、active、provider wait 和 unknown 时间。provider
-请求有自己的 deadline；机制预算只消耗 active work，外层 wall guard 负责兜底。恢复时
-根据 operation key 和已保存的截止证据继续未完成步骤，不重放已经提交的副作用。
+Each role operation records wall, active, provider-wait, and unknown time simultaneously. Provider requests have their own deadlines; the mechanism budget consumes only active work, while the outer wall guard provides a fallback. During recovery, continue unfinished steps according to the operation key and the saved deadline evidence; do not replay side effects that have already been submitted.
 
 ## Reference-level explanation
 
-时间区间按调用事件关联到稳定 call_id；重叠 provider 区间按 union 计数。manifest、receipt、
-远端 run.sh 和 controller 都携带同一 timeout policy，且由 launch gate 检查 policy 摘要
-一致。没有官方预算时才使用带来源标记的 1800 秒 fallback，外层截止固定为内层加 600 秒。
+Time intervals are associated with a stable call_id through call events; overlapping provider intervals are counted by their union. The manifest, receipt, remote run.sh, and controller all carry the same timeout policy, and the launch gate checks that the policy summaries match. The 1800-second fallback with a source marker is used only when no official budget exists; the outer deadline is fixed at the inner deadline plus 600 seconds.
 
 ## Drawbacks
 
-账本字段和 receipt 更复杂，旧消费者需要兼容读取；provider 事件缺失时仍可能留下 unknown
-时间，需要在报告中单独展示而不能静默归入 active。
+The ledger fields and receipt are more complex, and old consumers need backward-compatible reading; when provider events are missing, unknown time may still remain and must be shown separately in reports rather than silently classified as active.
 
 ## Rationale and alternatives
 
-选择显式拆分时间而不是简单延长总超时，是为了保留真实 wall time 同时避免服务端排队污染
-机制指标。备选方案是继续使用单一 wall budget，但它无法区分模型提供方故障、基础设施故障
-和 agent 本身超时，恢复也无法安全判定。
+Explicitly separating time instead of simply extending the total timeout preserves the true wall time while preventing server-side queueing from contaminating mechanism metrics. The alternative is to continue using a single wall budget, but it cannot distinguish model-provider failures, infrastructure failures, and agent timeouts, and recovery cannot be judged safely.
 
 ## Prior art
 
-0064 提供阶段游标、operation key 和 delivery 恢复边界；0065 提供官方预算、direct/模拟
-用户模式及统一 outcome。本 spec 把这些约束落实到 provider latency 和外层 wall guard。
+0064 provides phase cursors, operation keys, and delivery recovery boundaries; 0065 provides official budgets, direct/simulated-user modes, and a unified outcome. This spec applies those constraints to provider latency and the outer wall guard.
 
 ## Unresolved questions
 
-不同 provider 的重试等待是否应在报告中进一步拆成排队、首 token 和流式读取三个子类，待
-真实运行样本足够后再决定是否升级 schema。
+Whether retry waits from different providers should be further split in reports into queueing, time to first token, and streaming-read subclasses will be decided after sufficient real-run samples are available and based on whether the schema should be upgraded.
 
 ## Future possibilities
 
-可基于 call_id 生成跨角色 latency 分位数和预算预测，并在 launch 前用历史 provider wait
-估计是否需要调整并发或资源，而不改变官方 agent timeout。
+Cross-role latency percentiles and budget forecasts can be generated from call_id, and historical provider wait can be used before launch to estimate whether concurrency or resources need adjustment, without changing the official agent timeout.

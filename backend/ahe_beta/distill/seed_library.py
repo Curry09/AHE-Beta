@@ -1,15 +1,21 @@
-"""SeedLibrary（spec-0010/T1）：种子卡库的最小读写 + 契约约束校验。
+"""SeedLibrary (spec-0010/T1): minimal read/write and contract constraint validation for the
+    seed card library.
 
-一个库文件（JSON）承载多条 source-agnostic 种子卡记录；卡 schema 的唯一公共契约见
-tools/seed-distill/seed-card-schema.md。库本身是纯数据存取（与 0006 的 PersonaLibrary 同构）：
+A single library file (JSON) holds multiple source-agnostic seed card records; the only public
+contract for card schema is in tools/seed-distill/seed-card-schema.md. The library itself is pure
+data access (matching PersonaLibrary from 0006):
 
-- 读侧对未知键**前向兼容**（忽略不报错、原样保留），便于 schema 演化（Postel 法则）。
-- `validate_card` 是**独立的严格校验门**（采集/入库时显式调用、测试用），与存取的宽容解耦：
-  断言卡只含契约允许的顶层键（从而不含任何 benchmark/轨迹派生字段）、`source.not_in_benchmark`
-  恒为真（防 benchmark 污染）、domain ∈ 受控词表、capability_probed ⊆ 能力分类法。
+- Read side is **forward compatible with unknown keys** (ignores without error, preserves as-is),
+  enabling schema evolution (Postel's law).
+- `validate_card` is an **independent strict validation gate** (called explicitly at collection/
+  ingestion time, for tests), decoupled from the permissive access layer: asserts that cards
+  contain only contract-allowed top-level keys (thus no benchmark/trace-derived fields),
+  `source.not_in_benchmark` is always true (prevents benchmark pollution), domain ∈ controlled
+  vocabulary, and capability_probed ⊆ capability taxonomy.
 
-held-out 字段（oracle/test_cmd/gates）随卡采集保留；到 SeedScenario 的注入映射（含 held-out
-字段剥离）不在此处，归 0010/T2 seed_adapter.card_to_seed。
+The held-out field (oracle/test_cmd/gates) is retained with card collection; the injection
+mapping to SeedScenario (including held-out field stripping) is not here, see 0010/T2
+seed_adapter.card_to_seed.
 """
 
 from __future__ import annotations
@@ -17,7 +23,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-# seed-card-schema.md「domain 受控词表」单一真源的代码副本；与 persona D5.area 共享同一 14 token。
+# Code copy of the single source of truth for "domain controlled vocabulary" from seed-card-schema.md; shared with persona D5.area on the same 14 token.
 DOMAIN_VOCAB: frozenset[str] = frozenset(
     {
         "web-backend",
@@ -37,7 +43,7 @@ DOMAIN_VOCAB: frozenset[str] = frozenset(
     }
 )
 
-# seed-card-schema.md「capability 分类法」单一真源的代码副本。
+# Code copy of the single source of truth for "capability taxonomy" from seed-card-schema.md.
 CAPABILITY_TAXONOMY: frozenset[str] = frozenset(
     {
         "intent-inference",
@@ -51,8 +57,8 @@ CAPABILITY_TAXONOMY: frozenset[str] = frozenset(
     }
 )
 
-# seed-card-schema.md 卡记录允许的顶层键。白名单即「不含 benchmark/轨迹派生字段」的实现：
-# 任何非契约字段（如 benchmark 分数、轨迹特征）都会落在白名单外被 validate_card 拒。
+# Top-level keys allowed in card records per seed-card-schema.md. Whitelist implements "no benchmark/trace-derived fields":
+# Any field outside the contract (e.g., benchmark scores, trace features) falls outside the whitelist and is rejected by validate_card.
 ALLOWED_CARD_KEYS: frozenset[str] = frozenset(
     {
         "id",
@@ -68,7 +74,7 @@ ALLOWED_CARD_KEYS: frozenset[str] = frozenset(
         "pairing_constraints",
         "gates",
         "provenance",
-        # 被拒卡（未入库）记录：
+        # Record of rejected cards (not ingested):
         "reject_reason",
         "action",
     }
@@ -76,55 +82,59 @@ ALLOWED_CARD_KEYS: frozenset[str] = frozenset(
 
 
 def validate_card(record: dict) -> None:
-    """按 seed-card-schema.md 校验一条种子卡记录；不符合则抛 ValueError。
+    """Validate a seed card record per seed-card-schema.md; raise ValueError if non-conformant.
 
-    Spec-0010/T1: 只做契约级硬约束（白名单 + not_in_benchmark 门 + domain/capability 受控），
-    不替代抽取 skill 的两道门（oracle 门 + harbor 可复现门）。被拒卡（含 reject_reason，
-    不进种子库）不在此门内——只校验拟入库的真实卡。
+    Spec-0010/T1: Only enforce contract-level hard constraints (whitelist + not_in_benchmark gate
+    + domain/capability controlled vocabularies), not replace the two gates for extracting skill
+    validity (oracle gate + harbor reproducibility gate). Rejected cards (with reject_reason,
+    not entering the seed library) are outside this gate—only validates real cards destined for
+    ingestion.
     """
-    # 1. 白名单：任何契约外顶层键（疑似 benchmark/轨迹派生）即拒。
+    # 1. Whitelist: any top-level key outside the contract (suspected benchmark/trace-derived field) is rejected.
     extra = set(record) - ALLOWED_CARD_KEYS
     if extra:
         raise ValueError(
-            f"卡记录含契约外字段 {sorted(extra)}（疑似 benchmark/轨迹派生字段）；"
-            f"允许的顶层键见 seed-card-schema.md：{sorted(ALLOWED_CARD_KEYS)}"
+            f"Card record contains fields outside the contract {sorted(extra)} (possibly benchmark/trace-derived fields); "
+            f"See seed-card-schema.md for allowed top-level keys: {sorted(ALLOWED_CARD_KEYS)}"
         )
-    # 2. 非 benchmark 门（契约铁律 #3）：source.not_in_benchmark 恒为真。
+    # 2. Non-benchmark gate (contract iron rule #3): source.not_in_benchmark is always true.
     source = record.get("source")
     if isinstance(source, dict):
         if source.get("not_in_benchmark") is not True:
             raise ValueError(
-                "卡 source.not_in_benchmark 必须为真（防 benchmark 污染训练目标）；"
-                "见 seed-card-schema.md 铁律 #3"
+                "Card source.not_in_benchmark must be true (prevent benchmark contamination of training targets); "
+                "See seed-card-schema.md rule #3"
             )
-    # 3. domain ∈ 受控词表（单一 token）。
+    # 3. domain ∈ controlled vocabulary (single token).
     domain = record.get("domain")
     if domain is not None and domain not in DOMAIN_VOCAB:
         raise ValueError(
-            f"domain={domain!r} 不在受控词表内（须为单 token）；见 seed-card-schema.md：{sorted(DOMAIN_VOCAB)}"
+            f"domain={domain!r} is outside the controlled vocabulary (must be a single token); see seed-card-schema.md: {sorted(DOMAIN_VOCAB)}"
         )
-    # 4. capability_probed ⊆ 能力分类法。
+    # 4. capability_probed ⊆ capability taxonomy.
     caps = record.get("capability_probed")
     if caps is not None:
         unknown = set(caps) - CAPABILITY_TAXONOMY
         if unknown:
             raise ValueError(
-                f"capability_probed 含分类法外能力 {sorted(unknown)}；"
-                f"见 seed-card-schema.md：{sorted(CAPABILITY_TAXONOMY)}"
+                f"capability_probed contains capabilities outside the taxonomy {sorted(unknown)}; "
+                f"See seed-card-schema.md: {sorted(CAPABILITY_TAXONOMY)}"
             )
 
 
 class SeedLibrary:
-    """单个 JSON 文件承载多条种子卡记录的最小库。单进程 MVP，不处理并发写竞态。"""
+    """Minimal library for a single JSON file hosting multiple seed card records. Single-process MVP;
+    does not handle concurrent write races."""
 
     def __init__(self, path: str | Path) -> None:
         self._path = Path(path)
 
     def load(self) -> list[dict]:
-        """读全库；文件不存在视为空库（合法初始态）。
+        """Read entire library; absent file is treated as an empty library (legitimate initial state).
 
-        顶层可为裸卡数组，或 harvest 产出的 `{version, harvested_at, note, seeds:[...]}` 信封
-        （前向兼容：取 seeds 数组、忽略其余元数据键）。
+        Top level may be a bare card array, or a harvest output envelope
+        `{version, harvested_at, note, seeds:[...]}` (forward compatible: extract seeds array,
+        ignore other metadata keys).
         """
         if not self._path.exists():
             return []
@@ -132,18 +142,20 @@ class SeedLibrary:
         if isinstance(data, dict) and isinstance(data.get("seeds"), list):
             return data["seeds"]
         if not isinstance(data, list):
-            raise ValueError(f"种子卡库文件 {self._path} 顶层应为卡记录数组或 {{seeds:[...]}} 信封")
+            raise ValueError(
+                f"Seed library file {self._path} must contain a card-record array or a {{seeds:[...]}} envelope"
+            )
         return data
 
     def get(self, seed_id: str) -> dict:
-        """按 id 取一条卡；不存在抛 KeyError。"""
+        """Fetch a card by id; raises KeyError if not found."""
         for record in self.load():
             if record.get("id") == seed_id:
                 return record
         raise KeyError(seed_id)
 
     def add(self, record: dict) -> None:
-        """追加一条卡记录并落盘（存取宽容；严格校验请显式调 validate_card）。"""
+        """Append a card record and persist to disk (lenient on access; call validate_card explicitly for strict validation)."""
         records = self.load()
         records.append(record)
         self._path.parent.mkdir(parents=True, exist_ok=True)

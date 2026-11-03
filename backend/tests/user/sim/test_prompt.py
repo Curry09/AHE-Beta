@@ -1,4 +1,4 @@
-"""主/等待 three 跳 prompt 契约 + 离线 ScriptedPersonaClient + 容错解析。"""
+"""Primary/standby three jumps prompt contract + offline ScriptedPersonaClient + fault-tolerant parsing."""
 
 from __future__ import annotations
 
@@ -414,13 +414,13 @@ def test_scripted_client_capability_fork() -> None:
             ),
         )
 
-    assert _act(D1Eval.EXPERT)["action"] != "accept"  # 专家不轻易接受
-    assert _act(D1Eval.SHALLOW)["action"] == "accept"  # 浅层能跑即接受
+    assert _act(D1Eval.EXPERT)["action"] != "accept"  # Experts do not easily accept
+    assert _act(D1Eval.SHALLOW)["action"] == "accept"  # Shallow layer accepts as long as it runs
 
 
 def test_parse_json_tolerant() -> None:
     assert _parse_json('```json\n{"action": "accept", "message": "ok"}\n```')["action"] == "accept"
     assert _parse_json('noise {"action": "give_up"} trailing')["action"] == "give_up"
-    # 完全无法解析 -> 返回安全 dict, 不抛
+    # Completely unparseable → return safe dict, do not raise
     safe = _parse_json("not json at all")
     assert safe["action"] == "free"

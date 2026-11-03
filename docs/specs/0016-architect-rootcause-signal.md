@@ -1,12 +1,12 @@
 ---
 number: "0016"
-title: 设计师根因信号 + 读码效率 + 运行时聚合
+title: "Architect root-cause signals + code-reading efficiency + runtime aggregation"
 issue: 0
 slug: architect-rootcause-signal
-summary: 补上设计师的「为什么差」根因信号、机制层对照数字与读码效率：① 体感 reason 随分数落 index 并喂设计师；② search_file_content + 先搜后读；③ runtime_agg 事后扫最近 N 局 Session 聚合 0 步/超时/打断/错误占比与预算钮，注入 propose_once（只观测不归因）。落点 architect/ + user/session_store.py + agent_defs/architect/。
+summary: "Add the Architect's missing \"why is it bad\" root-cause signal, mechanism-level comparison numbers, and code-reading efficiency: ① feed the experience reason to the Architect alongside the score; ② search_file_content + search before reading; ③ runtime_agg scans the most recent N Session sessions after the fact, aggregates the proportions of 0-step/timeouts/interruptions/errors and the budget knobs, and injects them into propose_once (observation only, no attribution). Locations: architect/ + user/session_store.py + agent_defs/architect/."
 tasks:
   - id: T1
-    title: 体感 reason 作根因信号喂设计师
+    title: "Use the experience reason as a root-cause signal for the Architect"
     status: pending
     priority: P1
     tags: []
@@ -17,10 +17,10 @@ tasks:
       - backend/ahe_beta/demand/architect.py
       - backend/ahe_beta/user/session_store.py
       - backend/tests/loop/test_architect.py
-    scope: 补上设计师诊断根因所缺的定性信号。SessionStore：save() 写 index.json 时把 FeelingScore.reason（用户打分背后那句「为什么」）随 score/created_at 一起落库。architect：_feeling_trend 从 index 读出 (created_at, score, reason) 三元组、_format_trend 把 reason 拼进体感曲线喂给设计师——分数只告诉「差」，reason 才告诉「差在哪」。尤其「延迟/等待本身」这类痛点（等很久才失败/半天没动静/等到弃坑）是体感杀手，且只会出现在 reason 里、绝不体现在分数高低上；设计师须据 reason 先判是 bug 还是 feature、再把需求动作给 dev，别把「延迟」误读成「没交付」而去加恢复逻辑（反面教材）。设计师站位是产品+架构：以为用户解决问题为前提，看体感（分数+reason）→ 分析根因 → 提需求给 dev。
-    acceptance: SessionStore.save 后 index.json 每条含 reason 字段；_feeling_trend 返回含 reason 的三元组、_format_trend 输出把每个分数带上其 reason；设计师输入里能看到每轮分数对应的「为什么」。单测覆盖：index 落 reason、trend 读回三元组、格式化含 reason、缺省 reason 兼容。
+    scope: "Add the qualitative signal missing from the Architect's root-cause diagnosis. SessionStore: when save() writes index.json, persist FeelingScore.reason (the \"why\" behind the user's score) alongside score/created_at. architect: _feeling_trend reads (created_at, score, reason) triples from the index, and _format_trend incorporates reason into the experience trend for the Architect—scores only say \"bad,\" while reason says where it is bad. In particular, pain points such as \"latency/waiting itself\" (waiting a long time before failure / nothing happening for ages / waiting until abandonment) are experience killers and appear only in reason, never in the score level; the Architect must use reason to first determine whether the issue is a bug or a feature, then send the requirement action to dev, rather than misreading \"latency\" as \"not delivered\" and adding recovery logic (negative example). The Architect's position is product + architecture: starting from the premise of solving the user's problem, inspect experience (score + reason) → analyze the root cause → submit requirements to dev."
+    acceptance: "After SessionStore.save, every index.json entry includes a reason field; _feeling_trend returns triples containing reason, and _format_trend outputs each score together with its reason; the Architect's input shows the corresponding \"why\" for each round's score. Unit tests cover: reason persisted in the index, triples read back by trend, reason included in formatting, and compatibility with a missing default reason."
   - id: T2
-    title: 设计师 grep + 先搜后读，降低读码开销
+    title: "Architect grep + search before reading to reduce code-reading overhead"
     status: pending
     priority: P2
     tags: []
@@ -31,10 +31,10 @@ tasks:
       - backend/agent_defs/architect/agent.yaml
       - backend/agent_defs/architect/systemprompt.md
       - backend/agent_defs/architect/tools/search_file_content.tool.yaml
-    scope: 设计师此前无 shell、只能 read_file 整篇通读大文件（entry.py 数百行），瞬间烧光迭代预算（曾撞满 max-iter）。给它 search_file_content(grep) 工具，并在 systemprompt 立「先搜后读」纪律：entry.py 这类大文件先用 search_file_content 按关键词（如 timeout|retry|_CALL_TIMEOUT|_RUN_RETRIES|max_iter）跳到相关处，命中后只 read_file 那一段（带 offset/limit）精读；agents/main.md 通常短可直接读。读系统时先判根因在行为层（main.md）还是机制层（entry.py/agent.yaml），没读机制源码就别断言机制根因。search_file_content.tool.yaml 从 dev 工具定义复用。
-    acceptance: architect/agent.yaml 挂载 read_file/list_directory/search_file_content；systemprompt 含「先搜后读、别整篇通读」纪律与关键词示例；search_file_content.tool.yaml schema 合法可加载。模拟中设计师对大文件走 grep→精读而非整篇通读，不再因通读烧满迭代。
+    scope: "Previously, the Architect had no shell and could only read entire large files with read_file (entry.py is hundreds of lines), immediately exhausting the iteration budget (once reaching max-iter). Give it the search_file_content(grep) tool and establish a \"search before reading\" rule in the system prompt: for large files such as entry.py, first use search_file_content with keywords such as timeout|retry|_CALL_TIMEOUT|_RUN_RETRIES|max_iter to jump to relevant locations, then read only that section with read_file (using offset/limit) for close inspection; agents/main.md is usually short and can be read directly. When reading the system, first determine whether the root cause lies at the behavior layer (main.md) or the mechanism layer (entry.py/agent.yaml); do not assert a mechanism root cause without reading the mechanism source. Reuse the search_file_content.tool.yaml from the dev tool definition."
+    acceptance: "architect/agent.yaml mounts read_file/list_directory/search_file_content; the system prompt includes the \"search before reading; do not read the entire file\" rule and keyword examples; search_file_content.tool.yaml has a valid schema and can be loaded. In simulation, the Architect uses grep → focused reading for large files instead of reading them in full, and no longer exhausts iterations through full-file reading."
   - id: T3
-    title: 运行时行为聚合 runtime_agg：机制层观测数字喂设计师
+    title: "Runtime behavior aggregation runtime_agg: feed mechanism-level observation numbers to the Architect"
     status: done
     priority: P1
     tags: []
@@ -45,85 +45,85 @@ tasks:
     files:
       - backend/ahe_beta/demand/runtime_agg.py
       - backend/tests/loop/test_runtime_agg.py
-    scope: 补上设计师 prompt 宣称却从未注入的机制层对照数字。新增 architect/runtime_agg.py：事后扫 SessionStore 最近 N 局（默认 50）的 harness 轮，聚合任务无关指标——0 步轮占比、timeout/interrupted/harness_error 回复占比、tool_error 步占比、中位 steps、以及 harness 仓预算钮（_CALL_TIMEOUT/_RUN_RETRIES/max_iterations，只读常量/配置、不 import harness）。format_runtime_agg 把 RuntimeAgg 拼成可读块；由 architect.propose_once（归 T1 的 architect.py）在体感曲线旁注入。只做观测聚合、不做归因（归因留给设计师读 reason）。不改 Session schema、不改协议、不碰用户侧模拟路径。
-    acceptance: aggregate_runtime 对空仓返回零计数；有 sessions 时正确统计 0 步/timeout/interrupted/error/tool_error 与 median_steps；能从 harness 仓读出预算钮（缺省则 None）。format_runtime_agg 输出含占比与预算行。propose_once 输入含该块。单测覆盖：空仓、混合 reply 归类、预算解析、格式化。
+    scope: "Add the mechanism-level comparison numbers claimed by the Architect prompt but never injected. Add architect/runtime_agg.py: after the fact, scan the harness rounds from the most recent N sessions in SessionStore (default 50), aggregating task-independent metrics—the proportion of 0-step rounds, the proportion of timeout/interrupted/harness_error replies, the proportion of tool_error steps, median steps, and the Harness repository budget knobs (_CALL_TIMEOUT/_RUN_RETRIES/max_iterations, read-only constants/configuration; do not import harness). format_runtime_agg renders RuntimeAgg as a readable block; architect.propose_once (owned by T1's architect.py) injects it alongside the experience trend. This performs observation aggregation only and no attribution (attribution remains for the Architect to infer from reason). Do not change the Session schema or protocol, and do not touch the user-side simulation path."
+    acceptance: "aggregate_runtime returns zero counts for an empty repository; when sessions exist, it correctly counts 0-step/timeout/interrupted/error/tool_error and median_steps; it can read the budget knobs from the Harness repository (None if absent). format_runtime_agg outputs proportions and a budget line. propose_once input includes this block. Unit tests cover: empty repository, mixed reply classification, budget parsing, and formatting."
 ---
 
-# 0016 · 设计师根因信号 + 读码效率 + 运行时聚合
+# 0016 · Architect Root-Cause Signals + Code-Reading Efficiency + Runtime Aggregation
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: the frontmatter is structured source data (including the tasks DAG), and the body is a nine-section group-level rust-RFC overview. -->
 
 ## Summary
 
-补上设计师诊断所需信号与读码效率：
+Add the signals and code-reading efficiency required for the Architect's diagnosis:
 
-1. **体感 reason**——随分数落 index，喂曲线（延迟类痛点只在 reason 里）；
-2. **先搜后读**——`search_file_content` + 纪律，避免整篇烧迭代；
-3. **runtime_agg**——事后扫最近 N 局 Session，聚合 0 步/超时/打断/错误占比、中位 steps、预算钮，注入 `propose_once`（**只观测、不归因**）。
+1. **Experience reason**—persist it in the index alongside the score and feed it into the trend (latency-related pain points appear only in reason);
+2. **Search before reading**—`search_file_content` + discipline, avoiding iteration burn from reading entire files;
+3. **runtime_agg**—after the fact, scan the most recent N Session sessions, aggregate the proportions of 0-step rounds/timeouts/interruptions/errors, median steps, and budget knobs, and inject them into `propose_once` (**observation only, no attribution**).
 
-落点 `architect/` + `session_store` + `agent_defs/architect/`。
+Locations: `architect/` + `session_store` + `agent_defs/architect/`.
 
 ## Motivation
 
-只看分数会漏延迟根因、误提恢复逻辑；无 grep 会通读烧预算；prompt 宣称有「0 步占比/超时占比」却从未注入数字，reason 压成「又超时」时分不清失忆与预算太紧——故补 runtime_agg。
+Looking only at scores misses latency root causes and leads to incorrect recovery requirements; without grep, reading entire files burns the budget; the prompt claims to have "0-step proportion/timeout proportion" but never injects the numbers, and when reason is compressed to "timed out again," it is impossible to distinguish forgetting from a budget that is too tight—hence runtime_agg.
 
 ## Guide-level explanation
 
-- 曲线带 reason；延迟先判根因再提需求。
-- 大文件先搜后精读。
-- 旁路一块**机制层对照数字**（runtime_agg），设计师自行归因。
+- The trend includes reason; determine the root cause of latency before submitting requirements.
+- Search large files first, then read the relevant sections closely.
+- Add a side-channel block of **mechanism-level comparison numbers** (runtime_agg); the Architect performs attribution itself.
 
 ## Reference-level explanation
 
-### 代码锚点
+### Code anchors
 
-- `session_store` index 含 reason；`architect.py` trend + 注入 `format_runtime_agg(aggregate_runtime(...))`。
-- `runtime_agg.py`：`RuntimeAgg`、最近 N=50、reply 粗标签、读仓内 `_CALL_TIMEOUT`/`_RUN_RETRIES`/`max_iterations`。
-- architect agent.yaml / systemprompt / search_file_content。
+- `session_store`: the index includes reason; `architect.py`: trend + injection into `format_runtime_agg(aggregate_runtime(...))`.
+- `runtime_agg.py`: `RuntimeAgg`, most recent N=50, coarse reply labels, and reading `_CALL_TIMEOUT`/`_RUN_RETRIES`/`max_iterations` from the repository.
+- architect agent.yaml / systemprompt / search_file_content.
 
-### 信号流
+### Signal flow
 
 ```
 FeelingScore{score,reason} → index
-Turn.steps + reply + 预算钮 → runtime_agg
+Turn.steps + reply + budget controls → runtime_agg
         ↓
-propose_once：曲线(reason) + 运行时块 → 判 bug/feature → 提需求
+propose_once: curve(reason) + runtime block → classify as bug/feature → propose requirements
 ```
 
 ### DAG
 
 ```mermaid
 graph LR
-  T1[T1 reason 喂设计师]
-  T2[T2 grep + 先搜后读]
+  T1[T1 Feed reason to the architect]
+  T2[T2 grep + search before reading]
   T3[T3 runtime_agg]
   T1 --> T3
 ```
 
-### 文件分配
+### File allocation
 
-- **T1**：`architect.py`、`session_store.py`、`test_architect.py`（含 propose 注入调用点）
-- **T2**：architect agent 定义与 grep 工具
-- **T3**：`runtime_agg.py`、`test_runtime_agg.py`
+- **T1**: `architect.py`, `session_store.py`, `test_architect.py` (including the propose injection call site)
+- **T2**: architect agent definition and grep tool
+- **T3**: `runtime_agg.py`, `test_runtime_agg.py`
 
 ## Drawbacks
 
-reason 噪声；runtime_agg 粗标签非任务语义；grep 仍依赖关键词选择。
+reason noise; runtime_agg uses coarse labels rather than task semantics; grep still depends on keyword selection.
 
 ## Rationale and alternatives
 
-- 只看分数：延迟不可见。
-- 结构化打标 reason：MVP 先喂原文。
-- 不注入数字、靠 prompt 假装有指标：已证伪。
+- Scores only: latency is invisible.
+- Structured reason labels: the MVP feeds the raw text first.
+- Do not inject numbers and rely on the prompt to pretend that metrics exist: disproven.
 
 ## Prior art
 
-0005 FeelingScore；0012/0013 延迟与 steps 旁路。
+0005 FeelingScore; 0012/0013 latency and steps side channels.
 
 ## Unresolved questions
 
-reason 是否打标；是否把等待序列结构化并入 agg。
+Whether reason should be labeled; whether to structure waiting sequences and include them in agg.
 
 ## Future possibilities
 
-看板展示 agg；按标签聚合痛点。
+Display agg in a dashboard; aggregate pain points by label.

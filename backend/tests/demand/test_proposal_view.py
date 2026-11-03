@@ -1,5 +1,6 @@
 from ahe_beta.demand import issue_schema as sc
 from ahe_beta.demand.proposal_view import (
+    evidence_session_ids,
     format_proposal_list,
     format_proposal_reference,
     format_proposal_view,
@@ -14,8 +15,8 @@ def test_projection_contains_canonical_metadata_and_normalized_body() -> None:
     tracker = FakeTracker()
     tracker.create_issue(
         IssueDraft(
-            title="任务无关标题",
-            body="### 根因区域\n\n通用机制缺陷\n\ncovers: #2 #3",
+            title="Task irrelevant title",
+            body="### Root cause\n\nGeneric mechanism defect\n\ncovers: #2 #3",
             labels=[sc.PROPOSAL, sc.FROM_TRIAGE, "P1"],
         )
     )
@@ -25,23 +26,37 @@ def test_projection_contains_canonical_metadata_and_normalized_body() -> None:
     assert view.provenance == sc.FROM_TRIAGE
     assert view.covers == (2, 3)
     rendered = format_proposal_view(issue)
-    assert "任务无关标题" in rendered
-    assert "通用机制缺陷" in rendered
+    assert "Task irrelevant title" in rendered
+    assert "Generic mechanism defect" in rendered
     assert "priority=P1" in rendered
     assert "covers=#2,#3" in rendered
 
 
-def test_legacy_raw_report_section_is_excluded() -> None:
-    body = "### 根因区域\n\n通用机制缺陷\n\n## 原始用户报告（案例证据，非实现对象）\n\n具体任务正文"
-    assert normalized_proposal_body(body) == "### 根因区域\n\n通用机制缺陷"
-    assert "具体任务正文" not in normalized_proposal_body(body)
+def test_raw_report_section_is_excluded() -> None:
+    heading = "## Original user report (case evidence, not an implementation target)"
+    body = f"### Root cause\n\nGeneric mechanism defect\n\n{heading}\n\nSpecific task body"
+    assert normalized_proposal_body(body) == "### Root cause\n\nGeneric mechanism defect"
+    assert "Specific task body" not in normalized_proposal_body(body)
+
+
+def test_raw_report_cannot_grant_evidence_session_access() -> None:
+    heading = "## Original user report (case evidence, not an implementation target)"
+    tracker = FakeTracker()
+    tracker.create_issue(
+        IssueDraft(
+            title="Normalized proposal",
+            body=f"session_id: cited-session\n\n{heading}\n\nsession_id: private-session",
+            labels=[sc.PROPOSAL],
+        )
+    )
+    assert evidence_session_ids(tracker.list_open_issues()) == {"cited-session"}
 
 
 def test_list_empty_and_single_use_same_projection() -> None:
     tracker = FakeTracker()
     tracker.create_issue(IssueDraft(title="t", body="b", labels=[sc.PROPOSAL]))
     issue = tracker.list_open_issues()[0]
-    assert format_proposal_list([]) == "（空）"
+    assert format_proposal_list([]) == "(empty)"
     assert format_proposal_list([issue]) == format_proposal_view(issue)
 
 

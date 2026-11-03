@@ -1,4 +1,4 @@
-"""spec-0003：IssueTracker.list_open_issues 读路径单测（Fake + Gitea）。"""
+"""spec-0003: IssueTracker.list_open_issues read path unit test (Fake + Gitea)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ def test_fake_lists_only_open() -> None:
     t = FakeTracker()
     r1 = t.create_issue(IssueDraft(title="a", body="ba", labels=["bug"]))
     t.create_issue(IssueDraft(title="b", body="bb"))
-    t.set_state(r1.number, "closed", "done")  # 关掉第一条
+    t.set_state(r1.number, "closed", "done")  # Close the first one
     issues = t.list_open_issues()
     assert [i.number for i in issues] == [2]
     assert issues[0].title == "b" and issues[0].state == "open"

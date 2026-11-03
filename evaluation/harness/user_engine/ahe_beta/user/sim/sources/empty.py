@@ -1,10 +1,12 @@
-"""empty SeedSource（spec-0009/T2）。
+"""Empty SeedSource (spec-0009/T2).
 
-新建一个隔离空工作区目录；`params.doc` 非空时把其文本写成 `params.doc_name`（缺省
-"SPEC.md"）的说明文件，覆盖 NL2Repo 式「仅一份需求文档、空仓起步」的注入形态。
+Create a new isolated workspace directory; if `params.doc` is non-empty, write its text as a spec file
+named `params.doc_name` (default "SPEC.md"), supporting the NL2Repo injection pattern of "single requirements
+document, start from empty repo".
 
-可插拔证明：接入它只新增本模块——靠 spec-0009/T1 的 sources/ 自动发现注册，seed_source /
-models / workspace 与消费侧（sim_user / Sandbox）一律不改。不引入容器 / git / 依赖供给。
+Pluggable proof: integrating it only adds this module—auto-discovered via spec-0009/T1's sources/ registry,
+with seed_source / models / workspace and consuming code (sim_user / Sandbox) all unchanged. No introduction
+of containers / git / dependency supply.
 """
 
 from __future__ import annotations

@@ -1,10 +1,10 @@
 """
 clauses.py
-维度取值 -> 标准注入文案 (确定性查表, 可复现 / 可 codegen)。
-用于编译 BLOCK-P。文案是英文(喂 persona LLM), 不掺状态数值。
+Dimension values -> standard injection text (deterministic lookup table, reproducible / code-generatable).
+Used to compile BLOCK-P. Text is in English (fed to persona LLM), no state values mixed in.
 
-Spec-0037/T2: Process involvement + Time temperament 子句；文案描述「人」，
-不描述当前 harness 的具体键位（interrupt / queued / slash）。
+Spec-0037/T2: Process involvement + Time temperament clauses; text describes the "person",
+not specific harness keys of the current moment (interrupt / queued / slash).
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ D41_CLAUSE = {
     D41Grain.SPEC_LEVEL: "you provide spec-level detail including the information the assistant needs.",
 }
 
-# 过程卷入：人对「看得见进展」的需要，不是盯某个 UI 控件。
+# Process involvement: the person's need for "visible progress", not fixation on a specific UI control.
 D42_CLAUSE = {
     D42Supervise.EVERY_STEP: (
         "you need a sense of what the assistant is doing while it works; long stretches of "
@@ -61,7 +61,7 @@ D42_CLAUSE = {
     ),
 }
 
-# 质量失败策略：只描述结果不对时怎么办。
+# Quality failure strategy: describe only what to do when results are wrong.
 D43_CLAUSE = {
     D43Correct.FEEDBACK: (
         "when the result is wrong you describe the problem plainly and ask it to fix. "
@@ -122,12 +122,12 @@ def voice_for(p: Persona) -> str:
 
 
 # --------------------------------------------------------------------------
-# 内层 tool-using 核实子句（spec-0008/T3）
-# CAN（能力，机械）: 由 0008/T2 tool_stack 决定暴露哪些工具，这里只如实描述。
-# WILL（意愿，prompt）: 由 D3 + trust + 起疑状态 渲染「此刻是否倾向核实」。
+# Inner tool-using verification clause (spec-0008/T3)
+# CAN (capability, mechanical): determined by 0008/T2 tool_stack which tools are exposed; here we describe faithfully.
+# WILL (intent, prompt): rendered by D3 + trust + doubt state whether to verify now.
 # --------------------------------------------------------------------------
 def clause_capability(p: Persona, tool_names: list[str]) -> str:
-    """如实描述「你能用哪些工具自行核实」。无工具 -> 只能凭阅读判断。"""
+    """Faithfully describe 'which tools you can use to verify yourself'. No tools -> judgment by reading only."""
     if not tool_names:
         return (
             "You have NO tools to run or test things yourself. You can only judge from what you "
@@ -150,7 +150,7 @@ def clause_capability(p: Persona, tool_names: list[str]) -> str:
 
 
 def clause_verification_policy(p: Persona, trust: TrustStance) -> str:
-    """WILL：核实是可选且有成本的动作；倾向随 D3（验收严格度）+ trust（起疑）变化。"""
+    """WILL: verification is optional and has cost; inclination varies with D3 (acceptance rigor) + trust (doubt state)."""
     strict = p.d3 in (D3Accept.IDIOMATIC, D3Accept.RIGOROUS)
     suspicious = trust == TrustStance.SKEPTICAL
     if strict or suspicious:

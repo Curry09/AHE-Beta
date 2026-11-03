@@ -1,23 +1,27 @@
 """
 feeling.py
-体感评分 (FeelingScore 1–4 + 理由) —— 对齐 AHE-Beta spec-0001 的训练信号契约。
+Experience score (FeelingScore 1–4 + reason) — aligned with the AHE-Beta spec-0001 training signal contract.
 
-两路并出 (会话末各产一次, 互为校验):
-- ① LLM 自评 (parse_feeling_llm): persona 在角色内给"这次体验"打 1–4 + 理由,
-     对齐 spec-0001/T3"会话结束后经 LLM 产出 FeelingScore"的产出方式 (类 CC 评分)。
-- ② 框架派生 (derive_feeling): 从主观末态 (end_reason / verdict / trust) 确定性聚合,
-     可复现，仅作独立诊断，不填补缺失自评。
+Two parallel outputs (each produced at session end, mutually validating):
+- ① LLM self-assessment (parse_feeling_llm): persona in-role gives "this experience" a score of 1–4 + reason,
+     aligned with spec-0001/T3 "FeelingScore produced by LLM after session end" (similar to CC scoring).
+- ② Framework-derived (derive_feeling): deterministic aggregation from subjective end state (end_reason /
+     verdict / trust), reproducible, for independent diagnosis only, does not fill in missing self-assessment.
 
-铁律:
-- 体感是 *主观* 信号, 只从 persona 的末态 (end_reason / verdict / patience / trust)
-  派生, 绝不读客观真值 (gold)。这与项目"训练信号=用户体感, benchmark held-out"一致。
-- 会话末一次性产出 (不逐轮打分), 对齐 FeelingScore"一局一个总分"的形态。
+Iron rules:
+- User experience is a *subjective* signal, derived only from persona's end state (end_reason / verdict / patience /
+  trust), never read objective ground truth (gold). This aligns with the project's "training signal = user experience,
+  benchmark held-out".
+- Produced once at session end (not scored per turn), aligned with FeelingScore's "one score per session" form.
 
-评分细则 (类 CC 1–4, 数值越高体感越好):
-  4  顺畅满意 : 接受交付, 过程基本没反复 (failed_blame_harness <= 1 且信任未转怀疑)
-  3  有摩擦但接受: 最终接受, 但中途多次怪 harness 或信任已转 skeptical
-  2  未真正解决: 跑满轮次未收敛 / 提了 issue 收场 (建设性但挫败)
-  1  放弃     : 主动 give_up 中途弃用
+Scoring rules (similar to CC 1–4; higher value = better experience):
+  4  Smooth & satisfied: accepted deliverable, process had minimal back-and-forth (failed_blame_harness <= 1
+     and trust did not shift to doubt)
+  3  Friction but accepted: ultimately accepted, but multiple harness complaints mid-session or trust already
+     shifted to skeptical
+  2  Not truly resolved: ran full rounds without convergence / filed issue to close out (constructive but
+     frustrating)
+  1  Gave up: proactive give_up, abandoned mid-conversation
 """
 
 from __future__ import annotations
@@ -25,7 +29,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-# end_reason -> 基线分。其余 (terminated 等) 落默认 2。
+# end_reason -> baseline score. Other reasons (terminated, etc.) map to default 2.
 _BASE_BY_END = {
     "accepted": 4,
     "max_turns": 2,
@@ -34,23 +38,24 @@ _BASE_BY_END = {
 }
 
 _VERDICT_TEXT = {
-    4: "用户顺畅接受了交付。",
-    3: "用户最终接受, 但过程有反复/信任下降。",
-    2: "未真正解决就收场 (跑满轮次或提 issue)。",
-    1: "用户中途放弃。",
+    4: "The user accepted the delivery smoothly.",
+    3: "The user eventually accepted, but the process involved repeated attempts or declining trust.",
+    2: "The session ended without a real resolution (turn limit reached or issue filed).",
+    1: "The user gave up during the session.",
 }
 
 
 @dataclass
 class FeelingScore:
-    """1–4 体感评分 + 理由 (会话末产出, 作训练信号)。越界即构造期失败。"""
+    """1–4 experience score + reason (produced at session end, used as training signal). Out-of-bounds is a
+    construction-time failure."""
 
     score: int
     reason: str
 
     def __post_init__(self) -> None:
         assert type(self.score) is int and 1 <= self.score <= 4, (
-            f"体感分须为 1..4 的整数: {self.score!r}"
+            f"Experience score must be an integer in 1..4: {self.score!r}"
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -62,11 +67,11 @@ class FeelingScore:
 
 
 def parse_feeling_llm(ret: dict) -> FeelingScore | None:
-    """从 persona LLM 的会话末自评 dict 解析 1–4 体感分 (spec-0001/T3 的产出方式)。
+    """Parse a 1–4 experience score from the persona LLM's self-assessment at session end (the spec-0001/T3 output method).
 
-    期望 ret 形如 {"score": <1..4>, "reason": "<...>"}。无效 (缺字段 / 非整数 / 越界)
-    返回 None，缺测不能回填派生分。越界经 FeelingScore.__post_init__
-    断言失败 -> 捕获为 None, 既守住"越界即非法"又不崩 loop。
+    Expects ret in the form {"score": <1..4>, "reason": "<...>"}. Invalid input (missing fields / non-integer / out of range)
+    returns None; a missing measurement must not be filled with a derived score. Out-of-range values fail the
+    FeelingScore.__post_init__ assertion -> caught as None, preserving "out of range is invalid" without crashing the loop.
     """
     if not isinstance(ret, dict) or "score" not in ret:
         return None
@@ -97,16 +102,17 @@ def experience_feedback(ret: dict | None, *, source: str, error: str | None = No
 
 
 def derive_feeling(end_reason: str, turns: list) -> FeelingScore:
-    """从一局会话末态派生体感分。只吃主观信号 (end_reason / verdict / trust)。
+    """Derive experience score from a session's end state. Consumes only subjective signals (end_reason / verdict /
+    trust).
 
-    turns: list[TurnLog]; 仅读 verdict / trust 两个主观字段, 不依赖客观线。
+    turns: list[TurnLog]; reads only verdict / trust subjective fields, does not depend on objective lines.
     """
     fails = sum(1 for t in turns if t.verdict == "failed_blame_harness")
     stucks = sum(1 for t in turns if t.verdict == "stuck")
     final_trust = turns[-1].trust if turns else "balanced"
 
     score = _BASE_BY_END.get(end_reason, 2)
-    # 即便最终接受, 多次怪 harness / 多次卡住 / 信任崩到 skeptical -> 降一档为"有摩擦的接受"
+    # Even if ultimately accepted, repeated harness complaints / repeated stalls / trust falling to skeptical -> lower the score one level to "acceptance with friction".
     if score == 4 and (fails >= 2 or stucks >= 2 or final_trust == "skeptical"):
         score = 3
 

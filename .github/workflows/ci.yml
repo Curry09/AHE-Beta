@@ -1,7 +1,7 @@
-# CI 流水线（参考 OpenAgents 裁剪）。
-# 仅 "CI Gate" 作为分支保护的必需状态检查；其余 job 是它的前置。
-# 适配点：spec CLI 在本仓为 vendored（tools/spec-driven-development/vendor），
-# 通过 PYTHONPATH + `python -m openagents.spec.cli` 调用，而非 `uv run spec`。
+# CI pipeline (adapted from OpenAgents).
+# Only "CI Gate" is a required status check for branch protection; the other jobs are its prerequisites.
+# Adaptation: the spec CLI is vendored in this repository (tools/spec-driven-development/vendor),
+# and invoked via PYTHONPATH + `python -m openagents.spec.cli` rather than `uv run spec`.
 name: CI
 
 on:

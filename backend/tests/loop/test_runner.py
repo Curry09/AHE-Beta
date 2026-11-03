@@ -1,4 +1,4 @@
-"""spec-0004/T2：HarborRunner 首跑 / 恢复 / 幂等跳过单测（orchestrator + checkpoint 注入 spy）。"""
+"""spec-0004/T2: HarborRunner first run / recovery / idempotent skip unit test (orchestrator + checkpoint injection spy)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from ahe_beta.loop.runner import HarborRunner
 
 
 class _FakeOrch:
-    """run_round 按脚本返回新 ref，并记录每轮入参。"""
+    """run_round returns new ref per script and records per-round inputs."""
 
     def __init__(self, refs: list[str]) -> None:
         self._refs = refs
@@ -52,8 +52,8 @@ def test_first_run_emits_per_round(tmp_path) -> None:
         load_fn=lambda a, s: None,
     )
     latest = runner.run(initial_release_ref="v1", n_rounds=2, checkpoint_artifact=None)
-    assert orch.calls == ["v1", "v2"]  # 上轮返回喂下轮
-    assert len(save.calls) == 2  # 每轮一个 checkpoint
+    assert orch.calls == ["v1", "v2"]  # Previous round output feeds next round
+    assert len(save.calls) == 2  # One checkpoint per round
     assert latest == save.calls[-1]
     rs = read_run_state(tmp_path / "state")
     assert rs.round == 2 and rs.current_release_ref == "v3"
@@ -75,7 +75,7 @@ def test_resume_skips_completed_rounds(tmp_path) -> None:
         load_fn=fake_load,
     )
     runner.run(initial_release_ref="v1", n_rounds=4, checkpoint_artifact=tmp_path / "ckpt.tar.gz")
-    assert orch.calls == ["v3", "v4"]  # 只跑第 3、4 轮，从 run_state 的 ref 续起
+    assert orch.calls == ["v3", "v4"]  # Run only rounds 3 and 4, resuming from the ref in run_state
     assert len(save.calls) == 2
     assert read_run_state(state_dir).round == 4
 
@@ -95,9 +95,9 @@ def test_resume_already_complete_no_rounds(tmp_path) -> None:
     )
     ckpt = tmp_path / "ckpt.tar.gz"
     latest = runner.run(initial_release_ref="v1", n_rounds=4, checkpoint_artifact=ckpt)
-    assert orch.calls == []  # 全部轮已完成
+    assert orch.calls == []  # All rounds completed
     assert save.calls == []
-    assert latest == ckpt  # 返回传入的 checkpoint
+    assert latest == ckpt  # Return the passed-in checkpoint
 
 
 def test_nonpositive_rounds_raises(tmp_path) -> None:

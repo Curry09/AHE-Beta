@@ -1,13 +1,13 @@
-"""多 agent 活动注册表（流式观测）：各 agent（用户/创新者/开发者）的实时状态写到 data/live/。
+"""Stream each agent's runtime state to the multi-agent activity registry in data/live/.
 
-与权威 SessionStore 解耦，是易失观测投影。三个文件：
-- agents.json：每个 agent 一个槽（按 agent_id），running 标志 + 结构化过程流 log（status 变化、
-  assistant 发言、工具调用/结果，条目形如 {t, kind, text}）。
-- run.json：整条 run 的运行态（running / 当前轮 round / total_rounds / 各轮 main SHA）。
-- history.json：按轮归档的已完成工作项（append-only）——agent 槽位每轮被覆盖，归档让
-  「已完成状态按轮回看」成为可能。
+Decoupled from authoritative SessionStore, is volatile observation projection. Three files:
+- agents.json: one slot per agent (by agent_id), running flag + structured process flow log (status changes,
+  assistant utterances, tool calls/results, entries like {t, kind, text}).
+- run.json: run-wide runtime state (running / current round / total_rounds / each round main SHA).
+- history.json: completed work items archived by round (append-only)—agent slots overwritten each round, archiving enables
+  "retrospective view of completed state per round".
 
-原子写（temp+replace）避免读进程读到半成品。fresh run 清空；resume 保留历史并修正中断槽位。
+Atomic write (temp+replace) prevents read process from seeing incomplete artifacts. Fresh run clears; resume preserves history and corrects interrupted slots.
 """
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ from typing import Any
 _AGENTS_NAME = "agents.json"
 _RUN_NAME = "run.json"
 _HISTORY_NAME = "history.json"
-# role 展示顺序：用户 → 分诊 → divergent → architect → owner → 开发者
-# （对齐三平面闭环 a → 第一拍(triage∥divergent) → 第二拍(architect) → Owner 准入 → b，Spec-0029）。
+# role display order: user → triage → divergent → architect → owner → developer
+# (aligned three-plane loop a → first beat (triage∥divergent) → second beat (architect) → owner gate → b, Spec-0029).
 _ROLE_ORDER = {
     "user": 0,
     "triager": 1,
@@ -33,13 +33,13 @@ _ROLE_ORDER = {
     "owner": 4,
     "developer": 5,
 }
-# 过程流时间线长度上限：status 变化 + assistant 发言 + 逐工具调用/结果，一次 agent.run 可达数百条。
+# process flow timeline length limit: status changes + assistant utterances + each tool call/result, one agent.run can reach hundreds of entries.
 _LOG_CAP = 500
 
-# Spec-0017/T1：模块级一把锁，包住所有写函数的「读-改-写」全程。mkstemp 原子写只防撕裂写，
-# 不防两个写者基于同一旧快照互相覆盖（丢更新/丢槽位）——a 段多用户会话并行后，多个会话线程
-# 会同时 update_agent/append_agent_log/archive_agent。锁粒度=单文件操作全程（纯本地文件 IO，
-# 持锁期内无网络/子进程等待，无死锁面）；读函数不加锁（原子 replace 保证读到的总是完整快照）。
+# Spec-0017/T1: module-level single lock wrapping the entire "read-modify-write" sequence of all write functions. mkstemp atomic write only prevents torn writes,
+# not two writers based on the same old snapshot overwriting each other (lost updates/lost slots)—after multi-user sessions in segment a,
+# multiple session threads simultaneously call update_agent/append_agent_log/archive_agent. Lock granularity = entire single-file operation (pure local file IO,
+# no network/subprocess wait while holding, no deadlock surface); read functions unlocked (atomic replace guarantees read always gets complete snapshot).
 _WRITE_LOCK = threading.Lock()
 
 
@@ -50,7 +50,7 @@ def _live_file(*, data_dir: Path, name: str) -> Path:
 def _read_json(*, path: Path, fallback: Any) -> Any:
     if not path.exists():
         return fallback
-    # errors="replace"：harness 可能吐非法 UTF-8 字节，容错读回而非炸掉观测（易失投影，坏了就回落）。
+    # errors="replace": the harness may emit invalid UTF-8 bytes; fault-tolerant reading recovers rather than crashes observations (lossy projection, fallback on corruption).
     try:
         return json.loads(path.read_text(encoding="utf-8", errors="replace"))
     except (json.JSONDecodeError, OSError, ValueError):
@@ -59,14 +59,15 @@ def _read_json(*, path: Path, fallback: Any) -> Any:
 
 def _write_atomic(*, path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    # 唯一临时名（mkstemp）+ 原子 replace：并发写者（dev tracer 与 status 回调可能跨线程同时写）绝不
-    # 共用同一 .tmp 而相互串字节；encode errors="replace" 兜底非法字符，杜绝写出坏字节。
+    # Unique temporary name (mkstemp) + atomic replace: concurrent writers (dev tracer and status callbacks may write across threads simultaneously) never
+    # share the same .tmp or interleave bytes; encode errors="replace" catches invalid characters and prevents writing corrupted bytes.
     payload = json.dumps(data, ensure_ascii=False).encode("utf-8", errors="replace")
     fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(payload)
-        os.replace(tmp_name, path)  # 原子替换，读进程不会看到半成品
+        # Atomic replace ensures reading processes never see incomplete files.
+        os.replace(tmp_name, path)
     except BaseException:
         try:
             os.unlink(tmp_name)
@@ -75,7 +76,7 @@ def _write_atomic(*, path: Path, data: Any) -> None:
         raise
 
 
-# ---- agents.json：agent 活动槽 ----
+# ---- agents.json: agent activity slots ----
 
 
 def update_agent(
@@ -91,20 +92,20 @@ def update_agent(
     round_no: int | None = None,
     meta: dict[str, Any] | None = None,
 ) -> None:
-    """更新某 agent 的活动槽（upsert）。turns 给会话型 agent，detail 给 dev/architect 最终报告，
-    round_no 标注该活动属于第几轮（前端按轮分组的依据）。
+    """Update an agent's activity slot (upsert). turns applies to conversational agents, detail to final reports for dev/architect,
+    round_no marks which round this activity belongs to (basis for frontend grouping by round).
 
-    meta（Spec-0026/T1）：可选只读展示载荷（如用户 agent 的 persona 摘要 identity/level/domain/goal）——
-    纯前端展示用，不参与任何决策；不传时沿用上一次（同 round 的 sticky 语义），老调用退化为 None 不崩。"""
-    with _WRITE_LOCK:  # Spec-0017/T1：读-改-写全程持锁，并发 upsert 不同槽位不互相覆盖
+    meta (Spec-0026/T1): optional read-only display payload (e.g., user agent persona summary identity/level/domain/goal)—
+    for frontend display only, does not participate in any decision; when omitted, carries forward from prior instance (sticky semantics within same round), legacy calls default to None without error."""
+    with _WRITE_LOCK:  # Spec-0017/T1: read-modify-write held under lock throughout; concurrent upserts to different slots do not overwrite each other
         path = _live_file(data_dir=data_dir, name=_AGENTS_NAME)
         registry = _read_json(path=path, fallback={})
         prev = registry.get(agent_id, {})
         now = datetime.now().isoformat()
-        # started_at = 本段活动起始：刚由空闲转为 running（或新 agent）时重置，否则沿用，供前端算运行时长。
+        # started_at = activity start time: resets when transitioning from idle to running (or new agent), otherwise carries forward; used by frontend to compute runtime.
         became_running = running and not prev.get("running", False)
         started_at = now if became_running or not prev.get("started_at") else prev["started_at"]
-        # log = 过程流时间线：status 变化即追加（连续重复去重），跨任务累计、封顶 _LOG_CAP。
+        # log = process flow timeline: appended when status changes (consecutive duplicates deduplicated), accumulated across tasks, capped at _LOG_CAP.
         log = list(prev.get("log", []))
         if not log or log[-1].get("text") != status:
             log.append({"t": now, "kind": "status", "text": status})
@@ -127,12 +128,12 @@ def update_agent(
 
 
 def append_agent_log(*, data_dir: Path, agent_id: str, text: str, kind: str = "step") -> None:
-    """往某 agent 的过程流时间线追加一条（assistant 发言 / 工具调用 / 工具结果等）。
+    """Append an entry to an agent's process flow timeline (assistant utterance / tool invocation / tool result, etc.).
 
-    不动 status/turns 等其余字段，updated_at 照刷。agent 槽不存在则 no-op（步骤必然发生在
-    update_agent 建槽之后；不为孤儿步骤造半空槽）。连续重复去重，同 _LOG_CAP 封顶。
+    Does not modify status/turns or other fields; updated_at is always refreshed. If agent slot does not exist, no-op (step must occur after
+    update_agent creates the slot; do not create partial orphan slots). Consecutive duplicates are deduplicated, capped at _LOG_CAP.
     """
-    with _WRITE_LOCK:  # Spec-0017/T1：并发追加不丢行
+    with _WRITE_LOCK:  # Spec-0017/T1: concurrent appends do not lose entries
         path = _live_file(data_dir=data_dir, name=_AGENTS_NAME)
         registry = _read_json(path=path, fallback={})
         slot = registry.get(agent_id)
@@ -149,7 +150,7 @@ def append_agent_log(*, data_dir: Path, agent_id: str, text: str, kind: str = "s
 
 
 def read_agents(*, data_dir: Path) -> list[dict[str, Any]]:
-    """返回所有 agent 活动，按 role（用户在前）再 agent_id 排序。"""
+    """Return all agent activities, sorted by role (users first) then agent_id."""
     registry = _read_json(path=_live_file(data_dir=data_dir, name=_AGENTS_NAME), fallback={})
     return sorted(
         registry.values(),
@@ -157,7 +158,7 @@ def read_agents(*, data_dir: Path) -> list[dict[str, Any]]:
     )
 
 
-# ---- run.json：整条 run 的运行态 ----
+# ---- run.json: run execution state ----
 
 
 def update_live_run(
@@ -170,11 +171,12 @@ def update_live_run(
     phase: str | None = None,
     blocked_issues: list[int] | None = None,
 ) -> None:
-    """更新 run 运行态。round_shas / phase / blocked_issues 不传则沿用已有值。
+    """Update run execution state. round_shas / phase / blocked_issues retain their existing values if omitted.
 
-    Spec-0050/T4: phase ∈ users/demand/delivery_wait/blocked/done。
+    Spec-0050/T4: phase ∈ users/demand/delivery_wait/blocked/done.
     """
-    with _WRITE_LOCK:  # Spec-0017/T1：prev 快照与写回之间不被其他写者插入
+    # Spec-0017/T1: prev snapshot and write-back are not interleaved by other writers
+    with _WRITE_LOCK:
         path = _live_file(data_dir=data_dir, name=_RUN_NAME)
         prev = _read_json(path=path, fallback={})
         now = datetime.now().isoformat()
@@ -196,7 +198,7 @@ def update_live_run(
 
 
 def read_live_run(*, data_dir: Path) -> dict[str, Any]:
-    """返回 run 运行态；从未跑过则给静止缺省。"""
+    """Return run execution state; if never run, return idle defaults."""
     fallback = {
         "running": False,
         "round": 0,
@@ -210,7 +212,7 @@ def read_live_run(*, data_dir: Path) -> dict[str, Any]:
     return _read_json(path=_live_file(data_dir=data_dir, name=_RUN_NAME), fallback=fallback)
 
 
-# ---- history.json：按轮归档的已完成工作项 ----
+# ---- history.json: completed work items archived by round ----
 
 
 def archive_agent(
@@ -220,14 +222,14 @@ def archive_agent(
     round_no: int,
     extra: dict[str, Any],
 ) -> None:
-    """把某 agent 当前槽位快照 + extra 归档为一条已完成工作项（append-only）。
+    """Archive current slot snapshot of an agent plus extra as a completed work item (append-only).
 
-    槽位每轮被覆盖，归档发生在该 agent 一段活动收尾（running=False）时，把 label/role/status/
-    log/turns/detail 全量快照下来，供前端「已完成 · 按轮分组」回看。extra 至少含 kind
-    （user_session/architect_run/dev_run）与各角色专属字段（session_id/issue_number/tag…）。
-    槽不存在则 no-op（无活动可归档）。
+    The slot is overwritten each round; archival occurs when an agent's activity phase ends (running=False), capturing full snapshot of label/role/status/
+    log/turns/detail for frontend "completed · grouped by round" review. extra must contain at least kind
+    (user_session/architect_run/dev_run) and role-specific fields (session_id/issue_number/tag…).
+    If slot does not exist, no-op (no activity to archive).
     """
-    with _WRITE_LOCK:  # Spec-0017/T1：history 读-追加-写全程持锁，并发归档不丢条目
+    with _WRITE_LOCK:  # Spec-0017/T1: history read-append-write held under lock throughout; concurrent archival does not lose entries
         registry = _read_json(path=_live_file(data_dir=data_dir, name=_AGENTS_NAME), fallback={})
         slot = registry.get(agent_id)
         if slot is None:
@@ -263,17 +265,17 @@ def archive_agent(
 
 
 def read_history(*, data_dir: Path) -> list[dict[str, Any]]:
-    """返回全部已归档工作项（按归档先后自然有序）。"""
+    """Return all archived work items (naturally ordered by archive time)."""
     history = _read_json(path=_live_file(data_dir=data_dir, name=_HISTORY_NAME), fallback=[])
     return history if isinstance(history, list) else []
 
 
-# ---- 清理 ----
+# ---- Cleanup ----
 
 
 def clear_live(*, data_dir: Path) -> None:
-    """清空 live 观测投影（agents/run/history 全部）。一轮 run 开始时调用。幂等。"""
-    with _WRITE_LOCK:  # Spec-0017/T1：与在途写者互斥，清空不与 upsert 交错出半新半旧
+    """Clear live observation projections (agents/run/history all). Called at start of each run. Idempotent."""
+    with _WRITE_LOCK:  # Spec-0017/T1: mutually exclusive with in-flight writers; clearing does not interleave to produce half-old-half-new state
         for name in (_AGENTS_NAME, _RUN_NAME, _HISTORY_NAME):
             _live_file(data_dir=data_dir, name=name).unlink(missing_ok=True)
 
@@ -290,7 +292,7 @@ def prepare_live_resume(*, data_dir: Path, phase: str) -> None:
             if not isinstance(slot, dict) or not slot.get("running"):
                 continue
             slot["running"] = False
-            slot["status"] = "上次进程已中断，等待恢复对账"
+            slot["status"] = "Previous process interrupted; waiting for recovery reconciliation"
             slot["updated_at"] = now
             log = list(slot.get("log") or [])
             if not log or log[-1].get("text") != slot["status"]:

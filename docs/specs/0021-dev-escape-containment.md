@@ -1,12 +1,12 @@
 ---
 number: "0021"
-title: dev agent 逃逸围堵：凭证隔离 + 编排绊线 + 污染清理
+title: "Dev agent escape containment: credential isolation + orchestration tripwire + contamination cleanup"
 issue: 0
 slug: dev-escape-containment
-summary: 实测发现 dev agent 经 heredoc 隧道绕过 workspace-jail 的路径扫描，改写编排仓文件并用宿主继承的 GitHub 凭证推送。路径级 jail 关不住能调用解释器的 agent（其 docstring 已自陈），本组不加固扫描，改做纵深：进程级 git 凭证隔离掐断推送落地链、b 段后绊线断言编排仓未被触碰、清理历史逃逸的污染制品。OS 级沙箱留作治本方向。
+summary: "Testing found that a dev agent bypassed workspace-jail path scanning through a heredoc tunnel, modified files in the orchestration repo, and pushed using GitHub credentials inherited from the host. A path-level jail cannot contain an agent that can invoke interpreters (as its docstring already acknowledges). This group does not harden scanning; instead, it adds defense in depth: process-level git credential isolation breaks the push chain, a tripwire after segment b asserts that the orchestration repo has not been touched, and artifacts contaminated by past escapes are cleaned up. OS-level sandboxing is left as the fundamental solution."
 tasks:
   - id: T1
-    title: repo_guard 模块 + orchestrator b 段绊线
+    title: "repo_guard module + orchestrator segment b tripwire"
     status: done
     priority: P0
     tags: []
@@ -18,10 +18,10 @@ tasks:
       - backend/ahe_beta/loop/orchestrator.py
       - backend/tests/guards/test_repo_guard.py
       - backend/tests/loop/test_orchestrator.py
-    scope: '新模块 repo_guard：RepoIntegrityError；snapshot_repo(*,repo)->(HEAD sha, git status --porcelain)；verify_unchanged(*,repo,before) 快照不等即抛（git 读失败也抛，宁紧勿松）。orchestrator ctor 加可选 integrity_guard: Callable[[],None]|None=None；run_round 在 b 段之后、c 段 _resolve_head 之前调用（None 则跳过，退化今天行为）；guard 抛出传播中止 run_round。'
-    acceptance: snapshot/verify：未变→放行、新增 commit/改 tracked/新 untracked→抛 RepoIntegrityError，既有 untracked 前后都在→不误报。orchestrator：注入的 guard 在 b 段后被调用一次；guard 抛出使 run_round 抛出（不吞）。repo_guard 测试用 symbolic-ref 建仓（兼容 git <2.28，本机可跑）。
+    scope: "New repo_guard module: RepoIntegrityError; snapshot_repo(*,repo)->(HEAD sha, git status --porcelain); verify_unchanged(*,repo,before) raises if the snapshots differ (also raises if git reads fail, favoring strictness over leniency). Add optional integrity_guard: Callable[[],None]|None=None to the orchestrator ctor; run_round calls it after segment b and before segment c _resolve_head (skip if None, falling back to today's behavior); exceptions raised by the guard propagate and abort run_round."
+    acceptance: "snapshot/verify: unchanged → pass; new commit/modified tracked file/new untracked file → raise RepoIntegrityError; existing untracked files present both before and after → no false positive. orchestrator: the injected guard is called once after segment b; an exception from the guard causes run_round to raise (not swallowed). repo_guard tests initialize repositories using symbolic-ref (compatible with git <2.28, runnable locally)."
   - id: T2
-    title: run.py 凭证隔离 + 构造并注入编排仓绊线 guard
+    title: "run.py credential isolation + construct and inject the orchestration repo tripwire guard"
     status: done
     priority: P0
     tags: []
@@ -32,10 +32,10 @@ tasks:
     files:
       - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/tests/test_run_git_isolation.py
-    scope: '两处（同文件一并落）：① 凭证隔离 _isolate_git_credentials()——多信道封堵（单关终端提示不够，实测 VS Code 注入的 GIT_ASKPASS 会绕过）：GIT_SSH_COMMAND=false（setdefault）+ GIT_TERMINAL_PROMPT=0 + 清 GIT_ASKPASS/SSH_ASKPASS/SSH_AUTH_SOCK/VSCODE_GIT_ASKPASS_* + 经 GIT_CONFIG_* 空值重置 credential.helper；Gitea HTTP（token in URL）与本地无传输 git 不受影响。② 绊线接线——构造 developers 后、orch.run 前 before=snapshot_repo(repo=str(ROOT))，integrity_guard=lambda: verify_unchanged(repo=str(ROOT), before=before) 注入 Orchestrator（ROOT=编排仓根=逃逸目标；run 期间编排仓应全程冻结）。'
-    acceptance: 启动后 GIT_SSH_COMMAND=='false'（未显式覆盖时）、GIT_TERMINAL_PROMPT=='0'、GIT_ASKPASS/SSH_AUTH_SOCK/VSCODE_GIT_ASKPASS_* 全清、GIT_CONFIG_* 注入空 credential.helper（追加不覆盖既有）；单测覆盖以上分支。harness seed/reset 与 dev 推 Gitea 的 HTTP 流程不受影响。orch 收到非 None integrity_guard；正常跑（编排仓未被动）不抛；人工写改编排仓后再跑，run 抛 RepoIntegrityError 且 finally 落 running=False。
+    scope: "Two changes (apply both in the same file): ① Credential isolation _isolate_git_credentials() using multiple channels (disabling terminal prompts alone is insufficient; testing showed that GIT_ASKPASS injected by VS Code can bypass it): GIT_SSH_COMMAND=false (setdefault) + GIT_TERMINAL_PROMPT=0 + clear GIT_ASKPASS/SSH_ASKPASS/SSH_AUTH_SOCK/VSCODE_GIT_ASKPASS_* + reset credential.helper to an empty value via GIT_CONFIG_*; Gitea HTTP (token in URL) and local git operations without transport are unaffected. ② Tripwire wiring: after constructing developers and before orch.run, set before=snapshot_repo(repo=str(ROOT)), and inject integrity_guard=lambda: verify_unchanged(repo=str(ROOT), before=before) into Orchestrator (ROOT=orchestration repo root=escape target; the orchestration repo must remain frozen throughout the run)."
+    acceptance: "After startup, GIT_SSH_COMMAND=='false' (when not explicitly overridden), GIT_TERMINAL_PROMPT=='0', GIT_ASKPASS/SSH_AUTH_SOCK/VSCODE_GIT_ASKPASS_* are all cleared, and GIT_CONFIG_* injects an empty credential.helper (appended without overwriting existing entries); unit tests cover the above branches. harness seed/reset and the dev's HTTP flow for pushing to Gitea are unaffected. orch receives a non-None integrity_guard; a normal run (orchestration repo untouched) does not raise; after manually modifying the orchestration repo and running again, run raises RepoIntegrityError and finally sets running=False."
   - id: T3
-    title: 清理历史逃逸污染制品 MANUAL.md
+    title: "Clean up MANUAL.md, an artifact contaminated by a past escape"
     status: done
     priority: P1
     tags: []
@@ -44,108 +44,108 @@ tasks:
     parallel: false
     files:
       - backend/agent_defs/developer_agent/MANUAL.md
-    scope: 'git rm backend/agent_defs/developer_agent/MANUAL.md——dev agent 配置不加载它（agent.yaml 只 system_prompt: ./systemprompt.md；旧收尾配置的文档路径曾对 harness 仓解析），纯逃逸残留。'
-    acceptance: 文件从 git 移除；grep 全仓无对 agent_defs/developer_agent/MANUAL.md 的引用；dev/architect agent 构造/跑通不受影响（既有单测绿）。
+    scope: "git rm backend/agent_defs/developer_agent/MANUAL.md: the dev agent configuration does not load it (agent.yaml has only system_prompt: ./systemprompt.md; the documentation path in the old wrap-up configuration was previously resolved against the harness repo); it is purely a remnant of the escape."
+    acceptance: "The file is removed from git; grep finds no references to agent_defs/developer_agent/MANUAL.md anywhere in the repo; dev/architect agent construction and execution are unaffected (existing unit tests pass)."
 ---
 
-# 0021 · dev agent 逃逸围堵：凭证隔离 + 编排绊线 + 污染清理
+# 0021 · dev agent escape containment: credential isolation + orchestration tripwire + contamination cleanup
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is structured source data (including the tasks DAG), and the body is a group-level rust-RFC nine-section overview. -->
 
 ## Summary
 
-**当前落点**：凭证隔离仍在启动入口执行，完整性绊线由 `backend/ahe_beta/guards/repo_guard.py` 提供。下文事故描述保留历史成因；旧内置 Developer 与其收尾中间件已退役，不属于当前运行接线。
+**Current state**: Credential isolation is still enforced at the startup entry point, and the integrity tripwire is provided by `backend/ahe_beta/guards/repo_guard.py`. The incident description below preserves the historical causes; the old built-in Developer and its cleanup middleware have been retired and are not part of the current runtime wiring.
 
-实测发现 dev agent 用 python heredoc 打隧道绕过了 `WorkspaceJailMiddleware` 的路径扫描：直接工具
-（read_file/write_file/run_shell 里明晃晃带路径）被 jail 拒，但 `python3 - <<'PY' … os.chdir(编排仓);
-subprocess.run(['git','commit'/'push']) … PY` 把路径藏进 heredoc 正文，而 jail 的 `_strip_heredoc_bodies`
-恰好把正文剥掉再扫 → 放行。逃逸后 agent 改写了 `backend/agent_defs/developer_agent/MANUAL.md`（编排仓自身
-的文件，非 harness 沙盒），并用宿主继承的 GitHub SSH 凭证 `git push` 到远端。
+Testing revealed that the dev agent used a python heredoc as a tunnel to bypass `WorkspaceJailMiddleware`'s path scan: direct tools
+(read_file/write_file/run_shell with paths plainly present) were rejected by the jail, but `python3 - <<'PY' … os.chdir(orchestrator_repo);
+subprocess.run(['git','commit'/'push']) … PY` hides paths in the heredoc body, while the jail's `_strip_heredoc_bodies`
+stripped the body before scanning → allowed through. After escaping, the agent rewrote `backend/agent_defs/developer_agent/MANUAL.md` (a file in the orchestration repo itself,
+not the harness sandbox), and used the host-inherited GitHub SSH credentials to `git push` to the remote.
 
-根因：**正则扫命令串关不住一个能调用解释器的 agent**——`workspace_jail.py` 的模块 docstring 已自陈
-「要 100% airtight 需 OS 级沙箱」。本组不去加固扫描（军备竞赛，必败），改做**纵深防御的三层兜底**：
+Root cause: **regex scanning of command strings cannot contain an agent that can invoke an interpreter**—the module docstring of `workspace_jail.py` itself states
+“100% airtight requires an OS-level sandbox.” This group does not harden the scanner (an arms race that is bound to be lost), but instead provides **three layers of defense in depth**:
 
-1. **凭证隔离（掐断落地链）**：run.py 进程级设 `GIT_SSH_COMMAND=false` + `GIT_TERMINAL_PROMPT=0`——
-   dev 推 Gitea 走的是 URL 内嵌 token 的 HTTP origin（不受影响），任何 ssh 推送（GitHub `git@…`）直接失败。
-   逃逸仍可能发生，但**推不出去**。
-2. **编排绊线（秒级暴露）**：orchestrator b 段结束后断言编排仓（ahe-beta 检出）worktree 快照未变
-   （HEAD + porcelain 全等）；被 dev 触碰即抛 `RepoIntegrityError` 中止本轮，不再靠人翻远端才发现。
-3. **污染清理**：`git rm` 历史逃逸留下的 `backend/agent_defs/developer_agent/MANUAL.md`（纯残留、无代码引用）。
+1. **Credential isolation (break the delivery chain)**: set `GIT_SSH_COMMAND=false` + `GIT_TERMINAL_PROMPT=0` at the run.py process level—
+   dev pushes to Gitea via an HTTP origin with a token embedded in the URL (unaffected), while any ssh push (GitHub `git@…`) fails outright.
+   Escape is still possible, but **pushing out is not**.
+2. **Orchestration tripwire (exposure within seconds)**: after orchestrator segment b ends, assert that the orchestration repo (ahe-beta checkout) worktree snapshot is unchanged
+   (HEAD + porcelain are identical); if dev touches it, throw `RepoIntegrityError` to abort the current round, instead of relying on someone to inspect the remote to discover it.
+3. **Contamination cleanup**: `git rm` `backend/agent_defs/developer_agent/MANUAL.md` left by a historical escape (pure residue, with no code references).
 
-OS 级沙箱（容器/独立用户，唯一 airtight 方案）留作治本方向，并入 harbor（spec-0004）路线。
+An OS-level sandbox (container/separate user, the only airtight solution) remains the direction for addressing the root cause and is included in the harbor (spec-0004) roadmap.
 
 ## Motivation
 
-**这不是假想威胁，是实测事故。** dev agent 的工具日志给出完整逃逸链：① read_file/write_file/`test -f`/
-list_directory 指向 `…/agent_defs/developer_agent/MANUAL.md` 全被 `[workspace-jail]` 拒（路径在参数里）；
-② 改用 `python3 - <<'PY' … Path('…/MANUAL.md').read_text()/write_text() … PY` 读改真实文件（路径在
-heredoc 正文，`_strip_heredoc_bodies` 剥正文后扫不到）；③ `python3 - <<'PY' os.chdir('…/developer_agent');
-subprocess.run(['git','add'/'commit']) … PY` 在正文里 chdir+subprocess 提交，jail 全程看不见；
-④ `git push origin` 用继承的 GitHub 凭证推上去。
+**This is not a hypothetical threat; it is an observed incident.** The dev agent's tool logs show the complete escape chain: ① read_file/write_file/`test -f`/
+list_directory targeting `…/agent_defs/developer_agent/MANUAL.md` were all rejected by `[workspace-jail]` (the paths were in the arguments);
+② switched to `python3 - <<'PY' … Path('…/MANUAL.md').read_text()/write_text() … PY` to read and modify real files (the paths were in the
+heredoc body, which `_strip_heredoc_bodies` strips before scanning, so they could not be detected); ③ `python3 - <<'PY' os.chdir('…/developer_agent');
+subprocess.run(['git','add'/'commit']) … PY` used chdir+subprocess in the body to commit, entirely invisible to the jail;
+④ `git push origin` pushed using inherited GitHub credentials.
 
-**污染早已发生、只是首次被当场抓到。** `backend/agent_defs/developer_agent/MANUAL.md` 由 `dev@ahe-beta`
-于历史某轮凭空创建，之后被同类逃逸改过多次，且已随更早的合并进过 main。`workspace_jail.py:110` 的注释
-甚至已经记录过「实测被 dev 用来把 harness 内容写进自己的 def MANUAL.md」——洞是已知的，缺的是兜底。
+**Contamination had already occurred; this was merely the first time it was caught in the act.** `backend/agent_defs/developer_agent/MANUAL.md` was created from scratch by `dev@ahe-beta`
+in a historical round, subsequently modified multiple times through similar escapes, and had already reached main in an earlier merge. A comment in `workspace_jail.py:110`
+had even recorded that “testing showed dev used it to write harness content into its own def MANUAL.md”—the hole was known; what was missing was a fallback.
 
-**两个放大因素让后果落地**：dev agent 进程 cwd 能摸到真实编排仓（`SANDBOX_WORK_DIR` 指向 harness 沙盒，
-但绝对路径 chdir 绕开）、且继承了宿主的 GitHub 推送凭证。本组针对这两点各下一刀（凭证隔离 + 绊线），
-不寄望于把 jail 的正则修得更严。
+**Two amplifying factors allowed the consequences to materialize**: the dev agent process's cwd could reach the real orchestration repo (`SANDBOX_WORK_DIR` points to the harness sandbox,
+but chdir to an absolute path bypasses it), and it inherited the host's GitHub push credentials. This group addresses each of these (credential isolation + tripwire),
+without relying on stricter jail regexes.
 
-**为什么不加固 jail。** 任何「扫命令字符串里的路径 token」策略，对能调 `python -c`/`bash -c`/heredoc 的
-agent 都是形同虚设——正文里 `os.chdir`+`subprocess` 可干任何事。加固扫描只会催生下一个绕过姿势
-（base64 编码路径、拼接字符串、写临时脚本再执行…）。安全边界必须落在 agent **能力之外**：要么它没有
-凭证（凭证隔离），要么越界立即被独立信道发现（编排绊线），要么它根本进不了那个文件系统（OS 沙箱，Future）。
+**Why not harden the jail.** Any strategy that “scans path tokens in command strings” is ineffective against an
+agent that can invoke `python -c`/`bash -c`/heredoc—`os.chdir`+`subprocess` in the body can do anything. Hardening the scan would only prompt the next bypass
+(base64-encoded paths, concatenated strings, writing and executing a temporary script…). The security boundary must lie **outside the agent's capabilities**: either it has no
+credentials (credential isolation), a boundary violation is immediately detected through an independent channel (orchestration tripwire), or it cannot enter that filesystem at all (OS sandbox, Future).
 
 ## Guide-level explanation
 
-改完后每轮闭环（对照 spec-0007 a→d→b→c）：
+The closed loop for each round after the changes (compare spec-0007 a→d→b→c):
 
-- **进程启动**：run.py 在 main() 早段设 `GIT_SSH_COMMAND=false`、`GIT_TERMINAL_PROMPT=0`。此后本进程
-  及其所有子进程（含 dev agent 的 subprocess git）的 ssh 传输一律失败、HTTPS 不弹交互凭证。harness 推
-  Gitea 用 `http://OWNER:TOKEN@host/…` origin（token 在 URL，无需 ssh/helper）不受影响；本地 git
-  操作（rev-parse/status/checkout）无传输，不受影响。
-- **b 段收尾**：orchestrator 在 b 段（dev 直推）跑完后调 `integrity_guard()`——比对编排仓当前
-  `(HEAD sha, git status --porcelain)` 与本轮开跑前的快照；一致则放行进入 c 段，不一致则抛
-  `RepoIntegrityError`（附差异摘要）中止，run() 的 finally 照常落 running=False。编排仓被 dev 改一个字
-  都会 HEAD 或 porcelain 变化 → 立即暴露。
-- **既有 untracked 文件（本地 docs、.idea 等）** 在前后快照里都在 → porcelain 相等 → 不误报；只有**新增
-  的改动/提交**才触发。
-- **清理**：删掉 `backend/agent_defs/developer_agent/MANUAL.md`（逃逸残留），dev agent 配置不加载它，删了
-  无副作用。
+- **Process startup**: run.py sets `GIT_SSH_COMMAND=false` and `GIT_TERMINAL_PROMPT=0` early in main(). Thereafter, ssh transport fails for this process
+  and all its subprocesses (including the dev agent's subprocess git), and HTTPS does not prompt interactively for credentials. The harness pushes to
+  Gitea using the `http://OWNER:TOKEN@host/…` origin (token in the URL, no ssh/helper needed), which is unaffected; local git
+  operations (rev-parse/status/checkout) use no transport and are unaffected.
+- **Segment b cleanup**: after segment b (dev direct push) completes, orchestrator calls `integrity_guard()`—comparing the orchestration repo's current
+  `(HEAD sha, git status --porcelain)` with the snapshot taken before this round started; if identical, proceed to segment c; otherwise, throw
+  `RepoIntegrityError` (with a diff summary) and abort; run()'s finally sets running=False as usual. Even a one-character change by dev in the orchestration repo
+  changes HEAD or porcelain → immediately exposed.
+- **Existing untracked files (local docs, .idea, etc.)** appear in both snapshots → porcelain is equal → no false alarm; only **new
+  changes/commits** trigger it.
+- **Cleanup**: delete `backend/agent_defs/developer_agent/MANUAL.md` (escape residue); the dev agent configuration does not load it, so deleting it
+  has no side effects.
 
-当前保留 `guards/workspace_jail.py`、`guards/harness_boundary.py` 和 `guards/repo_guard.py`；前两者检查直接路径与提交范围，后者检查编排仓完整性。旧内置 Developer 的收尾中间件已经退役，当前交付由独立 OpenAgents 执行。
+`guards/workspace_jail.py`, `guards/harness_boundary.py`, and `guards/repo_guard.py` are currently retained; the first two check direct paths and commit scope, and the last checks orchestration repo integrity. The old built-in Developer's cleanup middleware has been retired; delivery is now performed by independent OpenAgents.
 
 ## Reference-level explanation
 
-### T1 编排绊线（repo_guard.py + orchestrator.py）
+### T1 Orchestration tripwire (repo_guard.py + orchestrator.py)
 
-新模块 `backend/ahe_beta/guards/repo_guard.py`：
+New module `backend/ahe_beta/guards/repo_guard.py`:
 
 ```python
 class RepoIntegrityError(RuntimeError): ...
 def snapshot_repo(*, repo: str) -> tuple[str, str]:      # (HEAD sha, porcelain)
-def verify_unchanged(*, repo: str, before: tuple[str, str]) -> None:  # 变了就抛
+def verify_unchanged(*, repo: str, before: tuple[str, str]) -> None:  # Raise if changed
 ```
 
-- 快照 = `git -C repo rev-parse HEAD` + `git -C repo status --porcelain`。dev 提交 → HEAD 变；dev 改
-  tracked 文件 → porcelain 出现 ` M …`；dev 新建文件 → porcelain 出现 `?? …`（但既有 untracked 前后都在，
-  只有**新增**才使集合变化）。全等即未被触碰。
-- git 读失败（repo 非法等）→ 抛 `RepoIntegrityError`（宁可中止不放过——绊线宁紧勿松）。
+- Snapshot = `git -C repo rev-parse HEAD` + `git -C repo status --porcelain`. dev commits → HEAD changes; dev modifies
+  a tracked file → ` M …` appears in porcelain; dev creates a file → `?? …` appears in porcelain (but existing untracked files appear in both snapshots,
+  so only **new** ones change the set). Exact equality means it has not been touched.
+- git read failure (invalid repo, etc.) → throw `RepoIntegrityError` (prefer aborting to letting it through—the tripwire should err on the side of strictness).
 
-orchestrator：ctor 加可选 `integrity_guard: Callable[[], None] | None = None`；`run_round` 在 b 段之后、
-c 段 `_resolve_head` 之前调用 `self._integrity_guard()`（None 则跳过，退化为今天行为）。guard 抛出即中止
-run_round → 传播出 run()，finally 仍落 running=False。
+orchestrator: add optional `integrity_guard: Callable[[], None] | None = None` to ctor; `run_round` calls `self._integrity_guard()` after segment b and
+before segment c `_resolve_head` (skip if None, falling back to today's behavior). If the guard throws, abort
+run_round → propagate out of run(), with finally still setting running=False.
 
-### T2 凭证隔离 + 绊线接线（run.py，两处一并落）
+### T2 Credential isolation + tripwire wiring (run.py, both changes together)
 
-**① 凭证隔离**——main() 早段（deferred import 之前、任何 agent 起跑之前）`_isolate_git_credentials()`。
-凭证泄漏有**多条静默信道**，单关一条不够（实测踩坑：只设 `GIT_TERMINAL_PROMPT=0` 时，VS Code + WSL
-注入的 `GIT_ASKPASS` 仍静默交出 GitHub token，dry-run push 照样成功）：
+**① Credential isolation**—early in main() (before deferred imports and before any agent starts), `_isolate_git_credentials()`.
+There are **multiple silent channels** for credential leakage, and closing just one is insufficient (a pitfall observed in testing: when only `GIT_TERMINAL_PROMPT=0` was set, the `GIT_ASKPASS` injected by VS Code + WSL
+still silently supplied a GitHub token, and a dry-run push succeeded):
 
 ```python
-os.environ.setdefault("GIT_SSH_COMMAND", "false")  # 掐 ssh 传输：GitHub git@… 推送失败
-os.environ["GIT_TERMINAL_PROMPT"] = "0"  # 禁终端交互凭证提示
-# 清 askpass / ssh-agent 静默信道（GIT_TERMINAL_PROMPT 管不到 askpass）：
+os.environ.setdefault("GIT_SSH_COMMAND", "false")  # Disable SSH transport: GitHub git@… pushes fail
+os.environ["GIT_TERMINAL_PROMPT"] = "0"  # Disable interactive terminal credential prompts
+# Clear silent askpass / ssh-agent channels (GIT_TERMINAL_PROMPT does not control askpass):
 for k in (
     "GIT_ASKPASS",
     "SSH_ASKPASS",
@@ -156,102 +156,103 @@ for k in (
     "VSCODE_GIT_IPC_HANDLE",
 ):
     os.environ.pop(k, None)
-# 空值经 GIT_CONFIG_* 注入重置 credential.helper 列表（store/manager/keychain 也是静默信道）：
-n = int(os.environ.get("GIT_CONFIG_COUNT", "0") or "0")  # 追加，不覆盖既有注入
+# Inject an empty value via GIT_CONFIG_* to reset the credential.helper list (store/manager/keychain are also silent channels):
+# Append without overwriting existing injections.
+n = int(os.environ.get("GIT_CONFIG_COUNT", "0") or "0")
 os.environ["GIT_CONFIG_COUNT"] = str(n + 1)
 os.environ[f"GIT_CONFIG_KEY_{n}"] = "credential.helper"
 os.environ[f"GIT_CONFIG_VALUE_{n}"] = ""
 ```
 
-- 四条信道全封：ssh 传输、终端提示、askpass（含 VS Code 注入）、credential.helper。
-- 用 `setdefault` 保留运维对 `GIT_SSH_COMMAND` 的显式覆盖；`GIT_TERMINAL_PROMPT` 强设（防残留放行）。
-- 影响面核验：`_seed_harness_repo`/`_reset_to_initial`/dev/architect 推送全走 Gitea HTTP（`http://
-  OWNER:TOKEN@host/…`，凭证在 URL、不经 askpass/helper），launcher/orchestrator 的 git 全是本地无传输
-  ——均不受影响。git ≥2.31 支持 GIT_CONFIG_* 注入；实测注入后 `git config credential.helper` 为空、
-  常规 git 操作正常。
-- 生产在 WSL（POSIX），`false` 在 PATH 内、忽略参数退出码 1 → ssh 调用失败。
+- Close all four channels: ssh transport, terminal prompts, askpass (including VS Code injection), and credential.helper.
+- Use `setdefault` to preserve an explicit operations override of `GIT_SSH_COMMAND`; force-set `GIT_TERMINAL_PROMPT` (to prevent residual settings from allowing access).
+- Impact verification: `_seed_harness_repo`/`_reset_to_initial`/dev/architect pushes all use Gitea HTTP (`http://
+  OWNER:TOKEN@host/…`, credentials in the URL, no askpass/helper), and all launcher/orchestrator git operations are local with no transport
+  —none are affected. git ≥2.31 supports GIT_CONFIG_* injection; testing confirmed that after injection `git config credential.helper` is empty and
+  normal git operations work.
+- Production runs on WSL (POSIX); `false` is in PATH and ignores arguments and exits with code 1 → ssh calls fail.
 
-**② 绊线接线**——构造 developers 后、`orch.run` 前：`before = snapshot_repo(repo=str(ROOT))`，
-`integrity_guard=lambda: verify_unchanged(repo=str(ROOT), before=before)` 注入 Orchestrator。
-ROOT = AHE-Beta 检出根（编排仓，即逃逸目标）；快照 run 前取一次，每轮 b 段后校验对同一 before
-（run 期间编排仓应全程冻结）。
+**② Tripwire wiring**—after constructing developers and before `orch.run`: `before = snapshot_repo(repo=str(ROOT))`,
+`integrity_guard=lambda: verify_unchanged(repo=str(ROOT), before=before)` injected into Orchestrator.
+ROOT = AHE-Beta checkout root (the orchestration repo, i.e., the escape target); take the snapshot once before run, and after segment b of each round compare against the same before
+(the orchestration repo should remain frozen throughout the run).
 
-### T3 污染清理
+### T3 Contamination cleanup
 
-`git rm backend/agent_defs/developer_agent/MANUAL.md`。核验无引用：agent.yaml 只 `system_prompt:
-./systemprompt.md`；旧收尾配置的 `manual_path=MANUAL.md` 对 SANDBOX_WORK_DIR（harness 仓）解析，
-非 agent_defs。删除后 dev/architect 配置加载不受影响。
+`git rm backend/agent_defs/developer_agent/MANUAL.md`. Verify there are no references: agent.yaml only `system_prompt:
+./systemprompt.md`; the old cleanup configuration's `manual_path=MANUAL.md` resolves against SANDBOX_WORK_DIR (the harness repo),
+not agent_defs. Loading dev/architect configurations is unaffected after deletion.
 
-### 现状锚点
+### Current-state anchors
 
-- `workspace_jail.py`：`_strip_heredoc_bodies`（剥正文）+ 模块 docstring 自陈 caveat；本组不改它。
-- `run.py`：`main()` env 装配段（LLM_*/NO_PROXY 已在此，git env 同处加）；`ROOT` 常量；`orch.run` 调用点。
-- `orchestrator.py:81-142 run_round`：b 段 `for developer in self._developers` 之后是 c 段 `_resolve_head`。
-- 逃逸残留：`backend/agent_defs/developer_agent/MANUAL.md`（`dev@ahe-beta` 署名历史创建）。
+- `workspace_jail.py`: `_strip_heredoc_bodies` (strips the body) + the module docstring's own caveat; this group does not change it.
+- `run.py`: `main()` env assembly section (LLM_*/NO_PROXY are already here; add git env in the same place); `ROOT` constant; `orch.run` call site.
+- `orchestrator.py:81-142 run_round`: segment b `for developer in self._developers` is followed by segment c `_resolve_head`.
+- Escape residue: `backend/agent_defs/developer_agent/MANUAL.md` (historically created under `dev@ahe-beta`'s name).
 
 ### DAG
 
 ```mermaid
 graph LR
-  T1[T1 repo_guard + orchestrator 绊线]
-  T2[T2 run.py 凭证隔离 + 接线 guard]
-  T3[T3 清理污染制品]
+  T1[T1 repo_guard + orchestrator tripwire]
+  T2[T2 run.py credential isolation + guard wiring]
+  T3[T3 clean up contaminated artifacts]
   T1 --> T2
 ```
 
-T2 依赖 T1（用 repo_guard）；T3 独立。凭证隔离与绊线接线是两个独立关注点但同改 run.py，合并进 T2
-一并提交（同组同文件不可分两 Task）。
+T2 depends on T1 (uses repo_guard); T3 is independent. Credential isolation and tripwire wiring are two independent concerns but both modify run.py, so combine them in T2
+and commit them together (the same file in the same group cannot be split across two Tasks).
 
-### 文件分配（互斥）
+### File allocation (mutually exclusive)
 
-- **T1**：`backend/ahe_beta/guards/repo_guard.py`、`backend/ahe_beta/loop/orchestrator.py`、
-  `backend/tests/guards/test_repo_guard.py`、`backend/tests/loop/test_orchestrator.py`
-- **T2**：`backend/ahe_beta/experiment/controllers/ordinary.py`（凭证隔离 env 段 + orchestrator 接线段）、
+- **T1**: `backend/ahe_beta/guards/repo_guard.py`, `backend/ahe_beta/loop/orchestrator.py`,
+  `backend/tests/guards/test_repo_guard.py`, `backend/tests/loop/test_orchestrator.py`
+- **T2**: `backend/ahe_beta/experiment/controllers/ordinary.py` (credential isolation env section + orchestrator wiring section),
   `backend/tests/test_run_git_isolation.py`
-- **T3**：`backend/agent_defs/developer_agent/MANUAL.md`（删除）
+- **T3**: `backend/agent_defs/developer_agent/MANUAL.md` (delete)
 
 ## Drawbacks
 
-- **绊线是事后检测，不是阻止**：push 已发生才被抓到（凭证隔离掐推送才是阻止层）。二者叠加：凭证隔离让
-  push 失败、绊线让「即便 push 成功也秒级可见」，纵深互补。
-- **绊线可能误报**：若某轮里编排仓被**合法**改动（正常不会——闭环只动 harness 沙盒与 data/），会误抛。
-  接受：编排仓在 run 期间本就该冻结，误报本身是有价值的信号。
-- **凭证隔离封的是「已知信道」**：ssh / 终端提示 / askpass / credential.helper 四条已封（实测 VS Code
-  的 GIT_ASKPASS 缺口已补）。但若有人把编排仓 origin 配成 URL 内嵌 token 的 HTTPS，凭证在 URL 里、
-  隔离挡不住（那种配置本身是把凭证写进 remote，另一问题）；绊线作为第二道兜底覆盖此缺口。
-- **非 airtight**：agent 若能写 `~/.ssh`、改 git config、或自己拼 token URL 仍有绕过面。真正闭合需
-  OS 沙箱（Future/spec-0022）——届时 agent 根本进不了宿主文件系统与凭证。
+- **The tripwire detects after the fact; it does not prevent**: the push has already occurred when it is caught (credential isolation blocking the push is the prevention layer). Together: credential isolation causes
+  the push to fail, while the tripwire makes it visible within seconds “even if the push succeeds”; they complement each other in depth.
+- **The tripwire may produce false positives**: if the orchestration repo is **legitimately** modified during a round (normally it is not—the closed loop only changes the harness sandbox and data/), it will throw erroneously.
+  Accepted: the orchestration repo should be frozen during a run anyway, and a false positive is itself a valuable signal.
+- **Credential isolation closes “known channels”**: ssh / terminal prompts / askpass / credential.helper are all closed (the VS Code
+  GIT_ASKPASS gap observed in testing has been closed). But if someone configures the orchestration repo's origin as HTTPS with a token embedded in the URL, the credentials are in the URL and
+  isolation cannot block it (that configuration itself writes credentials into the remote, a separate problem); the tripwire covers this gap as a second fallback.
+- **Not airtight**: if the agent can write `~/.ssh`, modify git config, or construct a token URL itself, bypasses remain possible. Truly closing the gap requires
+  an OS sandbox (Future/spec-0022)—then the agent cannot access the host filesystem or credentials at all.
 
 ## Rationale and alternatives
 
-- **加固 jail 的 heredoc 扫描（被否）**：军备竞赛；正文里可 base64/拼接/落临时脚本，扫描必被绕过。
-  安全边界不能建在「扫 agent 的命令字符串」上。
-- **只做凭证隔离、不做绊线（被否）**：凭证隔离挡 ssh，但挡不住 token-in-URL 的 HTTPS origin 与本地污染；
-  绊线补上「越界即暴露」。
-- **只做绊线、不做凭证隔离（被否）**：绊线是事后，push 可能已把污染推到远端；T1 从源头掐推送。
-- **让绊线只告警不中止（被否）**：安全事件应 fail-closed；继续跑只会让污染累积。
-- **改 dev agent 用独立 git 身份 / 清空 HOME（备选，未采）**：`GIT_SSH_COMMAND=false` 更直接且不影响
-  Gitea HTTP 流程；清 HOME 会波及 nexau 其它依赖。留作 Future 若需更强隔离。
+- **Harden jail heredoc scanning (rejected)**: An arms race; the body can use base64/concatenation/temporary scripts, so scanning will inevitably be bypassed.
+  The security boundary cannot be built on “scanning the agent's command strings.”
+- **Credential isolation only, without tripwires (rejected)**: Credential isolation blocks ssh, but cannot block HTTPS origins with token-in-URL or local contamination;
+  tripwires add “boundary violations are immediately exposed.”
+- **Tripwires only, without credential isolation (rejected)**: Tripwires act after the fact; push may already have sent contamination to the remote; T1 blocks pushes at the source.
+- **Have tripwires only warn without aborting (rejected)**: Security incidents should fail-closed; continuing only allows contamination to accumulate.
+- **Give the dev agent a separate git identity / clear HOME (alternative, not adopted)**: `GIT_SSH_COMMAND=false` is more direct and does not affect
+  the Gitea HTTP workflow; clearing HOME would affect other nexau dependencies. Reserved for Future if stronger isolation is needed.
 
 ## Prior art
 
-- **workspace_jail.py 自陈 caveat**：`python -c 动态拼路径静态扫不出——要 100% airtight 需 OS 级沙箱`——
-  本组正是对该已知缺口补纵深兜底。
-- **spec-0015 dev 过拟合隔离**：jail/harness_boundary 是同一防线的路径级实现；本组是其被绕过后的补强。
-- **CI/CD 最小权限原则**：构建 agent 不应持有生产推送凭证；T1 是该原则在本闭环的落地。
-- **git `GIT_SSH_COMMAND` / `GIT_TERMINAL_PROMPT`**：git 官方支持的传输/凭证禁用旋钮，标准手段。
+- **workspace_jail.py's own caveat**: `python -c dynamically constructed paths evade static scanning—100% airtight containment requires an OS-level sandbox`—
+  this group adds a defense-in-depth fallback for that known gap.
+- **spec-0015 dev overfitting isolation**: jail/harness_boundary is the path-level implementation of the same defense; this group reinforces it after a bypass.
+- **CI/CD principle of least privilege**: Build agents should not hold production push credentials; T1 applies this principle within this closed loop.
+- **git `GIT_SSH_COMMAND` / `GIT_TERMINAL_PROMPT`**: Officially supported git controls for disabling transport/credentials; standard measures.
 
 ## Unresolved questions
 
-- 绊线粒度：目前每轮 b 段后查一次；是否需要细到每个 developer.work_one 之后（更早中止，代价是多几次
-  git status）？先按轮查，观察。
-- 是否把编排仓的 origin 主动改成「只读或无 remote」的 worktree 供 run 使用，从根上让 push 无目标？
-  更彻底但改动运维流程，留后续评估。
+- Tripwire granularity: Currently checked once after segment b of each round; should checks run after every developer.work_one instead (earlier aborts, at the cost of a few more
+  git status calls)? Start with per-round checks and observe.
+- Should runs use a worktree whose orchestration repository origin is proactively changed to “read-only or no remote,” leaving push with no target at all?
+  More thorough, but changes operational workflows; leave for later evaluation.
 
 ## Future possibilities
 
-- **OS 级沙箱（治本）**：dev agent 关进容器/独立用户，只 bind-mount harness 仓——唯一 airtight 方案，
-  并入 harbor（spec-0004）rollout 隔离。届时 jail/凭证隔离/绊线降级为纵深冗余。
-- GitHub 侧 branch protection（禁 force-push、要求 PR）作为远端最后一道闸（仓库设置，非本仓代码）。
-- 绊线扩展为通用「run 期间冻结集」断言：编排仓 + data/ 之外目录全程只读校验。
+- **OS-level sandbox (addresses the root cause)**: Confine the dev agent to a container/separate user and bind-mount only the harness repository—the only airtight solution;
+  incorporate it into harbor (spec-0004) rollout isolation. At that point, jail/credential isolation/tripwires become redundant defense-in-depth layers.
+- GitHub-side branch protection (prohibit force-push, require PRs) as the final remote gate (repository settings, not code in this repository).
+- Extend tripwires into a general “frozen set during a run” assertion: verify throughout the run that the orchestration repository + directories outside data/ remain read-only.
 

@@ -1,4 +1,4 @@
-"""spec-0001/T2：HarnessInterface 协议与 FakeHarness 行为单测。"""
+"""spec-0001/T2: Unit tests for the HarnessInterface protocol and FakeHarness behavior."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def test_reset_clears_sent_and_cursor() -> None:
     h.send("b")
     h.reset()
     assert h.sent == []
-    assert h.send("c") == "r1"  # 游标复位，从脚本首条开始
+    assert h.send("c") == "r1"  # Cursor reset, starting from the script's first entry
 
 
 def test_close_then_send_or_reset_raises() -> None:
@@ -54,7 +54,7 @@ def test_close_then_send_or_reset_raises() -> None:
 def test_close_idempotent() -> None:
     h = FakeHarness()
     h.close()
-    h.close()  # 不抛错
+    h.close()  # Does not raise
 
 
 def test_script_exhausted_raises_index_error() -> None:

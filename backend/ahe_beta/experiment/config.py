@@ -1,4 +1,4 @@
-# Spec-0047/T2：实验配置、路径派生与 fail-closed 校验。
+# Spec-0047/T2: Experiment configuration, path derivation, and fail-closed validation.
 """Spec-0071/T3: strict public v2 configuration and shared identity helpers."""
 
 from __future__ import annotations
@@ -21,7 +21,9 @@ class ConfigError(ValueError):
 def validate_experiment_id(*, raw: str) -> str:
     text = raw.strip()
     if not _ID_RE.fullmatch(text) or len(text) > _ID_MAX:
-        raise ConfigError(f"experiment_id 非法 {raw!r}：仅小写字母数字与单连字符，最长 {_ID_MAX}")
+        raise ConfigError(
+            f"Invalid experiment_id {raw!r}: use lowercase letters, digits and single hyphens; maximum length {_ID_MAX}"
+        )
     return text
 
 

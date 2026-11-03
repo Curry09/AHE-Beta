@@ -83,6 +83,48 @@ def test_archive_content_cannot_be_silently_rewritten(tmp_path):
     assert any("Frozen archive content changed" in e for e in checker.inventory_errors(tmp_path))
 
 
+def test_declared_english_translation_retains_source_and_locks_translated_bytes(tmp_path):
+    archived = inventory(tmp_path)
+    manifest_path = tmp_path / "research/inventory.json"
+    manifest = json.loads(manifest_path.read_text())
+    row = manifest["files"][0]
+    original_sha = row["source_sha256"]
+    archived.write_text("English translation of the original research notes\n")
+    row["translation"] = {"language": "en", "source_sha256": original_sha}
+    row["destination_sha256"] = hashlib.sha256(archived.read_bytes()).hexdigest()
+    manifest_path.write_text(json.dumps(manifest))
+    assert checker.inventory_errors(tmp_path) == []
+    assert row["source_sha256"] == original_sha
+    archived.write_text("Unrecorded changes to the English translation\n")
+    assert any("Frozen archive content changed" in e for e in checker.inventory_errors(tmp_path))
+
+
+@pytest.mark.parametrize("invalid", [None, "0" * 64, "not-a-digest"])
+def test_archive_translation_requires_valid_destination_digest(tmp_path, invalid):
+    inventory(tmp_path)
+    path = tmp_path / "research/inventory.json"
+    manifest = json.loads(path.read_text())
+    row = manifest["files"][0]
+    row["translation"] = {"language": "en", "source_sha256": row["source_sha256"]}
+    row["destination_sha256"] = invalid
+    path.write_text(json.dumps(manifest))
+    # An arbitrary digest is rejected either by provenance or by the byte check.
+    assert checker.inventory_errors(tmp_path)
+
+
+def test_archive_translation_cannot_reassign_the_original_source(tmp_path):
+    inventory(tmp_path)
+    path = tmp_path / "research/inventory.json"
+    manifest = json.loads(path.read_text())
+    row = manifest["files"][0]
+    row["translation"] = {"language": "en", "source_sha256": "0" * 64}
+    row["destination_sha256"] = row["source_sha256"]
+    path.write_text(json.dumps(manifest))
+    assert any(
+        "Invalid archive translation provenance" in e for e in checker.inventory_errors(tmp_path)
+    )
+
+
 def test_historical_readme_also_requires_provenance(tmp_path):
     inventory(tmp_path)
     unlisted = tmp_path / "research/archives/another/README.md"

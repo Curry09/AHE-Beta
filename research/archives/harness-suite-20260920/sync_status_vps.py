@@ -26,11 +26,11 @@ ROOT = Path(__file__).resolve().parents[2]
 def experiment_name(run_id: str) -> str:
     """Stable human label derived from the frozen local run receipt."""
     if run_id.startswith("probe-"):
-        return "内部探针（隐藏）"
+        return "Internal probe（Hidden）"
     if run_id == "20260922T045045Z-5bb0a2":
         return "Scaling N=1（latency recovery）"
     if run_id == "20260921T220110Z-33a8ee":
-        return "N1 旧版失败运行（隐藏）"
+        return "N1 Legacy failed run（Hidden）"
     for path in (ROOT / "evaluation" / "harness-suite-20260920" / "runs").rglob("state.json"):
         try:
             value = json.loads(path.read_text(encoding="utf-8"))
@@ -40,21 +40,21 @@ def experiment_name(run_id: str) -> str:
             continue
         experiment_id = str(value.get("experiment_id") or "")
         if experiment_id.startswith("n16-kimi"):
-            return "模型对比实验(KIMI) N=16"
+            return "Model comparison experiment(KIMI) N=16"
         if experiment_id.startswith("n16-all-gpt6-luna"):
-            return "模型对比实验(GPT-6 Luna) N=16"
+            return "Model comparison experiment(GPT-6 Luna) N=16"
         if experiment_id.startswith("n16-") and "model" in experiment_id:
-            return "模型对比实验 N=16"
+            return "Model comparison experiment N=16"
         n = value.get("n")
         if n and "-r5-design-r6-users-" in experiment_id:
-            return f"Scaling N={n}（补跑设计开发＋第6轮）"
+            return f"Scaling N={n}（Additional design and development run＋Round 6 Round）"
         if n:
-            return f"Scaling N={n}（5轮混合实验）"
+            return f"Scaling N={n}（5 Round mixed experiment）"
         identity = value.get("identity") or {}
         experiment_id = str(identity.get("experiment_id") or "")
         if experiment_id:
             return experiment_id
-    return "未标注实验"
+    return "Unlabeled experiment"
 
 
 def _kv(path: Path) -> dict[str, str]:
@@ -166,7 +166,7 @@ def api_sources(env_text: str) -> dict[str, str]:
         elif host == "openrouter.ai":
             source = "OpenRouter"
         else:
-            source = "未知"
+            source = "Unknown"
         endpoints[allowed[key.strip()]] = source
     return endpoints
 
@@ -185,7 +185,7 @@ def _normalized_state(value: dict | None, *, default: str = "pending") -> str:
     raw = str(value.get("status") or "").strip().lower()
     if bool(value.get("running")) or raw in {"running", "in_progress", "active"}:
         return "running"
-    if raw in {"failed", "error", "timeout", "timed_out", "失败", "超时"}:
+    if raw in {"failed", "error", "timeout", "timed_out", "Failed", "timeout"}:
         return "failed"
     if raw in {
         "completed",
@@ -194,8 +194,8 @@ def _normalized_state(value: dict | None, *, default: str = "pending") -> str:
         "finished",
         "success",
         "succeeded",
-        "已完成",
-        "完成",
+        "Completed",
+        "Completed",
     }:
         return "finished"
     return default

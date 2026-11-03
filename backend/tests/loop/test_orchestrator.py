@@ -1,9 +1,9 @@
-# Spec-0032/T4：Orchestrator 需求面编排单测——会话级 main SHA 快照 + 生成两拍 + Owner 准入；dev 拍退役。
-"""mock launcher + 临时 git 仓：
+# Spec-0032/T4: Orchestrator demand-plane orchestration unit test—session-level main SHA snapshot + two generation beats + Owner admission; dev beat retired.
+"""mock launcher + temporary git repo:
 
-- 每局 launch 的 ref 解析自 harness 仓 main 当前 HEAD SHA；
-- 交付面（进程外 vigil）推进 main 由「会话中直接 commit 模拟」——c 步回灌读到前进的 live SHA；
-- 生成段两拍（triage 分片∥divergent → architect）→ Owner 准入 → 绊线，无 b 段 dev 拍。
+- Each session's launch ref is resolved from the current HEAD SHA of main in the harness repo;
+- Delivery plane (out-of-process vigil) advances main via "direct commit simulation during session"—step c feeds back the live SHA advancement read;
+- Generation stage: two beats (triage shard ∥ divergent → architect) → Owner admission → tripwire, no dev beat in segment b.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def _seed_repo(tmp_path: Path) -> Path:
-    """只含 main 的本地 harness 仓（trunk 模型，无 release）。"""
+    """Local harness repo containing only main (trunk model, no release branches)."""
     repo = tmp_path / "harness"
     repo.mkdir()
     subprocess.run(["git", "init", "-b", "main", str(repo)], check=True, capture_output=True)
@@ -42,7 +42,7 @@ def _seed_repo(tmp_path: Path) -> Path:
 
 
 def _advance_main(repo: Path, n: int) -> None:
-    """模拟交付面（进程外 vigil merge）推进 main：直接落一个 commit。"""
+    """Simulate delivery plane (out-of-process vigil merge) advancing main: directly commit one change."""
     (repo / "f").write_text(f"advanced {n}\n", encoding="utf-8")
     _git(repo, "commit", "-am", f"delivery advance {n}")
 
@@ -93,9 +93,9 @@ def test_round_launches_main_head_sha(tmp_path) -> None:
     events: list = []
     orch = _orch(repo, events, fixed_k=2)
 
-    out = orch.run_round("ignored-cursor")  # 传入游标被忽略，解析 live main
-    assert out == head  # 无交付面推进 → 回灌仍是当前 main HEAD
-    # a 段两局都按 main HEAD SHA launch（非 release_ref/tag）
+    out = orch.run_round("ignored-cursor")  # Incoming cursor is ignored, resolve live main
+    assert out == head  # No delivery plane advancement → feedback remains current main HEAD
+    # Both launches in phase a use main HEAD SHA (not release_ref/tag)
     assert events == [
         ("launch", head),
         ("session", head),
@@ -108,18 +108,18 @@ def test_no_delivery_keeps_main_latest(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
     head = _git(repo, "rev-parse", "main")
     orch = _orch(repo, [])
-    assert orch.run_round("c") == head  # 下一局仍取 main 最新（未变）
+    assert orch.run_round("c") == head  # Next session still takes latest main (unchanged)
 
 
 def test_external_delivery_advances_cursor(tmp_path) -> None:
-    """交付面在轮中推进 main（进程外 vigil merge 的等价模拟）→ c 步回灌读到前进的 SHA。"""
+    """Delivery surface advances main within the round (out-of-process equivalent simulation of vigil merge) → step c feeds back the SHA of the advanced position."""
     repo = _seed_repo(tmp_path)
     head_before = _git(repo, "rev-parse", "main")
     events: list = []
 
     def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
         events.append(("session", harness[1]))
-        _advance_main(repo, 1)  # 会话期间交付面合并落 main
+        _advance_main(repo, 1)  # Delivery surface merges into main during the session
 
     orch = Orchestrator(
         launcher=_Launcher(events),
@@ -129,8 +129,10 @@ def test_external_delivery_advances_cursor(tmp_path) -> None:
         initial_ref="main",
     )
     out = orch.run_round("c")
-    assert ("launch", head_before) in events  # a 段按起始 SHA launch（会话级快照）
-    assert out == _git(repo, "rev-parse", "main") != head_before  # 回灌 = 前进后的 live main
+    # Segment a launches from the initial SHA (session-level snapshot)
+    assert ("launch", head_before) in events
+    # Feedback = live main after advancing
+    assert out == _git(repo, "rev-parse", "main") != head_before
 
 
 def test_run_resolves_live_main_each_round(tmp_path) -> None:
@@ -141,7 +143,7 @@ def test_run_resolves_live_main_each_round(tmp_path) -> None:
     def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
         events.append(("session", harness[1]))
         counter["n"] += 1
-        _advance_main(repo, counter["n"])  # 每轮交付面各推进一次
+        _advance_main(repo, counter["n"])  # Delivery surface advances once per round
 
     orch = Orchestrator(
         launcher=_Launcher(events),
@@ -152,18 +154,17 @@ def test_run_resolves_live_main_each_round(tmp_path) -> None:
     )
     refs = orch.run(3)
     launched = [e[1] for e in events if e[0] == "launch"]
-    assert len(launched) == 3  # 三轮各一次 launch
-    assert len(set(refs)) == 3  # 每轮回灌 SHA 前进、互不相同
-    # 第 k+1 轮按第 k 轮回灌的 SHA launch（next 局取到上轮交付面推进后的 main）
+    assert len(launched) == 3  # Launch occurs once per round across three rounds
+    assert len(set(refs)) == 3  # Feedback SHA advances each round and is unique across rounds
+    # Round k+1 launches from the SHA that the delivery plane advanced to in round k (next session receives main as advanced by the previous round's delivery plane)
     assert launched[1:] == refs[:2]
 
 
-# Spec-0033/T3：游标改跟 origin/main——server-side merge 后本地 main 不再是真身。
+# Spec-0033/T3: cursor follows origin/main—after server-side merge, local main is no longer the source of truth.
 
 
 def _seed_with_origin(tmp_path: Path) -> tuple[Path, Path]:
-    """本地 harness 仓 + bare origin：返回 (repo, writer)。writer 是另一份 clone，模拟交付面
-    （vigil worker）向 origin 推进 main——本地 repo 不知情，恰是 spec-0032 后的真实拓扑。"""
+    """Local harness repo + bare origin: returns (repo, writer). writer is another clone simulating the delivery surface (vigil worker) advancing main on origin—the local repo is unaware, which is the actual topology after spec-0032."""
     repo = _seed_repo(tmp_path)
     bare = tmp_path / "origin.git"
     subprocess.run(
@@ -177,7 +178,7 @@ def _seed_with_origin(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_cursor_follows_origin_main_after_remote_merge(tmp_path) -> None:
-    """交付面在 origin 上推进 main（本地仓不知情）→ 游标解析到新 SHA，launcher 也按新 SHA 起。"""
+    """Delivery surface advances main on origin (local repo unaware) → cursor resolves to the new SHA, launcher also starts from the new SHA."""
     repo, writer = _seed_with_origin(tmp_path)
     (writer / "f").write_text("merged by vigil\n", encoding="utf-8")
     _git(writer, "commit", "-am", "delivery merge on origin")
@@ -187,12 +188,13 @@ def test_cursor_follows_origin_main_after_remote_merge(tmp_path) -> None:
     events: list = []
     orch = _orch(repo, events)
     out = orch.run_round("c")
-    assert out == remote_head  # 游标 = origin/main（非停滞的本地 seed）
-    assert ("launch", remote_head) in events  # fetch 已取回对象，launcher 按新 SHA 起
+    assert out == remote_head  # Cursor = origin/main (non-stalled local seed)
+    # Fetch has retrieved objects, launcher starts from new SHA
+    assert ("launch", remote_head) in events
 
 
 def test_cursor_falls_back_to_local_when_origin_unreachable(tmp_path) -> None:
-    """origin 不可达（离线）→ 告警不抛，退化解析本地 main（游标停滞但闭环不废）。"""
+    """Origin unreachable (offline) → alarm is not raised, parsing degrades to local main (cursor stalls but the loop is not broken)."""
     repo = _seed_repo(tmp_path)
     _git(repo, "remote", "add", "origin", str(tmp_path / "no-such-remote.git"))
     head = _git(repo, "rev-parse", "main")
@@ -200,11 +202,11 @@ def test_cursor_falls_back_to_local_when_origin_unreachable(tmp_path) -> None:
 
 
 def test_cursor_refuses_stale_remote_tracking_head_after_fetch_failure(tmp_path) -> None:
-    """已有 origin/main 但 fetch 失败时，不能静默使用可能过期的远端跟踪游标。"""
+    """When origin/main exists but fetch fails, cannot silently use a possibly stale remote-tracking cursor."""
     repo, _writer = _seed_with_origin(tmp_path)
     _git(repo, "remote", "set-url", "origin", str(tmp_path / "missing-origin.git"))
 
-    with pytest.raises(RuntimeError, match="拒绝使用可能过期"):
+    with pytest.raises(RuntimeError, match="refusing to use a potentially stale"):
         _orch(repo, []).run_round("c")
 
 
@@ -214,20 +216,22 @@ def test_run_nonpositive_raises(tmp_path) -> None:
         _orch(repo, []).run(0)
 
 
-# Spec-0017/T3：a 段并行化——线程池并发跑会话、单会话异常不废整轮。
+# Spec-0017/T3: segment a parallelization—thread pool concurrently runs sessions, single-session exceptions do not break the round.
 
 
 def test_parallel_sessions_all_run(tmp_path) -> None:
-    """max_parallel_users=4 并发 8 局：全部会话都跑到。"""
+    """max_parallel_users=4 concurrent with 8 sessions: all sessions run to completion."""
     import threading
 
     repo = _seed_repo(tmp_path)
     events: list = []
     lock = threading.Lock()
-    barrier = threading.Barrier(4)  # 4 个 worker 齐射，证明确实并发（串行会在此死锁超时）
+    # 4 workers fire together, proving actual concurrency (serial execution would deadlock here with timeout)
+    barrier = threading.Barrier(4)
 
     def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
-        barrier.wait(timeout=10)  # 若实际串行（并发度<4），首局在此卡死 → BrokenBarrierError
+        # If actually serial (concurrency < 4), first session stalls here → BrokenBarrierError
+        barrier.wait(timeout=10)
         with lock:
             events.append(("session", scenario.description))
 
@@ -242,18 +246,18 @@ def test_parallel_sessions_all_run(tmp_path) -> None:
     orch.run_round("c")
 
     sessions = [e for e in events if e[0] == "session"]
-    assert len(sessions) == 8  # 8 局全部跑到
+    assert len(sessions) == 8  # All 8 sessions run to completion
     assert {d for _, d in sessions} == {f"s{i}" for i in range(8)}
 
 
 def test_parallel_one_session_failure_does_not_kill_round(tmp_path) -> None:
-    """单会话抛异常（launch/落盘类意外）：记日志跳过，其余会话正常完成。"""
+    """Single session raises exception (launch/persistence anomaly): log and skip, remaining sessions complete normally."""
     repo = _seed_repo(tmp_path)
     events: list = []
 
     def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
         if scenario.description == "s1":
-            raise RuntimeError("这局炸了")
+            raise RuntimeError("This round crashed")
         events.append(("session", scenario.description))
 
     head = _git(repo, "rev-parse", "main")
@@ -265,14 +269,15 @@ def test_parallel_one_session_failure_does_not_kill_round(tmp_path) -> None:
         initial_ref="main",
         max_parallel_users=2,
     )
-    out = orch.run_round("c")  # 不抛 → 轮未被单会话失败废掉
+    out = orch.run_round("c")  # Does not raise → round is not broken by single session failure
 
     assert out == head
-    assert {d for k, d in events if k == "session"} == {"s0", "s2"}  # 其余会话都完成
+    # Remaining sessions all complete
+    assert {d for k, d in events if k == "session"} == {"s0", "s2"}
 
 
 def test_all_user_sessions_failed_blocks_round(tmp_path) -> None:
-    """所有会话都失败时，不能继续进入生成/准入并推进下一轮。"""
+    """When all sessions fail, must not continue into generation/admission and advance to the next round."""
     from ahe_beta.loop.round_gate import RoundDeliveryBlocked
 
     repo = _seed_repo(tmp_path)
@@ -292,11 +297,11 @@ def test_all_user_sessions_failed_blocks_round(tmp_path) -> None:
 
 
 def test_parallel_default_is_serial_equivalent(tmp_path) -> None:
-    """缺省 max_parallel_users=1：事件顺序与旧串行完全一致（回归基线，见 0017 acceptance）。"""
+    """Default max_parallel_users=1: event order is identical to old serial behavior (regression baseline, see 0017 acceptance)."""
     repo = _seed_repo(tmp_path)
     head = _git(repo, "rev-parse", "main")
     events: list = []
-    orch = _orch(repo, events, fixed_k=2)  # _orch 不传 max_parallel_users → 默认 1
+    orch = _orch(repo, events, fixed_k=2)  # _orch does not pass max_parallel_users → defaults to 1
 
     orch.run_round("c")
     assert events == [
@@ -304,10 +309,11 @@ def test_parallel_default_is_serial_equivalent(tmp_path) -> None:
         ("session", head),
         ("launch", head),
         ("session", head),
-    ]  # 逐局 launch→session 交替，与并行化之前的串行时序一致
+        # Alternating launch→session per session, consistent with serial timing before parallelization
+    ]
 
 
-# Spec-0008/T1 v2：共享工作区——每局先于 launch materialize，同一目录同时喂 launch 与 run_session。
+# Spec-0008/T1 v2: shared workspace—each session materializes before launch, same directory feeds both launch and run_session.
 class _WsLauncher:
     def __init__(self, events: list) -> None:
         self._events = events
@@ -342,14 +348,14 @@ def test_round_materializes_shared_workspace_before_launch(tmp_path, monkeypatch
     )
     orch.run_round("c")
 
-    # 顺序：materialize 早于 launch；launch 与 session 收到同一个 workspace_dir。
+    # Ordering: materialize before launch; launch and session receive the same workspace_dir.
     assert events[0] == ("materialize", "billing-split")
     assert events[1][0] == "launch" and events[1][1].cwd == "/ws/billing-split"
     assert events[2][0] == "session" and events[2][1] is events[1][1]
 
 
 def test_round_ensures_deps_after_materialize_before_launch(tmp_path, monkeypatch) -> None:
-    # Spec-0009/T3：依赖供给 hook 落在 materialize 之后、launch 之前；无工作区时不调。
+    # Spec-0009/T3: Dependency provisioning hook runs after materialize and before launch; not invoked when workspace is absent.
     repo = _seed_repo(tmp_path)
     events: list = []
     monkeypatch.setattr(
@@ -381,25 +387,25 @@ def test_round_ensures_deps_after_materialize_before_launch(tmp_path, monkeypatc
 
 
 def test_round_no_workspace_skips_ensure_deps(tmp_path, monkeypatch) -> None:
-    # 无工作区 → materialize 与 ensure_deps 都不该被调用。
+    # No workspace → neither materialize nor ensure_deps should be called.
     repo = _seed_repo(tmp_path)
     monkeypatch.setattr(
         "ahe_beta.loop.orchestrator.ensure_deps",
-        lambda ws, spec: (_ for _ in ()).throw(AssertionError("不应 ensure_deps")),
+        lambda ws, spec: (_ for _ in ()).throw(AssertionError("Should not ensure_deps")),
     )
-    orch = _orch(repo, [])  # fixed_set 场景无 workspace
-    orch.run_round("c")  # 不抛即通过
+    orch = _orch(repo, [])  # fixed_set scenario has no workspace
+    orch.run_round("c")  # Passing = no exception raised
 
 
 def test_round_no_workspace_uses_shared_scratch(tmp_path, monkeypatch) -> None:
-    # 纯文本卡（workspace=None）也开一个空的共享 scratch：不 materialize fixture，但 launch 与
-    # session 拿到**同一个**非空目录——确保用户 agent 落到 harness 同一工作目录真核实，
-    # 而非只凭 harness 回复"嘴上验"。
+    # Plain-text card (workspace=None) opens an empty shared scratch: do not materialize fixture, but launch and
+    # session receives the **same** non-empty directory—ensuring user agent lands in harness working directory for real verification,
+    # not merely by harness claiming verification in its reply.
     repo = _seed_repo(tmp_path)
     events: list = []
-    monkeypatch.setattr(  # 无 fixture 工作区时绝不该调 materialize
+    monkeypatch.setattr(  # materialize must never be called for workspace without fixture
         "ahe_beta.loop.orchestrator.materialize_workspace",
-        lambda spec: (_ for _ in ()).throw(AssertionError("不应 materialize")),
+        lambda spec: (_ for _ in ()).throw(AssertionError("Should not materialize")),
     )
 
     def run_session_fn(persona, scenario, harness, *, workspace_dir=None):
@@ -416,10 +422,11 @@ def test_round_no_workspace_uses_shared_scratch(tmp_path, monkeypatch) -> None:
 
     launch_ws = next(ws for kind, ws in events if kind == "launch")
     session_ws = next(ws for kind, ws in events if kind == "session")
-    assert launch_ws is not None and launch_ws == session_ws  # harness 与用户 agent 同一目录
+    # harness and user agent in the same directory
+    assert launch_ws is not None and launch_ws == session_ws
 
 
-# Spec-0021/T1（Spec-0032/T4 调整）：编排仓完整性绊线——每轮末调用一次；抛出即中止本轮（fail-closed）。
+# Spec-0021/T1 (Spec-0032/T4 adjustment): orchestration repository integrity guard rail—invoked once at end of each round; raising it aborts the round (fail-closed).
 
 
 def test_integrity_guard_called_once_at_round_end(tmp_path) -> None:
@@ -432,7 +439,7 @@ def test_integrity_guard_called_once_at_round_end(tmp_path) -> None:
     orch = _orch(repo, events, integrity_guard=guard)
     orch.run_round("c")
 
-    # guard 在会话之后、返回前恰调一次
+    # guard called exactly once after session, before return
     assert [k for k, *_ in events].count("guard") == 1
     assert events[-1] == ("guard", None)
 
@@ -443,25 +450,25 @@ def test_integrity_guard_raise_aborts_round(tmp_path) -> None:
     repo = _seed_repo(tmp_path)
 
     def guard() -> None:
-        raise RepoIntegrityError("编排仓被动了")
+        raise RepoIntegrityError("Orchestration repository was modified")
 
     orch = _orch(repo, [], integrity_guard=guard)
-    with pytest.raises(RepoIntegrityError):  # 安全事件 fail-closed，向上传播中止
+    with pytest.raises(RepoIntegrityError):  # security events fail-closed, propagate abort upward
         orch.run_round("c")
 
 
 def test_no_guard_is_backward_compatible(tmp_path) -> None:
-    """不传 integrity_guard → 行为与今天完全一致（退化）。"""
+    """integrity_guard not passed → behavior identical to today (degraded mode)."""
     repo = _seed_repo(tmp_path)
     head = _git(repo, "rev-parse", "main")
     assert _orch(repo, []).run_round("c") == head
 
 
-# Spec-0029/T8（Spec-0032/T4 调整）：生成段两拍（triage 分片∥divergent → architect）→ Owner 准入收尾。
+# Spec-0029/T8 (Spec-0032/T4 adjustment): generation stage with two beats (triage shard ∥ divergent → architect) → Owner admission to finish.
 
 
 class _Phase:
-    """记录自己被调用的时刻（往共享 events 里打一条）；shard 也记录（分片断言用）。"""
+    """Record the moment this is invoked (write one entry to shared events); shard also records (for shard assertions)."""
 
     def __init__(self, events: list, name: str) -> None:
         self._events = events
@@ -503,11 +510,11 @@ def test_beats_order_triage_divergent_then_architect_then_owner(tmp_path) -> Non
     orch.run_round("c")
 
     kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d")]
-    # a → 第一拍（triage×2∥divergent，组内顺序不定）→ 第二拍 architect → owner 收尾（无 dev 拍）
+    # a → first beat (triage×2 ∥ divergent, order within group undefined) → second beat architect → owner conclusion (no dev beat)
     assert kinds[0] == "session"
     assert set(kinds[1:4]) == {"triage0", "triage1", "divergent"}
     assert kinds[4:] == ["architect", "owner"]
-    # 分片参数：第 k 个 triager 拿 (k, n)
+    # shard parameters: the k-th triager receives (k, n)
     shards = {e[1]: e[2] for e in events if e[0] == "d" and e[1].startswith("triage")}
     assert shards == {"triage0": (0, 2), "triage1": (1, 2)}
 
@@ -551,7 +558,7 @@ def test_no_owner_skips_admission(tmp_path) -> None:
         initial_ref="main",
         triagers=[_Phase(events, "triage")],
     )
-    orch.run_round("c")  # owner=None 不炸、准入段跳过
+    orch.run_round("c")  # owner=None does not raise; admission stage is skipped
     kinds = [e[1] if e[0] == "d" else e[0] for e in events if e[0] in ("session", "d")]
     assert kinds == ["session", "triage"]
 
@@ -591,7 +598,7 @@ def test_run_binds_round_context_for_each_round() -> None:
 
 
 def test_callable_session_plan_redraws_each_round(tmp_path) -> None:
-    """fixed_set 为 callable 时每轮重抽 session 计划。"""
+    """When fixed_set is callable, resample session plan each round."""
     repo = _seed_repo(tmp_path)
     events: list = []
     calls = {"n": 0}
@@ -615,7 +622,7 @@ def test_callable_session_plan_redraws_each_round(tmp_path) -> None:
     assert [e[1] for e in events if e[0] == "session"] == ["r1", "r2"]
 
 
-# Spec-0050/T3：末轮只用户；闸失败不开下一轮用户。
+# Spec-0050/T3: final round user-only; gate failure does not open next user round.
 
 
 class _AdmitOwner:

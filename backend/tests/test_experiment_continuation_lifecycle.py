@@ -501,9 +501,9 @@ def test_resume_after_triage_reuses_frozen_projection_and_native_install(
                             "priority": "P1",
                             "proposal_title": "Investigated",
                             "fields": {
-                                "根因区域": "harness fails to report progress",
-                                "边界": "general harness capability",
-                                "验收": "progress is visible",
+                                "root_cause": "harness fails to report progress",
+                                "boundary": "general harness capability",
+                                "acceptance": "progress is visible",
                             },
                             "artifact": {
                                 "reported_problem": "Task stalled",
@@ -575,6 +575,14 @@ def test_resume_real_triager_reuses_saved_model_output_after_failed_side_effect(
                             "issue": pending[0].number,
                             "disposition": "reject",
                             "reason": "outside product scope",
+                            "artifact": {
+                                "reported_problem": "No visible progress",
+                                "user_impact": "The user cannot verify completion",
+                                "scope_boundary": "outside product scope",
+                                "evidence": [f"report:#{pending[0].number}"],
+                                "uncertainties": [],
+                                "implementation_target": "outside_harness",
+                            },
                         }
                     ]
                 }

@@ -1,36 +1,36 @@
-# Persona Card Schema — 唯一公共契约 (hub)
+# Persona Card Schema — Sole Public Contract (hub)
 
-<!-- Spec-0037/T3: D7 time_temperament + supervision/on_offtrack 语义注记；与 0006/T1 轮辐契约并存演进 -->
+<!-- Spec-0037/T3: D7 time_temperament + supervision/on_offtrack semantic note; co-evolves with the 0006/T1 spoke contract -->
 
-> 本文件是 persona 蒸馏侧的 **唯一 source-agnostic 公共契约**。所有「薄抽取 skill」（spoke，
-> 如 `extract-selfreport-persona/`、`extract-github-persona/` / `extract-stackoverflow-persona/`）
-> 只描述「从某类来源提取 + ground 哪几维」，**枚举 / 词表 / 卡形状 / 注入分布 / 真实性门原则一律引用本文件**，
-> 彼此不依赖。契约改一处，全员生效；加新来源只是新增一个薄 skill，不碰别人。
+> This file is the **sole source-agnostic public contract** on the persona distillation side. All “thin extraction skills” (spokes,
+> such as `extract-selfreport-persona/`, `extract-github-persona/` / `extract-stackoverflow-persona/`)
+> describe only “what to extract from a given source type + which dimensions to ground”; **enumerations / vocabularies / card shape / injection distribution / authenticity gate principles must all reference this file**,
+> and must not depend on one another. Change the contract in one place and it takes effect for everyone; adding a new source only adds a thin skill and does not touch the others.
 >
-> 对应 spec：`docs/specs/0006-persona-pipeline.md`（T1 采集、T2 注入 sim）；人轴语义演进见
-> `docs/specs/0037-persona-time-temperament-reframe.md`（D7 / 过程卷入 / 质量失败 ⊥ 等待）。
-> 卡 → sim `dimensions.Persona` 的注入映射归 `0006/T2` + `0037/T4`（`card_to_persona`），不在本契约内。
+> Corresponding spec: `docs/specs/0006-persona-pipeline.md` (T1 collection, T2 injection sim); human-axis semantic evolution is documented in
+> `docs/specs/0037-persona-time-temperament-reframe.md` (D7 / process involvement / quality failure ⊥ waiting).
+> The injection mapping for card → sim `dimensions.Persona` is defined by `0006/T2` + `0037/T4` (`card_to_persona`), and is outside this contract.
 
-## 铁律
+## Non-negotiable Rules
 
-1. **轮辐式**：本文件是 hub，抽取 skill 是 spoke。spoke 只依赖本契约，**spoke 之间彼此不依赖**
-   （杜绝 skill→skill 引用与多副本 schema 漂移）。
-2. **证据或弃**：每个 grounded 维度都要能追到一条 `evidence_quotes`；ground 不了就 inject，并降置信。
-3. **维度正交**：D1–D7 相互独立，**永远不要从一维派生另一维**（含 `on_offtrack` ⊥ `time_temperament`）。
-   一个 `expert` 同时 `over-trust` / `Accept-All` 是真实且常见的（见 selfreport reference 例 C /
-   Karpathy）；不要让高 D1 把 D2/D4 拉向严谨。
-4. **不引入 benchmark / 轨迹派生字段**：卡只装「从真实数据采集到的画像」，不得掺入任何 benchmark 分数、
-   轨迹特征或下游 sim 的派生量（保证训练信号真实、与测试目标不互污染）。
+1. **Hub-and-spoke**: this file is the hub, and extraction skills are spokes. Each spoke depends only on this contract, **and spokes do not depend on one another**
+   (preventing skill→skill references and schema drift across copies).
+2. **Evidence or discard**: every grounded dimension must be traceable to one `evidence_quotes`; if it cannot be grounded, inject it and lower confidence.
+3. **Dimension orthogonality**: D1–D7 are independent of one another; **never derive one dimension from another** (including `on_offtrack` ⊥ `time_temperament`).
+   A single `expert` being simultaneously `over-trust` / `Accept-All` is real and common (see selfreport reference example C /
+   Karpathy); do not let high D1 pull D2/D4 toward rigor.
+4. **Do not introduce benchmark / trajectory-derived fields**: the card contains only “personas collected from real data” and must not include any benchmark scores,
+   trajectory features, or downstream sim-derived quantities (to keep the training signal real and prevent contamination with the test target).
 
-## 卡记录形状 (card record)
+## Card Record Shape
 
-一条卡是一个 JSON 对象：
+A card is a JSON object:
 
 ```json
 {
-  "id": "<source-hash>",               // 句柄/来源 hash，存派生画像，不存 PII
-  "authenticity": "authentic",          // 真实性裁决，见 §真实性门
-  "era": {"value": "post_vibe", "basis": "<日期/依据>"},
+  "id": "<source-hash>",               // handle/source hash; stores derived persona, does not store PII
+  "authenticity": "authentic",          // authenticity ruling; see §Authenticity Gate
+  "era": {"value": "post_vibe", "basis": "<date/basis>"},
   "dimensions": {
     "D1_evaluation_capability": {"value": "...", "source": "...", "basis": "...", "confidence": "..."},
     "D2_acceptance_bar":        {"primary": "...", "flags": ["..."], "source": "...", "basis": "...", "confidence": "..."},
@@ -45,34 +45,34 @@
     "D7_time_temperament":      {"value": "...", "source": "...", "basis": "...", "confidence": "..."}
   },
   "provenance": {
-    "layers": ["L0", "..."],            // 可选：观测型来源的取证层（GitHub）
-    "sources": [{"url": "...", "type": "..."}],  // 可选：自述型来源清单
-    "self_report": true,                 // 可选：是否第一人称自述
-    "reputation": "...",                 // 可选：可独立佐证的公开声誉
+    "layers": ["L0", "..."],            // Optional: evidentiary layer for observational sources (GitHub)
+    "sources": [{"url": "...", "type": "..."}],  // Optional: self-report source list
+    "self_report": true,                 // Optional: whether it is a first-person self-report
+    "reputation": "...",                 // Optional: independently corroborated public reputation
     "evidence_quotes": [{"quote": "...", "source": "..."}]
   },
-  "behavioral_prediction": "<一句话：该 persona 如何用 harness、什么驱动其体感>"
+  "behavioral_prediction": "<one sentence: how this persona uses harness, what drives its user experience>"
 }
 ```
 
-被拒卡（未入库）形状：
+Rejected card (not stored) shape:
 
 ```json
 {"id": "...", "authenticity": "suspect|contaminated|insufficient_evidence",
  "reject_reason": "...", "action": "not admitted; ..."}
 ```
 
-### 每维封套 (per-dimension envelope)
+### Per-Dimension Envelope
 
-除 D2（用 `primary` + `flags`）、D3（三个子轴各自封套）、D5（结构化 `area/depth/stack/weak`）外，
-每维携带统一四元：
+Except for D2 (using `primary` + `flags`), D3 (each of the three sub-axes has its own envelope), and D5 (structured `area/depth/stack/weak`),
+each dimension carries the same four-tuple:
 
-- `value`（或 D2 的 `primary`+`flags`）：取值，见下方枚举。
-- `source`：`grounded`（有证据）| `injected`（无证据、采样补）。
-- `basis`：`observed`（看其所做）| `stated`（看其所说，self-report）| `stated+observed`（自述且有观测佐证）。
-- `confidence`：`low | medium | high`。
+- `value` (or `primary`+`flags` for D2): value; see the enumerations below.
+- `source`: `grounded` (evidence exists) | `injected` (no evidence; filled by sampling).
+- `basis`: `observed` (based on what it does) | `stated` (based on what it says, self-report) | `stated+observed` (self-report with observational corroboration).
+- `confidence`: `low | medium | high`.
 
-## 维度枚举
+## Dimension Enumerations
 
 ```
 D1 evaluation_capability : blind | surface | competent | expert
@@ -80,22 +80,22 @@ D2 acceptance_bar.primary: ship-fast | functional | modern-correct | type-safety
    acceptance_bar.flags  ⊆ {tests, types, scope, security, style, a11y, perf}
 D3 interaction_style.delegation  : vibe-dump | loose | spec-driven
    interaction_style.supervision : hands-off | reviews | micromanage
-     （语义=过程卷入：对助手进行中可见感的需要；不是产品按钮）
+     (semantics = process involvement: the need to have visibility into what is happening while the assistant is working; not a product button)
    interaction_style.on_offtrack : abandon | retry | correct | fix-self | file-issue
-     （语义=质量失败后的策略；不驱动等待耐心）
+     (semantics = strategy after a quality failure; does not drive patience with waiting)
 D4 trust_model           : over-trust | balanced | skeptical
 D5 domain.depth          : shallow | working | deep
 D6 autonomy_expectation  : advisory | collaborative | agentic
 D7 time_temperament      : patient | steady | impatient
-     （对等待/空转的耐受；与 on_offtrack 正交）
-era.value                : pre_vibe | post_vibe        (按发布日期切分，约 2025-10)
+     (tolerance for waiting/idling; orthogonal to on_offtrack)
+era.value                : pre_vibe | post_vibe        (split by publication date, approximately 2025-10)
 ```
 
-> 授权尺度（只读/可写/可跑）**不进卡库**：那是会话/产品策略，由 sim 从自主性期望半派生。
+> Authorization level (read-only/writable/runnable) **does not enter the card store**: it is a session/product policy, partially derived by sim from autonomy preference.
 
-### D5.area 受控词表 (controlled vocabulary)
+### D5.area Controlled Vocabulary
 
-`area` 取**单一 token**（库覆盖度可度量）；真正跨域无中心时用 `cross-stack`。具体技术栈进 `stack`，不进 `area`。
+`area` takes a **single token** (library coverage can be measured); use `cross-stack` when there is genuinely no central domain across domains. Put specific technology stacks in `stack`, not in `area`.
 
 ```
 web-backend | web-frontend | scientific-computing | data-viz | ml-ai |
@@ -103,62 +103,61 @@ data-analysis | dev-tooling | data-eng | infra-devops | databases |
 systems-runtime | security | mobile | cross-stack
 ```
 
-（`data-analysis` = pandas/numpy/excel/notebook 数据整理，区别于 `data-eng` 管线与 `scientific-computing` 数值/符号库。）
+（`data-analysis` = pandas/numpy/excel/notebook data organization, distinct from the `data-eng` pipelines and `scientific-computing` numerical/symbolic libraries.）
 
-`stack` = 实际使用的具体技术（如 `["typescript","node"]`）。`weak` = 有效能力降一档的子域（如 `["timezones/DST"]`），
-是塑造行为的强信号（让一个本来 competent 的用户漏掉某类领域 bug）；ground 不到就 inject 0–2 个或留 `[]`。
+`stack` = the specific technology actually used (for example, `["typescript","node"]`). `weak` = a subdomain that lowers effective capability by one level (for example, `["timezones/DST"]`),
+and is a strong behavior-shaping signal (causing an otherwise competent user to miss a certain class of domain bugs); if it cannot be grounded, inject 0–2 of them or leave `[]`.
 
-## 受控注入分布 (controlled injection)
+## Controlled Injection Distribution
 
-当某来源对某轴**确实沉默**时，从下列分布**逐卡独立采样**（与已 grounded 的维度正交），
-置 `source: injected` / `confidence: low`：
+When a source is **genuinely silent** on a given axis, independently sample from the following distributions **once per card** (orthogonally to dimensions that have already been grounded),
+and set `source: injected` / `confidence: low`:
 
-- `delegation`：vibe-dump 25% / loose 45% / spec-driven 30%
-- `supervision`：hands-off 30% / reviews 45% / micromanage 25%
-- `on_offtrack`：abandon 20% / retry 20% / correct 30% / fix-self 15% / file-issue 15%
-- `trust_model`：over-trust 30% / balanced 45% / skeptical 25%
-- `autonomy_expectation`（D6）：advisory 35% / collaborative 40% / agentic 25%
-- `time_temperament`（D7）：patient 25% / steady 50% / impatient 25%
-- `D5.weak`：按 `area` 注入 0–2 个合理弱项或 `[]`。
+- `delegation`: vibe-dump 25% / loose 45% / spec-driven 30%
+- `supervision`: hands-off 30% / reviews 45% / micromanage 25%
+- `on_offtrack`: abandon 20% / retry 20% / correct 30% / fix-self 15% / file-issue 15%
+- `trust_model`: over-trust 30% / balanced 45% / skeptical 25%
+- `autonomy_expectation` (D6): advisory 35% / collaborative 40% / agentic 25%
+- `time_temperament` (D7): patient 25% / steady 50% / impatient 25%
+- `D5.weak`: inject 0–2 reasonable weaknesses according to `area`, or `[]`.
 
-**正交强制**：`on_offtrack` 与 `time_temperament` 必须独立采样——禁止「abandon 必配 impatient」或「file-issue 必配 patient」的按档锁死。
+**Orthogonality is mandatory**: `on_offtrack` and `time_temperament` must be sampled independently—do not lock them together by level, such as «abandon must be paired with impatient» or «file-issue must be paired with patient».
 
-有弱先验时可偏置采样（自称 vibecoder → over-trust + vibe-dump；库维护者 → skeptical + spec-driven）。
-比例为起始默认，可按目标用户分布调。
+When weak priors are available, sampling may be biased (a self-described vibecoder → over-trust + vibe-dump; a library maintainer → skeptical + spec-driven). The proportions are initial defaults and may be adjusted to the target-user distribution.
 
-**采样，不要按档锁死（强制）**：注入是「逐卡真实抽一次」，不是「从 D1 确定性映射」。若每张 `surface` 卡都成了
-`functional+balanced+reviews+retry`、每张 `blind` 卡都成了 `ship-fast+over-trust+hands-off`，就是按档锁死了——
-重抽。各注入维独立抽（弱先验只微调赔率），批后目测分布是否塌缩。
+**Sample; do not lock by level (mandatory)**: injection means “draw once from the real distribution for each card,” not “deterministically map from D1.” If every `surface` card becomes
+`functional+balanced+reviews+retry`, and every `blind` card becomes `ship-fast+over-trust+hands-off`, then the levels have been locked together—
+redraw. Draw each injection dimension independently (weak priors only slightly adjust the odds), and visually inspect the post-batch distribution to check whether it has collapsed.
 
-## 真实性门原则 (authenticity gate，双向)
+## Authenticity Gate Principles (Bidirectional)
 
-真实性门是**双向**的，按来源类型选对应一侧；每条 grounded 维度都必须**先过门再 map**。
+The authenticity gate is **bidirectional**. Select the corresponding side according to the source type; every grounded dimension must **pass through the gate before mapping**.
 
-- **观测型来源**（看其所做，如 GitHub 足迹）：门是 **trace-floor + 一致性**。低于取证下限（自有 repo + 真实 PR +
-  已诊断 issue 合计过少，尤其 0 repo 且 0 PR）→ `insufficient_evidence`，不入库；浅层画像 ⊥ 深层产出 /
-  实现不可信的跨栈速度 / AI 格式痕迹（`id=` 围栏、过度模板化）→ `contaminated`，隔离永不入库；
-  ≥2 个**非空**层一致 → `authentic`。高 volume 是污染提示而非质量信号。
-- **自述型来源**（看其所说，如博客/访谈/演讲/长推）：门是 **performative / promotional / second-hand**。
-  课程营销 / 影响者带货 / 激励驱动 → `promotional` 拒；第三方转述、非本人原话 → `second_hand` 拒（去找一手）；
-  AI SEO 流水文、零具体个人细节 → `contaminated` 隔离；第一人称但无任何工作流细节 → `insufficient_evidence` 拒。
-  **夸张不等于失真**：真实第一人称的夸张（"我从不读 diff"）真实传达了一种 *立场*——抽出立场、标 `stated`、
-  置 `confidence: medium`，不要拒。
+- **Observational sources** (look at what they do, e.g. GitHub activity): the gate is **trace-floor + consistency**. Below the evidence floor (too few owned repos + real PRs +
+  diagnosed issues in total, especially 0 repo and 0 PR) → `insufficient_evidence`, do not admit to the repository; a shallow profile ⊥ deep output /
+  implausible cross-stack implementation speed / AI formatting traces (`id=` fences, excessive templating) → `contaminated`, quarantine and never admit to the repository;
+  ≥2 **non-empty** layers are consistent → `authentic`. High volume is a contamination indicator, not a quality signal.
+- **Self-reported sources** (look at what they say, e.g. blogs/interviews/talks/long tweets): the gate is **performative / promotional / second-hand**.
+  Course marketing / influencer product promotion / incentive-driven content → `promotional` reject; third-party retellings, not the person's own words → `second_hand` reject (seek first-hand sources);
+  mass-produced AI SEO content, zero specific personal details → `contaminated` quarantine; first-person accounts with no workflow details whatsoever → `insufficient_evidence` reject.
+  **Exaggeration does not equal distortion**: exaggeration in an authentic first-person account ("I never read diffs") genuinely conveys a *stance*—extract the stance, mark `stated`,
+  set `confidence: medium`, do not reject.
 
-裁决取值：`authentic | suspect | contaminated | insufficient_evidence`。各来源的门细则写在对应薄 skill，
-本契约只立**原则与裁决词表**。
+Adjudication values: `authentic | suspect | contaminated | insufficient_evidence`. Source-specific gate details are documented in the corresponding thin skills;
+this contract establishes only **principles and the adjudication vocabulary**.
 
-## `stated` → confidence 规则（自述型来源）
+## `stated` → confidence rules (self-reported sources)
 
-- 纯自述 grounded：`source: grounded` + `basis: stated` + **`confidence` 封顶 medium**。
-- 升到 `high` + `basis: stated+observed`：仅当有观测痕迹佐证（公开可测产出 / 知名维护者履历 / 在线产品）。
-- 「认错弱点」（"我不是技术出身"）造假动机低 → 可 `high`；「自夸专家」造假动机高 → 无佐证停在 `medium`。
+- Grounded solely in self-report: `source: grounded` + `basis: stated` + **`confidence` capped at medium**.
+- Upgrade to `high` + `basis: stated+observed`: only with corroborating observational traces (publicly measurable output / track record as a well-known maintainer / live product).
+- "Admitting weaknesses" ("I don't have a technical background") carries little incentive to fabricate → may use `high`; "self-proclaimed expertise" carries a strong incentive to fabricate → without corroboration, remain at `medium`.
 
-## 符合性规则 (conformance)
+## Conformance Rules
 
-1. 单值维（D1/D4/D6/D7 + D3 三子轴）用键 `value`；D2 用 `primary`+`flags`；D5 用 `area/depth/stack/weak`。
-2. `D5.area` ∈ 上方受控词表，且为**单一 token**。
-3. `source: grounded` 的维度必须有至少一条对应 `evidence_quotes`。
-4. `source: injected` 的维度 `confidence` 必须为 `low`。
-5. 卡记录**不得**含任何 benchmark / 轨迹派生字段。
-6. 遇未知键：读侧前向兼容（忽略不报错），便于 schema 演化。
-7. `D7_time_temperament` 缺省时注入侧回落 `steady`（旧卡兼容）；新卡应显式写出。
+1. Single-value dimensions (D1/D4/D6/D7 + the three D3 sub-axes) use key `value`; D2 uses `primary`+`flags`; D5 uses `area/depth/stack/weak`.
+2. `D5.area` ∈ the controlled vocabulary above, and must be a **single token**.
+3. Dimensions with `source: grounded` must have at least one corresponding `evidence_quotes`.
+4. For dimensions with `source: injected`, `confidence` must be `low`.
+5. Card records **must not** contain any benchmark / trajectory-derived fields.
+6. For unknown keys: readers must be forward-compatible (ignore without error), to facilitate schema evolution.
+7. When `D7_time_temperament` is absent, the injection side falls back to `steady` (compatibility with old cards); new cards should specify it explicitly.

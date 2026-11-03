@@ -75,11 +75,11 @@ class _Architect(Architect):
 
 def _rfc_fields(*, direction: str) -> dict[str, str]:
     return {
-        "问题": "跨场景能力边界不稳定",
-        "根因": "运行时约束缺少统一表达",
-        "涉及 issue": "规范化提案集合",
-        "方向": direction,
-        "验收": "相同约束在不同场景保持一致",
+        "problem": "Unstable cross scenario capability boundaries",
+        "root_cause": "Runtime constraints lack a unified expression",
+        "related": "Normalized proposal set",
+        "direction": direction,
+        "acceptance": "Maintain consistent constraints across different scenarios",
     }
 
 
@@ -89,7 +89,7 @@ def _seed_session(store: SessionStore) -> str:
             persona=Persona(identity="i", level="l", domain="d", goal="g", speaking_style="s"),
             scenario=SeedScenario(description="s"),
             transcript=Transcript(turns=[]),
-            feeling=FeelingScore(score=2, reason="等待中缺少确定感"),
+            feeling=FeelingScore(score=2, reason="Lack of certainty while waiting"),
         )
     )
     return str(store.index()[0]["session_id"])
@@ -99,12 +99,12 @@ def _owner_decision(issue: int, decision: str) -> dict:
     row = {
         "issue": issue,
         "decision": decision,
-        "handoff_summary": "交接原始目标",
-        "preserved_capabilities": ["原始能力"],
-        "acceptance_groups": ["独立验收"],
+        "handoff_summary": "Original handoff goal",
+        "preserved_capabilities": ["Original capability"],
+        "acceptance_groups": ["Independent acceptance"],
     }
     if decision == "hold":
-        row["reason"] = "缺少可观察验收接口"
+        row["reason"] = "Missing observable acceptance interface"
     return row
 
 
@@ -129,7 +129,7 @@ def test_role_contract_violations_are_structural_not_vocabulary_based() -> None:
         validate_pm(
             {
                 "evidence_sessions": ["s1"],
-                "product_opportunity": "任意措辞",
+                "product_opportunity": "Arbitrary wording",
                 "solution_level": "product_capability",
             },
             known_sessions={"s1"},
@@ -171,16 +171,16 @@ def test_report_is_normalized_once_and_raw_case_stays_out_of_downstream_context(
                     "disposition": "accept",
                     "kind": "bug",
                     "priority": "P1",
-                    "proposal_title": "执行约束未被稳定传递到验证阶段",
+                    "proposal_title": "Execution constraints are not consistently passed to the validation stage",
                     "fields": {
-                        "根因区域": "执行与验证之间的约束传递",
-                        "边界": "仅调整跨任务成立的 harness 行为",
-                        "验收": "约束在执行和验证输出中保持一致",
+                        "root_cause": "Constraint transfer between execution and validation",
+                        "boundary": "Only adjust what holds across tasks harness Behavior",
+                        "acceptance": "Constraints remain consistent in execution and validation outputs",
                     },
                     "artifact": {
-                        "reported_problem": "执行约束丢失",
-                        "user_impact": "结果不稳定",
-                        "scope_boundary": "harness 跨阶段行为",
+                        "reported_problem": "Execution constraints are lost",
+                        "user_impact": "Unstable results",
+                        "scope_boundary": "harness Cross stage behavior",
                         "evidence": ["report"],
                         "uncertainties": [],
                         "implementation_target": "harness",
@@ -204,7 +204,7 @@ def test_report_is_normalized_once_and_raw_case_stays_out_of_downstream_context(
     downstream = format_proposal_list([issue])
     assert raw_title not in downstream
     assert raw_body not in downstream
-    assert "执行约束未被稳定传递到验证阶段" in downstream
+    assert "Execution constraints are not consistently passed to the validation stage" in downstream
     assert any(raw_title in comment for comment in tracker.issue(number)["comments"])
 
     owner = _Owner(
@@ -244,16 +244,16 @@ def test_exact_proposal_set_flows_through_divergent_architect_and_owner(
                         "disposition": "accept",
                         "kind": "bug",
                         "priority": "P1",
-                        "proposal_title": "执行约束缺少统一传递边界",
+                        "proposal_title": "Execution constraints lack a unified transfer boundary",
                         "fields": {
-                            "根因区域": "执行约束传递",
-                            "边界": "跨任务运行时行为",
-                            "验收": "约束在阶段之间保持一致",
+                            "root_cause": "Execution constraint transfer",
+                            "boundary": "Cross task runtime behavior",
+                            "acceptance": "Constraints remain consistent across stages",
                         },
                         "artifact": {
-                            "reported_problem": "约束传递失败",
-                            "user_impact": "交付不稳定",
-                            "scope_boundary": "harness 行为",
+                            "reported_problem": "Constraint transfer failure",
+                            "user_impact": "Unstable delivery",
+                            "scope_boundary": "harness Behavior",
                             "evidence": ["report"],
                             "uncertainties": [],
                             "implementation_target": "harness",
@@ -275,16 +275,16 @@ def test_exact_proposal_set_flows_through_divergent_architect_and_owner(
             {
                 "proposals": [
                     {
-                        "title": "约束反馈能力",
-                        "user_goal": "掌握任务进展",
-                        "observed_behaviors": ["等待后追问"],
-                        "experience_tension": "进展不可见",
-                        "product_opportunity": "连续反馈",
-                        "desired_outcome": "无需追问",
+                        "title": "Constraint feedback capability",
+                        "user_goal": "Stay informed about task progress",
+                        "observed_behaviors": ["Follow up after waiting"],
+                        "experience_tension": "Progress is not visible",
+                        "product_opportunity": "Continuous feedback",
+                        "desired_outcome": "No need to follow up",
                         "evidence_sessions": [session_id],
                         "related_proposals": [report],
                         "solution_level": "product_capability",
-                        "abstraction_rationale": "用户能力层",
+                        "abstraction_rationale": "User capability layer",
                     }
                 ]
             },
@@ -296,7 +296,7 @@ def test_exact_proposal_set_flows_through_divergent_architect_and_owner(
 
     second_report = tracker.create_issue(
         IssueDraft(
-            title="验证阶段再次丢失约束",
+            title="Constraints are lost again during validation",
             body="session_id: " + session_id,
             labels=[sc.PROPOSAL, sc.FROM_TRIAGE],
         )
@@ -311,14 +311,14 @@ def test_exact_proposal_set_flows_through_divergent_architect_and_owner(
             {
                 "proposals": [
                     {
-                        "title": "统一约束生命周期",
+                        "title": "Unified constraint lifecycle",
                         "source_proposals": sorted(expected_for_architect),
-                        "relationship": "互补",
-                        "common_tension": "反馈边界不一致",
-                        "structural_direction": "统一约束表达与反馈边界",
-                        "expected_leverage": "覆盖多个体验问题",
+                        "relationship": "Complementary",
+                        "common_tension": "Inconsistent feedback boundaries",
+                        "structural_direction": "Unified constraint expression and feedback boundaries",
+                        "expected_leverage": "Covers multiple experience issues",
                         "solution_level": "structural_mechanism",
-                        "abstraction_rationale": "跨提案机制层",
+                        "abstraction_rationale": "Cross proposal mechanism layer",
                         "covers": sorted({*expected_for_architect, divergent_number}),
                     }
                 ]

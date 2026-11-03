@@ -1,30 +1,44 @@
 # Specs
 
-本目录是 AHE-Beta 的设计活快照，由 `spec-driven-development` skill 管理（vendored from OpenAgents，**单 markdown 文件形态**）。
+This directory contains the maintained English design specifications for AHE-Beta. The [original Chinese specifications](../specs-zh-CN/README.md) are preserved unchanged in a separate archive. The spec CLI reads and generates views for this directory.
 
-- 每个 spec 组 = 一个单文件 `NNNN-slug.md`：
-  - **YAML frontmatter**（机器读，结构化源）：组元数据 `number/title/issue/slug/summary` + `tasks[]`（每个 Task 的 `id/title/status/priority/depends-on/files/scope/acceptance` 等结构字段）。
-  - **Markdown 正文**（人/agent 读）：组级 rust-RFC 9 段总览（Summary / Motivation / Guide-level explanation / Reference-level explanation / Drawbacks / Rationale and alternatives / Prior art / Unresolved questions / Future possibilities），单 spec 自包含地讲清整个 feature，DAG + 文件分配收进 Reference-level。
-- `OVERVIEW.md`（全局看板：TL;DR 速览 / 看板 / 关系图 / 文件冲突 / 各 feature 详情）与 `ARCHITECTURE.md`（对代码的唯一映射，由 `spec graph` 从 `backend/ahe_beta/` 的 import 图 + docstring 生成）均**自动生成，勿手改**——改源（组 md 的 frontmatter/正文、或代码 docstring）后重跑 `render`/`graph`。
-- prose 字段用**精简、精确、学术化**的语言，不堆比喻。frontmatter `summary` 是组级人话 TL;DR，`spec new` 必填、`validate` 强制非空。
-- 必填总览段（`validate` 强制非空）：**Summary / Motivation / Reference-level explanation / Rationale and alternatives**。
-- 只驱动 CLI，不手写/手改 md 结构：
+The workflow is managed by the repository's `spec-driven-development` skill, adapted from OpenAgents. Each spec group is one `NNNN-slug.md` file with:
 
-  ```bash
-  ./tools/spec-driven-development/spec new <slug> --issue <N> --title "<标题>" --summary "<人话 TL;DR>"
-  ./tools/spec-driven-development/spec reserve-number --issue <N> --slug <slug>  # 现有 PR 改号前预留
-  ./tools/spec-driven-development/spec add-task <NNNN> --id T1 --title ... --priority P1 --files ... --scope ... --acceptance ...
-  ./tools/spec-driven-development/spec validate
-  ./tools/spec-driven-development/spec render                                      # 生成 OVERVIEW.md
-  ./tools/spec-driven-development/spec graph --package-root backend/ahe_beta  # 生成 ARCHITECTURE.md
-  ./tools/spec-driven-development/spec abandon <NNNN> <Tx> --reason "..."          # 从快照移除 Task（历史在 git）
-  ```
+- **YAML frontmatter:** group metadata (`number`, `title`, `issue`, `slug`, `summary`) and a `tasks` list. Each Task declares its identity, status, priority, dependencies, owned files, scope, and acceptance criteria.
+- **A Markdown design overview:** nine RFC sections that explain the feature without requiring other Specs for essential context. Include the Task DAG and file allocation in the Reference-level explanation.
 
-  > 组级正文（9 段）与既有 Task 的改动**直接编辑组 md 文件**即可（`spec amend`/`set-overview` 已退役，per-task 历史交给 git）。
+Use these sections in order: Summary, Motivation, Guide-level explanation, Reference-level explanation, Drawbacks, Rationale and alternatives, Prior art, Unresolved questions, and Future possibilities. Validation requires non-empty **Summary**, **Motivation**, **Reference-level explanation**, and **Rationale and alternatives** sections.
 
-## 编号规则
+Write concise, precise English. The frontmatter `summary` should explain the feature in plain language; it is required by `spec new` and must be non-empty for validation.
 
-- 共享 Git 仓库中，`spec new` 从本地与远端主分支、已有预留号取下一号，并在远端 `spec-reservations/NNNN` 原子预留后创建文件；远端不可用时停止创建。纯本地目录沿用最大号 + 1。
-- 一个组 ≤ 6 个 Task；超了就拆组。
-- 同组内各 Task 的 `files` 必须互不相交（便于并行实现无冲突）。
-- `backend/scripts/check-spec-number-conflicts.py` 校验本地 + open PR 间不撞号（匹配 `NNNN-slug.md`）。
+## Create and update a Spec
+
+Run the CLI from the repository root to create groups, add Tasks, or remove abandoned Tasks:
+
+```bash
+./tools/spec-driven-development/spec new <slug> --issue <N> --title "<Title>" --summary "<What changes and why>"
+# Reserve a number before renumbering an existing PR.
+./tools/spec-driven-development/spec reserve-number --issue <N> --slug <slug>
+./tools/spec-driven-development/spec add-task <NNNN> --id T1 --title ... --priority P1 --files ... --scope ... --acceptance ...
+./tools/spec-driven-development/spec validate
+./tools/spec-driven-development/spec render
+./tools/spec-driven-development/spec graph --package-root backend/ahe_beta
+# Remove a Task from the current snapshot; Git retains its history.
+./tools/spec-driven-development/spec abandon <NNNN> <Tx> --reason "..."
+```
+
+Edit existing Task fields and the design overview directly in the group Markdown file, then validate and regenerate the views. The `amend` and `set-overview` commands and per-Task history directories are retired; revisions are recorded in Git.
+
+## Generated views
+
+- `OVERVIEW.md` contains feature summaries, the Task board, relationships, file conflicts, and feature details. Generate it with `spec render`.
+- `ARCHITECTURE.md` maps the code's components and dependencies using the import graph and module docstrings under `backend/ahe_beta/`. Generate it with `spec graph`.
+
+Edit the source specifications or docstrings to update these files. **Do not edit the generated views manually.** Commit regenerated views with their source changes.
+
+## Numbering rules
+
+- In a shared Git repository, `spec new` selects the next number from local groups, the remote main branch, and existing reservations. It atomically reserves `spec-reservations/NNNN` on the remote before creating the file. A remote failure stops creation. Directories without a remote use the local maximum plus one.
+- Keep each group to at most six Tasks; split larger designs into focused groups.
+- Tasks within a group must own disjoint `files` lists so they can be implemented concurrently without competing writes.
+- `backend/scripts/check-spec-number-conflicts.py` checks local groups and open PRs for conflicting `NNNN-slug.md` numbers.

@@ -1,15 +1,7 @@
-# 用户侧背景（不挂载到 harness 工作区）
+# User-Side Context (Not Mounted in the Harness Workspace)
 
-你负责旧账单导入器和新仪表盘的上线。账单导入器本月不能升级，它按 CSV
-表头和原始 ID 对账；新仪表盘则不能拿到原始 ID/email。同一客户在同一租户
-需要稳定关联，不同租户不能串联。环境离线，新增依赖要走很长的审批。
+You are responsible for launching the legacy billing importer and the new dashboard. The billing importer cannot be upgraded this month; it reconciles using CSV headers and raw IDs. The new dashboard must not receive raw IDs or email addresses. The same customer must be linked consistently within the same tenant, while different tenants must not be linked. The environment is offline, and adding dependencies requires a lengthy approval process.
 
-你倾向仪表盘默认脱敏，但不能因此改变旧账单入口。助手讨论默认值时，
-可以明确仪表盘显式启用、旧调用保持默认，并要求迁移说明写清楚。
-新数据叫 account_id，旧接口叫 customer_id；被问到两者同时出现
-时，你的真实偏好是相同值接受，不同值报错，避免悄悄选错客户。这个额外
-冲突策略只有实际沟通确认后才能作为验收要求。不要故意藏住助手正在询问
-的信息，不要为制造难度反复改变决定。
+You prefer the dashboard to use redaction by default, but that must not change the legacy billing entry point. When discussing defaults, the assistant may state that redaction is explicitly enabled for the dashboard while legacy calls retain the default, and require the migration notes to make this clear. The new data field is called account_id, and the legacy interface uses customer_id. If asked about both appearing together, your actual preference is to accept matching values and reject differing values, to avoid silently choosing the wrong customer. This additional conflict-handling policy may be made an acceptance requirement only after it has been confirmed through actual communication. Do not deliberately conceal information the assistant is asking about, and do not repeatedly change your decision to create difficulty.
 
-按现有 persona 和心跳自然追问、核验；不使用固定轮次或触发脚本。不编造
-测试结果，不预设不满意。没有发生补充/更新时，如实记录没有发生。
+Ask questions and verify details naturally according to the existing persona and heartbeat; do not use fixed turns or trigger scripts. Do not fabricate test results or assume dissatisfaction. If no addition or update occurred, record truthfully that none occurred.

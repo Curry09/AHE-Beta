@@ -1,12 +1,12 @@
 ---
 number: '0075'
-title: 统一入口的实验后官方 SWE 评分
+title: "Post-experiment official SWE grading through a unified entry point"
 issue: 0
 slug: post-run-swe-grading
-summary: 保留完整会话补丁，校验冻结任务与归档后独立运行官方 fresh-container 评分，结果不回流演化或改写原实验。
+summary: "Preserve complete session patches, verify frozen tasks and archives, and independently run official fresh-container grading without feeding results back into evolution or modifying the original experiment."
 tasks:
 - id: T1
-  title: 完整会话补丁与不可变预测回执
+  title: "Complete session patches and immutable prediction receipts"
   status: done
   priority: P1
   tags: []
@@ -18,10 +18,10 @@ tasks:
   - backend/ahe_beta/loop/sim_user.py
   - backend/tests/user/test_prediction_artifacts.py
   - backend/ahe_beta/user/sim/runtime.py
-  scope: 两条生产runner原子保留完整补丁与相对receipt，兼容旧Session与错误导出
-  acceptance: 长补丁与空补丁保真，冲突/非法路径拒绝，direct和simulated均保存，恢复不覆盖
+  scope: "Both production runners atomically preserve complete patches and relative receipts, with compatibility for legacy Session and error exports"
+  acceptance: "Preserve long and empty patches faithfully, reject conflicts/invalid paths, save in both direct and simulated modes, and avoid overwriting on resume"
 - id: T2
-  title: 已收集输入绑定与独立官方评分
+  title: "Collected input binding and independent official grading"
   status: done
   priority: P1
   tags: []
@@ -34,10 +34,10 @@ tasks:
   - backend/ahe_beta/evaluation/adapters/swebench.py
   - backend/tests/test_experiment_grading.py
   - backend/tests/evaluation/test_swebench_runner.py
-  scope: 严格读终态归档，匹配计划/恢复/预测与官方dataset，复用evaluator并独立保留每次评分
-  acceptance: 错配/篡改/未知report拒绝，完整失败状态，local/E2B归档同路径，无模型/provider调用或原run写入
+  scope: "Strictly read terminal-state archives, match plans/resume data/predictions against the official dataset, reuse the evaluator, and retain each grading run independently"
+  acceptance: "Reject mismatches/tampering/unknown reports, retain complete failure states, use the same path for local/E2B archives, and make no model/provider calls or writes to the original run"
 - id: T4
-  title: 双语教程与历史能力状态
+  title: "Bilingual tutorial and historical capability status"
   status: done
   priority: P1
   tags: []
@@ -54,10 +54,10 @@ tasks:
   - README.md
   - README.zh-CN.md
   - CLAUDE.md
-  scope: 说明显式本地dataset和哈希、安装evaluationextra、两后端评分、旧预测边界及不回流演化
-  acceptance: 英中命令一致，held-out泛化与用户任务评分区分，历史缺口如实更新
+  scope: "Explain explicit local datasets and hashes, installation of the evaluation extra, grading for both backends, legacy prediction boundaries, and the absence of feedback into evolution"
+  acceptance: "Keep English and Chinese commands consistent, distinguish held-out generalization from user-task grading, and accurately update historical gaps"
 - id: T3
-  title: 统一评分CLI与完整生产验收
+  title: "Unified grading CLI and complete production acceptance"
   status: done
   priority: P1
   tags: []
@@ -72,88 +72,88 @@ tasks:
   - backend/tests/test_experiment_grading_e2e.py
   - backend/scripts/e2e-spec-0075-post-run-grading.sh
   - backend/scripts/check_experiment_repository.py
-  scope: 接线grade选轮/离线验证/JSON，真实冻结/会话/收集到评分接线及完整回归
+  scope: "Wire up grade round selection/offline verification/JSON, connect real freezing/session/collection to grading, and run the full regression suite"
   acceptance: 
-    生产链生成补丁后collect再grade，原Session/manifest/checkpoint/archive不变，结果与模拟官方边界准确分类
+    "Generate patches through the production chain, then collect and grade; keep the original Session/manifest/checkpoint/archive unchanged, and accurately classify results and simulated official boundaries"
 ---
 
-# 0075 · 统一入口的实验后官方 SWE 评分
+# 0075 · Post-experiment Official SWE Grading Through the Unified Entry Point
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level overview in nine rust-RFC sections. -->
 
 ## Summary
 
-统一实验命令现使用 `grade RUN_ID --plan PATH`（0083 将本组最初的 dataset 参数退役）：在已停止且完整收集的实验中，校验冻结任务、轮次会话及完整补丁，独立调用官方 SWE-bench fresh-container evaluator。默认评分末轮的全部 SWE 会话；可显式选择一个已完成轮次。未选择规则的会话由当前通用报告单列为 not_configured，不补造评分。实验后的结果保存在独立 evaluation 目录，不改原 manifest、Session、checkpoint、Issue、seal 或原归档。
+The unified experiment command now uses `grade RUN_ID --plan PATH` (0083 retired this group's original dataset parameter): for stopped and fully collected experiments, it verifies frozen tasks, round sessions, and complete patches, then independently invokes the official SWE-bench fresh-container evaluator. By default, it grades all SWE sessions in the final round; a completed round can be explicitly selected. Sessions for which no rule is selected are listed separately as not_configured in the current general report; no scores are fabricated. Post-experiment results are saved in a separate evaluation directory without modifying the original manifest, Session, checkpoint, Issue, seal, or archive.
 
 ## Motivation
 
-统一入口已可执行混合任务和批次，但官方评分仍只有底层 evaluator，没有与 run 材料绑定的公开命令。会话目前只持有 diff hash；direct 的 review 只显示截断补丁，不能据此还原完整预测。直接恢复旧 controller 的在线评分开关会让评分进入演化期间的上下文，同时 E2B 不提供 fresh Docker instance。因此选择两后端完成 collect 后统一在操作者的 Docker 主机做事后评分，并为新会话保存完整预测。
+The unified entry point can already execute mixed tasks and batches, but official grading still has only a low-level evaluator, with no public command bound to run materials. Sessions currently retain only a diff hash; direct review displays only a truncated patch, which cannot reconstruct a complete prediction. Restoring the old controller's online grading switch directly would introduce grading into the context during evolution, while E2B does not provide a fresh Docker instance. The chosen approach is therefore to perform post-experiment grading on the operator's Docker host after collect completes on either backend, and to save complete predictions for new sessions.
 
-此命令评的是该轮用户任务补丁，不是对 Harness 的新 held-out 泛化测试，也不能据一个任务成绩宣称通用提升。原来的独立 benchmark 工具继续用于真正 held-out 测试；官方 test_patch、gold patch 和评分结论均不进入用户/需求/交付的冻结输入。
+This command grades the user task patch for the selected round. It is not a new held-out generalization test of the Harness, and a score on one task cannot establish a general improvement. The existing standalone benchmark tool remains available for true held-out testing; official test_patch, gold patch, and grading conclusions never enter the frozen user/requirements/delivery inputs.
 
 ## Guide-level explanation
 
-先运行并收集实验，然后准备一份私有 grading plan，声明本地官方数据集（JSON/JSONL/parquet）的路径和 SHA-256，并以 swebench adapter 选择原任务。数据集不进入实验 JSON 或任务包；操作者安装锁定 evaluation extra 并在本机使用 Docker。E2B 实验也是取其完整归档后本机评分，不在云端运行嵌套 Docker。
+First run and collect the experiment, then prepare a private grading plan declaring the path and SHA-256 of a local official dataset (JSON/JSONL/parquet), and select the original tasks through the swebench adapter. The dataset is not included in the experiment JSON or task package; the operator installs the pinned evaluation extra and uses Docker locally. E2B experiments are also graded locally after retrieving their complete archives, without running nested Docker in the cloud.
 
 ```bash
 uv sync --locked --extra experiments --extra dev --extra evaluation
 uv run --locked --extra experiments --extra evaluation python backend/scripts/experiment.py grade RUN_ID --plan /path/to/grading-plan.json --offline
 uv run --locked --extra experiments --extra evaluation python backend/scripts/experiment.py grade RUN_ID --plan /path/to/grading-plan.json
-# 可选 --round 1；默认 config.rounds.count；时限在每个 plan grader 的 timeout_seconds 中声明。
+# Optional --round 1; defaults to config.rounds.count; each plan grader declares its limit in timeout_seconds.
 ```
 
-私有 plan 的 materials.dataset 对应文件路径及 sha256，graders 条目声明 adapter=swebench、contract_version=1、原 task_ids、inputs.dataset 材料引用及 timeout_seconds。当前公开 CLI 不保留 dataset 参数兼容；其他 suite 使用各自 adapter 材料，不强制套用 SWE dataset。
+The private plan's materials.dataset specifies the file path and sha256. The graders entries declare adapter=swebench, contract_version=1, the original task_ids, an inputs.dataset material reference, and timeout_seconds. The current public CLI does not retain compatibility with the dataset parameter; other suites use their own adapter materials and are not required to use a SWE dataset.
 
-offline 仅验证已收集输入、绑定及数据集，不调用 Docker、模型、Gitea 或 E2B，也不写评分产物。正式评分逐会话运行 fresh evaluator；输出严格区分 completed/pass、completed/fail、missing prediction、unavailable、crashed、timed_out。缺预测不当作空补丁；已成功导出且 hash 相符的空补丁可以评分。旧冻结 controller 未保存完整补丁时明确不可评分，需要新 run，禁止从截断轨迹或当前远端代码猜测补丁。已 destroy 的完整实验仍可评分，不重新启动实验资源。
+offline only validates collected inputs, bindings, and the dataset; it does not invoke Docker, models, Gitea, or E2B, and does not write grading artifacts. Actual grading runs a fresh evaluator for each session; outputs strictly distinguish completed/pass, completed/fail, missing prediction, unavailable, crashed, and timed_out. A missing prediction is not treated as an empty patch; a successfully exported empty patch with a matching hash can be graded. If an old frozen controller did not save the complete patch, it is explicitly ungradable and requires a new run; patches must not be inferred from truncated traces or current remote code. A complete experiment that has already been destroyed can still be graded without restarting experiment resources.
 
-官方 4.1.0 将空预测单列 `empty_patch_ids` 并跳过实例测试。成功保存的空补丁通过输入校验，但正式报告为 `not_evaluated / official_empty_prediction / passed:null / fresh:false`，不计完整评分；它既不是缺预测，也不是 evaluator 崩溃。与 resolved/unresolved 同时出现的矛盾报告拒绝。[固定版本的官方报告逻辑](https://github.com/SWE-bench/SWE-bench/blob/v4.1.0/swebench/harness/reporting.py)是此分类的依据。
+Official version 4.1.0 lists empty predictions separately as `empty_patch_ids` and skips instance testing. A successfully saved empty patch passes input validation, but is reported as `not_evaluated / official_empty_prediction / passed:null / fresh:false` in actual grading and does not count as complete grading; it is neither a missing prediction nor an evaluator crash. Contradictory reports that also list it as resolved/unresolved are rejected. The [pinned version's official report logic](https://github.com/SWE-bench/SWE-bench/blob/v4.1.0/swebench/harness/reporting.py) is the basis for this classification.
 
 ## Reference-level explanation
 
-### 会话预测保存
+### Saving session predictions
 
-新增 `user/patches.py`，在模拟和 direct 两条生产 session runner 的 workspace export 成功后，按 `store.root.parent/predictions/<session_id>.patch` 原子保存完整 UTF-8 补丁（不依赖可变 cwd 或 provider 目录），Session.workspace_evidence 持有 `prediction` receipt：contract_version=1、session_id、path=`predictions/<session_id>.patch`、sha256、bytes。没有工作区或 export 失败则无 receipt 并保留失败证据。写入失败不得伪造 receipt；冲突同 session ID 不覆盖已有不同补丁。完整保存发生在 Session 最终落盘前；恢复复用原 Session/patch。direct 给用户 review 的截断预览保持现有含义。
+Add `user/patches.py`. After successful workspace export in both production session runners, simulation and direct, atomically save the complete UTF-8 patch according to `store.root.parent/predictions/<session_id>.patch` (without depending on a mutable cwd or provider directory). Session.workspace_evidence holds an `prediction` receipt: contract_version=1, session_id, path=`predictions/<session_id>.patch`, sha256, bytes. If there is no workspace or export fails, no receipt is issued and failure evidence is retained. A write failure must not produce a fabricated receipt; a conflicting session ID must not overwrite an existing different patch. The complete patch is saved before Session is finally persisted; recovery reuses the original Session/patch. The truncated preview shown to users for direct review retains its existing meaning.
 
-两条 runner 在 Harness 第一次使用工作区前冻结 Git HEAD 为 `workspace_evidence.diff_base_commit`。最终导出相对该初始提交的完整 diff，包含 Harness 的提交、staged edits 与未被 Git ignore 的新文件；采用临时 index，不改变实际 Git index 或工作区。基线捕获失败不生成可评分 receipt，SWE 评分要求该 base 与冻结任务 Git revision 相同，防止将相对修改后 HEAD 的空 diff 当作最终预测。未声明新基线的旧 exporter 继续自身既有语义，但其结果不声称符合新评分合同。
+Both runners freeze Git HEAD as `workspace_evidence.diff_base_commit` before the Harness first uses the workspace. Final export produces the complete diff against that initial commit, including Harness commits, staged edits, and new files not ignored by Git; it uses a temporary index without changing the actual Git index or workspace. Failure to capture the baseline produces no gradable receipt. SWE grading requires this base to match the frozen task's Git revision, preventing an empty diff against a modified HEAD from being treated as the final prediction. Old exporters that do not declare the new baseline retain their existing semantics, but their results do not claim conformance to the new grading contract.
 
-导出明确禁用 Git ext-diff 与 textconv，保证得到可应用的原始补丁而非展示文本；临时 index 添加文件时排除 `.venv/`、`__pycache__/` 和 `*.py[cod]` 等运行产物。这些文件原本就不属于冻结任务源码；任务没有自己的 ignore 规则时也不能把依赖环境打进预测。不改用户实际 index、ignore 文件或 Git 配置。
+Export explicitly disables Git ext-diff and textconv to ensure an applicable raw patch rather than display text; when adding files to the temporary index, it excludes runtime artifacts such as `.venv/`, `__pycache__/`, and `*.py[cod]`. These files are not part of the frozen task source in the first place; dependency environments must not be included in predictions even when the task has no ignore rules of its own. The user's actual index, ignore files, and Git configuration are not modified.
 
-### 已收集输入的绑定
+### Binding collected inputs
 
-`experiment/grading.py` 只读 matching schema2/workload-contract1 run、验证原材料和 RecoveryIdentity，再读取 `archive/collection.json` 与 artifacts.tar.gz。要求 collection COMPLETE、consistent=true、terminal=true，archive SHA 和内部 collection/file inventory 与外部 receipt 相符；拒绝路径逃逸、链接、重名成员和 checksum 漂移。以归档字节为权威，不读取仍可变化的 live session、当前仓库或重新 collect。只接受归档 manifest 与当前冻结身份匹配、collection controller nonce 与归档 recovery/supervisor 终态一致的输入；任何归档不支持的旧结构明确报错，不隐式改写材料。
+`experiment/grading.py` reads only a matching schema2/workload-contract1 run, verifies the original materials and RecoveryIdentity, and then reads `archive/collection.json` and artifacts.tar.gz. It requires collection COMPLETE, consistent=true, and terminal=true, with the archive SHA and internal collection/file inventory matching the external receipt; path traversal, links, duplicate member names, and checksum drift are rejected. Archive bytes are authoritative; it does not read live sessions that may still change, the current repository, or a new collect. Inputs are accepted only when the archived manifest matches the current frozen identity and the collection controller nonce agrees with the archived recovery/supervisor terminal state; any unsupported legacy archive structure produces an explicit error, without implicitly rewriting materials.
 
-将计划 binding 与 recovery 的 round.user_sha、users unit 的 key/session_id/完成状态匹配；逐 Session 核对 persona、task_id/digest/kind、run_id、round_no/slot、harness_sha、session_id。选择的轮次必须 sealed，原 COMPLETE 不等于所有用户有效。prediction 路径必须为本 session 唯一预期路径，hash/bytes 必须与完整归档补丁、workspace diff hash 相符。invalid/infrastructure session 不升级为有效完成；报告其原状态与评分适用性。
+Match the plan binding against recovery's round.user_sha and the users unit's key/session_id/completion status; verify persona, task_id/digest/kind, run_id, round_no/slot, harness_sha, and session_id for each Session. The selected round must be sealed; the original COMPLETE does not mean all users are valid. The prediction path must be the unique expected path for this session, and hash/bytes must match the complete archived patch and workspace diff hash. An invalid/infrastructure session is not promoted to valid completion; report its original status and grading applicability.
 
-同时核对当前宿主 runtime 的实验终态、collection COMPLETE 及可获得的最新 controller nonce，拒绝已经 resume/RUNNING、PROVISIONING、UNKNOWN 或 PARTIAL 的旧归档；旧 archive 文件保留不表示仍可用于当前 generation。读取和开始 attempt 前再次检查，发生变化拒绝，不为校验调用 provider。评分资格所用的 sim_trace 是否存在、evaluation_status、interaction_status 必须与不可变 recovery output 的规范化状态一致，不能通过改动 Session 的派生状态升级 invalid 会话。
+Also verify the current host runtime's experiment terminal state, collection COMPLETE, and the latest available controller nonce, rejecting old archives after resume/RUNNING, PROVISIONING, UNKNOWN, or PARTIAL; retaining an old archive file does not mean it remains usable for the current generation. Check again when reading and before starting an attempt, rejecting changes without invoking a provider for validation. The presence of sim_trace, evaluation_status, and interaction_status used to determine grading eligibility must agree with the normalized states of immutable recovery output; modifying Session's derived states must not promote an invalid session.
 
-### 数据集与 evaluator
+### Dataset and evaluator
 
-读取本地 dataset 的固定字节并验证用户给定 SHA（读取前后变化拒绝）；JSON/JSONL/parquet 必须在选中 instance_id 上唯一匹配，且 repo/base_commit 与 frozen SWE package 的 Git repo/revision 相同。拷贝选中的原官方 row 到评分 attempt 内，隐蔽 test/gold 字段只在此目录及 evaluator fresh container 中使用。失败输入在调用 evaluator 前拒绝。内部 _SWEbenchRunner 复用官方 CLI（锁定 swebench 4.1.0）；正式执行先确认依赖和 Docker 可用。官方 report 只有明确将目标 instance 列为 resolved 或 unresolved 且不在 error/incomplete/missing 集合时才成为 completed；未知/malformed report 为 crashed，不能解释为正常不通过。官方 4.1.0 有时会在 pytest 加载 conftest 或收集失败后仍汇总为 unresolved。若其原始 test_output 的正式测试区间含明确加载/收集失败诊断，分类为 crashed / official_test_start_failed，不计正常失败分数；这类错误可能来自环境或补丁，不重写官方测试与判分。fresh 是官方隔离运行合同，记录 evaluator 版本/命令、patch/dataset hashes 和官方原始报告，不自造官方成功。
+Read fixed bytes from the local dataset and verify the user-provided SHA (reject changes before and after reading); JSON/JSONL/parquet must uniquely match the selected instance_id, and repo/base_commit must match the frozen SWE package's Git repo/revision. Copy the selected original official row into the grading attempt; hidden test/gold fields are used only in this directory and the evaluator's fresh container. Invalid inputs are rejected before invoking the evaluator. The internal _SWEbenchRunner reuses the official CLI (pinned to swebench 4.1.0); actual execution first checks that dependencies and Docker are available. An official report becomes completed only if it explicitly lists the target instance as resolved or unresolved and does not include it in the error/incomplete/missing sets; an unknown/malformed report is crashed and cannot be interpreted as an ordinary failure. Official version 4.1.0 sometimes still summarizes an instance as unresolved after pytest fails to load conftest or collect tests. If the formal test interval in its raw test_output contains explicit loading/collection failure diagnostics, classify it as crashed / official_test_start_failed and do not count it as an ordinary failure score; such errors may originate from the environment or the patch, and official tests and scoring are not rewritten. fresh is the official isolated execution contract. Record the evaluator version/command, patch/dataset hashes, and raw official reports; do not fabricate official success.
 
-### 独立结果与重复操作
+### Independent results and repeated operations
 
-`run_dir/evaluation/<unique-attempt-id>/` 保存冻结评分 intent、各预测/官方 row、evaluator logs/reports、汇总；单独锁序列化本 run 的评分，不写 run runtime/journal。为避免读到未落完的管理操作，短暂只读打开已经存在的 operation lock 并取共享锁，执行期释放该锁，开始 attempt 和发布总结前核对同一宿主 generation；发生 resume 等变更则留下不完整 attempt 并拒绝成功总结。offline 不创建锁文件或目录。每次正式调用创建新 attempt，历史结果不覆盖；进程中断留下不完整 attempt，不将其视为成功。评分 intent 不复制凭证或 secrets_file。结果含原 run/config/catalog/plan/archive hashes、round、session/task/persona/Harness SHA、原用户接受/有效性与评分状态，不改任何用户体感或 acceptance。CLI 不读取 --secrets-file；摘要不包含 dataset 行的 gold/test 内容。
+`run_dir/evaluation/<unique-attempt-id>/` stores the frozen grading intent, each prediction/official row, evaluator logs/reports, and the summary; a separate lock serializes grading for this run without writing to the run runtime/journal. To avoid reading partially persisted administrative operations, briefly open the existing operation lock read-only and acquire a shared lock, release it during execution, and verify the same host generation before starting an attempt and publishing a summary; if a change such as resume occurs, leave an incomplete attempt and refuse to produce a successful summary. offline creates no lock files or directories. Each actual invocation creates a new attempt without overwriting historical results; process interruption leaves an incomplete attempt, which is not treated as successful. The grading intent does not copy credentials or secrets_file. Results include the original run/config/catalog/plan/archive hashes, round, session/task/persona/Harness SHA, original user acceptance/validity, and grading status, without changing any user experience or acceptance. The CLI does not read --secrets-file; the summary does not include gold/test content from dataset rows.
 
-### Task DAG 与所有权
+### Task DAG and ownership
 
-T1 完整预测 → T2 归档绑定与官方评分 → T3 统一 CLI 与生产验收；T4 教程与迁移清单独立开展，最终 T3 验证文档/示例一致。每个 Task files 在 frontmatter 分配，新增集成脚本 `backend/scripts/e2e-spec-0075-post-run-grading.sh`。关键验收包括超过 12000 字符完整补丁、同 session 冲突、空补丁与缺补丁、错误 task/round/SHA、损坏/链接归档、数据集错基线、官方失败/error/timeout、评分重复调用、原实验字节不变以及 local/E2B-shaped 归档共用读路径。离线测试在模型/provider/官方 Docker 边界替身，真实 Docker 验收单列，不将替身 report 称为官方成绩。
+T1 complete predictions → T2 archive binding and official grading → T3 unified CLI and production verification; T4 tutorials and migration checklist proceed independently, with T3 ultimately verifying consistency of documentation/examples. Each Task's files are assigned in frontmatter; add the integration script `backend/scripts/e2e-spec-0075-post-run-grading.sh`. Key verification cases include complete patches exceeding 12000 characters, same-session conflicts, empty versus missing patches, incorrect task/round/SHA, corrupted/link-containing archives, dataset baseline mismatches, official failure/error/timeout, repeated grading invocations, unchanged original experiment bytes, and a shared read path for local/E2B-shaped archives. Offline tests use substitutes at the model/provider/official Docker boundaries. Real Docker verification is listed separately, and substitute reports are not called official scores.
 
 ## Drawbacks
 
-完整补丁增加存储；官方 images 和 fresh Docker 评分需要磁盘、网络及时间。历史只有 hash 的 Session 无法补回预测；首版不能迁移或修复旧 run。评分不在 E2B 执行，操作者需要可运行 Docker 的主机。逐会话评分首版串行，批次用户自行对成员调用相同命令。
+Complete patches increase storage requirements; official images and fresh Docker grading require disk space, network access, and time. Historical Sessions containing only hashes cannot recover their predictions; the first version cannot migrate or repair old runs. Grading does not execute on E2B, so operators need a Docker-capable host. The first version grades sessions serially; batch users invoke the same command for each member themselves.
 
 ## Rationale and alternatives
 
-直接开 controller 内 objective evaluation 虽能复用旧路径，却把评分与演化隔离、运行资源、失败恢复揉在一起；不选。只给一个独立 hbench 命令没有原 run 会话补丁绑定，无法回答用户试用是否技术通过。从当前任务仓或截断输出重构预测没有可审计来源；拒绝。使用终态归档及 frozen materials，将评分与既有单 run 生命周期解耦，保留一个用户入口和独立研究评估边界。
+Enabling objective evaluation directly inside the controller could reuse the old path, but would entangle grading with evolution isolation, runtime resources, and failure recovery; this option is rejected. Providing only a standalone hbench command would lack binding to the original run's session patches and could not determine whether a user trial technically passed. Reconstructing predictions from the current task repository or truncated output has no auditable provenance and is rejected. Using terminal archives and frozen materials decouples grading from the existing single-run lifecycle, preserving one user entry point and a separate research evaluation boundary.
 
 ## Prior art
 
-内部 _SWEbenchRunner 已封装官方单 prediction CLI；独立 evaluation/harness_bench 已有 held-out 运行，不替换它。现有 collect 的 terminal inventory、Orchestrator logical binding/round seal 与 Session immutable evidence 可以复用，不能只凭文件名或用户接受宣称有效。
+The internal _SWEbenchRunner already wraps the official single-prediction CLI; standalone evaluation/harness_bench already supports held-out runs and is not replaced. Existing collect terminal inventory, Orchestrator logical binding/round seal, and Session immutable evidence can be reused; validity cannot be claimed solely from filenames or user acceptance.
 
 ## Unresolved questions
 
-本次没有依赖未确定选择。若 live Docker/官方 image 不可用，仍完成可重复的离线接线验收并明确尚未实测；不补造成绩。
+This work has no dependencies on unresolved choices. If live Docker/official images are unavailable, still complete reproducible offline integration verification and clearly state that live testing has not yet been performed; do not fabricate scores.
 
 ## Future possibilities
 
-后续可加入多 attempt 比较、批次评分调度、跨版本 held-out 套件及独立评分看板。历史 continuation、工程 CI、seed 输入适配分别设计，不在本组借评分开启旧入口。
+Future additions may include comparisons across attempts, batch grading scheduling, cross-version held-out suites, and an independent grading dashboard. Historical continuation, engineering CI, and seed input adaptation are designed separately; this group does not use grading to reopen old entry points.

@@ -1,12 +1,12 @@
 ---
 number: "0011"
-title: AgentBoard：卡通形式的活动 agent 页面
+title: "AgentBoard: A Cartoon-Style Active Agent Page"
 issue: 19
 slug: agentboard-cartoon-page
-summary: 本组在观测看板前端新增一个独立页 **AgentBoard**：以卡通形式（emoji 头像 + CSS 动画）实时展示 当前活动的 agent，展示其身份并支持点击，取代此前嵌于每页顶部的朴素折叠面板 `AgentsPanel`。 数据源沿用既有 `/api/agents`（`data/live/agents.json` 的只读投影，2 秒轮询），**零后端改动、 零新依赖**——卡通表现由 emoji + CSS keyframes 实现，符合奥卡姆理念。
+summary: "This group adds an independent **AgentBoard** page to the observation dashboard frontend: it displays currently active agents in real time in cartoon form (emoji avatars + CSS animations), shows their identities, and supports clicking, replacing the plain collapsible panel `AgentsPanel` previously embedded at the top of every page. The data source continues to use the existing `/api/agents` (a read-only projection of `data/live/agents.json`, polled every 2 seconds), with **zero backend changes and zero new dependencies**—the cartoon presentation is implemented with emoji + CSS keyframes, consistent with Occam’s razor."
 tasks:
   - id: T1
-    title: AgentBoard 卡通页 + 卡片 + 共享工具，摘除旧面板
+    title: "AgentBoard cartoon page + cards + shared utilities, remove the old panel"
     status: done
     priority: P1
     tags: []
@@ -23,105 +23,105 @@ tasks:
       - frontend/src/main.tsx
       - frontend/src/index.css
       - frontend/src/components/AgentsPanel.tsx
-    scope: 新增 /agentboard 独立路由页与导航入口；用 emoji 头像+CSS 动画表现 agent；两类卡片均可点。从 Shell 摘除常驻 AgentsPanel 并删除该组件。零新依赖、零后端改动。不改 agents.json 结构、不补 session_id、不触 benchmark。
-    acceptance: npm run build 通过无类型错误；导航出现 AgentBoard 入口且旧顶部面板不再出现在任何页；给定含 running/完成用户 + 开发者的 agents.json，页面显示 emoji 头像、身份、状态动画并 2s 刷新；点运行中用户卡跳其最新会话详情、点开发者卡就地展开 detail；pytest 保持全绿（未改后端）。
+    scope: "Add an independent /agentboard route page and navigation entry; represent agents with emoji avatars + CSS animations; both types of cards are clickable. Remove the persistent AgentsPanel from Shell and delete that component. Zero new dependencies, zero backend changes. Do not change the agents.json structure, add session_id, or touch the benchmark."
+    acceptance: "npm run build passes with no type errors; the AgentBoard entry appears in navigation and the old top panel no longer appears on any page; given an agents.json containing running/completed users + a developer, the page displays emoji avatars, identities, status animations, and refreshes every 2 seconds; clicking a running user card navigates to its latest session details, while clicking a developer card expands detail in place; pytest remains fully green (no backend changes)."
 ---
 
-# 0011 · AgentBoard：卡通形式的活动 agent 页面
+# 0011 · AgentBoard: A cartoon-style page for active agents
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level rust-RFC overview in 9 sections. -->
 
 ## Summary
 
-本组在观测看板前端新增一个独立页 **AgentBoard**：以卡通形式（emoji 头像 + CSS 动画）实时展示
-当前活动的 agent，展示其身份并支持点击，取代此前嵌于每页顶部的朴素折叠面板 `AgentsPanel`。
-数据源沿用既有 `/api/agents`（`data/live/agents.json` 的只读投影，2 秒轮询），**零后端改动、
-零新依赖**——卡通表现由 emoji + CSS keyframes 实现，符合奥卡姆理念。
+This group adds a standalone **AgentBoard** page to the observability dashboard frontend: it displays
+currently active agents in real time in cartoon form (emoji avatars + CSS animations), shows their identities, and supports clicking, replacing the plain collapsible panel `AgentsPanel` previously embedded at the top of every page.
+The data source remains the existing `/api/agents` (a read-only projection of `data/live/agents.json`, polled every 2 seconds), with **zero backend changes and
+zero new dependencies**—the cartoon presentation uses emoji + CSS keyframes, following the principle of Occam's razor.
 
-数据流脊柱：
+Data-flow backbone:
 
 ```
-run.py 闭环 ─update_agent→ data/live/agents.json
-        │  （用户 agent: agent_id=user-{identity}, label=identity, turns[]
-        │    开发者 agent: agent_id=dev-N, label=dev#N, detail）
+run.py loop ─update_agent→ data/live/agents.json
+        │  (User agent: agent_id=user-{identity}, label=identity, turns[]
+        │   Developer agent: agent_id=dev-N, label=dev#N, detail)
         ▼
-  /api/agents（既有只读端点） ──2s 轮询──► useLiveData(getAgents)
+  /api/agents (existing read-only endpoint) ──poll every 2s──► useLiveData(getAgents)
         ▼
-  AgentBoard 页（T1）：按 role 分两组卡片墙
-        ├─ AgentCard：emoji 头像(hash(label)) + role 装饰 + 身份 + status + 健康动画
-        └─ 点击：用户卡→按 persona_identity===label 匹配 /api/sessions 最新一条→跳 /sessions/:id
-                 开发者卡→就地展开 status/detail（无会话可跳，数据现实）
+  AgentBoard page (T1): card wall split into two groups by role
+        ├─ AgentCard: emoji avatar(hash(label)) + role styling + identity + status + health animation
+        └─ Click: user card → match persona_identity===label to the latest entry in /api/sessions → navigate to /sessions/:id
+                  developer card → expand status/detail in place (no session to navigate to; reflects the available data)
 ```
 
-一个 Task 即可交付（前端单页 + 抽出的共享工具 + 从 Shell 摘除旧面板）：**T1** 落地
-`/agentboard` 路由页、`AgentCard` 卡通卡、`lib/agentHealth`（健康判定 + fmtDur，从旧
-`AgentsPanel` 抽出复用）、`lib/avatar`（确定性 emoji 头像），并在 `main.tsx` 移除常驻
-`AgentsPanel`、删除 `AgentsPanel.tsx`，导航加 AgentBoard 入口。
+A single Task delivers this (a frontend page + extracted shared utilities + removal of the old panel from Shell): **T1** implements
+the `/agentboard` route page, `AgentCard` cartoon cards, `lib/agentHealth` (health assessment + fmtDur, extracted from the old
+`AgentsPanel` for reuse), and `lib/avatar` (deterministic emoji avatars), removes the persistent
+`AgentsPanel` from `main.tsx`, deletes `AgentsPanel.tsx`, and adds an AgentBoard entry to navigation.
 
-held-out 纪律不受影响：本组只读观测，不触 benchmark、不改训练信号、不写任何权威状态。
+Held-out discipline is unaffected: this group performs read-only observation, does not touch benchmarks, does not change training signals, and does not write any authoritative state.
 
 ## Motivation
 
-旧 AgentsPanel 把 agent 活动塞进每页顶部的朴素折叠列表，信息密度低、身份不直观，且常驻挤占各页顶部空间。
-用户要「以卡通形式展示活动 agent、展示身份、支持点击」的独立页面：卡通头像让「谁在跑、什么身份、健康与否」
-一眼可辨，独立页把 agent 观测从各业务页解耦出来。选 emoji + CSS 而非引入头像生成库（DiceBear 等），是遵循
-CLAUDE.md 奥卡姆理念——最小可用、零新依赖即可达成卡通表现；数据源已就绪，无需任何后端或注册表结构改动。
+The old AgentsPanel crams agent activity into a plain collapsible list at the top of every page, with low information density, unclear identities, and persistent use of top-of-page space.
+The user wants a standalone page that “displays active agents in cartoon form, shows their identities, and supports clicking”: cartoon avatars make “who is running, in what role, and whether they are healthy”
+clear at a glance, while a standalone page decouples agent observation from individual application pages. Choosing emoji + CSS instead of introducing an avatar generation library (such as DiceBear) follows
+CLAUDE.md's principle of Occam's razor—a minimal viable cartoon presentation with zero new dependencies; the data source is already available, so no backend or registry schema changes are needed.
 
 ## Guide-level explanation
 
-在观测看板前端新增独立页 AgentBoard（/agentboard），以卡通形式实时展示当前活动的 agent 并支持点击，
-取代此前嵌于每页顶部的朴素折叠面板 AgentsPanel。数据源沿用既有只读端点 /api/agents（data/live/agents.json
-的投影，2s 轮询），零后端改动、零新依赖。交付四个前端文件 + 两处既有文件改动 + 一处删除：① pages/AgentBoard.tsx
-——轮询 getAgents，按 role 拆用户/开发者两组，各渲染卡片墙，空态提示；② components/AgentCard.tsx——单个 agent
-的卡通卡：emoji 头像 + role 装饰 + 身份（role 中文名 + label）+ 一行 status + 按健康态驱动的 CSS 动画，点击
-按 role 分派（用户卡跳会话、开发者卡就地展开）；③ lib/agentHealth.ts——从旧 AgentsPanel 抽出的健康判定
-health(a, now)（异常>卡顿>运行>完成）与 fmtDur、STALE_MS，供复用、去重复；④ lib/avatar.ts——确定性 emoji
-头像（hash(label) 定脸 + role 定角标）。同时在 main.tsx 从 Shell 摘除常驻 AgentsPanel、加 AgentBoard 路由与
-导航入口，并删除 components/AgentsPanel.tsx（仅此一处引用）。
+Add a standalone AgentBoard page (/agentboard) to the observability dashboard frontend to display currently active agents in cartoon form in real time and support clicking,
+replacing the plain collapsible AgentsPanel previously embedded at the top of every page. The data source remains the existing read-only endpoint /api/agents (a projection of data/live/agents.json,
+polled every 2s), with zero backend changes and zero new dependencies. Deliver four frontend files + changes to two existing files + one deletion: ① pages/AgentBoard.tsx
+—poll getAgents, split agents into user/developer groups by role, render a card wall for each, and show an empty-state message; ② components/AgentCard.tsx—a cartoon card for a single
+agent: emoji avatar + role decoration + identity (Chinese role name + label) + one line of status + CSS animations driven by health state; clicking
+dispatches by role (user cards navigate to a session, developer cards expand in place); ③ lib/agentHealth.ts—health assessment extracted from the old AgentsPanel,
+health(a, now) (error > stalled > running > completed), plus fmtDur and STALE_MS, for reuse and deduplication; ④ lib/avatar.ts—deterministic emoji
+avatars (hash(label) determines the face + role determines the badge). Also remove the persistent AgentsPanel from Shell in main.tsx, add the AgentBoard route and
+navigation entry, and delete components/AgentsPanel.tsx (referenced only here).
 
 ## Reference-level explanation
 
-- 目录：pages/AgentBoard.tsx（页面）、components/AgentCard.tsx（卡片）、lib/agentHealth.ts 与 lib/avatar.ts
-  （纯函数工具）。页面/卡片/工具三层职责分离（理念 2 解耦、3 结构化）。
-- 数据契约（沿用 types.ts 的 Agent，不改）：agent_id · role("user"|"developer") · label · running · status ·
-  turns[] · detail · started_at · updated_at。用户 agent 的 label === 后端 _summarize 的 persona_identity
-  （run.py 中 mp.identity=sp.persona_id，label=identity；三者同源），是用户卡点击跳转的关联依据。
-- AgentBoard：useLiveData(getAgents, 2000) 取实时数据 → now=Date.now() → 按 role 拆 users/devs 两组 →
-  各渲染 flex-wrap 卡片墙。error 时显示「加载失败：{error}」；两组皆空显示「暂无活动 agent（跑闭环后实时出现）」。
-- agentHealth.ts：把旧 AgentsPanel 的 health(a, now)（异常>卡顿>运行>完成，STALE_MS=330_000）与 fmtDur
-  原样抽出为共享纯函数；卡片与（若未来复用）他处共用一份判定，杜绝逻辑漂移。缺 started_at 时回退 updated_at。
-- avatar.ts：简单字符串哈希 hash(label) 映射到一组固定 emoji 脸之一（同一 agent 恒定同脸）；role 决定角标
-  （用户叠 🙋、开发者叠 🛠️）。纯函数、无状态、可单测。
-- AgentCard：接收 {agent, now}，算 health → 渲染头像 + role 中文名（用户 Agent/开发者 Agent）+ label +
-  一行 status；健康态映射为动画 class：ok 上下浮动+绿色光环 / warn 黄色慢摇摆 / err 红色抖动 / idle 变暗+😴
-  无动画（CSS keyframes 写入 index.css，复用既有 ok/warn/err/idle 色板）。点击用受控 state toggle 内联展开，
-  对两类卡统一交互（不用 <details>）。
-- 点击分派：用户卡 → 调既有 getSessions() → 过滤 persona_identity===label → 按 created_at 倒序取首个 →
-  navigate('/sessions/:session_id')；无匹配（该 persona 尚无落库会话）则降级为就地展开，不报错、不跳空白。
-  开发者卡 → 无会话可跳（数据现实），点击就地展开 status/detail。
-- main.tsx：Shell 中移除 <AgentsPanel />；Routes 加 <Route path="/agentboard" element={<AgentBoard/>} />；
-  nav 加 <Link to="/agentboard">AgentBoard</Link>（置于「概览」之后）。删除 components/AgentsPanel.tsx。
+- Directories: pages/AgentBoard.tsx (page), components/AgentCard.tsx (card), lib/agentHealth.ts and lib/avatar.ts
+  (pure-function utilities). Separate responsibilities into three layers: page/card/utilities (principle 2: decoupling; principle 3: structure).
+- Data contract (reuse Agent from types.ts without changes): agent_id · role("user"|"developer") · label · running · status ·
+  turns[] · detail · started_at · updated_at. A user agent's label === persona_identity from the backend _summarize
+  (in run.py, mp.identity=sp.persona_id, label=identity; all three share the same source), which provides the association used for navigation when a user card is clicked.
+- AgentBoard: useLiveData(getAgents, 2000) retrieves live data → now=Date.now() → split into users/devs groups by role →
+  render each as a flex-wrap card wall. On error, show “Load failed: {error}”; when both groups are empty, show “No active agents (they appear in real time after running the closed loop)”.
+- agentHealth.ts: extract the old AgentsPanel's health(a, now) (error > stalled > running > completed, STALE_MS=330_000) and fmtDur
+  unchanged as shared pure functions; cards and any future consumers share one assessment implementation to prevent logic drift. Fall back to updated_at when started_at is missing.
+- avatar.ts: a simple string hash, hash(label), maps to one of a fixed set of emoji faces (the same agent always has the same face); role determines the badge
+  (🙋 overlaid for users, 🛠️ for developers). Pure functions, stateless, and unit-testable.
+- AgentCard: receives {agent, now}, computes health → renders avatar + Chinese role name (User Agent/Developer Agent) + label +
+  one line of status; health states map to animation classes: ok floats vertically with a green halo / warn sways slowly in yellow / err shakes in red / idle dims with 😴
+  and no animation (CSS keyframes go in index.css, reusing the existing ok/warn/err/idle palette). Clicking uses a controlled state toggle to expand inline,
+  providing consistent interaction for both card types (without <details>).
+- Click dispatch: user card → call the existing getSessions() → filter persona_identity===label → sort by created_at descending and take the first →
+  navigate('/sessions/:session_id'); if there is no match (this persona has no persisted session yet), fall back to expanding in place, without errors or navigation to a blank page.
+  Developer card → no session to navigate to (the actual data situation), so clicking expands status/detail in place.
+- main.tsx: remove <AgentsPanel /> from Shell; add <Route path="/agentboard" element={<AgentBoard/>} /> to Routes;
+  add <Link to="/agentboard">AgentBoard</Link> to nav (after “Overview”). Delete components/AgentsPanel.tsx.
 
-**接口**
+**Interfaces**
 
-路由：GET /agentboard（前端路由）。
-组件：<AgentBoard />（无 props，页面级）；<AgentCard agent={Agent} now={number} />。
-工具（lib）：
-- agentHealth.ts：health(a: Agent, now: number) -> {cls, text}；fmtDur(ms: number) -> string；STALE_MS。
-- avatar.ts：avatarFor(label: string, role: string) -> {face: string, badge: string}。
-数据：复用 api.ts 既有 getAgents()/getSessions() 与 hooks/useLiveData；后端契约 /api/agents、/api/sessions 不变。
+Route: GET /agentboard (frontend route).
+Components: <AgentBoard /> (no props, page-level); <AgentCard agent={Agent} now={number} />.
+Utilities (lib):
+- agentHealth.ts: health(a: Agent, now: number) -> {cls, text}; fmtDur(ms: number) -> string; STALE_MS.
+- avatar.ts: avatarFor(label: string, role: string) -> {face: string, badge: string}.
+Data: reuse the existing getAgents()/getSessions() in api.ts and hooks/useLiveData; backend contracts /api/agents and /api/sessions remain unchanged.
 
-**测试**
+**Tests**
 
-前端为轻量 SPA，无既有单测框架；验收以构建 + 手工冒烟为准（见 acceptance）：
-- npm run build（tsc --noEmit && vite build）通过，无类型错误。
-- 导航出现 AgentBoard 入口；旧顶部 AgentsPanel 不再出现在任何页（概览/会话/看板）。
-- 造 data/live/agents.json（含 running 用户 + 完成用户 + 开发者各若干）→ 启后端+前端 → 肉眼确认卡通头像、
-  身份、四类状态动画、2s 刷新。
-- 点运行中用户卡 → 跳该 persona 最新会话详情；点开发者卡 → 就地展开 detail；无匹配会话的用户卡 → 就地展开不报错。
-后端未改，pytest（含 /api/agents 覆盖的 backend/tests/web/test_api.py）应保持全绿，仅作回归确认。
+The frontend is a lightweight SPA with no existing unit test framework; acceptance is based on a build + manual smoke tests (see acceptance):
+- npm run build (tsc --noEmit && vite build) passes with no type errors.
+- An AgentBoard entry appears in navigation; the old top-of-page AgentsPanel no longer appears on any page (overview/sessions/dashboard).
+- Create data/live/agents.json (with several running user agents, completed user agents, and developer agents) → start the backend + frontend → visually verify cartoon avatars,
+  identities, the four types of status animations, and 2s refresh.
+- Click a running user card → navigate to that persona's latest session details; click a developer card → expand detail in place; click a user card with no matching session → expand in place without errors.
+The backend is unchanged, so pytest (including backend/tests/web/test_api.py, which covers /api/agents) should remain fully green, serving only as a regression check.
 
-**文件（单一 writer 所有权）**
+**Files (single-writer ownership)**
 
   - `frontend/src/pages/AgentBoard.tsx`
   - `frontend/src/components/AgentCard.tsx`
@@ -131,37 +131,37 @@ health(a, now)（异常>卡顿>运行>完成）与 fmtDur、STALE_MS，供复用
   - `frontend/src/index.css`
   - `frontend/src/components/AgentsPanel.tsx`
 
-依赖 DAG：各 Task 相互独立，无依赖。
+Dependency DAG: all Tasks are independent, with no dependencies.
 
 ## Drawbacks
 
-<!-- 待填 -->
+<!-- TODO -->
 
 ## Rationale and alternatives
 
-- emoji + CSS vs 引头像生成库（DiceBear/boring-avatars）：选前者。零新依赖即达卡通表现（奥卡姆），代价是
-  头像多样性有限（一组固定脸），但对内部观测看板足够。
-- 独立页 vs 保留顶部常驻面板：选独立页并摘除旧面板。避免两处重复展示同批 agent、还各页顶部挤占空间；代价是
-  看 agent 活动需切到 AgentBoard 页（可接受，本就是观测动作）。
-- 用户卡点击靠前端匹配 persona_identity vs 后端给 agents.json 补 session_id：选前端匹配。零后端改动、
-  label 与 persona_identity 已同源；代价是多一次 /api/sessions 拉取与匹配（数据量小，可接受）。
-- 开发者卡无会话可跳的不对称：接受「就地展开 detail」而非禁用点击。两类卡都可点、交互一致，符合用户「都可以点」。
+- emoji + CSS vs introducing an avatar generation library (DiceBear/boring-avatars): choose the former. It achieves a cartoon presentation with zero new dependencies (Occam's razor), at the cost of
+  limited avatar variety (a fixed set of faces), which is sufficient for an internal observability dashboard.
+- Standalone page vs retaining the persistent top panel: choose a standalone page and remove the old panel. This avoids displaying the same agents twice and taking up space at the top of every page; the cost is
+  switching to the AgentBoard page to view agent activity (acceptable, since this is an observation action).
+- Matching persona_identity on the frontend when a user card is clicked vs adding session_id to agents.json on the backend: choose frontend matching. Zero backend changes,
+  and label and persona_identity already share the same source; the cost is one additional /api/sessions fetch and matching step (acceptable given the small data volume).
+- Asymmetry because developer cards have no session to navigate to: accept “expand detail in place” instead of disabling clicks. Both card types are clickable with consistent interaction, matching the user's “both should be clickable”.
 
 ## Prior art
 
-既有实现：frontend/src/components/AgentsPanel.tsx（health/fmtDur/STALE_MS 原逻辑出处，本 Task 抽出后删除）、
-frontend/src/types.ts（Agent DTO 契约）、frontend/src/hooks/useLiveData.ts、frontend/src/api.ts
-（getAgents/getSessions）、frontend/src/pages/SessionDetail.tsx（点击跳转目标）、frontend/src/index.css
-（既有 ok/warn/err/idle 色板与 dot/badge 样式）。后端 backend/ahe_beta/web/api.py（/api/agents、
-/api/sessions）、loop/live.py（agents.json 写入）、run.py（agent_id/label 约定）。
+Existing implementations: frontend/src/components/AgentsPanel.tsx (source of the original health/fmtDur/STALE_MS logic, deleted after extraction in this Task),
+frontend/src/types.ts (Agent DTO contract), frontend/src/hooks/useLiveData.ts, frontend/src/api.ts
+(getAgents/getSessions), frontend/src/pages/SessionDetail.tsx (click navigation destination), frontend/src/index.css
+(existing ok/warn/err/idle palette and dot/badge styles). Backend: backend/ahe_beta/web/api.py (/api/agents,
+/api/sessions), loop/live.py (writes agents.json), run.py (agent_id/label conventions).
 
 ## Unresolved questions
 
-- 头像脸谱表规模：初版一组固定 emoji 脸即可；persona 增多后是否需更大脸库或按 domain 着色，留待观测后定。
-- 用户卡点击的会话匹配用「最新一条」：同一 persona 多局会话时只跳最近一局；若需选具体某局，属后续增强。
-- agents.json 未来若加 session_id 字段，用户卡可直接跳转、省去 /api/sessions 匹配；本组不做该后端改动。
+- Avatar face set size: a fixed set of emoji faces is sufficient for the initial version; whether a larger face library or coloring by domain is needed as personas increase will be decided after observation.
+- Session matching on user-card clicks uses the “latest entry”: when the same persona has multiple sessions, navigation goes only to the most recent one; selecting a specific session would be a future enhancement.
+- If agents.json gains a session_id field in the future, user cards can navigate directly and skip /api/sessions matching; this group does not make that backend change.
 
 ## Future possibilities
 
-<!-- 待填 -->
+<!-- TODO -->
 

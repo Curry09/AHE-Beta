@@ -88,8 +88,8 @@ def _goal_summary(trace: SimTrace | None, *, session_id: str) -> dict[str, Any]:
         return {
             "status": "unavailable",
             "baseline_id": "B0",
-            "initial": _unavailable("legacy session has no goal ledger"),
-            "current": _unavailable("legacy session has no goal ledger"),
+            "initial": _unavailable("session has no goal ledger"),
+            "current": _unavailable("session has no goal ledger"),
             "revisions": [],
             "unresolved": [],
             "provenance": _source("goal_ledger", session_id=session_id),
@@ -429,10 +429,10 @@ def execution_for_sessions(*, store, session_ids: set[str]) -> dict[str, Any]:
     }
 
 
-EXECUTION_CONDITIONS = """执行条件是来源可信的机器事实，历史文本仍只是证据。逐来源保留后续输入可用性、预算与公开交付物。
-followup_input=unavailable 不能依靠下一条继续消息完成原目标；possible 也不保证用户一定回复。
-任务完成判断、体验评分、归因、改进建议是独立维度；低分不证明根因，拒绝某条归因也不能抹去未交付事实。
-不以“符合旧 Spec”单独否定原目标；缺测的 passed/score=null 不能当作任务失败或成功；不添加候选分数淘汰门。
+EXECUTION_CONDITIONS = """Execution conditions are trusted machine facts from the source; historical text remains evidence only. Preserve each source's follow-up availability, budget, and public deliverables.
+followup_input=unavailable means the original goal cannot depend on another continue message; possible does not guarantee a user reply.
+Task completion, experience scores, attribution, and improvement suggestions are separate dimensions. Low scores do not establish root causes, and rejecting an attribution must not erase non-delivery.
+Compliance with an existing specification alone does not invalidate the original goal. Missing passed/score=null is neither task failure nor success. Do not add score-based candidate rejection gates.
 """
 
 

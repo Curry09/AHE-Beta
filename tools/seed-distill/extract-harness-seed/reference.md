@@ -1,150 +1,167 @@
-# Reference: Harness-Seed Harvesting（extract-harness-seed 薄 skill 的来源特异细则）
+# Reference: Harness-Seed Harvesting (source-specific rules for the thin extract-harness-seed skill)
 
-本文件只承载 `extract-harness-seed`（closed issue + merged fix PR / 高票 Q&A 源）的抽取细则：
-oracle 分层、harbor 可复现分层、difficulty 校准、harvest mechanics、范例。**卡的字段 schema /
-枚举 / domain 词表 / 两道门原则 / held-out 存放约定见唯一公共契约
-[`../seed-card-schema.md`](../seed-card-schema.md)，此处不重复。**
+This file contains only the extraction rules for `extract-harness-seed` sources: closed issues with
+merged fix PRs and highly voted Q&A. It covers oracle tiers, harbor reproducibility tiers, difficulty
+calibration, harvesting mechanics, and examples. **The card field schema, enums, domain vocabulary,
+two-gate principles, and held-out storage conventions are in the sole shared contract,
+[`../seed-card-schema.md`](../seed-card-schema.md), and are not duplicated here.**
 
-## 1. capability 识别（从「修复揭示的真实所需」判定）
+## 1. Identify capability from what the resolution proves was required
 
-分类法本身在契约 §capability。判定要点：从 *resolution* 揭示任务真正需要什么去标，而非从诉求表面。
+The taxonomy itself is in the contract's capability section. Label what the *resolution* reveals
+the task truly requires, rather than its surface wording.
 
-- `intent-inference` — 原诉求含糊（"变快点"/"不工作"），修复显示真实意图须被推断/澄清。
-- `correctness-edgecase` — 修复是系于微妙情形（off-by-one、null/空、引号、顺序、竞态）的小 diff。
-- `long-output` — 解决是整文件重写 / 多文件改 / 大产物。压测截断、丢块、"其余不变"式偷懒。
-- `tool-use-verification` — 只有真跑测试/构建/复现才知对。压测 harness 是否真跑核实 vs 宣称完成。
-- `scope-discipline` — merged fix 刻意最小；诱人的更大改动会破坏邻近行为。
-- `env-setup` — 任务就是把依赖/构建/配置弄通（CI、打包、工具链）。
-- `error-recovery` — thread 显示迭代：首修失败、二修成功。压测有效调试环 vs 放弃/空转。
-- `explanation-teaching` — 提问者低能力；成功 = 一个他能据以行动的答案。
+- `intent-inference`: an ambiguous request ("make it faster" / "doesn't work") whose fix reveals an intent that must be inferred or clarified.
+- `correctness-edgecase`: a small fix dependent on subtle cases: off-by-one, null/empty, quoting, ordering, or races.
+- `long-output`: resolution requires a whole-file rewrite, multiple files, or a large artifact. Tests truncation, missing chunks, and "the rest is unchanged" shortcuts.
+- `tool-use-verification`: only running tests/builds/reproductions establishes correctness. Tests actual verification rather than merely claiming completion.
+- `scope-discipline`: the merged fix is deliberately minimal; a tempting broader change would break neighboring behavior.
+- `env-setup`: the task is making dependencies/build/configuration work: CI, packaging, or toolchains.
+- `error-recovery`: the thread shows iteration, with a failed first fix and successful second fix. Tests an effective debugging loop rather than abandonment or idle repetition.
+- `explanation-teaching`: the asker has limited capability; success means an answer they can act on.
 
-一卡可标 2–3 个，但选它最干净隔离的**主**能力。
+A card may have 2–3 labels, but choose the **primary** capability it isolates most cleanly.
 
-## 2. oracle 分层（强 → 弱；取制品支持的最强档）
+## 2. Oracle tiers: strongest to weakest, using the strongest supported by artifacts
 
-契约 §枚举 `oracle.tier` 列出取值。各档来源与保真：
+See the contract's enum section for `oracle.tier` values. Sources and fidelity by tier:
 
-| tier | 是什么 | 从何 harvest | 可自动 | 保真 |
-|---|---|---|---|---|
-| `executable-test` | 一条随修复 FAIL→PASS 的具体测试 | fix PR **新增/改**的测试 | ✅ | 最高 |
-| `test-suite` | 修复 commit 上既有套件通过 | 跑套件 @fix vs @parent | ✅ | 高 |
-| `sandbox-run` | 脚本化跑复现期望输出/行为 | 由 issue 的 repro + 期望构造 | ✅/半 | 高–中 |
-| `rubric` | 必备属性清单 | 需求 + accepted answer | ⚠️ judge | 中 |
-| `llm-judge` | 比对 harness 输出与参考解 | merged diff / accepted answer 作参考 | ⚠️ 噪 | 低–中 |
-| `none` | 无 harness-独立 check（纯设计/观点） | — | — | **排除** |
+| tier | Meaning | Harvest source | Automated | Fidelity |
+|------|---------|----------------|-----------|----------|
+| `executable-test` | A specific test that changes FAIL→PASS with the fix | Tests **added/changed** by the fix PR | ✅ | Highest |
+| `test-suite` | Existing suite passes at the fix commit | Run suite @fix versus @parent | ✅ | High |
+| `sandbox-run` | Scripted reproduction of expected output/behavior | Constructed from the issue's reproduction and expected behavior | ✅/partial | High–medium |
+| `rubric` | Checklist of required properties | Requirements and accepted answer | ⚠️ judge | Medium |
+| `llm-judge` | Compare harness output with a reference solution | Merged diff / accepted answer as reference | ⚠️ noisy | Low–medium |
+| `none` | No harness-independent check: pure design/opinion | — | — | **Exclude** |
 
-规则：优先 `executable-test`（fix PR 加回归测试即理想种子）；`rubric`/`llm-judge` 可入但
-`oracle.confidence` 封顶 `medium` 并标低保真；oracle 须**独立于 harness**（绝不用 harness 自身输出
-定义成功）；`provenance.resolution_quote` 记**逐字**解决原句（测试名 / 断言 / accepted answer 关键句）。
+Prefer `executable-test`: a fix PR adding a regression test is an ideal seed.
+`rubric`/`llm-judge` may be admitted, but cap `oracle.confidence` at `medium` and mark low fidelity.
+The oracle must be **independent of the harness**: never define success using the harness's own output.
+Record the **verbatim** resolution text in `provenance.resolution_quote`: test name, assertion, or key accepted-answer sentence.
 
-## 3. harbor 可复现门（契约 §两道门原则第 2 道的分层）
+## 3. Harbor reproducibility gate: tiers within the contract's second gate
 
-| tier | 条件 | 动作 |
-|---|---|---|
-| `easy` | 单仓、标准包管理、hermetic 单测 | admit |
-| `medium` | 需可容器化服务（postgres/redis）或 vendored 数据 fixture | admit（写进 env spec） |
-| `hard` → **拒** | live cloud、特定 OS、特定硬件、超大数据、live 三方 API、flaky/timing/network 测试 | 拒，或降 oracle 为 `rubric` 并标 `env.reproducible: "hard-rubric-only"` |
+| tier | Conditions | Action |
+|------|------------|--------|
+| `easy` | Single repo, standard package management, hermetic unit tests | Admit. |
+| `medium` | Containerizable service (postgres/redis) or vendored data fixtures required | Admit; declare them in the env spec. |
+| `hard` → **reject** | Live cloud, specific OS/hardware, huge datasets, live third-party APIs, flaky/timing/network tests | Reject, or downgrade the oracle to `rubric` and mark `env.reproducible: "hard-rubric-only"`. |
 
-`env` 供 harbor 消费：`base_image` / `repo_at`(父 commit SHA) / `setup`(确定性、pin 死) /
-`test_cmd` / `external_deps`(`none`|`containerizable:[...]`|`live(REJECT)`) / `budget`。**pin 一切**
-（lockfile、镜像 digest），无 "latest"、无 unpinned 网络安装。
+`env` is consumed by harbor: `base_image` / `repo_at` (parent commit SHA) / `setup` (deterministic, pinned) /
+`test_cmd` / `external_deps` (`none`|`containerizable:[...]`|`live(REJECT)`) / `budget`.
+**Pin everything**, including lockfiles and image digests. No "latest" and no unpinned network installation.
 
-## 4. difficulty & scope 校准
+## 4. Calibrate difficulty and scope
 
-- `difficulty`: `trivial|easy|medium|hard` — 按修复的**概念深度**判，不按行数（3 行竞态修复算 `hard`）。
-- `scope`: `single-file|multi-file|cross-module|repo-wide`。
-- 二者驱动**配对**：`pairing_constraints.min_capability` 随难度升（`hard` ABI 种子需 `expert`；
-  `trivial` 语法种子配 `surface`），并让**归因**干净（`hard` 种子上低体感可能是任务难而非 harness 差，
-  oracle 消歧）。
+- `difficulty`: `trivial|easy|medium|hard`, based on the fix's **conceptual depth**, not line count.
+  A 3-line race-condition fix can be `hard`.
+- `scope`: `single-file|multi-file|cross-module|repo-wide`.
+- These determine **pairing**: raise `pairing_constraints.min_capability` with difficulty
+  (`hard` ABI seeds require `expert`; `trivial` syntax seeds pair with `surface`).
+  They also clarify **attribution**: low user experience on a `hard` seed may reflect task difficulty
+  rather than a poor harness; the oracle disambiguates.
 
-## 5. 从何 harvest (source-product)
+## 5. Harvest sources and outputs
 
-| 来源 | 最擅长 | oracle 产率 | 备注 |
-|---|---|---|---|
-| closed issue + **带测试的 merged fix PR** | 金种子 | `executable-test` | SWE-bench 配方，**非 benchmark** 实例 |
-| 无测试的 merged fix PR | 逻辑种子 | `test-suite` / `sandbox-run` | 跑套件 @fix vs @parent |
-| accepted / 高票 SO 答案 | 低端 & how-do-I 种子 | `sandbox-run` / `rubric` | 配 blind/surface persona |
-| feature request + 落地的 PR | `scope-discipline` 种子 | `rubric` / `test-suite` | 注意可复现性 |
+| Source | Best use | Oracle yield | Notes |
+|--------|----------|--------------|-------|
+| Closed issue + **merged fix PR with tests** | Gold-standard seeds | `executable-test` | SWE-bench recipe, **not benchmark** instances |
+| Merged fix PR without tests | Logic seeds | `test-suite` / `sandbox-run` | Run suite @fix versus @parent. |
+| Accepted / highly voted SO answer | Lower-tier and how-do-I seeds | `sandbox-run` / `rubric` | Pair with blind/surface personas. |
+| Feature request + implemented PR | `scope-discipline` seeds | `rubric` / `test-suite` | Check reproducibility. |
 
-与 persona 同域采集，故 seed 与 persona 能同域配对；但**从不同实例** harvest，排除 held-out benchmark。
+Collect in the same domain as personas so seeds and personas can be paired by domain,
+but harvest them **from different instances** and exclude held-out benchmarks.
 
-## 6. harvest mechanics（operator SOP）
+## 6. Harvesting mechanics: operator SOP
 
-**两类字段两条规则**：FACT 逐字转录/命令派生，绝不发明；JUDGMENT 按本 skill §1–§4 准则判定。
-字段到来源的对应见契约卡形状注释。
+**Two field classes, two rules:** transcribe FACT fields verbatim or derive them with commands; never invent them.
+Judge JUDGMENT fields using §1–§4 of this skill. The contract's card-shape comments map fields to sources.
 
-### 6.1 发现 query（找金制品）
+### 6.1 Discovery queries: find high-quality artifacts
 
-先定 domain（由 harvest 所在仓决定，是 FACT），再找一个 **closes issue 且加/改测试的 merged PR**：
+First establish the domain from the harvested repository: it is a FACT.
+Then find a **merged PR that closes an issue and adds/changes tests**:
 
 ```bash
-# 1. 某仓引用了 closed issue 的 merged PR
+# 1. Merged PRs in a repo that reference a closed issue
 gh search prs --repo pytest-dev/pytest --state closed --merged \
   --match body "fixes #" -L 50 --json number,title,url,closedAt
-# 2. 只留动了测试文件的（executable-test 候选）
+# 2. Keep only those changing test files (executable-test candidates)
 gh pr view <N> --repo pytest-dev/pytest --json files \
   -q '[.files[].path | select(test("(^|/)tests?/|test_.*\\.py$"))]'
 ```
 
-### 6.2 `repo_at` — 父（未修复）commit，由命令求（注入侧要求真实 SHA、拒占位）
+### 6.2 `repo_at`: derive the parent, unfixed commit with commands; injection requires a resolved SHA
 
-要复现的状态 = base-before-merge = 合并 commit 的第一父：
+The state to reproduce is base-before-merge: the merge commit's first parent.
 
 ```bash
 MERGE=$(gh pr view <N> --repo OWNER/REPO --json mergeCommit -q .mergeCommit.oid)
-gh api repos/OWNER/REPO/commits/$MERGE -q '.parents[0].sha'   # -> repo_at（真实 40 位 SHA）
+gh api repos/OWNER/REPO/commits/$MERGE -q '.parents[0].sha'   # -> repo_at (resolved 40-character SHA)
 ```
 
-`repo_at` 必须**在 harvest 时解析为真实 SHA**；卡里留 `<parent-commit-...>` 等占位是未完成的采集——
-0010/T2 注入侧会**拒收占位**（占位在物化时才炸，前移到注入边界暴露）。验 PASS 的 commit 是 `MERGE` 本身。
+**Resolve `repo_at` to a real SHA during harvest.** Leaving `<parent-commit-...>` or another placeholder
+in the card means harvesting is incomplete. 0010/T2 injection **rejects placeholders**, exposing the
+problem at injection rather than waiting for materialization to fail. The commit checked for PASS is `MERGE` itself.
 
-### 6.3 `not_in_benchmark` — 机检（绝不"大概没事"）
+### 6.3 `not_in_benchmark`: machine-check, never assume
 
-- **日期规则**：只当 PR `merged_at` 晚于 benchmark 采集 cutoff 才 admit（SWE-bench 实例多在 cutoff 前）。
-- **ID 规则**：载 benchmark 实例表，断言 `f"{repo}-{issue_number}"`（及 SWE-bench `OWNER__REPO-NNNN` 形）**不在**其中。
+- **Date rule:** admit only when the PR's `merged_at` is later than the benchmark collection cutoff.
+  SWE-bench instances generally predate that cutoff.
+- **ID rule:** load the benchmark instance table and assert that `f"{repo}-{issue_number}"`
+  and the SWE-bench `OWNER__REPO-NNNN` form are **absent**.
 
-记下过的是哪条规则；两条都判不了 → **不**置 `true`，扣住该卡。
+Record which rule passed. If neither can be evaluated, **do not** set `true`: withhold the card.
 
-### 6.4 `external_deps` — 读，别猜
+### 6.4 `external_deps`: read rather than guess
 
 ```bash
-gh pr diff <N> --repo OWNER/REPO | grep -E '^\+\s*(import|from) '   # 测试的依赖
+gh pr diff <N> --repo OWNER/REPO | grep -E '^\+\s*(import|from) '   # Test dependencies
 ls .github/workflows && grep -RnE 'services:|postgres|redis|docker' .github/workflows
 ```
 
-仅 stdlib/in-repo → `none`；需容器可供的 postgres/redis 等 → `containerizable:[...]`（repro `medium`）；
-需 live cloud / 三方 API / 设备 / 特定 OS → `live(REJECT)`（§3 → 拒或降级）。
+Only stdlib/in-repo dependencies → `none`; containerizable postgres/redis or similar services →
+`containerizable:[...]` (repro `medium`); live cloud / third-party APIs / devices / specific OS →
+`live(REJECT)` (reject or downgrade under §3).
 
-### 6.5 reproduce-once（真正的 S7 检查，校验器做不到）
+### 6.5 Reproduce once: the real S7 check, beyond the validator
 
 ```bash
 git clone https://github.com/OWNER/REPO && cd REPO
-git checkout <repo_at>      && <setup> && <test_cmd>   # 期望: fail
-git checkout <merge_commit> && <setup> && <test_cmd>   # 期望: pass
+git checkout <repo_at>      && <setup> && <test_cmd>   # Expected: fail
+git checkout <merge_commit> && <setup> && <test_cmd>   # Expected: pass
 ```
 
-只有 `FAIL@parent → PASS@fix` 才证明 `repo_at`/`test_cmd`/`oracle` 可信；不符即某 FACT 错，修，别 admit。
+Only `FAIL@parent → PASS@fix` proves that `repo_at`/`test_cmd`/`oracle` are trustworthy.
+A mismatch means a FACT is wrong: correct it rather than admitting the card.
 
-## 7. 范例
+## 7. Examples
 
-### A — admit（easy, executable-test）
+### A — admit: easy, executable-test
 
-closed dbt-core issue：长名 generic test 节点丢 `depends_on`；merged PR 加 `test_long_name_resolution`。
-单仓、pip 可装、hermetic 测 → easy；FAIL→PASS 测 → executable oracle。**Admit。**
+A closed dbt-core issue: long-name generic test nodes lose `depends_on`; the merged PR adds
+`test_long_name_resolution`. A single repo, pip installation, and hermetic tests make it easy;
+a FAIL→PASS test supplies an executable oracle. **Admit.**
 
-### B — reject（不可复现）
+### B — reject: not reproducible
 
-Spark-on-AKS issue：只在 live Azure Cosmos DB 上复现。需 live cloud → harbor 无法确定性搭起。
-出被拒卡：`{"reject_reason": "harbor_repro_gate: requires live Azure Cosmos DB + AKS", "action": "not admitted; 若 env-setup 欠覆盖，改找 in-repo hermetic 等价实例"}`。
+A Spark-on-AKS issue reproduces only against live Azure Cosmos DB. Live cloud cannot be provisioned
+deterministically in harbor. Emit a rejected card:
+`{"reject_reason": "harbor_repro_gate: requires live Azure Cosmos DB + AKS", "action": "not admitted; if env-setup coverage is sparse, find an equivalent in-repo hermetic instance instead"}`.
 
-### C — admit（rubric oracle，低保真）
+### C — admit: rubric oracle, low fidelity
 
-accepted SO 答案「React 离页前警告未保存编辑」。无单仓/单测，但 accepted answer 定义必备项 →
-`sandbox-run` 不可得 → `rubric` oracle，标 `oracle.confidence: medium`、`env.reproducible:
-hard-rubric-only`、`gates.harbor_repro_gate: downgraded`。**Admit，低保真。**
+An accepted SO answer explains warning about unsaved edits before leaving a React page.
+There is no single repo/unit test, but the accepted answer defines required properties.
+`sandbox-run` is unavailable, so use a `rubric` oracle with `oracle.confidence: medium`,
+`env.reproducible: hard-rubric-only`, and `gates.harbor_repro_gate: downgraded`.
+**Admit with low fidelity.**
 
-## 8. 库的覆盖对象
+## 8. Library coverage
 
-同 persona 库，真实对象是一个**分布**——此处覆盖 `domain × capability`。追踪哪些格已填；一个无可复现
-种子的能力是 harness 盲点。别过度挖单仓/单能力；追欠覆盖格（尤其 `tool-use-verification` 与
-`long-output`，旧的纯聊天 sim 无法压测的两格）。
+As with personas, the real object is a **distribution**, here over `domain × capability`.
+Track filled cells: a capability with no reproducible seeds is a harness blind spot.
+Do not over-harvest one repo/capability. Fill underrepresented cells, especially
+`tool-use-verification` and `long-output`, which the old text-only simulation could not stress-test.

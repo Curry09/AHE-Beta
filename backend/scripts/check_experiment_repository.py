@@ -93,11 +93,22 @@ def inventory_errors(root: Path) -> list[str]:
         ):
             errors.append(f"Missing or unsafe destination: {destination}")
             continue
-        if (
-            kind == "archived"
-            and hashlib.sha256(target.read_bytes()).hexdigest() != row["source_sha256"]
-        ):
-            errors.append(f"Frozen archive content changed: {destination}")
+        if kind == "archived":
+            expected = row["source_sha256"]
+            translation = row.get("translation")
+            if translation is not None:
+                # The original source identity stays fixed. An explicitly recorded
+                # English translation has its own locked destination digest.
+                if translation != {"language": "en", "source_sha256": expected} or not (
+                    isinstance(row.get("destination_sha256"), str)
+                    and len(row["destination_sha256"]) == 64
+                    and all(c in "0123456789abcdef" for c in row["destination_sha256"])
+                ):
+                    errors.append(f"Invalid archive translation provenance: {destination}")
+                else:
+                    expected = row["destination_sha256"]
+            if hashlib.sha256(target.read_bytes()).hexdigest() != expected:
+                errors.append(f"Frozen archive content changed: {destination}")
         if kind in {"archived", "moved"} and destination != original and (root / original).exists():
             errors.append(f"Obsolete duplicate remains: {original}")
     # Every archived file must have provenance; README is newly authored explanation.

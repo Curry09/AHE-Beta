@@ -17,7 +17,7 @@ input_schema:
     issue_number:
       type: integer
       description: >-
-        Open (or historical) issue number to resolve to the session that filed it.
+        An open or closed issue number used to locate the session that filed it.
     session_id:
       type: string
       description: >-

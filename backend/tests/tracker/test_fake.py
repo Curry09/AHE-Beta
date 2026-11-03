@@ -1,4 +1,4 @@
-"""spec-0001/T5：IssueTracker 协议与 FakeTracker 行为单测。"""
+"""spec-0001/T5: IssueTracker protocol and FakeTracker behavior unit test."""
 
 from __future__ import annotations
 
@@ -29,31 +29,31 @@ def test_create_issue_monotonic_numbering() -> None:
 def test_add_comment() -> None:
     t = FakeTracker()
     r = t.create_issue(_draft())
-    t.add_comment(r.number, "一条评论")
-    assert "一条评论" in t.issue(r.number)["comments"]
+    t.add_comment(r.number, "A comment")
+    assert "A comment" in t.issue(r.number)["comments"]
 
 
 def test_list_comments_matches_gitea_shape() -> None:
-    """Spec-0020/T2：观测读路径，形状对齐 GiteaTracker.list_comments。"""
+    """Spec-0020/T2: Observation of read path, shape aligned with GiteaTracker.list_comments."""
     t = FakeTracker()
     r = t.create_issue(_draft())
     assert t.list_comments(number=r.number) == []
-    t.add_comment(r.number, "[dev-attempt] 失败一次")
+    t.add_comment(r.number, "[dev-attempt] Failed once")
     rows = t.list_comments(number=r.number)
-    assert [c["body"] for c in rows] == ["[dev-attempt] 失败一次"]
+    assert [c["body"] for c in rows] == ["[dev-attempt] Failed once"]
     assert set(rows[0]) == {"author", "body", "created_at"}
     with pytest.raises(KeyError):
         t.list_comments(number=999)
 
 
 def test_set_labels_replaces() -> None:
-    """Spec-0025/T3a：整组替换标签（去旧加新）+ ensure 进标签集；number 不存在抛 KeyError。"""
+    """Spec-0025/T3a: Replace labels in bulk (remove old, add new) + ensure into label set; raise KeyError if number does not exist."""
     t = FakeTracker()
     r = t.create_issue(IssueDraft(title="t", body="b", labels=["bug", "needs-triage"]))
     t.set_labels(r.number, ["bug", "triaged"])
     labels = t.issue(r.number)["labels"]
-    assert set(labels) == {"bug", "triaged"}  # needs-triage 移除、triaged 加入
-    assert "triaged" in t.labels()  # 顺带 ensure
+    assert set(labels) == {"bug", "triaged"}  # Remove needs-triage, add triaged
+    assert "triaged" in t.labels()  # Also ensure
     with pytest.raises(KeyError):
         t.set_labels(999, ["x"])
 
@@ -81,10 +81,10 @@ def test_transition_issue_replaces_state_and_labels_together() -> None:
 def test_set_state_round_trip() -> None:
     t = FakeTracker()
     r = t.create_issue(_draft())
-    t.set_state(r.number, "closed", "已修复")
+    t.set_state(r.number, "closed", "Fixed")
     snap = t.issue(r.number)
-    assert (snap["state"], snap["reason"]) == ("closed", "已修复")
-    t.set_state(r.number, "open", "重新打开")
+    assert (snap["state"], snap["reason"]) == ("closed", "Fixed")
+    t.set_state(r.number, "open", "Reopen")
     assert t.issue(r.number)["state"] == "open"
 
 

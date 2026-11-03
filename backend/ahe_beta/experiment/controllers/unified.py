@@ -106,7 +106,9 @@ def main() -> int:
     for _suffix in ("MODEL", "BASE_URL", "API_KEY"):
         _val = os.environ.get(f"HARNESS_LLM_{_suffix}")
         if not _val:
-            raise SystemExit(f"运行配置缺 HARNESS_LLM_{_suffix}（harness 本体的独立 LLM 配置）")
+            raise SystemExit(
+                f"Runtime configuration is missing HARNESS_LLM_{_suffix} (the harness's independent LLM configuration)"
+            )
         os.environ[f"LLM_{_suffix}"] = _val
     _reasoning_effort = os.environ.get("HARNESS_LLM_REASONING_EFFORT", "").strip()
     if _reasoning_effort:
@@ -118,7 +120,7 @@ def main() -> int:
 
     roster = load_roster()
     print(
-        f"⓪.5 编制 roster：用户×{roster['user']} · Architect×{roster['architect']} · 交付面并发×{roster['developer']}（vigil --parallel；前端房间容量与此一致）"
+        f"⓪.5 Roster: users×{roster['user']} · Architects×{roster['architect']} · delivery concurrency×{roster['developer']} (vigil --parallel; frontend room capacity matches)"
     )
     bypass = ["localhost", "127.0.0.1"]
     for url in (
@@ -143,7 +145,7 @@ def main() -> int:
     from ahe_beta.user.sim.persona_client import AgenticPersonaClient, ApiPersonaClient
     from ahe_beta.user.sim.persona_io import card_to_personas
 
-    print(f"⓪ 输入：冻结 persona 卡库={os.environ['PERSONA_LIBRARY']}")
+    print(f"⓪ Input: frozen persona library={os.environ['PERSONA_LIBRARY']}")
     run_mode = runtime.experiment_run_mode()
     role_runs = runtime.install_role_runs(data_root=runtime.DATA)
     recovery = runtime.load_recovery_store(mode=run_mode)
@@ -159,24 +161,24 @@ def main() -> int:
                 "delivery": os.environ.get("ANTHROPIC_MODEL", ""),
             },
         )
-    print(f"⓪.6 实验切片 ROLE_RUNS_DIR={role_runs}")
+    print(f"⓪.6 Experiment invocation slice ROLE_RUNS_DIR={role_runs}")
     if run_mode == "fresh":
-        print("① fresh：种 harness 本地仓 ...")
+        print("① fresh: initialize the local harness repository ...")
         repo = runtime._seed_harness_repo()
     else:
-        print("① resume：复用现有 harness 本地仓 ...")
+        print("① resume: reuse the existing local harness repository ...")
         repo = runtime.existing_harness_repo()
-    print("② 接 Gitea + 本地存储 + launcher ...")
+    print("② Connect Gitea + local storage + launcher ...")
     tracker = GiteaTracker(
         base_url=gitea["GITEA_URL"], owner=gitea["OWNER"], repo=gitea["REPO"], token=gitea["TOKEN"]
     )
     tracker.ensure_labels(["bug", "feature"])
     runtime._set_gitea_remote(repo, gitea)
     if run_mode == "fresh":
-        print("②.5 fresh：复位 Gitea harness、issue 与 live 投影 ...")
+        print("②.5 fresh: reset Gitea harness, issues, and live projections ...")
         runtime._reset_to_initial(repo, tracker)
     else:
-        print("②.5 resume：保留 Gitea、session、harness 与 live 历史 ...")
+        print("②.5 resume: preserve Gitea, session, harness, and live history ...")
     store = SessionStore(role_runs / "sessions")
     from ahe_beta.loop.round_assessment import RoundAssessment, read_json
 
@@ -189,7 +191,9 @@ def main() -> int:
         HarnessLauncher(harness_repo=str(repo), runs_root=runtime.DATA / "harness_runs"),
         round_assessment,
     )
-    print("③ 装配 sim 用户 agent（spec-0005 控制信封）+ 生成/准入角色 ...")
+    print(
+        "③ Assemble the simulated user (spec-0005 control loop) and generation/admission roles ..."
+    )
     api = ApiPersonaClient()
 
     def client_factory() -> AgenticPersonaClient:
@@ -257,7 +261,7 @@ def main() -> int:
         ctx = current_usage_context()
         turns = [t.to_dict() for t in result_to_turns(res)]
         last = res.turns[-1] if res.turns else None
-        status = f"对话中… 第 {last.turn} 轮 · {last.verdict}" if last else "启动中…"
+        status = f"In conversation… turn {last.turn} · {last.verdict}" if last else "Starting…"
         update_agent(
             data_dir=runtime.DATA,
             agent_id=f"user-{ctx.session_id}",
@@ -338,7 +342,7 @@ def main() -> int:
     frozen_manifest = read_json_document(path=Path(os.environ["AHE_BETA_FROZEN_MANIFEST"]))
     run_root = Path(os.environ["AHE_BETA_FROZEN_MANIFEST"]).parent
     if delivery_required(frozen_manifest["config"]):
-        print(f"③.5 起交付面 vigil（OpenAgents，mode={runtime.vigil_mode()}）...")
+        print(f"③.5 Start delivery vigil (OpenAgents, mode={runtime.vigil_mode()})...")
         vigil = runtime.start_vigil(
             repo=repo,
             parallel=roster["developer"],
@@ -346,7 +350,7 @@ def main() -> int:
             log_path=runtime.DATA / "vigil.log",
         )
     print(
-        f"④ 跑 {runtime.TOTAL_ROUNDS} 轮闭环（{len(plan['rounds'][0])} 个 session × {len(triagers)} triager 分片 ∥ {len(divergents)} divergent → {roster['architect']} architect → owner({('评审' if roster['owner'] >= 1 else '零 LLM 机械交接')})；交付面 vigil --parallel {roster['developer']}（末轮只用户；非末轮封口后切轮），a 段并发 {max_parallel_users}，背压阈值 proposal>{proposal_alarm}/ready>{ready_alarm}，真模型）..."
+        f"④ Run {runtime.TOTAL_ROUNDS} evolution rounds ({len(plan['rounds'][0])} sessions × {len(triagers)} triager shards ∥ {len(divergents)} divergent → {roster['architect']} architect → owner({('review' if roster['owner'] >= 1 else 'mechanical handoff without LLM')})); delivery vigil --parallel {roster['developer']} (users only in the final round; otherwise seal delivery before advancing), stage a concurrency {max_parallel_users}, backpressure thresholds proposal>{proposal_alarm}/ready>{ready_alarm}, real models)..."
     )
     refs: list[str] = []
     exit_code = 0
@@ -427,7 +431,7 @@ def main() -> int:
             phase="blocked",
             blocked_issues=list(exc.numbers),
         )
-        print(f"[orchestrator] 本轮交付卡死，实验停止：{exc}")
+        print(f"[orchestrator] Delivery blocked this round; experiment stopped: {exc}")
     finally:
         if vigil is not None:
             runtime.stop_vigil(vigil)
@@ -441,13 +445,13 @@ def main() -> int:
         )
     if terminal_phase == "stopped":
         return exit_code
-    print("\n=== 结果 ===")
-    print("各轮 main HEAD SHA:", refs)
+    print("\n=== Results ===")
+    print("main HEAD SHA by round:", refs)
     m = Metrics(tracker, store)
-    print("当前 open issue 数:", m.open_issue_count())
-    print("体感趋势:", m.feeling_trend())
-    print("issue 曲线 (t, opened, net_open):", m.issue_curve())
-    print("本地仓分支:", end=" ")
+    print("Current open issue count:", m.open_issue_count())
+    print("User experience trend:", m.feeling_trend())
+    print("Issue curve (t, opened, net_open):", m.issue_curve())
+    print("Local repository branches:", end=" ")
     subprocess.run(["git", "-C", str(repo), "branch", "--format=%(refname:short)"])
     return exit_code
 

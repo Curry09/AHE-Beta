@@ -1,4 +1,4 @@
-"""Spec-0039/T2：Gitea issue timeline 分页与 label 方向归一。"""
+"""Spec-0039/T2: Gitea issue timeline pagination and label direction normalization."""
 
 from __future__ import annotations
 
@@ -155,7 +155,7 @@ def test_replay_put_replacement_exposes_metadata_loss_without_backfilling_curren
         "round-lost",
         "blocking-destroyed-metadata",
     } <= codes
-    assert result["transitions"][-1]["title"] == "标签完整性异常"
+    assert result["transitions"][-1]["title"] == "Label integrity anomaly"
 
 
 def test_replay_reports_exclusive_conflict_incomplete_history_and_current_drift():
@@ -176,4 +176,6 @@ def test_replay_reports_exclusive_conflict_incomplete_history_and_current_drift(
         "incomplete-history",
         "timeline-current-drift",
     } <= codes
-    assert result["current"]["plane"] == "ready", "当前标签仍是真值，不以回放结果覆盖"
+    assert result["current"]["plane"] == "ready", (
+        "The current label remains the source of truth，Do not overwrite with replay results"
+    )

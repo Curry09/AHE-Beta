@@ -1,45 +1,45 @@
-# 部署资源
+# Deployment Resources
 
-本目录保存实验基础设施的 Compose 模板、镜像构建文件和维护脚本。运行实验时，使用统一入口 `backend/scripts/experiment.py`；不需要先手动启动这里的 Gitea 服务。完整步骤见[快速开始](../../docs/QUICKSTART.zh-CN.md)。本文中的命令均从仓库根目录执行。
+This directory stores the experiment infrastructure's Compose templates, image build files, and maintenance scripts. When running experiments, use the unified entry point `backend/scripts/experiment.py`; you do not need to manually start the Gitea service here first. For complete steps, see [Quick Start](../../docs/QUICKSTART.md). All commands in this document are executed from the repository root.
 
-## 目录用途
+## Directory Purposes
 
-| 目录 | 用途 |
+| Directory | Purpose |
 | --- | --- |
-| [`experiment/`](experiment/) | local 后端使用的基础设施模板。每个 run 独立创建 Gitea、网络、存储和出口代理；启用本地工程 CI 时，由后端补充专属 runner 和 CI 服务。 |
-| [`gitea/`](gitea/) | 手动联调使用的单实例 Gitea、Actions runner 和出口代理。使用固定容器名、网络名和端口，适合维护，不用于并行实验。 |
-| [`vigil/`](vigil/) | OpenAgents 交付环境的镜像构建文件、容器入口和证据读取能力记录。统一入口根据冻结的源码与运行配方准备交付环境。 |
-| [`swebench-seed/`](swebench-seed/) | SWE-bench 任务工作区的存储镜像和运行环境配方；不是初始 Harness 源码。构建脚本需要已准备的 `workspace/` 和 `build-state.json`。 |
+| [`experiment/`](experiment/) | Infrastructure templates used by the local backend. Each run independently creates Gitea, a network, storage, and an egress proxy; when local project CI is enabled, the backend adds a dedicated runner and CI service. |
+| [`gitea/`](gitea/) | A single-instance Gitea, Actions runner, and egress proxy for manual integration testing. It uses fixed container names, network names, and ports, making it suitable for maintenance but not for parallel experiments. |
+| [`vigil/`](vigil/) | Image build files, container entrypoint, and evidence-reading capability records for the OpenAgents delivery environment. The unified entry point prepares the delivery environment according to the frozen source and runtime recipe. |
+| [`swebench-seed/`](swebench-seed/) | Storage image and runtime environment recipe for SWE-bench task workspaces; it is not the initial Harness source code. The build scripts require prepared `workspace/` and `build-state.json`. |
 
-独立 Harness 基准评测使用仓库根目录的 `evaluation.yaml`，操作见[评测指南](../../evaluation/docs/harbor.zh-CN.md)。
+The standalone Harness benchmark evaluation uses `evaluation.yaml` in the repository root. For instructions, see [Evaluation Guide](../../evaluation/docs/harbor.md).
 
-## 实验部署
+## Experiment Deployment
 
-local 后端自动准备本地 Gitea，生成账号和凭证，并保存到该 run 的私有 `secrets/` 目录。需要访问网页时，从运行记录读取实际地址；端口由实验管理，不固定为 3000。
+The local backend automatically prepares local Gitea, generates accounts and credentials, and saves them to the run's private `secrets/` directory. When web access is needed, read the actual address from the run records; ports are managed by the experiment and are not fixed at 3000.
 
-E2B 后端使用自己的 Gitea.com 账户托管仓库，不启动本地 Gitea。模型凭证、`E2B_API_KEY` 和 `GITEA_TOKEN` 通过实验凭证文件提供。配置字段见[实验配置](../../docs/CONFIGURATION.zh-CN.md)。
+The E2B backend uses its own Gitea.com account to host repositories and does not start local Gitea. Model credentials, `E2B_API_KEY`, and `GITEA_TOKEN` are provided through the experiment credential file. For configuration fields, see [Experiment Configuration](../../docs/CONFIGURATION.md).
 
-本地工程 CI 是可选项，通过 `runtime.local.ci_enabled` 开启。统一入口为每个 run 准备并核验独立的 runner；它不复用下面手动部署的共享 runner。具体配置见[本地工程 CI](../../docs/CONFIGURATION.zh-CN.md#本地工程-ci)。
+Local project CI is optional and is enabled through `runtime.local.ci_enabled`. The unified entry point prepares and verifies a dedicated runner for each run; it does not reuse the shared runner deployed manually below. For specific configuration, see [Local Project CI](../../docs/CONFIGURATION.md#local-engineering-ci).
 
-## 模型出口与证据访问
+## Model Egress and Evidence Access
 
-local 实验的交付环境通过出口代理访问模型服务。后端根据配置中的模型端点生成目标主机和端口规则，无需修改仓库中的静态代理模板。
+The delivery environment for local experiments accesses model services through an egress proxy. The backend generates destination host and port rules according to the model endpoint in the configuration; there is no need to modify the static proxy template in the repository.
 
-手动部署使用的静态模板默认允许 Anthropic 和 Claude 服务。使用其他模型网关时，需要显式修改对应的出口规则。自建 Gitea 使用 gzip 证据附件；Gitea.com 使用 ZIP 附件及其 R2 下载地址，交付环境必须支持对应的读取协议，统一入口会在模型调用前预检实际运行环境。
+The static template used for manual deployment allows Anthropic and Claude services by default. When using another model gateway, you must explicitly modify the corresponding egress rules. Self-hosted Gitea uses gzip evidence attachments; Gitea.com uses ZIP attachments and its R2 download address. The delivery environment must support the corresponding retrieval protocol, and the unified entry point pre-checks the actual runtime environment before invoking the model.
 
-手动部署需要访问 Gitea.com 证据时，在启动 Compose 前设置：
+When manual deployment needs to access Gitea.com evidence, set the following before starting Compose:
 
 ```bash
 export AHE_BETA_EGRESS_CONFIG=./egress-gitea-com.conf
 ```
 
-该配置在基础出口规则上增加 `gitea.com:443` 和匹配规则的 R2 主机访问权限，不会放开任意外网地址。
+This configuration adds `gitea.com:443` and access permission for R2 hosts matching the rules to the basic egress rules; it does not open access to arbitrary external addresses.
 
-## 手动启动 Gitea
+## Manually Starting Gitea
 
-以下步骤仅用于基础设施联调。需要 Docker Engine、Compose、Bash 和 curl。服务使用 SQLite 和命名数据卷，HTTP 与 SSH 端口只绑定本机；这份模板不包含 TLS 或高可用部署配置。
+The following steps are only for infrastructure integration testing. Docker Engine, Compose, Bash, and curl are required. The service uses SQLite and named data volumes, and the HTTP and SSH ports are bound only to localhost; this template does not include TLS or high-availability deployment configuration.
 
-先启动 Gitea 和出口代理，再初始化账号、仓库及 runner：
+Start Gitea and the egress proxy first, then initialize the account, repository, and runner:
 
 ```bash
 export GITEA_ADMIN_USER=aheadmin
@@ -56,29 +56,29 @@ export GITEA_ADMIN_PASS
 unset GITEA_ADMIN_PASS
 ```
 
-Gitea 地址为 `http://localhost:3000`，SSH 端口为 `2222`。初始化脚本等待服务就绪，创建管理员、私有工作仓库和标签，生成访问 Token，并在取得 runner 注册 Token 后启动 Actions runner。
+The Gitea address is `http://localhost:3000`, and the SSH port is `2222`. The initialization script waits for the service to be ready, creates an administrator, a private work repository, and labels, generates an access Token, and starts the Actions runner after obtaining a runner registration Token.
 
-脚本把连接信息写入 `backend/deploy/gitea/.env`，文件权限为 `0600`，且已被 Git 忽略：
+The script writes the connection information to `backend/deploy/gitea/.env`. The file permissions are `0600`, and the file is ignored by Git:
 
-| 字段 | 含义 |
+| Field | Meaning |
 | --- | --- |
-| `GITEA_URL` | 服务根地址，不带尾斜杠或 `/api/v1` 后缀 |
-| `OWNER` | 初始化的管理员用户名 |
-| `REPO` | 工作仓库名，默认 `ahe-beta-work` |
-| `TOKEN` | 包含 `write:user`、`write:issue` 和 `write:repository` 权限的访问 Token |
-| `RUNNER_TOKEN` | Actions runner 注册 Token |
+| `GITEA_URL` | Service root address, without a trailing slash or the `/api/v1` suffix |
+| `OWNER` | Initialized administrator username |
+| `REPO` | Work repository name, defaulting to `ahe-beta-work` |
+| `TOKEN` | Access Token containing the `write:user`, `write:issue`, and `write:repository` permissions |
+| `RUNNER_TOKEN` | Actions runner registration Token |
 
-重复执行时，脚本保留已有账号和仓库，复用 `.env` 中的 Token；不会更新已有账号的密码。可通过 `GITEA_WORK_REPO` 和 `GITEA_TOKEN_NAME` 设置仓库名及 Token 名称。
+When run repeatedly, the script retains existing accounts and repositories and reuses the Token in `.env`; it does not update the passwords of existing accounts. The repository name and Token name can be set through `GITEA_WORK_REPO` and `GITEA_TOKEN_NAME`.
 
-### 检查连接
+### Check Connection
 
-服务版本接口返回 HTTP 200 表示 Gitea 已就绪：
+The service version endpoint returns HTTP 200, indicating that Gitea is ready:
 
 ```bash
 curl -fsS http://localhost:3000/api/v1/version
 ```
 
-需要检查仓库写入权限时，可以创建一条测试 Issue：
+To check repository write permissions, you can create a test Issue:
 
 ```bash
 (
@@ -91,19 +91,19 @@ curl -fsS http://localhost:3000/api/v1/version
 )
 ```
 
-### 停止与清理
+### Stop and Clean Up
 
-停止服务并保留数据：
+Stop the service and retain the data:
 
 ```bash
 docker compose -f backend/deploy/gitea/docker-compose.yml down
 ```
 
-如果需要重新初始化，下面的命令会同时删除 Gitea 与 runner 的数据卷，包括账号、仓库、Issue 和 runner 注册信息：
+If reinitialization is needed, the command below also deletes the Gitea and runner data volumes, including accounts, repositories, Issues, and runner registration information:
 
 ```bash
 docker compose -f backend/deploy/gitea/docker-compose.yml down -v
 rm -f backend/deploy/gitea/.env
 ```
 
-这些命令只管理手动部署的单实例。统一入口创建的实验应通过 `experiment.py` 的 `stop` 和 `destroy` 命令管理，详见[快速开始](../../docs/QUICKSTART.zh-CN.md)。
+These commands manage only the manually deployed single instance. Experiments created by the unified entry point should be managed using the `stop` and `destroy` commands of `experiment.py`. For details, see [Quick Start](../../docs/QUICKSTART.md).

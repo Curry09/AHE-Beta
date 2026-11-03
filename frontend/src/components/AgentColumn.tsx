@@ -2,14 +2,14 @@ import { Fragment, type ReactNode } from "react";
 import type { Agent, AgentRole, HistoryItem, Selection } from "../types";
 import { Card } from "./Card";
 
-// 用户卡副行：persona 的「水平 · 领域」（Spec-0026/T4）。缺 meta（老后端/非用户角色）→ 空，卡片退回只显 identity。
+// User card subtitle: persona level · domain (Spec-0026/T4). Missing meta (older backends / other roles) → empty; card displays identity only.
 function personaSubline(agent: Agent): string | undefined {
   const m = agent.meta;
   if (!m) return undefined;
   return [m.level, m.domain].filter(Boolean).join(" · ") || undefined;
 }
 
-// 已完成工作项的 meta 行：按 kind 给出各角色最要紧的一眼信息。
+// Completed work item metadata: show the most useful at-a-glance information for each role by kind.
 function historyMeta(item: HistoryItem): ReactNode {
   if (item.kind === "user_session") {
     const origin = item.session_provenance;
@@ -17,8 +17,8 @@ function historyMeta(item: HistoryItem): ReactNode {
       <>
         {origin && <span>{origin.task_id} · {origin.persona_id}</span>}
         {origin && <span title={origin.harness_sha}>Harness {origin.harness_sha.slice(0, 8)}</span>}
-        {item.session_id && <span>会话 {item.session_id}</span>}
-        {item.score != null && <span className={`score s${item.score}`}>体感 {item.score}</span>}
+        {item.session_id && <span>session {item.session_id}</span>}
+        {item.score != null && <span className={`score s${item.score}`}>Experience {item.score}</span>}
       </>
     );
   }
@@ -27,15 +27,15 @@ function historyMeta(item: HistoryItem): ReactNode {
       <>
         {item.issue_number != null && <span>#{item.issue_number}</span>}
         {item.tag && <span className="chip tag">{item.tag}</span>}
-        <span>{item.committed ? "已推进 main" : "未推进"}</span>
+        <span>{item.committed ? "Main updated" : "Main unchanged"}</span>
       </>
     );
   }
-  // Spec-0029：triager 的结果已在 status 行（升提案/驳回计数），meta 不重复；owner 显准入数。
+  // Spec-0029: triager results already appear in the status row (proposal promotion / rejection counts); avoid duplication in meta; owner shows admissions.
   if (item.kind === "triager_run") return null;
-  if (item.kind === "owner_run") return <span>{(item.proposals ?? []).length} 条准入</span>;
-  if (item.kind === "divergent_run") return <span>{(item.proposals ?? []).length} 条候选</span>;
-  return <span>{(item.proposals ?? []).length} 条提案</span>;
+  if (item.kind === "owner_run") return <span>{(item.proposals ?? []).length} admissions</span>;
+  if (item.kind === "divergent_run") return <span>{(item.proposals ?? []).length} candidates</span>;
+  return <span>{(item.proposals ?? []).length} proposals</span>;
 }
 
 export function AgentColumn(props: {
@@ -49,7 +49,7 @@ export function AgentColumn(props: {
 }) {
   const { role, name, agents, history, showDone, selection, onSelect } = props;
 
-  // 已完成工作项按轮分组（新轮在前，轮内保持归档先后）。
+  // Group completed work items by round (newest round first; preserve archive order within a round).
   const byRound = new Map<number, { item: HistoryItem; index: number }[]>();
   if (showDone) {
     for (const entry of history) {
@@ -68,7 +68,7 @@ export function AgentColumn(props: {
         {name}
         <span className="count">
           {agents.length}
-          {showDone ? ` · 完成 ${doneCount}` : ""}
+          {showDone ? ` · Completed ${doneCount}` : ""}
         </span>
       </div>
       <div className="column-body">
@@ -83,11 +83,11 @@ export function AgentColumn(props: {
             onClick={() => onSelect({ type: "agent", agentId: a.agent_id })}
             meta={
               <>
-                {a.round != null && a.round > 0 && <span>第 {a.round} 轮</span>}
+                {a.round != null && a.round > 0 && <span>Round {a.round}</span>}
                 {a.meta?.session_provenance && (
                   <>
                     <span>{a.meta.session_provenance.task_id} · {a.meta.session_provenance.persona_id}</span>
-                    <span>会话 {a.meta.session_id ?? a.agent_id.replace(/^user-/, "")}</span>
+                    <span>session {a.meta.session_id ?? a.agent_id.replace(/^user-/, "")}</span>
                     <span title={a.meta.session_provenance.harness_sha}>Harness {a.meta.session_provenance.harness_sha.slice(0, 8)}</span>
                   </>
                 )}
@@ -97,11 +97,11 @@ export function AgentColumn(props: {
             titleAttr={a.meta?.goal ?? undefined}
           />
         ))}
-        {agents.length === 0 && !showDone && <div className="empty">暂无活动</div>}
+        {agents.length === 0 && !showDone && <div className="empty">No activity yet</div>}
         {showDone &&
           roundsDesc.map((r) => (
             <Fragment key={r}>
-              <div className="round-divider">第 {r} 轮</div>
+              <div className="round-divider">Round {r}</div>
               {(byRound.get(r) ?? []).map(({ item, index }) => (
                 <Card
                   key={`${item.agent_id}-${item.archived_at}`}
@@ -116,7 +116,7 @@ export function AgentColumn(props: {
             </Fragment>
           ))}
         {showDone && agents.length === 0 && doneCount === 0 && (
-          <div className="empty">暂无活动</div>
+          <div className="empty">No activity yet</div>
         )}
       </div>
     </section>

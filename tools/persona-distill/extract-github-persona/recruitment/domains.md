@@ -1,7 +1,7 @@
 ---
 kind: domain-registry
 scope: shared            # used by extract-github-persona, extract-stackoverflow-persona
-vocab_source: ../../card-schema.md   # 「D5.area 受控词表」14 个 token 的唯一真源（公共契约）
+vocab_source: ../../card-schema.md   # Single source of truth for the 14 D5.area controlled-vocabulary tokens (shared contract)
 ---
 
 # Domain registry (anchor repos per controlled-vocab token)
@@ -12,8 +12,10 @@ domain's repos, and the `domain` field is then **derived from the repo's registr
 (a FACT)**, not invented. This is what lets you *steer* coverage and kills the
 "everything ends up `systems-runtime`/`data-eng`" mislabeling failure.
 
-`D5.area` 的 14 个受控词表 token 由公共契约 [`../../card-schema.md`](../../card-schema.md) 定义
-（本文件只把每个 token 映射到锚 repos + 消歧规则，不重列词表——轮辐式：契约是唯一真源）。
+The 14 controlled-vocabulary tokens for `D5.area` are defined by the shared contract
+[`../../card-schema.md`](../../card-schema.md). This file only maps each token to anchor
+repos and disambiguation rules; it does not repeat the vocabulary. In this hub-and-spoke
+structure, the contract is the single source of truth.
 
 **How to specify a domain when searching:**
 1. Choose the target domain token (e.g. you need to fill `dev-tooling`).

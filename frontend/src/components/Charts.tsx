@@ -1,8 +1,8 @@
 import { useId } from "react";
 import type { OverviewResponse } from "../types";
 
-// 概览曲线（Spec-0026/T3）：内联 SVG，消费 /api/overview。preserveAspectRatio=none 撑满宽度、
-// vector-effect=non-scaling-stroke 保线宽恒定，双主题走 token（stroke=currentColor via CSS var）。
+// Overview curves (Spec-0026/T3): inline SVG consuming /api/overview. preserveAspectRatio=none fills the width,
+// vector-effect=non-scaling-stroke keeps line widths constant; theme tokens support both themes (stroke=currentColor via CSS var).
 const VW = 300;
 const VH = 44;
 const PAD = 5;
@@ -60,7 +60,7 @@ function Panel(props: {
       {values.length > 0 ? (
         <LineChart values={values} min={min} max={max} color={color} />
       ) : (
-        <div className="empty-line">暂无数据</div>
+        <div className="empty-line">No data yet</div>
       )}
     </div>
   );
@@ -75,7 +75,7 @@ export function Charts({ overview }: { overview: OverviewResponse | null }) {
   return (
     <div className="overview">
       <Panel
-        title="体感"
+        title="Experience"
         now={feelNow}
         values={feeling}
         min={1}
@@ -83,7 +83,7 @@ export function Charts({ overview }: { overview: OverviewResponse | null }) {
         color="var(--role-user)"
       />
       <Panel
-        title="可执行 backlog"
+        title="Actionable backlog"
         now={backlogNow}
         values={backlog}
         min={0}
@@ -92,8 +92,8 @@ export function Charts({ overview }: { overview: OverviewResponse | null }) {
       />
       {Object.entries(overview?.feedback_counts ?? {}).map(([condition, count]) => (
         <div className="chart" key={condition}>
-          <div className="chart-head">体感样本 · {{ unavailable: "无后续输入", possible: "可后续输入", unknown: "输入条件未知" }[condition] ?? condition}</div>
-          <div className="dim">有效 {count.rated} · 未提供 {count.missing} · 无效 {count.invalid} · 不可用 {count.unavailable}</div>
+          <div className="chart-head">Experience sample · {{ unavailable: "No follow-up input", possible: "Follow-up input available", unknown: "Input conditions unknown" }[condition] ?? condition}</div>
+          <div className="dim">Valid {count.rated} · Not provided {count.missing} · Invalid {count.invalid} · Unavailable {count.unavailable}</div>
         </div>
       ))}
     </div>

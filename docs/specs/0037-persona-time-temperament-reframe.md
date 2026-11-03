@@ -1,12 +1,12 @@
 ---
 number: "0037"
-title: 人轴重构：时间气质 ⊥ 质量失败 · 过程卷入 · 蒸馏 spoke 对齐
+title: "Reframe the human axis: time temperament ⊥ quality failure · process involvement · distillation spoke alignment"
 issue: 0
 slug: persona-time-temperament-reframe
-summary: 接缝接近真人 CLI 后，等待体感差在「人」轴：旧设计把耐心焊在质量失败策略(d43)上、supervision 仍是回合制盯梢。本组新增 tempo(卡 D7)驱动耐心，d43 只答结果错了怎么办，supervision 改为过程卷入，D6Authz 标为会话策略不进卡；hub 加 D7 与正交注入；注入缺省 steady；三个蒸馏 spoke 对齐 ground/inject。不另起翻译模块，投影仍走 judge→intent→act；不把 interrupt/queued/slash 焊进人轴。
+summary: "With the seam approaching a human-operated CLI, the gap in the waiting experience lies on the “human” axis: the old design hardwires patience to the quality-failure strategy (d43), while supervision remains turn-based monitoring. This group adds tempo (card D7) to drive patience, limits d43 to answering what to do when the result is wrong, reframes supervision as process involvement, and marks D6Authz as a session policy excluded from cards; the hub adds D7 and orthogonal injection; injection defaults to steady; three distillation spokes align ground/inject. No separate Translation module is introduced, and projection still follows judge→intent→act; interrupt/queued/slash are not hardwired into the human axis."
 tasks:
   - id: T1
-    title: 写 0037 活快照
+    title: "Write the 0037 live snapshot"
     status: done
     priority: P1
     tags: []
@@ -15,10 +15,10 @@ tasks:
     parallel: false
     files:
       - docs/specs/0037-persona-time-temperament-reframe.md
-    scope: 写清动机：接缝 0035/0036 后等待体感差在人轴；旧 d43 绑耐心导致正交人像失真；禁焊 interrupt/queued/slash 进卡。选定 tempo 驱动耐心、d43 只管质量失败、supervision=过程卷入、D6Authz 出卡、hub D7 + spoke 对齐。明确不做独立 Translation 模块、不宣称相对旧系统体感 uplift。
-    acceptance: spec validate 通过；正文含 Summary/Motivation/Reference-level explanation/Rationale and alternatives；DAG 与文件分配清楚；Unresolved 记录存量卡回填与 D7 硬门边界。
+    scope: "Clearly document the motivation: after seam 0035/0036, the gap in the waiting experience lies on the human axis; the old d43 ties patience to it, distorting orthogonal personas; prohibit hardwiring interrupt/queued/slash into cards. Select tempo-driven patience, d43 limited to quality failure, supervision=process involvement, D6Authz excluded from cards, and hub D7 + spoke alignment. Explicitly state that no independent Translation module will be built and no experience uplift over the old system is claimed."
+    acceptance: "spec validate passes; the body includes Summary/Motivation/Reference-level explanation/Rationale and alternatives; the DAG and file assignments are clear; Unresolved records backfilling existing cards and the D7 hard-gate boundary."
   - id: T2
-    title: sim：tempo 驱动耐心 · 过程卷入语义 · D6Authz 会话策略
+    title: "sim: tempo-driven patience · process involvement semantics · D6Authz session policy"
     status: done
     priority: P1
     tags: []
@@ -34,10 +34,10 @@ tasks:
       - backend/tests/user/sim/test_dimensions.py
       - backend/tests/user/sim/test_state.py
       - backend/tests/user/sim/test_heartbeat.py
-    scope: Persona 增 TimeTemperament/tempo；init_state/make_coef 耐心基线与衰减跟 tempo，不再跟 d43；高过程卷入(d42 every_step) 可加 stuck_extra；clauses/BLOCK-P 写过程卷入与时间气质，不出现 interrupt/queued/slash 焊进维文案；D6Authz 文档标为会话策略（半派生，非卡库人轴）。demo 展示 tempo 正交。配套单测。
-    acceptance: patience0/decay 随 tempo 分档；同 d43 不同 tempo 耐心不同；clauses 含 Process involvement / Time temperament；相关 pytest 绿；demo 可打印 tempo 与 stuck_extra。
+    scope: "Add TimeTemperament/tempo to Persona; the patience baseline and decay in init_state/make_coef follow tempo rather than d43; high process involvement (d42 every_step) may add stuck_extra; clauses/BLOCK-P describe process involvement and time temperament, without wording that hardwires interrupt/queued/slash into dimensions; D6Authz documentation marks it as a session policy (semi-derived, not a human axis in the card library). The demo demonstrates tempo orthogonality. Include supporting unit tests."
+    acceptance: "patience0/decay are tiered by tempo; the same d43 with different tempo values produces different patience; clauses include Process involvement / Time temperament; relevant pytest tests pass; the demo can print tempo and stuck_extra."
   - id: T3
-    title: hub：card-schema 增 D7 与语义注记
+    title: "hub: add D7 and semantic notes to card-schema"
     status: done
     priority: P1
     tags: []
@@ -47,10 +47,10 @@ tasks:
     parallel: false
     files:
       - tools/persona-distill/card-schema.md
-    scope: 唯一公共契约增 D7_time_temperament（patient|steady|impatient）与注入分布；注明 supervision=过程卷入、on_offtrack=质量失败策略且不驱动等待耐心；正交强制 on_offtrack ⊥ time_temperament；符合性：缺 D7 时注入侧回落 steady（旧卡兼容），新卡应显式写出。不改三个 spoke（归 T5）。
-    acceptance: card-schema 含 D7 枚举、注入比例、正交强制与 supervision/on_offtrack 语义注记；授权尺度仍不进卡库。
+    scope: "Add D7_time_temperament（patient|steady|impatient）and its injection distribution to the sole public contract; specify that supervision=process involvement and on_offtrack=quality-failure strategy and does not drive patience while waiting; enforce orthogonality: on_offtrack ⊥ time_temperament; conformance: when D7 is missing, fall back to steady on the injection side (backward compatibility with old cards); new cards should specify it explicitly. Do not modify the three spokes (assigned to T5)."
+    acceptance: "card-schema includes the D7 enum, injection proportions, enforced orthogonality, and semantic notes for supervision/on_offtrack; the authorization scale remains excluded from the card library."
   - id: T4
-    title: 注入：card_to_persona 读 D7→tempo
+    title: "Injection: card_to_persona reads D7→tempo"
     status: done
     priority: P1
     tags: []
@@ -63,10 +63,10 @@ tasks:
     files:
       - backend/ahe_beta/user/sim/persona_io.py
       - backend/tests/user/sim/test_persona_io.py
-    scope: card_to_persona 映射 D7_time_temperament → Persona.tempo；缺字段回落 steady（旧卡兼容，不报错）；非法枚举仍报错。D6Authz 仍不从卡读。配套单测。
-    acceptance: 有 D7 的卡注入 tempo 正确；无 D7 卡 tempo=steady；非法 D7 报错；既有 grounded 覆盖派生（D2/D4）不回归。
+    scope: "card_to_persona maps D7_time_temperament → Persona.tempo; a missing field falls back to steady (backward compatibility with old cards, without raising an error); invalid enum values still raise errors. D6Authz is still not read from cards. Include corresponding unit tests."
+    acceptance: "Cards with D7 inject the correct tempo; cards without D7 use tempo=steady; invalid D7 raises an error; no regressions in existing grounded overrides of derivation (D2/D4)."
   - id: T5
-    title: 蒸馏 spoke 对齐 D7 与人轴语义
+    title: "Align distillation spokes with D7 and human-axis semantics"
     status: done
     priority: P1
     tags: []
@@ -86,10 +86,10 @@ tasks:
       - tools/persona-distill/extract-github-persona/reference.md
       - tools/persona-distill/extract-stackoverflow-persona/SKILL.md
       - tools/persona-distill/extract-stackoverflow-persona/reference.md
-    scope: 三个薄 spoke 对齐 hub 的 D7 与语义注记，仍只引用 ../card-schema.md、不内嵌枚举。① selfreport：ground 表与 quote mining 增 D7（等待/干等耐受原话）；supervision→过程卷入；on_offtrack 明确≠等待耐心；文案「6 维」改为含 D7；范例卡补 D7。② github/SO：D7 默认 injected（走 hub 分布）；局限段写观测不到等待气质；禁止从 PR 量/发完消失派生 impatient 或与 abandon 锁死；范例卡补 injected D7。不改 card-schema（归 T3）、不改 backend、不重采存量卡库。
-    acceptance: 三 spoke 无「仅 6 维」残留；selfreport ground 表含 D7 与正交说明；观测型两 spoke 写明 D7 默认 inject + 禁错误派生；范例卡形状含 D7_time_temperament 且可被 validate_card/card_to_persona 消费。
+    scope: "Align the three thin spokes with the hub's D7 and semantic notes; continue to reference only ../card-schema.md without embedding enums. ① selfreport: add D7 to the ground table and quote mining (verbatim statements about tolerance for waiting/idle waiting); supervision→process involvement; clarify that on_offtrack≠patience while waiting; update the wording “6 dimensions” to include D7; add D7 to example cards. ② github/SO: D7 defaults to injected (using the hub distribution); state in the limitations section that waiting temperament cannot be observed; prohibit deriving impatient from PR volume/disappearing after posting or rigidly coupling it with abandon; add injected D7 to example cards. Do not modify card-schema (assigned to T3), modify the backend, or recollect the existing card library."
+    acceptance: "No residual “only 6 dimensions” wording in the three spokes; the selfreport ground table includes D7 and an explanation of orthogonality; the two observational spokes explicitly state that D7 defaults to inject and prohibit incorrect derivation; example card structures include D7_time_temperament and can be consumed by validate_card/card_to_persona."
   - id: T6
-    title: 探针：tempo / 过程卷入 / d43 正交可观测
+    title: "Probes: orthogonal observability of tempo / process involvement / d43"
     status: done
     priority: P2
     tags: []
@@ -102,125 +102,125 @@ tasks:
       - tools/dev/probes/probe_persona_reframe.py
       - tools/dev/probes/probe_swebench_persona.py
       - tools/dev/probes/probe_d43_quality_fail.py
-    scope: 脚本探针验证重构轴可观测：tempo A/B（耐心/等待菜单差异）、过程卷入差异、d43 质量失败路径差异；支持覆盖 tempo/d42/d43。不宣称相对旧系统体感 uplift；不把 probe 当 CI 门禁。
-    acceptance: 三探针可独立跑通（脚本/脚本 harness/可选真 seed）；覆盖项文档化；不修改 sim 核心文件（归 T2/T4）。
+    scope: "Scripted probes verify that the refactored axes are observable: tempo A/B (differences in patience/waiting menus), differences in process involvement, and differences in d43 quality-failure paths; support overriding tempo/d42/d43. Do not claim user experience uplift relative to the old system; do not use probes as CI gates."
+    acceptance: "All three probes can run independently (script/script harness/optional real seed); overrides are documented; do not modify sim core files (assigned to T2/T4)."
 ---
 
-# 0037 · 人轴重构：时间气质 ⊥ 质量失败 · 过程卷入 · 蒸馏 spoke 对齐
+# 0037 · Persona-axis refactoring: Time temperament ⊥ quality failure · Process involvement · Distillation spoke alignment
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: frontmatter is the structured source data (including the tasks DAG), and the body is a group-level nine-section rust-RFC overview. -->
 
 ## Summary
 
-本组重构用户侧 **persona 人轴**：把「等多久受得了」从「结果错了怎么办」里拆出来，并让蒸馏卡库与 sim 消费对齐。
+This group refactors the user-side **persona axis**: separate “how long can I tolerate waiting?” from “what do I do when the result is wrong?”, and align the distilled card library with sim consumption.
 
-核心契约：
+Core contract:
 
-- 新增 **时间气质** `tempo`（卡字段 `D7_time_temperament`：`patient | steady | impatient`）驱动等待耐心基线与衰减；
-- **质量失败策略**（sim `d43` / 卡 `on_offtrack`）只回答交付质量不行时怎么做，**不**驱动耐心；
-- **过程卷入**（sim `d42` / 卡 `supervision`）回答进行中要不要可见感，**不是**产品键（interrupt / queued / slash）；
-- **授权尺度** `D6Authz` 标为会话策略（由自主性期望半派生），**不进卡库**；
-- 卡契约 hub（`tools/persona-distill/card-schema.md`）加 D7、注入分布与正交强制；注入缺 D7 → `steady`；
-- 三个蒸馏 spoke 对齐「谁可 ground D7 / 谁只能 inject」，禁止把等待气质焊进 on_offtrack。
+- Add **time temperament** `tempo` (card field `D7_time_temperament`: `patient | steady | impatient`) to drive the waiting-patience baseline and decay;
+- **Quality failure strategy** (sim `d43` / card `on_offtrack`) only answers what to do when delivery quality is inadequate; it does **not** drive patience;
+- **Process involvement** (sim `d42` / card `supervision`) answers whether visibility is needed during execution; it is **not** a product control (interrupt / queued / slash);
+- Mark **authorization scope** `D6Authz` as session policy (partially derived from autonomy expectations); it **does not enter the card library**;
+- Add D7, the injection distribution, and enforced orthogonality to the card contract hub (`tools/persona-distill/card-schema.md`); injected cards missing D7 → `steady`;
+- Align the three distillation spokes on “which can ground D7 / which can only inject it”; prohibit coupling waiting temperament to on_offtrack.
 
-投影仍走既有 **judge → intent → act**，**不**另起 Translation 模块。本组**不宣称**相对旧系统的体感 uplift（轴可观测 ≠ 净收益已证）。
+Projection continues through the existing **judge → intent → act** path; **no** separate Translation module is introduced. This group **does not claim** user-experience uplift over the old system (axis observability ≠ proven net benefit).
 
 ## Motivation
 
-### 接缝已近真人 CLI，差在「人」
+### The interface is already close to a real CLI; the gap is in the “person”
 
-用户↔harness 内外通道与可见状态已收敛：内=message（含旁路 progress/status）、外=interrupt；stdin 统一写、以 `type=reply` 软唤醒；busy 时可有 queued/status。真人差异大量落在**时间轴**：有人干等几分钟仍 keep_waiting，有人两分钟就炸、催进度或打断。若人轴仍把「耐心」焊在「翻车策略」上，接缝再真，模拟用户也只会在质量失败路径上分叉，长等待上塌成同一种人。
+The internal/external user↔harness channels and visible states have converged: internal=message (including out-of-band progress/status), external=interrupt; stdin uses unified writes and `type=reply` for soft wake-up; queued/status may be available while busy. Much of the variation among real people lies on the **time axis**: some keep_waiting after several minutes of idle waiting, while others lose patience after two minutes, ask for progress, or interrupt. If the persona axis still couples “patience” to “failure strategy,” then however realistic the interface becomes, simulated users will diverge only along quality-failure paths and collapse into the same kind of person during long waits.
 
-### 旧焊点：耐心跟 d43 / on_offtrack
+### The old coupling: patience tied to d43 / on_offtrack
 
-旧 sim 用质量失败策略（如 give_up vs feedback）间接影响等待耐心。真实正交组合因此失真，例如：
+The old sim indirectly influenced waiting patience through quality failure strategies (such as give_up vs feedback). This distorts real orthogonal combinations, for example:
 
-- **较真但能等**：结果不行要 file-issue / handover，但空转时仍耐心 keep_waiting；
-- **随手接受但等不住**：交付差不多就过，干等两分钟就催/打断。
+- **Demanding but patient**: wants to file-issue / handover when the result is inadequate, but still patiently keep_waiting during idle time;
+- **Readily accepting but unable to wait**: accepts a roughly adequate delivery, but asks for progress/interrupts after two minutes of idle waiting.
 
-二者被焊死后，蒸馏卡 `on_offtrack=abandon` 容易被误读成 impatient，训练信号把「放弃交付」与「等不下去」混为一谈。
+Once the two are coupled, distilled card `on_offtrack=abandon` is easily misread as impatient, and the training signal conflates “giving up on the delivery” with “being unable to wait any longer.”
 
-### supervision 语义过时
+### Outdated supervision semantics
 
-卡/sim 的 supervision 仍带「读不读 diff / 回合制盯梢」味道。接缝层已有进行中可见事件后，人轴应表达的是**过程卷入**（opaque 是否不安、要不要可见性），而不是把当前 harness UX 枚举焊进人格。
+Card/sim supervision still carries a sense of “whether to read diffs / turn-based monitoring.” Now that the interface layer has visible in-progress events, the persona axis should express **process involvement** (whether opacity causes unease, whether visibility is needed), rather than coupling the current harness UX enums to personality.
 
-### 蒸馏 spoke 滞后于 hub
+### Distillation spokes lag behind the hub
 
-轮辐式采集：唯一契约 `card-schema.md` + 薄 spoke（selfreport / github / stackoverflow）。若 hub 已有 D7 而 spoke 仍按「6 维」教抽取，新采卡缺 D7 → 注入全变 `steady`，tempo 轴在库里塌缩，sim 侧 A/B 等于白做。
+Hub-and-spoke collection: a single contract `card-schema.md` + thin spokes (selfreport / github / stackoverflow). If the hub already has D7 but the spokes still teach extraction in “6 dimensions,” newly collected cards will lack D7 → injection will set all of them to `steady`, collapsing the tempo axis in the library and making sim-side A/B work pointless.
 
-### 明确不做的事
+### Explicit non-goals
 
-- 不把 interrupt / queued / slash 写进人轴枚举或抽取指南；
-- 不另起「情境→动作」独立 Translation 模块；
-- 不重开 persona 管线史诗、不批量回填存量卡（旧卡缺省 steady）；
-- 不把探针当 CI 门禁，不宣称旧系统 A/B 净收益。
+- Do not put interrupt / queued / slash into persona-axis enums or extraction guides;
+- Do not introduce a separate “situation→action” Translation module;
+- Do not reopen the persona pipeline epic or batch-backfill existing cards (old cards default to steady);
+- Do not treat probes as CI gates or claim net benefit from A/B testing against the old system.
 
 ## Guide-level explanation
 
-三人像（只谈人，不绑 v0 字段名）：
+Three personas (describing people only, without tying them to v0 field names):
 
-1. **急**：任务一丢出去，空转就坐立不安；进度条停了就催一句或考虑打断。交付质量翻车时怎么处理是另一回事——他可能仍愿意让 agent 再试一次，只是**等**得难受。
-2. **能等**：同样长任务，可以去干别的；心跳看见还在动就继续等。若最终结果烂，他可能直接自己收尾或开 issue——**耐心与翻车策略正交**。
-3. **高过程卷入**：不一定急，但讨厌黑盒；进行中希望有可见进展，长时间无信号会更快觉得「卡住了」（耐心额外扣一点），仍不等于必须按某个产品按钮。
+1. **Impatient**: becomes restless during idle time as soon as a task is submitted; when the progress bar stops, asks for an update or considers interrupting. How they handle a delivery quality failure is a separate matter—they may still be willing to let the agent try again, but **waiting** is uncomfortable.
+2. **Patient**: can go do something else during the same long task; continues waiting when the heartbeat shows activity. If the final result is poor, they may finish it themselves or open an issue—**patience and failure strategy are orthogonal**.
+3. **High process involvement**: not necessarily impatient, but dislikes black boxes; wants visible progress during execution, and prolonged silence makes them feel “stuck” sooner (with a small additional patience deduction), without implying that they must press a particular product button.
 
-蒸馏侧：
+On the distillation side:
 
-- 读**自述**（博客/访谈）时，把「我受不了干等」「我去倒杯咖啡再回来」ground 进 D7；把「结果不对我就自己改」ground 进 on_offtrack——两句不要并成一维。
-- 读 **GitHub / SO** 足迹时，多数时候**看不到**等待气质 → D7 按契约注入分布抽，并标 `injected` / `low`；不要从 PR 频率或「发完消失」推出 impatient 并与 abandon 锁死。
+- When reading **self-reports** (blogs/interviews), ground statements such as “I cannot stand waiting without feedback” and “I will get a coffee and come back” in D7; ground “If the result is wrong, I will fix it myself” in on_offtrack—do not merge the two statements into one dimension.
+- When reading **GitHub / SO** traces, waiting temperament is usually **not observable** → sample D7 from the contract's injection distribution and mark `injected` / `low`; do not infer impatient from PR frequency or “disappearing after posting” and lock it to abandon.
 
-跑局时：卡 → `card_to_persona` → `Persona.tempo` / `d42` / `d43` → 状态机耐心系数 + BLOCK-P 文案 → 既有三跳决策。
+During a session: card → `card_to_persona` → `Persona.tempo` / `d42` / `d43` → state-machine patience coefficients + BLOCK-P wording → existing three-hop decision process.
 
 ## Reference-level explanation
 
-### 人轴对照（卡 ↔ sim）
+### Persona-axis mapping (card ↔ sim)
 
-| 卡（hub） | sim | 语义 | 驱动 |
+| Card (hub) | sim | Semantics | Drives |
 |----------|-----|------|------|
-| `D7_time_temperament` | `Persona.tempo` | 对等待/空转的耐受 | 耐心初值与衰减 |
-| `interaction_style.supervision` | `d42` | 过程卷入（可见感需求） | stuck 时额外扣耐心等 |
-| `interaction_style.on_offtrack` | `d43` | 质量失败后的策略 | 翻车路径意图，**不**驱动耐心 |
-| （不进卡） | `D6Authz` | 会话授权尺度 | 由自主性期望半派生 |
-| `interaction_style.delegation` | `d41` | 委派粒度 | 既有 |
-| `D2_acceptance_bar` / `D4_trust_model` | `d3` / `trust` | 验收 / 信任 | 既有覆盖派生 |
+| `D7_time_temperament` | `Persona.tempo` | Tolerance for waiting/idle time | Initial patience and decay |
+| `interaction_style.supervision` | `d42` | Process involvement (need for visibility) | Additional patience deductions when stuck, etc. |
+| `interaction_style.on_offtrack` | `d43` | Strategy after quality failure | Intent on failure paths; does **not** drive patience |
+| (Not in cards) | `D6Authz` | Session authorization scope | Partially derived from autonomy expectations |
+| `interaction_style.delegation` | `d41` | Delegation granularity | Existing behavior |
+| `D2_acceptance_bar` / `D4_trust_model` | `d3` / `trust` | Acceptance / trust | Existing override derivation |
 
-枚举（卡侧，契约真源在 `card-schema.md`）：
+Enums (card side; the contract source of truth is `card-schema.md`):
 
-- D7：`patient | steady | impatient`
-- supervision：`hands-off | reviews | micromanage`（语义=过程卷入）
-- on_offtrack：`abandon | retry | correct | fix-self | file-issue`（语义=质量失败；≠等待）
+- D7: `patient | steady | impatient`
+- supervision: `hands-off | reviews | micromanage` (semantics=process involvement)
+- on_offtrack: `abandon | retry | correct | fix-self | file-issue` (semantics=quality failure; ≠waiting)
 
-注入分布（沉默轴）：D7 为 patient 25% / steady 50% / impatient 25%；**强制**与 on_offtrack 独立采样。
+Injection distribution (unobserved axis): D7 is patient 25% / steady 50% / impatient 25%; sampling independently of on_offtrack is **mandatory**.
 
-### 状态与文案
+### State and wording
 
-- `init_state`：耐心初值按 tempo 分档（impatient 低、patient 高）；任务量仅微浮动，不盖过气质档。
-- `make_coef`：`patience_decay` 跟 tempo；`stuck_extra` 在高过程卷入时 >0。
-- `clauses` / BLOCK-P：Process involvement + Time temperament；**禁止**把当前 harness 产品键写进维文案当人格定义。
+- `init_state`: initial patience is tiered by tempo (low for impatient, high for patient); task volume introduces only minor variation and does not override temperament tiers.
+- `make_coef`: `patience_decay` follows tempo; `stuck_extra` is >0 for high process involvement.
+- `clauses` / BLOCK-P: Process involvement + Time temperament; **do not** put current harness product controls into dimension wording as personality definitions.
 
-### 注入与兼容
+### Injection and compatibility
 
-`card_to_persona`：有 `D7_time_temperament.value` → 映射 tempo；缺字段 → `steady`（旧卡兼容）；非法值报错。D6Authz 永不从卡读。
+`card_to_persona`: if `D7_time_temperament.value` exists → map tempo; if the field is missing → `steady` (old-card compatibility); invalid values raise errors. D6Authz is never read from cards.
 
-### 蒸馏 spoke（T5）
+### Distillation spokes (T5)
 
-轮辐不变：spoke 只依赖 `../card-schema.md`，彼此不依赖 schema。
+The hub-and-spoke structure is unchanged: spokes depend only on `../card-schema.md`, not on one another's schemas.
 
-| Spoke | D7 | 语义改写要点 |
+| Spoke | D7 | Key semantic revisions |
 |-------|----|--------------|
-| selfreport | 可 **ground**（等待/干等原话）；无证则 inject | supervision→过程卷入；on_offtrack≠等待；文案含 D7；范例卡补字段 |
-| github / SO | **默认 inject** | 局限段写「观测不到等待气质」；禁从 PR 量/发完消失派生 impatient 或与 abandon 锁死；范例补 injected D7 |
+| selfreport | May **ground** (verbatim statements about waiting/idle waiting); inject without evidence | supervision→process involvement; on_offtrack≠waiting; wording includes D7; add the field to example cards |
+| github / SO | **Inject by default** | State “waiting temperament is not observable” in the limitations section; prohibit deriving impatient from PR volume/disappearing after posting or locking it to abandon; add injected D7 to examples |
 
-不重采存量卡库；不改 hub（T3 已定契约）。
+Do not recollect the existing card library; do not change the hub (T3 has already established the contract).
 
-### 探针（非门禁）
+### Probes (not gates)
 
-- `tools/dev/probes/probe_persona_reframe.py` — 脚本态正交
-- `tools/dev/probes/probe_swebench_persona.py` — 可选真 seed；可覆盖 `--tempo/--d42/--d43`
-- `tools/dev/probes/probe_d43_quality_fail.py` — 质量失败路径
+- `tools/dev/probes/probe_persona_reframe.py` — scripted orthogonality
+- `tools/dev/probes/probe_swebench_persona.py` — optional real seed; can override `--tempo/--d42/--d43`
+- `tools/dev/probes/probe_d43_quality_fail.py` — quality-failure paths
 
-验收口径：轴可观测、正交成立；**不**写「优于旧系统」。
+Acceptance criteria: the axes are observable and orthogonality holds; do **not** write “better than the old system.”
 
-e2e / 探针入口（非 CI 门禁）：
+e2e / probe entry points (not CI gates):
 
 ```text
 tools/dev/probes/probe_persona_reframe.py
@@ -228,69 +228,69 @@ tools/dev/probes/probe_swebench_persona.py
 tools/dev/probes/probe_d43_quality_fail.py
 ```
 
-当前维护工具从仓库根目录用 `PYTHONPATH=backend .venv/bin/python -m tools.dev.probes.<module>` 调用。
-各工具的显式输入、凭证与是否调用模型见 `tools/dev/README.md`；它们不注册另一套实验配置或多任务入口。
+Current maintenance tools are invoked from the repository root using `PYTHONPATH=backend .venv/bin/python -m tools.dev.probes.<module>`.
+See `tools/dev/README.md` for each tool's explicit inputs, credentials, and whether it calls a model; they do not register another set of experiment configurations or multi-task entry points.
 
-实现注释约定：本组落地代码用「本编号 + 任务号」追溯（形如本文件 `number` 加 `/T2` 的注释前缀，见 tools/spec-driven-development 注释规范）。
+Implementation comment convention: code delivered in this group is traceable using “this number + task number” (a comment prefix such as this file's `number` plus `/T2`; see the comment conventions in tools/spec-driven-development).
 
-### 任务 DAG 与文件分配
+### Task DAG and file allocation
 
 ```text
-T1 活快照
- ├─ T2 sim（dimensions/state/clauses/demo + 单测）
+T1 Live snapshot
+ ├─ T2 sim (dimensions/state/clauses/demo + unit tests)
  ├─ T3 hub card-schema
- │    └─ T5 三 spoke 文档对齐（done）
+ │    └─ T5 three-spoke documentation alignment (done)
  └─ T2+T3 → T4 persona_io
-              └─ T2+T4 → T6 探针
+              └─ T2+T4 → T6 probe
 ```
 
-| Task | 状态 | 拥有文件（互斥） |
+| Task | Status | Owned files (mutually exclusive) |
 |------|------|------------------|
 | T1 | done | `docs/specs/0037-persona-time-temperament-reframe.md` |
-| T2 | done | `user/sim/{dimensions,state,clauses,demo}.py` + 对应单测 |
+| T2 | done | `user/sim/{dimensions,state,clauses,demo}.py` + corresponding unit tests |
 | T3 | done | `tools/persona-distill/card-schema.md` |
 | T4 | done | `persona_io.py` + `test_persona_io.py` |
-| T5 | done | 三个 spoke 的 `SKILL.md` / `reference.md` |
-| T6 | done | 三个 `probe_*.py` |
+| T5 | done | `SKILL.md` / `reference.md` for the three spokes |
+| T6 | done | Three `probe_*.py` |
 
-依赖：`T1→T2`，`T1→T3`，`T1+T2+T3→T4`，`T1+T3→T5`，`T2+T4→T6`。
+Dependencies: `T1→T2`, `T1→T3`, `T1+T2+T3→T4`, `T1+T3→T5`, `T2+T4→T6`.
 
 ## Drawbacks
 
-- 旧卡无 D7 一律 `steady`；新采 selfreport/github 卡已显式带 D7，但观测型 D7 仍多为 inject，库内「真人等待锚」仍偏依赖 selfreport。
-- 观测型源 D7 几乎全 inject → 等待气质真人锚仍主要靠 selfreport（与态度轴历史局面同构）。
-- 枚举字符串（hands-off/reviews 等）先保留、只改语义注释，读者可能短暂混淆旧名新义。
-- handover 等质量失败路径在无真实可写工作区时弱可测，探针不能代替有工作区的验收。
-- 本组不证旧系统 uplift，产品叙事上不能夸大「体感进化已验证」。
+- All old cards without D7 use `steady`; newly collected selfreport/github cards explicitly include D7, but D7 from observational sources is still mostly injected, so “real-person waiting anchors” in the library still rely heavily on selfreport.
+- D7 from observational sources is almost entirely injected → real-person anchors for waiting temperament still mainly rely on selfreport (structurally similar to the historical situation for attitude axes).
+- Enum strings (hands-off/reviews, etc.) are retained for now, with only semantic comments changed; readers may briefly confuse old names with new meanings.
+- Quality-failure paths such as handover have limited testability without a real writable workspace; probes cannot replace acceptance testing with a workspace.
+- This group does not establish uplift over the old system, so product narratives must not overstate that “user-experience evolution has been verified.”
 
 ## Rationale and alternatives
 
-- **tempo 独立轴 vs 继续用 d43 代理耐心**：选独立轴。焊在 d43 上无法表达正交人像，且污染蒸馏语义。
-- **过程卷入改语义 vs 新开一维替换 supervision**：选改语义、保留枚举槽。奥卡姆：卡形状少炸一次；产品键不进枚举。
-- **D6Authz 出卡 vs 进卡库**：选出卡。授权是会话/产品策略，不是「这个人是谁」；进卡会把实验条件焊进画像。
-- **缺 D7 → steady vs 强制报错**：选 steady 兼容旧卡；新卡应显式写。硬门留给 Unresolved。
-- **spoke 同组对齐 vs 另开蒸馏组**：选同组。契约变更与消费者（sim + spoke）同组才闭环；spoke 是文档对齐不是新管线。
-- **独立 Translation 模块 vs 既有三跳**：选三跳。tempo/卷入进 state 系数与 prompt 已够投影；另起实体无必要证据。
-- **备选否决：把 interrupt/queued 写进 persona**：否。那是 harness 产品面，进化对象不能焊进人真源。
+- **Independent tempo axis vs continuing to use d43 as a patience proxy**: choose an independent axis. Coupling it to d43 cannot express orthogonal personas and contaminates distillation semantics.
+- **Change process-involvement semantics vs introduce a new dimension to replace supervision**: choose changed semantics while retaining the enum slot. Occam's razor: avoid another disruption to card structure; product controls stay out of enums.
+- **Keep D6Authz out of cards vs include it in the card library**: choose to keep it out. Authorization is session/product policy, not “who this person is”; including it in cards would couple experimental conditions to the profile.
+- **Missing D7 → steady vs mandatory error**: choose steady for old-card compatibility; new cards should specify it explicitly. Leave a hard gate to Unresolved.
+- **Align spokes in the same group vs open a separate distillation group**: choose the same group. Keeping contract changes and consumers (sim + spokes) in one group closes the loop; the spokes involve documentation alignment, not a new pipeline.
+- **Independent Translation module vs existing three-hop process**: choose the three-hop process. Adding tempo/involvement to state coefficients and prompts is sufficient for projection; there is no necessary evidence for a separate entity.
+- **Rejected alternative: put interrupt/queued into persona**: no. These belong to the harness product surface; the object being evolved must not be coupled to the persona source of truth.
 
 ## Prior art
 
-- 本仓 persona 管线：轮辐式 `card-schema` + selfreport/github/SO spoke；卡→sim 唯一桥 `card_to_persona`；覆盖派生保留 grounded 信任/验收。
-- 用户侧等待环与接缝：心跳 judge→intent→act；stdout 可见 progress/status；统一 stdin 写与 reply 软唤醒——本组承接「差在人轴」而非再改线协议。
-- 探针实践：矩阵探针验证轴可观测，不作发版门禁（benchmark held-out 纪律不变）。
+- This repository's persona pipeline: hub-and-spoke `card-schema` + selfreport/github/SO spokes; `card_to_persona` is the sole card→sim bridge; override derivation preserves grounded trust/acceptance.
+- User-side waiting loop and interface: heartbeat judge→intent→act; visible progress/status on stdout; unified stdin writes and reply soft wake-up—this group addresses “the gap is in the persona axis” rather than changing the wire protocol again.
+- Probe practice: matrix probes verify axis observability without serving as release gates (benchmark held-out discipline remains unchanged).
 
 ## Unresolved questions
 
-- 合并库（`persona_library.json` = sr + gh）里，是否还要对**更旧、无 D7** 的遗留卡做批次回填（现注入缺省 `steady`）？
-- `validate_card` 是否对**新卡**强制 D7 必填（旧卡仍合法）？
-- handover 在真实可写工作区下的行为验收是否另开探针/任务？
-- 是否要做旧系统 vs 本组的体感 A/B（大 N）？本组明确**不**把它当作验收前提。
-- 采样器是否要显式「GitHub 取 D1×D5 + selfreport/注入取态度」混搭（现行是整卡使用，无自动拼轴）？
+- In the merged library (`persona_library.json` = sr + gh), should **older legacy cards without D7** also receive batch backfilling (the current injection default is `steady`)?
+- Should `validate_card` require D7 for **new cards** (while old cards remain valid)?
+- Should behavior acceptance testing for handover in a real writable workspace have a separate probe/task?
+- Should there be a large-N user-experience A/B test of the old system vs this group? This group explicitly does **not** make it a prerequisite for acceptance.
+- Should the sampler explicitly mix “D1×D5 from GitHub + attitudes from selfreport/injection” (currently whole cards are used, without automatic axis composition)?
 
 ## Future possibilities
 
-- 继续用 selfreport 补齐 impatient/patient 真人锚，校准注入分布；用 SO spoke 补 blind/surface 网格。
-- 库侧硬门：basis 强制、观测源态度轴/D7 注入约束升级为 `validate_card`。
-- 若枚举旧名持续误导，可另开组做 rename（micromanage→high involvement 等）并迁移卡库——本组不做。
-- 过程卷入与可见事件（progress/status）的更细耦合（例如「无新进度」与 stuck 判定）可在等待环侧演进，仍不把具体 UX 键焊进卡。
-- 可选：卡库分文件（`persona_library_selfreport.json` / `persona_library_github.json`）+ 合并默认库，便于按源跑实验（已在运行侧落地，非本组 Task 文件归属）。
+- Continue using selfreport to fill in real-person impatient/patient anchors and calibrate the injection distribution; use the SO spoke to fill the blind/surface grid.
+- Library-side hard gates: mandatory basis, and observational-source attitude-axis/D7 injection constraints promoted to `validate_card`.
+- If old enum names remain misleading, open another group for renaming (micromanage→high involvement, etc.) and card-library migration—outside this group's scope.
+- Finer coupling between process involvement and visible events (progress/status), such as “no new progress” and stuck detection, can evolve on the waiting-loop side, while still keeping specific UX controls out of cards.
+- Optional: separate card-library files (`persona_library_selfreport.json` / `persona_library_github.json`) + a merged default library, making experiments by source easier (already implemented on the runtime side, outside this group's Task file ownership).

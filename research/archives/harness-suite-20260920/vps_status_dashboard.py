@@ -59,7 +59,7 @@ def public_status(value: dict) -> dict:
     result["api_sources"] = {
         role: sources[role]
         for role in ("harness", "user", "synthesizer", "developer")
-        if isinstance(sources, dict) and sources.get(role) in ("Boyue", "WIS", "OpenRouter", "未知")
+        if isinstance(sources, dict) and sources.get(role) in ("Boyue", "WIS", "OpenRouter", "Unknown")
     }
     # Historical snapshots may have labelled a failed process as finished.
     if result.get("exit_code") not in (None, 0, "0"):
@@ -159,16 +159,16 @@ table{border-collapse:collapse;width:100%;background:white}th,td{padding:9px;bor
 section{background:#fff;padding:16px;margin:14px 0;border:1px solid #e1e4e8;border-radius:8px}
 button{padding:5px 10px;cursor:pointer}small{color:#667085}
 </style><body><h1>Harness Evaluation Status</h1><small id="updated">loading…</small>
-<section><table><thead><tr><th>实验</th><th>run</th><th>API 使用源</th><th>round</th><th>phase</th><th>OpenAgents 提案</th><th>components</th><th>账本更新时间</th><th>state</th></tr></thead><tbody id="runs"></tbody></table></section>
-<section id="detail"><h2>选择一个 run</h2></section>
+<section><table><thead><tr><th>Experiment</th><th>run</th><th>API Source used</th><th>round</th><th>phase</th><th>OpenAgents Proposal</th><th>components</th><th>Ledger update time</th><th>state</th></tr></thead><tbody id="runs"></tbody></table></section>
+<section id="detail"><h2>Select one run</h2></section>
 <script>
 let selected=null, refreshInFlight=false;
 const snapshots=new Map(), rowNodes=new Map();
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function componentSummary(x){return (x.components||[]).map(c=>esc(c.name)+': '+esc(c.state)+(c.total?' · '+esc(c.completed)+'/'+esc(c.total)+' 完成':'')+(c.failed?' · '+esc(c.failed)+' 失败':'')+(c.name==='openagents'?'（进程状态，不代表正在交付）':'')).join('<br>')||'—';}
-function proposalSummary(x){let p=x.proposals;if(!p)return '尚无提案监控数据';return `进入 ${esc(p.admitted)} 条 · 完成 ${esc(p.completed)}<br>处理中 ${esc(p.processing)} · 就绪 ${esc(p.ready)} · 待确认 ${esc(p.awaiting_confirmation)}<br>失败 ${esc(p.failed)} · 阻塞 ${esc(p.blocked)} · 未知 ${esc(p.unknown)}`;}
-function sourceSummary(x){let s=x.api_sources||{};let names=[...new Set(['harness','user','synthesizer','developer'].map(k=>s[k]).filter(Boolean))];return names.length?names.map(esc).join(' / '):'未记录';}
-function proposalTable(x){let p=x.proposals;if(!p)return '<p>尚无提案监控数据</p>';let labels={completed:'已完成（账本确认）',processing:'处理中',ready:'就绪待处理',awaiting_confirmation:'开发完成，待总控确认',failed:'失败',blocked:'阻塞',unknown:'待核实'};return '<h3>本轮进入 OpenAgents 的提案</h3><p>'+proposalSummary(x)+'</p><small>处理中来自最近观测，不保证持续推进；心跳更新不等于完成。账本长期不变也不直接代表卡死。</small><table><thead><tr><th>提案</th><th>PR</th><th>状态</th><th>开发记录</th><th>最近具体动作 / 时间</th><th>最近观测</th></tr></thead><tbody>'+p.items.map(r=>`<tr><td>#${esc(r.issue)}</td><td>${r.pr?'#'+esc(r.pr):'—'}</td><td>${esc(labels[r.state]||r.state)}</td><td>${esc(r.runtime_status||'—')} / ${esc(r.observed_phase||'—')}</td><td>${esc(r.last_action||'—')}<br>${esc(r.last_action_at||'—')}</td><td>${esc(r.last_observed_at||'—')}</td></tr>`).join('')+'</tbody></table>';}
+function componentSummary(x){return (x.components||[]).map(c=>esc(c.name)+': '+esc(c.state)+(c.total?' · '+esc(c.completed)+'/'+esc(c.total)+' Completed':'')+(c.failed?' · '+esc(c.failed)+' Failed':'')+(c.name==='openagents'?'（Process status，Does not indicate ongoing delivery）':'')).join('<br>')||'—';}
+function proposalSummary(x){let p=x.proposals;if(!p)return 'No proposal monitoring data yet';return `Enter ${esc(p.admitted)} Items · Completed ${esc(p.completed)}<br>Processing ${esc(p.processing)} · Ready ${esc(p.ready)} · Pending confirmation ${esc(p.awaiting_confirmation)}<br>Failed ${esc(p.failed)} · Blocked ${esc(p.blocked)} · Unknown ${esc(p.unknown)}`;}
+function sourceSummary(x){let s=x.api_sources||{};let names=[...new Set(['harness','user','synthesizer','developer'].map(k=>s[k]).filter(Boolean))];return names.length?names.map(esc).join(' / '):'Not recorded';}
+function proposalTable(x){let p=x.proposals;if(!p)return '<p>No proposal monitoring data yet</p>';let labels={completed:'Completed（Ledger confirmation）',processing:'Processing',ready:'Ready for processing',awaiting_confirmation:'Development complete，Pending central controller confirmation',failed:'Failed',blocked:'Blocked',unknown:'Pending verification'};return '<h3>Entered this round OpenAgents Proposals</h3><p>'+proposalSummary(x)+'</p><small>Processing status is based on the latest observation，Does not guarantee continued progress；Heartbeat updates do not indicate completion。An unchanged ledger over time does not necessarily indicate a stall。</small><table><thead><tr><th>Proposal</th><th>PR</th><th>Status</th><th>Development records</th><th>Latest concrete action / Time</th><th>Latest observation</th></tr></thead><tbody>'+p.items.map(r=>`<tr><td>#${esc(r.issue)}</td><td>${r.pr?'#'+esc(r.pr):'—'}</td><td>${esc(labels[r.state]||r.state)}</td><td>${esc(r.runtime_status||'—')} / ${esc(r.observed_phase||'—')}</td><td>${esc(r.last_action||'—')}<br>${esc(r.last_action_at||'—')}</td><td>${esc(r.last_observed_at||'—')}</td></tr>`).join('')+'</tbody></table>';}
 function renderRows(rows){
 const tbody=document.getElementById('runs');
 for(const x of rows){
@@ -179,12 +179,12 @@ const age=x.updated_at?Math.max(0,Math.floor((Date.now()-Date.parse(x.updated_at
 const openagents=(x.components||[]).find(c=>c.name==='openagents');
 const final=x.state==='finished'||(x.exit_code!=null&&!openagents?.process_running);
 const stale=!final&&(age==null||age>180);
-const syncLabel=final?'最终快照':stale?'同步陈旧':'同步正常';
-const cells=[esc(x.experiment_name||'未标注实验'),`<button onclick="selectRun('${esc(x.run_id)}')">${esc(x.run_id)}</button>`,sourceSummary(x),`${esc(x.round)}/${esc(x.total_rounds)}`,esc(x.phase),proposalSummary(x),componentSummary(x),`${esc(x.last_heartbeat||'—')}<br><small>同步 ${esc(x.updated_at||'—')}</small><br><span class="${stale?'stale':'ok'}">${syncLabel} · ${esc(age??'—')}s 前</span>`,`<span class="${bad?'bad':'ok'}">${esc(x.state||'unknown')}</span>`];
+const syncLabel=final?'Final snapshot':stale?'Sync stale':'Synchronization normal';
+const cells=[esc(x.experiment_name||'Unlabeled experiment'),`<button onclick="selectRun('${esc(x.run_id)}')">${esc(x.run_id)}</button>`,sourceSummary(x),`${esc(x.round)}/${esc(x.total_rounds)}`,esc(x.phase),proposalSummary(x),componentSummary(x),`${esc(x.last_heartbeat||'—')}<br><small>Synchronize ${esc(x.updated_at||'—')}</small><br><span class="${stale?'stale':'ok'}">${syncLabel} · ${esc(age??'—')}s Before</span>`,`<span class="${bad?'bad':'ok'}">${esc(x.state||'unknown')}</span>`];
 cells.forEach((body,i)=>{if(tr.children[i].innerHTML!==body)tr.children[i].innerHTML=body;});
 }
 rows.forEach((x,i)=>{const tr=rowNodes.get(x.run_id);if(tbody.children[i]!==tr)tbody.insertBefore(tr,tbody.children[i]||null);});
-if(!rows.length)tbody.innerHTML='<tr><td colspan="9">暂无同步数据</td></tr>';
+if(!rows.length)tbody.innerHTML='<tr><td colspan="9">No synchronization data available</td></tr>';
 }
 async function refresh(){
 if(refreshInFlight)return;
@@ -210,7 +210,7 @@ finally{clearTimeout(timeout);refreshInFlight=false;}
 }
 function selectRun(id){selected=id;let x=snapshots.get(id);if(!x)return;
 const detail=document.getElementById('detail');const opened=detail.querySelector('details')?.open;
-document.getElementById('detail').innerHTML='<h2>'+esc(x.run_id||id)+'</h2><p>round '+esc(x.round)+'/'+esc(x.total_rounds)+' · phase '+esc(x.phase)+' · 账本/角色状态未更新 '+esc(x.stalled_for_seconds??'—')+'s（非卡死判定）</p>'+proposalTable(x)+'<details><summary>组件与账本明细</summary><div class="mono">'+esc(JSON.stringify({components:x.components,delivery:x.delivery},null,2))+'</div></details>';
+document.getElementById('detail').innerHTML='<h2>'+esc(x.run_id||id)+'</h2><p>round '+esc(x.round)+'/'+esc(x.total_rounds)+' · phase '+esc(x.phase)+' · Ledger/Character status not updated '+esc(x.stalled_for_seconds??'—')+'s（Not stuck determination）</p>'+proposalTable(x)+'<details><summary>Component and ledger details</summary><div class="mono">'+esc(JSON.stringify({components:x.components,delivery:x.delivery},null,2))+'</div></details>';
 if(opened)detail.querySelector('details').open=true;
 }
 refresh();setInterval(refresh,5000);

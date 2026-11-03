@@ -23,7 +23,7 @@ def card(*, task_id: str, repo: str | None) -> dict:
     result = {
         "id": task_id,
         "source": {"not_in_benchmark": True},
-        "task": {"prompt": "保留 'quote' 和换行。\r\n\n  "},
+        "task": {"prompt": "Preserve 'quote' and line breaks。\r\n\n  "},
     }
     if repo is not None:
         result["source"]["repo"] = repo
@@ -140,7 +140,7 @@ def test_generated_setup_runs_original_strings_in_independent_shells_with_venv_p
     original = card(task_id="text", repo=None)
     commands = [
         "printf '%s\\n' \"a 'quote' and \\\"double\\\"\" > quoted.txt\n"
-        "cat <<'END' >> quoted.txt\nline one\n中文 line two\nEND\n"
+        "cat <<'END' >> quoted.txt\nline one\nChinese line two\nEND\n"
         "export FROM_FIRST=yes; cd /",
         'test -z "${FROM_FIRST:-}"; test "$PWD" = "$TASK_ROOT"; pip --version > pip.txt',
     ]
@@ -172,7 +172,7 @@ def test_generated_setup_runs_original_strings_in_independent_shells_with_venv_p
     subprocess.run(["bash", str(script)], env=env, check=True, capture_output=True)
     assert (
         root / "quoted.txt"
-    ).read_text() == "a 'quote' and \"double\"\nline one\n中文 line two\n"
+    ).read_text() == "a 'quote' and \"double\"\nline one\nChinese line two\n"
     assert (root / "pip.txt").read_text() == "task venv pip\n"
     assert "--seed" in (root / "uv-args.txt").read_text().splitlines()
 

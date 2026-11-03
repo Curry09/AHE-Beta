@@ -1,12 +1,12 @@
 ---
 number: "0069"
-title: 本地 Docker 与 E2B 可选实验启动
+title: "Selectable local Docker and E2B experiment startup"
 issue: 0
 slug: selectable-experiment-backends
-summary: 共用实验定义，提供本地 Docker 默认路径与 E2B 云端路径，补齐准备、预检、运行、恢复和真实新用户验收。
+summary: "Share experiment definitions, provide the local Docker default path and the E2B cloud path, and complete preparation, preflight checks, execution, recovery, and acceptance with real new users."
 tasks:
   - id: T1
-    title: 统一实验 schema 与材料冻结
+    title: "Unified experiment schema and material freezing"
     status: done
     priority: P1
     tags: []
@@ -20,10 +20,10 @@ tasks:
       - backend/ahe_beta/experiment/schemas/task-package-v1.json
       - backend/tests/test_experiment_config_v2.py
       - backend/tests/test_experiment_materials.py
-    scope: 实现严格 v2 配置与任务包解析、自动生成计划及冻结输入；旧 schema 显式拒绝，不启用兼容运行链路
-    acceptance: 未知字段与错误材料在启动前失败；冻结哈希可重验，相对路径和 env 引用正确且不包含凭证
+    scope: "Implement strict v2 configuration and task-package parsing, automatically generate plans, and freeze inputs; explicitly reject the old schema without enabling a compatibility execution path."
+    acceptance: "Unknown fields and invalid materials fail before startup; frozen hashes can be revalidated, relative paths and env references are correct, and credentials are not included."
   - id: T2
-    title: 共用 controller context 与后端协议
+    title: "Shared controller context and backend protocol"
     status: done
     priority: P1
     tags: []
@@ -39,10 +39,10 @@ tasks:
       - backend/ahe_beta/experiment/controllers/ordinary.py
       - backend/ahe_beta/experiment/controllers/swebench.py
       - backend/tests/test_experiment_engine.py
-    scope: 共用现有闭环、注入全部受支持模型参数和材料，定义生命周期后端接口
-    acceptance: ordinary 与 SWE 路径均读取冻结 context，不再依赖隐式 backend/.env；参数生效且末轮语义保持
+    scope: "Share the existing closed loop, inject all supported model parameters and materials, and define the lifecycle backend interface."
+    acceptance: "Both the ordinary and SWE paths read the frozen context and no longer depend on implicit backend/.env; parameters take effect and final-round semantics remain unchanged."
   - id: T3
-    title: 本地 Docker 与 localhost Gitea 适配
+    title: "Local Docker and localhost Gitea integration"
     status: done
     priority: P1
     tags: []
@@ -61,10 +61,10 @@ tasks:
       - backend/ahe_beta/harness/launcher.py
       - backend/ahe_beta/user/sim/sources/docker_seed.py
       - backend/tests/user/sim/test_docker_seed_source.py
-    scope: 自动准备本地基础设施、Gitea 身份、动态地址和隔离执行环境；健康观察由当前 local backend 完成，旧 health 模块已退出。
-    acceptance: 真实 controller 与 vigil 健康才可运行；动态端口可达、无空注册 runner，停止及清理只作用所属资源
+    scope: "Automatically prepare local infrastructure, Gitea identities, dynamic addresses, and isolated execution environments; health monitoring is handled by the current local backend, and the old health module has been retired."
+    acceptance: "Execution is permitted only when the real controller and vigil are healthy; dynamic ports are reachable, no runner is registered without a backing process, and stopping and cleanup affect only owned resources."
   - id: T4
-    title: E2B 与 Gitea.com 执行适配
+    title: "E2B and Gitea.com execution integration"
     status: done
     priority: P1
     tags: []
@@ -81,10 +81,10 @@ tasks:
       - backend/tests/user/sim/test_prebuilt_source.py
       - backend/tests/user/sim/test_workspace_runtime.py
       - backend/tests/test_experiment_e2b_backend.py
-    scope: 通用云环境安装、资源能力核实、Gitea.com 发布读取预检及远端进程管理
-    acceptance: 不依赖个人目录和嵌套 Docker；实际资源匹配，真实 reader 读取 ZIP，创建失败可追踪清理且重复运行不重复 controller
+    scope: "Generic cloud-environment installation, resource-capability verification, Gitea.com publication/readiness preflight, and remote process management."
+    acceptance: "Do not depend on personal directories or nested Docker; match actual resources, have the real reader read ZIP files, ensure failed creation can be tracked and cleaned up, and prevent duplicate controllers on repeated runs."
   - id: T5
-    title: 统一 CLI 和生命周期管理
+    title: "Unified CLI and lifecycle management"
     status: done
     priority: P1
     tags: []
@@ -100,10 +100,10 @@ tasks:
       - backend/ahe_beta/experiment/collection.py
       - backend/tests/test_experiment_cli_v2.py
       - backend/tests/test_experiment_lifecycle_v2.py
-    scope: 接通 check/prepare/run 与统一管理，分离状态；旧 v1 生命周期、转发 wrapper 和历史 launcher 已退出，现行命令仅服务 v2。
-    acceptance: 已有 v2 运行保持身份及冻结输入，状态如实反映存活与采集；dirty checkout 和缺模型 key 不阻塞 collect/destroy；旧命令或 schema 在 provider 操作前拒绝。
+    scope: "Connect check/prepare/run through unified management and separate state; the old v1 lifecycle, forwarding wrapper, and historical launcher have been retired, and current commands serve v2 only."
+    acceptance: "Existing v2 runs retain their identity and frozen inputs, while state truthfully reflects liveness and collection; dirty checkouts and missing model keys do not block collect/destroy; old commands or schemas are rejected before provider operations."
   - id: T6
-    title: 双语教程与两路径完整验收
+    title: "Bilingual tutorial and complete acceptance for both paths"
     status: done
     priority: P1
     tags: []
@@ -139,58 +139,58 @@ tasks:
       - backend/scripts/e2e-spec-0069-experiment-entry.sh
       - backend/tests/test_experiment_public_examples.py
       - .github/workflows/experiment-contract.yml
-    scope: 补齐可公开素材与版本依赖、两份等价示例、英中教程和真实验收证据
-    acceptance: 干净 checkout 按教程各完成 local 与 E2B 五轮和一次 stop/resume，无私人 wrapper；离线 CI 通过，未验证或发布阻塞项如实列出
+    scope: "Provide publishable materials and version dependencies, two equivalent examples, bilingual tutorials, and real acceptance evidence."
+    acceptance: "From a clean checkout, complete five rounds and one stop/resume cycle for both local and E2B paths according to the tutorials, without private wrappers; offline CI passes, and unverified or release-blocking items are listed accurately."
 ---
 
-# 0069 · 本地 Docker 与 E2B 可选实验启动
+# 0069 · Selectable Local Docker and E2B Experiment Launch
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: the frontmatter is structured source data (including the tasks DAG), and the body is a nine-section group-level rust-RFC overview. -->
 
 ## Summary
 
-> 0071 清理后的当前契约：v1 生命周期兼容、create/start/preflight/archive 别名和 auditable wrapper 已退出；现行仅支持 v2 check/prepare/run/status/logs/stop/resume/collect/destroy。已准备 v2 run 保留原冻结源码和哈希，不升级其 controller。下文 Motivation 中旧入口描述是历史背景，当前任务包每轮仍只支持一个 session。
+> Current contract after the 0071 cleanup: v1 lifecycle compatibility, the create/start/preflight/archive aliases, and the auditable wrapper have exited; only v2 check/prepare/run/status/logs/stop/resume/collect/destroy are currently supported. The prepared v2 run retains its original frozen source and hash, and its controller is not upgraded. The old-entry descriptions in Motivation below are historical background; the current task package still supports only one session per round.
 
-统一开源实验入口为 `backend/scripts/experiment.py`，以一份版本化实验定义描述任务、persona、Harness 初始版本、角色、模型和轮数，提供 `local`（本机 Docker + 自动启动 localhost Gitea）与 `e2b`（E2B + 用户自己的 Gitea.com）两种执行后端。共用材料解析、冻结、预检、闭环控制与运行管理，后端仅承担资源和执行环境差异。交付两份可执行 N=1 示例、中英 QuickStart、从干净 checkout 完成五轮的教程和可核查的实跑记录。
+Unify the open-source experiment entry point as `backend/scripts/experiment.py`. A versioned experiment definition describes the task, persona, initial Harness version, roles, models, and number of rounds, and provides `local` (local Docker + automatically started localhost Gitea) and `e2b` (E2B + the user's own Gitea.com) as two execution backends. Material parsing, freezing, preflight checks, closed-loop control, and run management are shared; the backends handle only differences in resources and execution environments. Deliver two executable N=1 examples, Chinese and English QuickStarts, a tutorial that completes five rounds from a clean checkout, and verifiable records of an actual run.
 
-本文已经用户批准，当前进入实施与验证；任务状态记录实现进度。现有私人试跑 wrapper 不作为开源入口，也不把启动成功视为五轮完成。
+This document has been approved by the user and is now entering implementation and verification; task status records implementation progress. The existing private trial wrapper is not an open-source entry point, and successful startup is not treated as completion of five rounds.
 
 ## Motivation
 
-当前入口分别解决了不同阶段的问题，没有形成一条新用户路径：
+The current entry points solve problems at different stages and do not form a new-user path:
 
-- `experiment.py` 的 create/plan/preflight/start 偏向基础设施管理，start 启动 Compose 并记录 RUNNING，却不等价于启动实验 controller；stop 也未统一管理 controller 进程。
-- `run_auditable_experiment.py` 能组织本地完整闭环，但要求用户准备多份已经冻结的材料、镜像及版本；它与基础设施入口还各自构造 context。
-- 历史 `run_n1_e2b.py` 依赖固定任务、persona、外部 Harness 归档和本机路径。当前 E2B JSON 部分路径、模型设置和资源声明没有被执行器读取，填了配置不代表生效。
-- 本地和 E2B 的配置版本、Owner 计数、模型映射、恢复与产物目录语义不一致。真实试跑还需要仓外 wrapper 和凭证拼装。
-- README/QuickStart 没有清晰列出“用户填写什么、程序生成什么、怎样证明完整结束”，也混合了历史复现与新实验。
+- The create/plan/preflight/start commands of `experiment.py` focus on infrastructure management. start launches Compose and records RUNNING, but this is not equivalent to starting the experiment controller; stop also does not uniformly manage the controller process.
+- `run_auditable_experiment.py` can orchestrate a complete local closed loop, but requires users to prepare multiple already-frozen materials, images, and versions; it also constructs context separately from the infrastructure entry point.
+- Historical `run_n1_e2b.py` depends on fixed tasks, personas, external Harness archives, and local paths. In the current E2B JSON, some paths, model settings, and resource declarations are not read by the executor; filling in configuration does not mean it takes effect.
+- Configuration versions, Owner counts, model mappings, recovery, and artifact-directory semantics differ between local and E2B. A real trial still requires an out-of-repository wrapper and assembled credentials.
+- The README/QuickStart does not clearly state “what the user fills in, what the program generates, and how to prove complete termination,” and mixes historical reproduction with new experiments.
 
-这次统一不改进化算法：用户使用 → 报告 → 需求处理与 Owner 准入 → OpenAgents 交付 → 本轮封口 → 下一轮；末轮仅用户试用。主观评分不作工程合并门禁，官方 benchmark 评分仍独立事后执行。
+This unification does not change the evolution algorithm: user use → report → requirement handling and Owner admission → OpenAgents delivery → close the current round → next round; the final round is for user trial only. Subjective scores are not an engineering merge gate, and official benchmark scoring is still performed independently afterward.
 
 ## Guide-level explanation
 
-### 两条路径，一个操作流程
+### Two Paths, One Operating Flow
 
-| 项目 | local | e2b |
+| Item | local | e2b |
 | --- | --- | --- |
-| 用户本机 | Linux 或 WSL2、Python/uv、Docker Engine/Compose | Python/uv，执行完整实验不要求本机 Docker |
-| 实验环境 | 本机 controller，隔离的用户工作区与 vigil 容器 | 每场实验一个 E2B sandbox，controller 与 vigil 在其中运行 |
-| Gitea | 自动创建实验专用 localhost 服务、账户、token、私有仓库 | 使用用户 Gitea.com token 创建实验专用私有仓库 |
-| 附加凭证 | 无需手工部署 Gitea 或填写管理员密码 | E2B_API_KEY、GITEA_TOKEN；账户由 API 解析，配置名称用于校验 |
-| 模型 | User、Harness、共享需求面及 Claude Code 交付模型 | 相同模型配置结构 |
-| 管理 | 同一组 run/status/logs/stop/resume/collect/destroy 命令 | 同左；显示云资源到期时间与最后观察时间 |
+| User machine | Linux or WSL2, Python/uv, Docker Engine/Compose | Python/uv; local Docker is not required to run the complete experiment |
+| Experiment environment | Local controller, isolated user workspace, and vigil container | One E2B sandbox per experiment, with the controller and vigil running inside it |
+| Gitea | Automatically creates an experiment-specific localhost service, account, token, and private repository | Uses the user's Gitea.com token to create an experiment-specific private repository |
+| Additional credentials | No manual Gitea deployment or administrator password entry required | E2B_API_KEY, GITEA_TOKEN; the account is resolved through the API, and the configured name is used for validation |
+| Models | User, Harness, shared requirements surface, and Claude Code delivery model | Same model configuration structure |
+| Management | Same run/status/logs/stop/resume/collect/destroy commands | Same; displays cloud-resource expiration time and last-observed time |
 
-三个 Git 仓库要明确区分：ahe-beta 是控制器；新建的 Gitea 仓库保存被进化的 Harness；pvlib 等任务仓库是 User/Harness 的试用工作区，按任务 revision 重置，不是 OpenAgents 要进化的仓库。
+The three Git repositories must be clearly distinguished: ahe-beta is the controller; the newly created Gitea repository stores the Harness being evolved; task repositories such as pvlib are trial workspaces for the User/Harness, reset according to the task revision, and are not repositories that OpenAgents should evolve.
 
-以下为仓库根目录执行的目标界面；实施前不能把它作为当前可用教程：
+The following is the target interface executed from the repository root; it must not be treated as a currently usable tutorial before implementation:
 
 ```bash
 uv sync --locked --extra experiments
 cp examples/experiment.env.example .env.experiment
-# 填写模型凭证；E2B 路径另填 E2B_API_KEY / GITEA_TOKEN。
+# Fill in model credentials; for E2B, also set E2B_API_KEY / GITEA_TOKEN.
 uv run python backend/scripts/experiment.py check --config examples/experiments/u1-e2b.json --offline
 uv run python backend/scripts/experiment.py prepare --config examples/experiments/u1-e2b.json --secrets-file .env.experiment
-# prepare 输出 run_id、冻结目录、资源计划及下一条可复制命令。
+# prepare outputs run_id, the frozen directory, the resource plan, and the next copyable command.
 uv run python backend/scripts/experiment.py run <run_id> --secrets-file .env.experiment
 uv run python backend/scripts/experiment.py status <run_id>
 uv run python backend/scripts/experiment.py logs <run_id> --follow
@@ -200,37 +200,37 @@ uv run python backend/scripts/experiment.py collect <run_id>
 uv run python backend/scripts/experiment.py destroy <run_id> --confirm <run_id>
 ```
 
-本地只替换 config 为 `u1-local.json`，不改命令。不需要新用户选择历史 launcher。`run --config ... --secrets-file ...` 为 prepare → run 的便利组合，调用同一实现；不增加独立配置通路。`prepare` 不调用模型、不启动实验资源；下载依赖和任务材料、构建本地镜像会明确输出进度。E2B 模板准备如果需要创建云资源，归于 run 的可见 provisioning 阶段。
+For local, replace only config with `u1-local.json`; do not change the command. New users do not need to choose a historical launcher. `run --config ... --secrets-file ...` is a convenience combination of prepare → run and calls the same implementation; it does not add an independent configuration path. `prepare` does not call models or start experiment resources; downloading dependencies and task materials and building local images must report progress explicitly. If preparing an E2B template requires creating cloud resources, that belongs to run's visible provisioning phase.
 
-### 用户要准备的材料
+### Materials the User Must Prepare
 
-| 材料 | 格式与要求 | N=1 示例默认来源 |
+| Material | Format and requirements | Default source for the N=1 examples |
 | --- | --- | --- |
-| 实验定义 | JSON，`schema_version: 2`，相对路径以配置文件目录为基准 | 两份 examples/experiments/u1-*.json |
-| 模型设置 | JSON 中填模型名及 base URL/key 的环境变量名，凭证写独立 env 文件 | examples/experiment.env.example 列全字段和用途 |
-| 初始 Harness | `builtin`，或自备 archive + SHA-256；有可启动入口 | 仓内 backend/harness_template，冻结当前代码版本 |
-| 试用任务 | task package JSON + instruction.md；代码来源、固定 revision、setup recipe | 仓内 pvlib__pvlib-python-1478 定义，公开代码固定 revision |
-| persona | persona library JSON + persona_ids；校验实际库 schema 与 ID | 明确引用仓内已有库；不要求下载个人目录中的库 |
-| 自定义 SWE 任务 | SWE 实例材料，包含任务文本、repo、base_commit 等，明确 kind=swebench | 示例可由仓内单实例定义生成所需 Parquet，无需完整数据集 |
-| 云基础设施凭证 | 仅 E2B 路径，独立 env 文件 | 用户自己的账户 |
+| Experiment definition | JSON, `schema_version: 2`; relative paths are based on the configuration file's directory | Two files, examples/experiments/u1-*.json |
+| Model settings | Fill in model names and the environment-variable names for the base URL/key in the JSON; put credentials in a separate env file | examples/experiment.env.example lists all fields and their purposes |
+| Initial Harness | `builtin`, or a self-provided archive + SHA-256; must have a launchable entry point | backend/harness_template in the repository, freezing the current code version |
+| Trial task | Task package JSON + instruction.md; code source, fixed revision, setup recipe | The in-repository pvlib__pvlib-python-1478 definition, with a public code fixed revision |
+| persona | Persona library JSON + persona_ids; validate the actual library schema and IDs | Explicitly references an existing in-repository library; does not require downloading a library from a personal directory |
+| Custom SWE task | SWE instance materials, including task text, repo, base_commit, etc.; explicitly set kind=swebench | A single in-repository instance definition can generate the required Parquet without a complete dataset |
+| Cloud infrastructure credentials | E2B path only, in a separate env file | The user's own account |
 
-roster、pool、逐轮 plan、单实例 Parquet、Harness 归档、源代码归档、SHA-256 清单、运行 context、Gitea 地址与仓库名均由 prepare/run 生成。高级用户可提供已冻结材料，但仍进入同一校验链，不能绕过哈希和 schema 检查。`.env.experiment` 被 Git 忽略，权限检查后使用，不写入配置快照或打包产物。
+roster, pool, per-round plans, single-instance Parquet, Harness archives, source-code archives, SHA-256 manifests, run context, Gitea addresses, and repository names are generated by prepare/run. Advanced users may provide already-frozen materials, but they still enter the same validation chain and cannot bypass hash and schema checks. `.env.experiment` is ignored by Git, used after permission checks, and is not written to configuration snapshots or packaged artifacts.
 
-`builtin` 表示此版本源码中的 seed，绝不标为历史 `cade14d`。精确重现实验旧基线时必须显式提供那份 archive 及真实校验和；没有该归档就报告缺失，不偷偷换 seed。
+`builtin` denotes the seed in this version of the source code and must never be labeled as historical `cade14d`. To reproduce an old experiment baseline exactly, that archive and its actual checksum must be provided explicitly; if the archive is unavailable, report it as missing and do not silently substitute another seed.
 
-### 示例与完整教程
+### Examples and Complete Tutorial
 
-两份 N=1 配置使用同一 pvlib 任务、同一 persona、同一 Harness 来源、相同模型/角色/轮数，仅基础设施与显示名称不同。五轮为 R1–R4 用户试用后执行需求与交付，R5 仅试用最终版本。无可交付 issue 的合法轮次也可封口；`automation-failed` 等失败不能被包装为成功。
+The two N=1 configurations use the same pvlib task, persona, Harness source, and model/role/round settings; only the infrastructure and display name differ. The five rounds are R1–R4 user trials followed by requirement execution and delivery, while R5 is trial of the final version only. A valid round with no deliverable issue may also be closed; failures such as `automation-failed` must not be wrapped as success.
 
-QuickStart 先给两路径选择表、依赖和凭证表、最短启动命令，再链接完整教程。教程必须覆盖：干净 clone → 锁定依赖 → 填 env → 检查配置 → 准备材料 → 资源预检 → 真正启动 controller → 查看当前轮与 Gitea → 中断/恢复 → 五轮结果与证据 → 收集与释放资源；每步给预期输出和常见失败的定位命令。说明运行耗时、费用由模型和云资源决定，公布本次验证的实际环境与用量，不编造固定完成时间。
+The QuickStart first provides a two-path selection table, dependency and credential tables, and the shortest startup command, then links to the complete tutorial. The tutorial must cover: clean clone → lock dependencies → fill in env → check configuration → prepare materials → preflight resources → actually start the controller → view the current round and Gitea → interrupt/recover → five-round results and evidence → collect and release resources; each step must include expected output and diagnostic commands for common failures. Explain that runtime duration and cost depend on the models and cloud resources, and publish the actual environment and usage for this verification run; do not invent a fixed completion time.
 
-在调用真实模型前可跑离线 contract tests；可另用两轮 canary 验证交付链。canary 不能替代这份五轮示例的完整验收。完整跑通指闭环与证据完整；不等于 pvlib 修复获得官方 SWE-bench pass。
+Before calling real models, offline contract tests may be run; a separate two-round canary may be used to verify the delivery chain. The canary cannot replace complete acceptance of this five-round example. A complete run means that the closed loop and evidence are complete; it does not mean that the pvlib fix receives an official SWE-bench pass.
 
 ## Reference-level explanation
 
-### 1. 配置、模型与材料编译
+### 1. Configuration, Models, and Material Compilation
 
-新增 schema_version=2 的公开 schema；所有层级拒绝未知字段，后端不支持的字段报错，不能接受后忽略。示意结构如下，模型名由用户填入其账户可用值：
+Add a public schema with schema_version=2; all levels reject unknown fields, and fields unsupported by a backend must produce an error rather than being accepted and ignored. The illustrative structure is as follows; the user supplies model names available through their account:
 
 ```json
 {
@@ -260,58 +260,58 @@ QuickStart 先给两路径选择表、依赖和凭证表、最短启动命令，
 }
 ```
 
-上述具体文件由实施阶段补齐，不能让示例引用不存在的材料。local runtime 使用 `backend: local`、`gitea.provider: localhost`，不允许同时包含 e2b 配置。共享模型运行时对应 `models.demand`，明确 triager/architect/divergent 使用同一需求面配置，不暴露当前无法独立生效的逐角色模型假选项。机械 Owner 不占 LLM 角色槽位，不再让 owner=0 与“缺失 Owner”混淆。上下文长度、输出长度、重试、超时等只暴露能接通底层并测试生效的选项。
+The specific files above must be completed during implementation; examples must not reference nonexistent materials. The local runtime uses `backend: local` and `gitea.provider: localhost` and must not contain e2b configuration at the same time. The shared model runtime corresponds to `models.demand` and clearly states that triager/architect/divergent use the same requirements-surface configuration, without exposing per-role model pseudo-options that cannot currently take effect independently. The mechanical Owner does not occupy an LLM role slot, and owner=0 must no longer be conflated with a “missing Owner.” Context length, output length, retries, timeouts, and similar options may expose only settings that connect to the underlying layer and have been tested to take effect.
 
-模型 key/base URL 仅从显式 secrets-file 或显式进程环境读取（文件覆盖同名进程变量），不隐式读取开发者 backend/.env、~/.claude 或其他试跑目录。CLI 校验缺失时只输出变量名。管理命令读取凭证来源引用或允许 `--secrets-file` 覆盖，仅加载该操作必需凭证；status/collect/destroy 不要求模型 key。
+Model keys/base URLs are read only from an explicitly specified secrets-file or explicit process environment (the file overrides a process variable with the same name); do not implicitly read developer backend/.env, ~/.claude, or other trial directories. When CLI validation finds a missing value, it must output only the variable name. Management commands read credential-source references or allow `--secrets-file` to override them, and load only the credentials required for that operation; status/collect/destroy do not require a model key.
 
-task package schema 至少包含 kind、id、instruction_file、source（Git URL + 完整 revision，或受管本地目录快照）、setup recipe 与依赖锁。任务 recipe 是受信执行输入，prepare 展示脚本来源与内容摘要。普通场景保持 seed-card 语义；SWE 保持其来源声明，不伪装 `not_in_benchmark=true`。只供运行所需的任务文本和初始代码，不能把标准答案、gold patch、hidden tests 传给优化角色。官方评分需要的完整元数据在独立评分流程使用。
+task package schema must include at least kind, id, instruction_file, source (Git URL + complete revision, or a managed local-directory snapshot), setup recipe, and locked dependencies. The task recipe is trusted execution input; prepare displays the script source and a content summary. Ordinary scenarios retain seed-card semantics; SWE retains its source declaration and must not masquerade as `not_in_benchmark=true`. Provide only the task text and initial code required for execution; do not pass standard answers, gold patches, or hidden tests to optimization roles. Complete metadata required for official scoring is used in a separate scoring flow.
 
-prepare 原子生成 `<experiments_root>/<run_id>/`，默认 experiments_root 为仓库 `.experiments/`，支持全局 `--runs-dir` 或环境变量定位。run_id 自动生成且不可重用，name 仅显示用途。冻结 config、task/persona、Harness、计划、完整 source SHAs、依赖锁、构建 recipe 与所有材料 SHA-256；凭证只记变量名和受保护的文件位置引用。以后 run/resume 使用冻结材料，不重读用户修改后的原配置；源 checkout 改动不阻塞既有实验管理。
+prepare atomically generates `<experiments_root>/<run_id>/`. By default, experiments_root is `.experiments/` in the repository, with support for locating it through global `--runs-dir` or an environment variable. run_id is generated automatically and cannot be reused; name is for display only. Freeze the config, task/persona, Harness, plan, complete source SHAs, dependency locks, build recipe, and SHA-256 values for all materials; credentials record only variable names and protected file-location references. Subsequent run/resume operations use the frozen materials and do not reread the user's modified original configuration; changes to the source checkout do not block management of an existing experiment.
 
-公开 release compatibility 清单提供 OpenAgents、NexAU 的真实不可变版本和 runtime recipe，prepare 自动缓存，普通用户不用摆放三个 sibling checkout。不将现有 `reader_release_commit: null` 当作已发布兼容版本；在联合发布前可明确标记候选 commit 并验证，新手正式教程绑定通过验收的版本。源代码归档白名单、依赖链接展开和上传 hash 校验必须覆盖曾出现的 symlink 外部源码漏上传问题。
+The public release compatibility manifest provides real immutable versions and runtime recipes for OpenAgents and NexAU. prepare caches them automatically, so ordinary users do not need to place three sibling checkouts. Do not treat existing `reader_release_commit: null` as a released compatible version; before the joint release, it may be explicitly marked as a candidate commit and verified, while the formal beginner tutorial must bind to a version that has passed acceptance. The source-archive allowlist, dependency-link expansion, and upload hash validation must cover the previously encountered issue where external source code reached through symlinks was not uploaded.
 
-### 2. 共用运行器与后端边界
+### 2. Shared Runner and Backend Boundary
 
-共用 controller 适配现有 Orchestrator、RecoveryStore、SeedSource、观察/证据发布及交付等待，不另写第二份轮次调度器。对 ordinary 与 SWE runner 统一注入冻结 context，去掉已提供运行配置后仍强制读取 backend/.env 的行为。资源绑定地址、角色配置、路径映射由一个 context builder 生成。
+The shared controller adapts the existing Orchestrator, RecoveryStore, SeedSource, observation/evidence publication, and delivery waiting; do not write a second round scheduler. Inject the frozen context uniformly into ordinary and SWE runners, removing the behavior that still forcibly reads backend/.env after runtime configuration has been supplied. Resource binding addresses, role configuration, and path mappings are generated by one context builder.
 
-Backend 协议提供 provision、preflight、launch/inspect/stop controller、logs、collect、destroy；返回带 ownership 的资源描述与实际能力，不暴露各自不同的“实验开始”语义。用户调用 run 后只有 controller 健康、身份匹配才进入 RUNNING，Compose up 或 sandbox 创建成功只算 PROVISIONING。
+The Backend protocol provides provision, preflight, launch/inspect/stop controller, logs, collect, and destroy; it returns resource descriptions with ownership and actual capabilities, without exposing different backend-specific meanings of “experiment start.” After the user calls run, only a healthy controller with matching identity may enter RUNNING; successful Compose startup or sandbox creation counts only as PROVISIONING.
 
-local adapter 复用实验级 Compose 隔离，记录映射端口和 host/container 两套可达 URL，初始化账户/token/repo。新建账户的真实用户名和密码保存到 run 的受保护 `secrets/local-gitea-login.env`（0600，目录 0700）；恢复保留原密码，旧账户缺记录时不伪造或自动重置。先启动所需基础设施，再启动配置完整的 vigil；启用工程 CI 才启动已注册 act_runner，跳过 CI 就不启动空 token runner。根据明确模型 URL 生成必要 egress 配置，保持容器围堵默认策略。构建/拉取镜像进入 prepare 的明确阶段，不要求用户猜测缺哪些镜像。
+The local adapter reuses experiment-level Compose isolation and records both mapped ports and host/container reachable URLs, initializing the account/token/repository. The actual username and password for the newly created account are stored in the run's protected `secrets/local-gitea-login.env` (0600, directory 0700); recovery retains the original password, and when an old account lacks a record, it must not fabricate or automatically reset one. Start the required infrastructure first, then start vigil with complete configuration; start the registered act_runner only when project CI is enabled, and do not start an empty-token runner when CI is skipped. Generate the necessary egress configuration from the explicit model URL while preserving the default containment policy for containers. Image building/pulling is an explicit prepare phase, so users do not have to guess which images are missing.
 
-e2b adapter 固定 Gitea.com API 路径，先验证用户身份、建仓权限和证据上传/真实读取能力；验证仓库或 attachment 标记为 probe 并清理。复用已完成的 ZIP 传输协商及 reader capability gate，既验证发布端，也验证 sandbox 内实际运行的 OpenAgents reader。创建模板/实例后检查实际 CPU、内存、template/build ID、超时和网络能力，把实际值追加到独立 runtime manifest，绝不回写 frozen config/config_hash；resume 对照原 template/build 和资源身份检查。不能拿 JSON 中的期望值冒充资源证据。资源不符合配置即停止并清理。
+e2b adapter fixes the Gitea.com API path and first validates user identity, repository-creation permission, evidence-upload capability, and actual read capability; mark the validation repository or attachment as probe and clean it up. Reuse the completed ZIP transfer negotiation and reader capability gate, validating both the publication side and the actual OpenAgents reader running inside the sandbox. After creating the template/instance, check the actual CPU, memory, template/build ID, timeout, and network capabilities, and append the actual values to a separate runtime manifest; never write them back to frozen config/config_hash. resume checks against the original template/build and resource identity. Expected values in JSON must not be presented as resource evidence. Stop and clean up when resources do not satisfy the configuration.
 
-E2B 不依赖嵌套 Docker，使用 sandbox 内隔离任务目录与已准备依赖运行用户任务，vigil 是 sandbox 内进程。其边界是整场实验的 sandbox，不能宣称具有与 local 每角色容器完全相同的隔离。公开配置明确此差异，放宽现有“subprocess 仅宿主调试”的规则时只适用于经验证的 E2B sandbox，不能顺带放宽宿主路径。Claude Code 使用固定版本安装配方及可用性检查，不要求用户上传个人机器二进制。
+E2B does not depend on nested Docker. It runs user tasks with isolated task directories and prepared dependencies inside the sandbox, and vigil is a process inside the sandbox. Its boundary is the sandbox for the entire experiment; it must not claim to provide exactly the same per-role container isolation as local. The public configuration explicitly states this difference. Relaxing the existing rule that “subprocess is for host debugging only” applies only to a validated E2B sandbox and must not also relax host paths. Claude Code uses a fixed-version installation recipe and availability check; users are not required to upload binaries from their personal machines.
 
-### 3. 生命周期、恢复与收集
+### 3. Lifecycle, Recovery, and Collection
 
-不可变 manifest 保存输入身份，动态 runtime 分开记录 experiment_state、resource_state、collection_state；COMPLETED 不被 STOPPED/ARCHIVED 覆盖。实验状态至少有 PREPARING、PREPARED、PROVISIONING、RUNNING、STOPPING、STOPPED、COMPLETED、FAILED、LOST；不可达记 observation=UNKNOWN，不未经证据判断完成或存活。prepare 构建期间记录 PREPARING、未完成标记并持有操作锁，status 可非阻塞查看；只有准备成功才允许 run 调用 provider。status 显示轮次/阶段、controller 心跳、Gitea repo、最后一次观察、云到期时间与最后成功收集时间。
+The immutable manifest stores input identity, while dynamic runtime data is recorded separately as experiment_state, resource_state, and collection_state; COMPLETED is not overwritten by STOPPED/ARCHIVED. Experiment states include at least PREPARING, PREPARED, PROVISIONING, RUNNING, STOPPING, STOPPED, COMPLETED, FAILED, and LOST; unreachable resources are recorded with observation=UNKNOWN, and completion or liveness is not inferred without evidence. During prepare construction, record PREPARING, mark the operation incomplete, and hold the operation lock; status may inspect it without blocking. Only a successful preparation permits run to call the provider. status displays the round/phase, controller heartbeat, Gitea repo, last observation, cloud expiration time, and last successful collection time.
 
-创建云资源前先持久化本地启动 journal、固定 run ownership 标签与唯一资源名称，获得 ID 后立即写盘。覆盖 provider 创建成功而 ID 尚未落盘的崩溃窗口：重启先按标签/唯一名称查询并 reconcile sandbox 与 Gitea repo，只有确认不存在才创建；查询不确定时停止并给出人工定位信息，不盲目重建。controller 独占锁与远端身份共同防止重复运行；重复 run/resume 在确认存活时 attach 或返回已运行，不启动第二个 controller。仅凭没有 exit-code 文件不能推断已停止。
+Before creating cloud resources, first persist a local startup journal, fixed run ownership labels, and a unique resource name; write the ID to disk immediately after obtaining it. Cover the crash window in which the provider has created the resource but its ID has not yet been persisted: after restart, first query by label/unique name and reconcile the sandbox and Gitea repo, creating only after confirming that they do not exist. If the query is uncertain, stop and provide information for manual investigation; do not blindly recreate. The controller-exclusive lock and remote identity together prevent duplicate runs; duplicate run/resume operations attach when liveness is confirmed or return that the run is already active, and do not start a second controller. The absence of an exit-code file alone cannot imply that the run has stopped.
 
-本地用户会话容器同样带 run/config ownership 标签，强制中断后只回收本 run 遗留会话。stop 先请求 controller 和交付进程停止，终止所属进程组，封存 checkpoint，再停可停资源；失败时报告尚存资源及状态。E2B stop 停止进程不等于销毁 sandbox，仍可能计费。resume 重用 run_id、repo、冻结材料和 checkpoint，重新核对在途交付，不能同时有两份 vigil/controller。sandbox 到期/删除或必要本地资源丢失标记 LOST，不暗中新建并称为续跑。
+Local user-session containers likewise carry run/config ownership labels; after a forced interruption, reclaim only sessions left by this run. stop first requests that the controller and delivery process stop, terminates the owned process group, archives the checkpoint, and then stops resources that can be stopped; on failure, report the resources and states that remain. E2B process termination is not equivalent to destroying the sandbox, which may still incur charges. resume reuses run_id, repo, frozen materials, and checkpoint, and rechecks in-flight delivery; two vigil/controller instances must not exist simultaneously. If the sandbox expires/is deleted or a required local resource is lost, mark the run LOST; do not silently create a new one and call it a continuation.
 
-collect 支持运行中 best-effort 快照和终态完整归档，两者标记不同。归档内有材料与产物清单、hash、轮次/封口 SHA、退出原因；终态一致性和校验通过才称 COMPLETE。周期收集在主机在线时执行，记录上次成功位置；主机关机且 sandbox 到期可能丢失未收集数据，教程必须诚实说明，不能把本地 detached monitor 说成云端永久保管。自动收集失败时保留仍存在资源并报告截止时间；正常完成后在验证终态归档完整后释放实验专有计算资源。
+collect supports best-effort snapshots while running and complete archival in a terminal state; the two are marked differently. The archive contains material and artifact inventories, hashes, round/sealing SHA, and the exit reason; only after terminal-state consistency and validation pass may it be called COMPLETE. Periodic collection runs while the host is online and records the last successful position; if the host is shut down and the sandbox expires, uncollected data may be lost. The tutorial must state this honestly and must not describe a local detached monitor as permanent cloud storage. When automatic collection fails, retain resources that still exist and report the deadline; after normal completion, release experiment-specific compute resources only after verifying that the terminal archive is complete.
 
-destroy 默认保留本地产物、Gitea 实验仓库与共享模板/cache；验证资源 ownership，仅删除本 run 专有资源。没有完整收集时默认拒绝破坏性删除，可显式 `--discard-uncollected --confirm <run_id>`。运行管理凭证只用于相应 provider，缺模型凭证或源工作树变脏不妨碍收集/释放。
+destroy retains local artifacts, the Gitea experiment repository, and shared templates/cache by default; verify resource ownership and delete only resources dedicated to this run. If complete collection has not occurred, destructive deletion is refused by default; `--discard-uncollected --confirm <run_id>` may be supplied explicitly. Runtime management credentials are used only for the corresponding provider; missing model credentials or a dirty source worktree do not prevent collection/release.
 
-### 4. 入口收敛与迁移
+### 4. Entry-Point Consolidation and Migration
 
-当前公开实验仅使用 experiment.py 的 v2 命令。旧 create/start/preflight/archive 命令和 v1 schema 在 provider 操作前拒绝；不提供转发 wrapper 或新 main 调旧 launcher 的兼容链路。历史实现、配置和材料集中在 research/archives，通过 inventory 指定的冻结 checkout 复现。当前和已准备 v2 实验使用各自冻结 controller，保留身份和输入哈希；多任务及历史导入追加轮尚未接入。
+Current public experiments use only the v2 commands of experiment.py. The old create/start/preflight/archive commands and the v1 schema are rejected before provider operations; no forwarding wrapper or compatibility chain in which a new main calls the old launcher is provided. Historical implementations, configurations, and materials are consolidated in research/archives and reproduced using the frozen checkout specified by the inventory. Current and already-prepared v2 experiments use their respective frozen controllers, retaining identity and input hashes; multi-task support and historical-import append rounds are not yet connected.
 
-现有运行目录仍可由旧路径管理；新入口检测旧 manifest 明确提示适用命令，不直接覆写为 v2。历史固定身份实验不得自动转换为新 schema 并沿用原 run_id。
+Existing run directories can still be managed through the old paths; the new entry point detects an old manifest and clearly indicates the applicable command, without directly overwriting it as v2. Historical fixed-identity experiments must not be automatically converted to the new schema while retaining the original run_id.
 
-### 5. 文件分工与验证
+### 5. File Ownership and Verification
 
-任务 frontmatter 是精确文件分工的权威来源；本表说明模块责任，不扩大单任务文件所有权。
+Task frontmatter is the authoritative source for exact file ownership; this table describes module responsibilities and does not expand per-task file ownership.
 
-| 任务 | 责任 | 依赖 |
+| Task | Responsibility | Dependencies |
 | --- | --- | --- |
-| T1 | 公开 v2 schema、严格解析、材料编译与冻结 | 无 |
-| T2 | 共用运行 context/controller 与 backend 协议、模型注入 | T1 |
-| T3 | local 资源与执行适配，修复 Gitea/bootstrap/容器生命周期 | T2 |
-| T4 | E2B/Gitea.com 适配、运行环境、实际能力检查 | T2 |
-| T5 | 统一 CLI、manifest 状态、管理与旧入口迁移 | T2（与后端按稳定协议并行） |
-| T6 | 依赖与兼容清单、示例、双语教程、两路径实跑验收 | T3、T4、T5 |
+| T1 | Public v2 schema, strict parsing, material compilation, and freezing | None |
+| T2 | Shared run context/controller and backend protocol, model injection | T1 |
+| T3 | Local resource and execution adapter; fix Gitea/bootstrap/container lifecycle | T2 |
+| T4 | E2B/Gitea.com adapter, runtime environment, and actual capability checks | T2 |
+| T5 | Unified CLI, manifest state, management, and old-entry-point migration | T2 (parallel with backends under a stable protocol) |
+| T6 | Dependency and compatibility inventory, examples, bilingual tutorials, and two-path live-run acceptance | T3, T4, T5 |
 
 ```mermaid
 graph LR
@@ -324,33 +324,33 @@ graph LR
   T5 --> T6
 ```
 
-端到端入口为 `backend/scripts/e2e-spec-0069-experiment-entry.sh`：默认离线 contract/fake-provider 验证；显式 `--live --backend local|e2b` 才消耗模型/云资源。CI 默认不使用个人秘密或创建付费资源。验证要求：
+The end-to-end entry point is `backend/scripts/e2e-spec-0069-experiment-entry.sh`: offline contract/fake-provider verification by default; only explicit `--live --backend local|e2b` consumes model/cloud resources. CI does not use personal secrets or create paid resources by default. Verification requirements:
 
-1. 两份示例 schema 合法、材料引用真实；归一化后的实验语义一致；未知/未实现字段、错误哈希、缺素材、非法 persona ID 均提前失败。env 引用不被误判成明文秘密。
-2. run 真实启动 controller，status 来自健康检查；普通/SWE context、所有公开模型参数和本地动态 Gitea 端口均被使用。收集与停止状态不覆盖实验结果。
-3. 验证重复 run/resume、进程中断、启动中失败（包含资源已创建但 ID 未落盘）、云端不可达/到期、失败收集、dirty checkout、无模型 key 时管理；资源不得孤儿化或双 controller。
-4. 从干净 checkout、没有开发者 HOME 下材料开始，在 local 与 E2B 各跑一次完整 N=1 五轮；不得编辑 Python 常量、monkeypatch、依赖私有 wrapper/内部 Gitea。凭证与网络是唯一外部账户输入，依赖/公开素材由文档明确获取。
-5. 逐轮保存 session、用户反馈/需求提案、Owner 准入、交付结果与 sealed SHA；验证下一轮实际使用上一轮封口 Harness。实际存在的交付验证对应协商 profile 的附件读取：默认 local 的 gzip/direct 与 Gitea.com 的 ZIP/R2 均用实际 OpenAgents reader 验证；若该实跑无交付票，另加对应 transport canary，不制造用户投诉。
-6. 测试一次工作中 stop/resume，身份不变且无重复交付。保留脱敏验证报告：代码/依赖 pins、实际资源、命令、时间、各阶段结果与产物 hash。失败如实列出，不能把模型不可用标为闭环通过。
-7. 英中 README、QuickStart、配置和 N=1 教程命令一致；正式文档只能将有上述证据的步骤标成已验证。官方评测明确未执行，或单独提供独立评测报告。
+1. Both example schemas are valid and material references are real; normalized experiment semantics are consistent; unknown/unimplemented fields, incorrect hashes, missing materials, and invalid persona IDs fail early. env references must not be misclassified as plaintext secrets.
+2. run actually starts the controller, and status comes from health checks; the ordinary/SWE contexts, all public model parameters, and the local dynamic Gitea port are used. Collection and stop states must not overwrite experiment results.
+3. Verify management of duplicate run/resume operations, process interruption, startup failure (including resources created but their IDs not persisted), cloud unreachability/expiration, failed collection, dirty checkouts, and absent model keys; resources must not become orphaned and there must not be two controllers.
+4. Starting from a clean checkout with no developer HOME-based materials, run one complete N=1 five-round experiment in local and E2B respectively; do not edit Python constants, monkeypatch, or depend on private wrappers/internal Gitea. Credentials and network are the only external account inputs; dependencies/public materials are obtained explicitly as documented.
+5. Save each round's session, user feedback/requirement proposals, Owner admission, delivery results, and sealed SHA; verify that the next round actually uses the previous round's sealed Harness. Verification of actual deliveries reads attachments using the negotiated profile: default local gzip/direct and Gitea.com ZIP/R2 are both verified with the actual OpenAgents reader; if the live run has no delivery issue, add a corresponding transport canary instead of fabricating a user complaint.
+6. Test one stop/resume during execution; identity must remain unchanged and there must be no duplicate delivery. Retain a redacted verification report containing code/dependency pins, actual resources, commands, timestamps, results for each phase, and artifact hashes. List failures honestly; do not mark the loop closed when the model is unavailable.
+7. English and Chinese README, QuickStart, configuration, and N=1 tutorial commands must be consistent; formal documentation may mark a step as verified only when it has the evidence described above. State explicitly that the official evaluation was not performed, or provide a separate independent evaluation report.
 
 ## Drawbacks
 
-统一配置和生命周期涉及多个旧入口，容易产生迁移回归，因此保留明确旧运行识别并逐步薄封装，避免改写历史 recovery identity。两后端实际隔离不同，无法靠统一 CLI 消除；需在配置与证据中记录差异。首次依赖下载/镜像构建仍有成本。五轮真实验收需要模型和云资源费用，不能用离线测试代替，也不适合每次 PR 自动执行。
+Unified configuration and lifecycle management involve multiple old entry points and can easily introduce migration regressions, so explicit recognition of old runs is retained and the migration is gradually thinly wrapped, avoiding rewrites of historical recovery identity. The two backends have materially different isolation, which cannot be eliminated by a unified CLI; the differences must be recorded in the configuration and evidence. Initial dependency downloads/image builds still incur costs. Five-round live acceptance requires model and cloud-resource spending, cannot be replaced by offline tests, and is not suitable for automatic execution on every PR.
 
 ## Rationale and alternatives
 
-只写两份独立教程或新增一层 shell 分发，无法解决配置字段未生效、停止不停止 controller、恢复身份和材料不一致，故不采用。强制所有人先部署公网 Gitea 增加门槛，也违背用户明确的两条路径。把 Gitea 搬进 E2B 会新增服务寿命、持久化与公网访问设计，本次选择用户已有 Gitea.com。直接重写 controller 风险更高，采用既有闭环加共用材料编译器与两个 backend adapter。公开 schema 明确升级，优于长期背负同名不同义字段。
+Writing only two independent tutorials or adding another shell dispatch layer would not solve configuration fields failing to take effect, stopping without stopping the controller, or inconsistency of recovery identity and materials, so neither approach is adopted. Requiring everyone to deploy public Gitea would add a barrier and violate the user's explicit two paths. Moving Gitea into E2B would add service-lifetime, persistence, and public-access design; this effort instead uses the user's existing Gitea.com. Directly rewriting the controller carries higher risk, so the existing closed loop is used with a shared material compiler and two backend adapters. Making the public schema explicitly versioned is preferable to carrying same-name, different-meaning fields indefinitely.
 
 ## Prior art
 
-本仓现有实验 manifest/Compose 管理提供隔离基础；auditable launcher 提供材料校验与全流程；E2B N=1 试跑提供 sandbox/context 经验；已完成的两仓证据传输修改提供 Gitea.com ZIP 与 capability gate。本设计整合这些能力，不把临时 wrapper 作为新的产品框架，也不新增 OpenAgents 内部业务协议。
+The repository's existing experiment manifest/Compose management provides an isolation foundation; the auditable launcher provides material validation and the full workflow; the E2B N=1 trial provides sandbox/context experience; and the completed two-repository evidence-transport changes provide Gitea.com ZIP and capability-gate support. This design integrates those capabilities without turning a temporary wrapper into a new product framework or adding an internal OpenAgents business protocol.
 
 ## Unresolved questions
 
-当前需求没有必须由用户再次选择的产品分歧：明确支持 local+localhost 与 E2B+Gitea.com，统一入口和完整 N=1 教程。实施验收前必须核实的发布条件为：兼容版本 pin、可用 Claude Code 安装配方、两后端真实五轮结果。材料使用现有真实 persona，不自动替换合成人格。用户文档按最终开源后的获取方式编写，不加入当前内部访问状态或来源审查提示；验证报告记录实际命令和结果。
+The current requirements contain no product divergence that requires another user choice: local+localhost and E2B+Gitea.com are explicitly supported, with a unified entry point and a complete N=1 tutorial. Release conditions that must be verified before implementation acceptance are compatible version pins, an available Claude Code installation recipe, and real five-round results on both backends. Materials use existing real personas and do not automatically replace them with synthetic personas. User documentation is written according to the acquisition method after final open-sourcing and does not include current internal access status or source-review notices; the verification report records actual commands and results.
 
 ## Future possibilities
 
-在同一 schema/adapter 接口下支持自托管公网 Gitea、高级多用户 scaling、云端持久化归档与已销毁 sandbox 的新身份重启。上述内容不纳入此次开源最短路径；已有历史实验仍可独立复现。
+Support self-hosted public Gitea, advanced multi-user scaling, cloud-persistent archives, and restarting with a new identity after a sandbox has been destroyed under the same schema/adapter interfaces. These items are outside the shortest open-source path for this effort; existing historical experiments can still be reproduced independently.
 

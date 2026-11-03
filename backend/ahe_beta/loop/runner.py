@@ -1,7 +1,7 @@
-"""可恢复 Harbor runner（Spec-0004/T2, Spec-0064/T2）。
+"""Resumable Harbor runner (Spec-0004/T2, Spec-0064/T2).
 
-在 orchestrator 外层驱动逐轮跑；每轮边界 write_run_state + save_checkpoint，经 harbor artifact 通道吐出沙盒；
-新运行可由 Orchestrator 的 recovery ledger 续到阶段/工作项；旧运行仍按完整轮次游标恢复。
+Driven per-round outside orchestrator; each round boundary write_run_state + save_checkpoint, output sandbox via harbor artifact channel;
+new runs can resume to phase/work item via Orchestrator's recovery ledger; old runs still recover by complete round cursor.
 """
 
 from __future__ import annotations
@@ -13,13 +13,13 @@ from ahe_beta.loop.checkpoint import load_checkpoint, save_checkpoint
 from ahe_beta.loop.orchestrator import Orchestrator
 from ahe_beta.loop.run_state import RunState, read_run_state, write_run_state
 
-# checkpoint 存取注入点（默认真实实现；测试可注入 spy）。
+# checkpoint read/write injection point (default real implementation; tests can inject spy).
 SaveFn = Callable[[Path, Path], Path]
 LoadFn = Callable[[Path, Path], None]
 
 
 class HarborRunner:
-    """orchestrator 外层的可恢复运行入口。"""
+    """Resumable run entry point outside orchestrator."""
 
     def __init__(
         self,
@@ -38,12 +38,12 @@ class HarborRunner:
     def run(
         self, initial_release_ref: str, n_rounds: int, checkpoint_artifact: str | Path | None = None
     ) -> Path | None:
-        """跑至多 n_rounds 轮；每轮末吐增量 checkpoint，返回最新 artifact（无轮次则返回传入的）。"""
+        """Run up to n_rounds rounds; emit incremental checkpoint at each round end, return latest artifact (return input if no rounds)."""
         if n_rounds <= 0:
-            raise ValueError(f"n_rounds 须为正：{n_rounds}")
+            raise ValueError(f"n_rounds must be positive: {n_rounds}")
 
         if checkpoint_artifact is not None:
-            self._load(Path(checkpoint_artifact), self._state_dir)  # 还原 STATE_DIR
+            self._load(Path(checkpoint_artifact), self._state_dir)  # restore STATE_DIR
             if getattr(self._orch, "recovery_enabled", False):
                 self._orch.refresh_recovery()
             rs = read_run_state(self._state_dir)

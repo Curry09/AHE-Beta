@@ -1,12 +1,12 @@
 ---
 number: "0049"
-title: 角色调用输入输出持久化与跨面归因
+title: "Role invocation input/output persistence and cross-plane attribution"
 issue: 0
 slug: role-invocation-io-store
-summary: 以 run_id 为实验切片，把用户会话与需求面/交付面每次角色调用的填好输入和结构化产出落在同一份不可复位删除的目录里，使事后能还原实验并定位出问题的环节；OpenAgents 只按同一 schema 写出。
+summary: "Use run_id as the experiment slice, storing user sessions and the fully populated inputs and structured outputs of every role invocation on the demand/delivery planes in a single directory that cannot be deleted by a reset, so the experiment can be reconstructed afterward and the problematic stage located; OpenAgents only writes using the same schema."
 tasks:
   - id: T1
-    title: 调用记录契约与审计基线
+    title: "Invocation record contract and audit baseline"
     status: done
     priority: P0
     tags: []
@@ -15,10 +15,10 @@ tasks:
     parallel: false
     files:
       - docs/specs/0049-role-invocation-io-store.md
-    scope: 把「日志必须能还原实验」第一性原理、现状审计、schema、落盘位置、围堵例外、过拟合隔离、重放边界写成自包含 RFC。
-    acceptance: 九段 RFC 完整；术语表把 side/plane、structured/protocol、prompt/task/message、role_runs 与既有模块的界限写死；还原清单与非目标可机读；spec validate/render/graph 通过。
+    scope: "Write a self-contained RFC covering the first principle that “logs must allow experiment reconstruction,” the current-state audit, schema, storage locations, exception containment, overfitting isolation, and replay boundaries."
+    acceptance: "All nine RFC sections are complete; the glossary fixes the boundaries of side/plane, structured/protocol, prompt/task/message, and role_runs relative to existing modules; the reconstruction checklist and non-goals are machine-readable; spec validate/render/graph pass."
   - id: T2
-    title: InvocationStore、run manifest 与 v1 schema
+    title: "InvocationStore, run manifest, and v1 schema"
     status: done
     priority: P0
     tags: []
@@ -29,10 +29,10 @@ tasks:
     files:
       - backend/ahe_beta/invocation.py
       - backend/tests/test_invocation.py
-    scope: 新增与 usage.py 同级的 fail-open 存储：一调用一 JSON、按 run_id 分子目录、原子写、index 追加；同目录写最小 manifest（模型名、agent_def pin、roster、轮次 SHA 占位）；缺 env 则 no-op。
-    acceptance: 合法记录 round-trip；并发写不撕裂；写失败不影响调用方返回值；manifest 不含密钥；缺目录/缺 env 静默跳过；pytest 绿。
+    scope: "Add fail-open storage alongside usage.py: one JSON per invocation, subdirectories by run_id, atomic writes, and index appends; write a minimal manifest in the same directory (model name, agent_def pin, roster, round SHA placeholder); no-op if env is missing."
+    acceptance: "Valid records round-trip; concurrent writes do not tear; write failures do not affect caller return values; manifests contain no secrets; missing directories/env are silently skipped; pytest passes."
   - id: T3
-    title: 需求面 run_agent_def 落盘
+    title: "Persist demand-plane run_agent_def invocations"
     status: done
     priority: P0
     tags: []
@@ -47,10 +47,10 @@ tasks:
       - backend/ahe_beta/demand/divergent.py
       - backend/ahe_beta/demand/owner.py
       - backend/tests/demand/test_agent_runtime.py
-    scope: 在唯一 nexau 派发入口记录填好的 message 与 submit 原文/状态；四 driver 传入 subject；round/run_id 读 usage 上下文；超时与未 submit 仍落盘。
-    acceptance: 四角色经 run_agent_def 各产生 demand 记录且 subject 非 unknown（triage 为 report 号，其余为 round 或票号）；超时与未 submit 可区分；存储故障不改变 agent.run 返回与异常；既有 read_submit 测试不回归。
+    scope: "Record the fully populated message and raw submit text/status at the sole nexau dispatch entry point; all four drivers pass subject; read round/run_id from the usage context; persist even on timeout or when no submit occurs."
+    acceptance: "Each of the four roles produces a demand record through run_agent_def with a non-unknown subject (the report number for triage, and the round or issue number for the others); timeout and missing submit are distinguishable; storage failures do not change agent.run returns or exceptions; existing read_submit tests do not regress."
   - id: T4
-    title: run 生命周期、会话迁入、vigil 导出与 jail
+    title: "Run lifecycle, session migration, vigil export, and jail"
     status: done
     priority: P0
     tags: []
@@ -64,10 +64,10 @@ tasks:
       - backend/tests/test_run_vigil.py
       - backend/ahe_beta/guards/workspace_jail.py
       - backend/tests/guards/test_workspace_jail.py
-    scope: 进程启动钉死 AHE_BETA_RUN_ID 与 ROLE_RUNS_DIR；SessionStore 与用量 JSONL 写进该 run 目录；实验内 round 之间不得调用 _reset_to_initial；不得删除 role_runs（含其中 sessions）；容器只 rw 挂载本 run 的 delivery 子目录，并在任何 agent/clone 前以短暂 root 入口修正跨 UID owner 后永久降权；配置了 ROLE_RUNS_DIR 却不可写时 fail-closed；jail 把 role_runs 列入禁读目录名。
-    acceptance: 同一进程内多 round 后 Gitea main 可前进且 role_runs 仍在；连续两次旧入口启动后上一 run_id 的 sessions/demand/delivery 仍在；看板经当前 run 的 sessions 别名可读；container 挂载不含 sessions/demand；入口把 delivery 交给 UID/GID 1000 后以 setpriv 降权，降权写入探针失败则非零退出；keep-alive 且 run_id 变化时重建容器；读 role_runs 被 jail 拒绝；相关单测绿。
+    scope: "Pin AHE_BETA_RUN_ID and ROLE_RUNS_DIR at process startup; write SessionStore and usage JSONL into that run directory; do not call _reset_to_initial between rounds within an experiment; do not delete role_runs (including its sessions); mount only this run's delivery subdirectory as rw in the container, and use a brief root entry point to correct ownership across UIDs before any agent/clone, then permanently drop privileges; fail-closed when ROLE_RUNS_DIR is configured but not writable; jail includes role_runs among prohibited directory names."
+    acceptance: "After multiple rounds in the same process, Gitea main can advance and role_runs remains present; after two consecutive launches through the old entry point, sessions/demand/delivery for the previous run_id remain present; the dashboard can read through the current run's sessions alias; container mounts exclude sessions/demand; the entry point hands delivery to UID/GID 1000 and drops privileges with setpriv, exiting nonzero if the write probe after dropping privileges fails; rebuild the container when keep-alive is enabled and run_id changes; jail denies reads of role_runs; related unit tests pass."
   - id: T5
-    title: 冻结调用离线重放
+    title: "Offline replay of frozen invocations"
     status: done
     priority: P1
     tags: []
@@ -79,10 +79,10 @@ tasks:
       - tools/dev/replay/replay_role_invocations.py
       - backend/tests/scripts/test_replay_role_invocations.py
       - backend/scripts/e2e-spec-0049-role-invocation-io-store.sh
-    scope: 从 role_runs 读取 demand 判断角色的 input.prompt，注入新 agent_def 再跑 run_agent_def；对比新旧 output.structured；不重放文件写入、不启 Gitea/vigil。
-    acceptance: 给定 fixture 调用记录可替换 agent_def 得到可 diff 的 structured；判断角色只喂冻结 prompt；实现者记录被跳过并计数；e2e 脚本无密钥。
+    scope: "Read input.prompt for demand judgment roles from role_runs, inject a new agent_def, and rerun run_agent_def; compare the new and old output.structured; do not replay file writes or start Gitea/vigil."
+    acceptance: "Given fixture invocation records, replacing agent_def produces structured output that can be diffed; judgment roles receive only the frozen prompt; implementer records are skipped and counted; the e2e script contains no secrets."
   - id: T6
-    title: 交付面 run_agent 写出同一 schema
+    title: "Delivery-plane run_agent writes the same schema"
     status: done
     priority: P0
     tags: []
@@ -96,68 +96,68 @@ tasks:
       - OpenAgents/tests/test_runtime_engine.py
       - backend/tests/test_delivery_invocation_contract.py
       - backend/tests/fixtures/delivery_invocation.v1.json
-    scope: OpenAgents ahe-beta/v0.1 在 run_agent 的 finally 按 ROLE_RUNS_DIR 写 v1 JSON（填好的 prompt/context/placeholders 与 structured）；ahe-beta 用黄金夹具锁定跨仓契约。
-    acceptance: env 未设时零文件、行为与现网一致；成功与 protocol_error/backend_error 均落盘（后二者沿用 engine 既有 status 字面量）；不写工具参数与 transcript；黄金夹具通过 AD 契约测试；engine 单测 fail-open。
+    scope: "OpenAgents ahe-beta/v0.1 writes v1 JSON to ROLE_RUNS_DIR in run_agent's finally (fully populated prompt/context/placeholders and structured); ahe-beta locks the cross-repository contract with golden fixtures."
+    acceptance: "When env is unset, no files are created and behavior matches production; both success and protocol_error/backend_error are persisted (the latter two retain the engine's existing status literals); tool arguments and transcript are not written; golden fixtures pass AD contract tests; engine unit tests verify fail-open behavior."
 ---
 
-# 0049 · 角色调用输入输出持久化与跨面归因
+# 0049 · Role Invocation Input/Output Persistence and Cross-Surface Attribution
 
-<!-- 本文件由 spec 工具维护：frontmatter 为结构化源数据（含 tasks DAG），正文为组级 rust-RFC 9 段总览。 -->
+<!-- This file is maintained by the spec tool: the frontmatter is structured source data (including the tasks DAG), and the body is the group-level rust-RFC nine-section overview. -->
 
 ## Summary
 
-> 0071 清理后的当前映射：包内 ordinary controller 保留 role_runs 和阶段恢复的证据寿命；根目录单例 run.sh 已退出。下文有关单例重置与旧入口寿命的描述为设计时背景，不是当前启动方式。新运行与已有 v2 管理由统一入口管理。
+> Current mapping after 0071 cleanup: the in-package ordinary controller retains the evidence lifetime for role_runs and phase recovery; the singleton run.sh at the repository root has exited. Descriptions below concerning singleton resets and the lifetime of old entry points are design-time background, not the current startup method. New runs and existing v2 management are handled by the unified entry point.
 
-第一性原理：**日志必须能还原出这一次实验**，否则无法事后判定问题出在用户模拟、需求面某一角色，还是交付面某一角色。
+First principles: **logs must be able to reconstruct this experiment**, otherwise it is impossible to determine afterward whether the problem occurred in user simulation, with a role on the demand surface, or with a role on the delivery surface.
 
-因此一次闭环进程对应一个 `run_id`，其权威目录是 `backend/data/role_runs/<run_id>/`。其中同时保存：
+Therefore, one closed-loop process corresponds to one `run_id`, whose authoritative directory is `backend/data/role_runs/<run_id>/`. It stores all of the following:
 
-- 用户模拟会话（既有 `SessionStore`：`sim_trace` / `persona_trace` / `harness_steps`）；
-- 需求面每一次 `run_agent_def` 的填好 `message` 与 submit 结构化产出；
-- 交付面每一次 `run_agent` 的填好 prompt/`context` 与末行 JSON；
-- 最小 `manifest.json`（模型名、agent_def pin、编制、各轮 harness SHA）。
+- User simulation sessions (the existing `SessionStore`: `sim_trace` / `persona_trace` / `harness_steps`);
+- The completed `message` and structured submit output for every `run_agent_def` on the demand surface;
+- The completed prompt/`context` and final-line JSON for every `run_agent` on the delivery surface;
+- The minimum `manifest.json` (model name, agent_def pin, composition, and harness SHA for each round).
 
-该目录不被删除。OpenAgents 不另建记录库，只往 `ROLE_RUNS_DIR` 按同一 schema 写交付面调用。看板 `data/live/` 是**本实验进程内**的易失投影，不是跨实验档案。
+This directory is not deleted. OpenAgents does not create a separate record store; it writes delivery-surface invocations into `ROLE_RUNS_DIR` using the same schema. The dashboard `data/live/` is a volatile projection **within this experiment process**, not a cross-experiment archive.
 
-**从种子起跑的单位是实验，不是 round。** 一次实验内部的第 2、第 3 轮必须接着已经进化的 `origin/main`，禁止打回 v0。新实验才从种子（v0 / 显式 seed pin）起。当前 `./run.sh` 在进程开头对**共享** Gitea 调 `_reset_to_initial`，是「全机只有一个实验」时用毁掉上一实验的仓来给下一进程腾地方——这是单例缺陷，不是正确的 round 语义。0049 不把该行为升格为目标模型；0047 用每实验独立 Gitea 消灭它。在旧入口仍存在期间，若启动时仍复位共享 Gitea，也不得连带删除 `role_runs/`。
+**The unit that starts from a seed is an experiment, not a round.** Round 2 and round 3 within one experiment must continue from the already evolved `origin/main`; reverting to v0 is prohibited. Only a new experiment starts from a seed (v0 / explicit seed pin). Currently, `./run.sh` calls `_reset_to_initial` on the **shared** Gitea at process start. This is used when there is “only one experiment on the entire machine” to destroy the previous experiment’s repository and make room for the next process. This is a singleton defect, not correct round semantics. 0049 does not promote this behavior to the target model; 0047 eliminates it with per-experiment independent Gitea. While the old entry point still exists, if startup still resets shared Gitea, it must not also delete `role_runs/`.
 
-分析单位：用户侧是一局 session；角色侧是一次 `run_agent_def` / `run_agent`。不是工具环全文，不是 Gitea 票面，不是截断后的看板过程流。判断角色可用冻结 `input.prompt` 重放并 diff `output.structured`。实现者不重放写文件。
+Analysis units: on the user side, one session; on the role side, one `run_agent_def` / `run_agent`. It is not the full tool loop, not the Gitea issue view, and not the truncated dashboard process stream. Role behavior can be evaluated by replaying frozen `input.prompt` and diffing `output.structured`. Implementers do not replay file writes.
 
 ## Motivation
 
-要审计「哪一环节出了问题」，观察者必须能拿着**当时**的输入和结构化产出，而不是共享目录被下一个实验进程清掉之后还剩什么。
+To audit “which stage failed,” an observer must have the inputs and structured outputs **from that time**, rather than whatever remains after the shared directory has been cleared by the next experiment process.
 
-用户模拟今天已经把 persona 各阶段的 system/user/raw/parsed 和与 harness 的过程摘要写入 `data/sessions/<id>.json`。**同一次** `./run.sh` 进程里多 round 不会删这些文件（`_reset_to_initial` 只在进程开头调一次，不在 `run_round` 之间调）。但当前仍是全机一份 `backend/data` 加一份 Gitea：再开一个 `./run.sh` 进程会强推 v0、关遗留 issue、删除 `sessions/*.json` 并 `clear_live`。这把「新实验」做成了「毁掉上一实验」。并行实验运行时规定每实验独立 Gitea 与 `sessions/`、`stop` 不删、`destroy` 才删，但尚未实现。需求面/交付面则连本实验进程内都几乎没有对等文件。
+User simulation already writes each persona’s system/user/raw/parsed data for each phase, along with the process summary with the harness, into `data/sessions/<id>.json`. Within the **same** `./run.sh` process, multiple rounds do not delete these files (`_reset_to_initial` is called only once at process start, not between `run_round`). However, there is currently one `backend/data` and one Gitea for the entire machine: starting another `./run.sh` process force-pushes v0, closes legacy issues, deletes `sessions/*.json`, and `clear_live`. This turns “a new experiment” into “destroying the previous experiment.” For parallel experiment runs, the requirement is one independent Gitea and `sessions/` per experiment, `stop` must not be deleted, and only `destroy` may be deleted, but this has not yet been implemented. The demand and delivery surfaces, meanwhile, have almost no equivalent files even within the current experiment process.
 
-需求面现状（ahe-beta，2026-09-01 代码）：
+Current demand-surface state (ahe-beta, code as of 2026-09-01):
 
-1. **唯一派发入口**是 `architect/agent_runtime.py` 的 `run_agent_def`。四个 driver（`triage.py` / `architect.py` / `divergent.py` / `owner.py`）各自拼好 `message` 后调用它，再 `read_submit` 取结构化数组写 Gitea。`message` 就是当时的完整输入；submit 回显就是当时的结构化产出。二者都只活在该次函数栈里。
-2. **看板过程流不是实验记录。** `loop/live_tracer.py` 把工具入参截到约 200 字、工具结果约 500 字；`loop/live.py` 的 agent log 上限 500 条。`archive_agent` 写入 `data/live/history.json` 的仍是这份截断投影。每次 `./run.sh` 开头 `clear_live`。
-3. **Token 用量 JSONL 只含计量。** `usage.py` 逐次记录 tokens 与 role/round，fail-open，不含 prompt 与产出。一次用量事件对应一次 LLM HTTP；一次角色调用内部可以有多次用量事件。
-4. **Gitea 只留产品。** proposal body、Owner 评论、标签是治理结果，不是填好的 `message`，也不是被 driver 丢掉的非法 submit。
-5. **现有重放脚本重建输入，而不是重放冻结输入。** `scripts/replay_roles_offline.py` 等从 sessions + FakeTracker 再跑一遍 driver。agent 定义或 tracker 视图一变，拼出的 `message` 就变。
+1. **The sole dispatch entry point** is `run_agent_def` in `architect/agent_runtime.py`. The four drivers (`triage.py` / `architect.py` / `divergent.py` / `owner.py`) each construct `message` and call it, then call `read_submit` to obtain the structured array and write it to Gitea. `message` is the complete input at that time; the submit echo is the structured output at that time. Both exist only on that function stack.
+2. **The dashboard process stream is not an experiment record.** `loop/live_tracer.py` truncates tool arguments to approximately 200 characters and tool results to approximately 500 characters; the agent log of `loop/live.py` is capped at 500 entries. `archive_agent` still writes this truncated projection into `data/live/history.json`. It is cleared by `clear_live` at the beginning of every `./run.sh`.
+3. **Token-usage JSONL contains measurement only.** `usage.py` records tokens and role/round for each event, fails open, and contains neither prompts nor outputs. One usage event corresponds to one LLM HTTP request; one role invocation may contain multiple usage events internally.
+4. **Gitea retains only the product.** The proposal body, Owner comments, and labels are governance results, not the completed `message` and not invalid submits discarded by the driver.
+5. **Existing replay scripts reconstruct inputs rather than replaying frozen inputs.** `scripts/replay_roles_offline.py` and others run the driver again from sessions + FakeTracker. If the agent definition or tracker view changes, the constructed `message` changes.
 
-交付面现状（OpenAgents `ahe-beta/v0.1`，由 AHE-Beta `start_vigil` 拉起）：
+Current delivery-surface state (OpenAgents `ahe-beta/v0.1`, launched by AHE-Beta `start_vigil`):
 
-1. **唯一派发入口**是 `openagents/runtime/engine.py` 的 `run_agent`。`task`、`context`、校验后的 dict 在此次调用内完整存在。
-2. **既有遥测明确不以 transcript 为分析对象。** 工具名 jsonl、token jsonl 留在 worktree；机器可读全文在 `protocol_output`（OpenAgents 字段名，本组 schema 不沿用该键），容器缺省零宿主挂载，`--rm` 后宿主拿不到。
-3. **implementer 的结构化产出就是校验后的末行 JSON。** 文件编辑发生在同一次 `backend.run` 内部。v1 不重放写文件，不采集 diff。
+1. **The sole dispatch entry point** is `run_agent` in `openagents/runtime/engine.py`. `task`, `context`, and the validated dict all exist in full during this call.
+2. **Existing telemetry explicitly does not treat the transcript as an analysis object.** Tool-name JSONL and token JSONL remain in the worktree; the machine-readable full text is in `protocol_output` (an OpenAgents field name; this group’s schema does not reuse that key). The container has zero host mounts by default, and after `--rm` the host cannot retrieve it.
+3. **The implementer’s structured output is the validated final-line JSON.** File editing occurs within the same `backend.run`. v1 does not replay file writes and does not collect diffs.
 
-围堵与过拟合约束仍然有效：设计师与容器内 coding agent 不得把任务轨迹读进下一轮决策。`role_runs` 与 `sessions` / `harness_runs` 同类，必须进 jail 拒绝表；vigil 只挂本 `run_id` 的 `delivery/`。
+The containment and overfitting constraints remain effective: the architect and the coding agent inside the container must not read task traces into decisions for the next round. `role_runs` and `sessions` / `harness_runs` are of the same kind and must be included in the jail deny-read list; vigil only mounts `delivery/` for this `run_id`.
 
-因此本组把「一次实验进程」的可审计切片做成 `role_runs/<run_id>/`：用户会话迁入同一包，角色调用按 schema 写入。这与「每实验独立 sessions、stop 不删」同向；实验运行时落地后该目录就是实验根下的 telemetry/sessions，而不是第二套权威。
+Therefore, this group makes the auditable slice of “one experiment process” into `role_runs/<run_id>/`: user sessions move into the same package, and role invocations are written according to the schema. This is aligned with “independent sessions per experiment, stop does not delete”; once experiment execution is deployed, this directory is telemetry/sessions under the experiment root, not a second authority.
 
 ## Guide-level explanation
 
-一次闭环进程开始时，`run.py` 生成 `run_id`，设置 `AHE_BETA_RUN_ID` 与 `ROLE_RUNS_DIR=backend/data/role_runs/<run_id>`。`SessionStore` 写 `ROLE_RUNS_DIR/sessions/`。用量 JSONL 写 `ROLE_RUNS_DIR/usage.jsonl`。看板若仍读 `data/sessions`，则该路径只是指向**当前** `run_id` 的 sessions 的别名（符号链接或同等），换 `run_id` 只改别名，不删上一包。
+When a closed-loop process begins, `run.py` generates `run_id` and sets `AHE_BETA_RUN_ID` and `ROLE_RUNS_DIR=backend/data/role_runs/<run_id>`. `SessionStore` writes `ROLE_RUNS_DIR/sessions/`. Usage JSONL writes `ROLE_RUNS_DIR/usage.jsonl`. If the dashboard still reads `data/sessions`, that path is merely an alias (symbolic link or equivalent) to the sessions of the **current** `run_id`; switching `run_id` changes only the alias and does not delete the previous package.
 
-实验内各 round 接着进化后的 main，不复位。**禁止**删除 `role_runs/` 下任何已有 `run_id`。旧单例入口若仍在启动时对共享 Gitea 强推 v0，那是给**新的实验进程**腾仓，不得写成「每一轮从种子起」；且该路径仍不得删记录目录。看板 live 只服务当前进程，换实验进程时清空 live 可以，清空上一实验的 `role_runs` 不可以。
+Each round within an experiment continues from the evolved main and does not reset. **Do not** delete any existing `run_id` under `role_runs/`. If the old singleton entry point still force-pushes v0 to shared Gitea at startup, that is to make room for a **new experiment process** and must not be written as “each round starts from the seed”; that path must still not delete the record directory. The live dashboard serves only the current process. When switching experiment processes, clearing live is allowed; clearing `role_runs` from the previous experiment is not.
 
-需求面每调用一次 `run_agent_def`，往 `demand/` 写一条 JSON。交付面 vigil 只 rw 挂载 `delivery/` 到容器内 `/role_runs`。用户局结束仍走既有 `SessionStore.save`，只是根目录换到本包内，不双写两份 persona_trace。
+Each demand-surface call to `run_agent_def` writes one JSON record to `demand/`. Delivery-surface vigil mounts only `delivery/` read-write into `/role_runs` in the container. When a user session ends, it still uses the existing `SessionStore.save`; only the root directory moves into this package, without writing two copies of persona_trace.
 
-审计者打开一个 `run_id` 目录应能回答：用户在各局如何判断与动作、harness 过程摘要是什么、triage/architect/owner/drafter/… 各自吃了什么输入、交出了什么 structured。把某条 demand 记录的 `input.prompt` 喂给改写后的 agent 定义，diff `output.structured`，即环节消融。实现者记录 `replayable=false`，脚本跳过。
+An auditor opening one `run_id` directory should be able to answer: how the user judged and acted in each session, what the harness process summary was, what input triage/architect/owner/drafter/… each received, and what structured output each produced. Feed the `input.prompt` from a demand record to a rewritten agent definition and diff `output.structured` to perform stage ablation. The implementer records `replayable=false`; scripts skip it.
 
-示例（需求面角色调用；会话 JSON 仍是 SessionStore 既有形状）：
+Example (demand-surface role invocation; the session JSON retains the existing SessionStore shape):
 
 ```json
 {
@@ -169,110 +169,110 @@ tasks:
   "role": "owner",
   "subject": {"kind": "round", "id": "3"},
   "replayable": true,
-  "input": {"prompt": "你是投资与组合治理 Owner。…", "context": "", "placeholders": {}},
+  "input": {"prompt": "You are the investment and portfolio governance Owner. …", "context": "", "placeholders": {}},
   "output": {"structured": {"decisions": [{"issue": 12, "disposition": "hold"}]}, "status": "success", "error": null},
   "env": {"model": "…", "agent_def_pin": "sha256:…", "captured_at": "2026-09-01T08:00:00+00:00"}
 }
 ```
 
-操作者保留 `backend/data/role_runs/<run_id>/` 即保留该次实验的可还原切片。再开一个实验进程不得擦掉它。
+Retaining `backend/data/role_runs/<run_id>/` retains the reconstructable slice of that experiment. Starting another experiment process must not erase it.
 
 ## Reference-level explanation
 
-### 第一性原理：还原清单
+### First principles: reconstruction checklist
 
-「还原实验」在 v1 指：不依赖「共享 Gitea 还没被下一个实验进程打回 v0」，仅凭该 `run_id` 目录即可做环节审计。
+In v1, “reconstructing an experiment” means being able to audit the stage using only that `run_id` directory, without depending on “shared Gitea not yet having been reverted to v0 by the next experiment process.”
 
-| 要回答的问题 | v1 靠什么 | 不靠什么 |
+| Question to answer | What v1 uses | What it does not use |
 |---|---|---|
-| 用户为何 Accept / 放弃 | `sessions/*.json` 的 `persona_trace` 与 `sim_trace` | live 看板 |
-| 用户与产品怎么来回 | 同文件 `harness_steps`（既有长度上限仍在） | harness 内部完整 transcript |
-| 需求面某角色是否偏保守 | `demand/` 的 `input.prompt` + `output.structured` | Gitea 评论、截断 live log |
-| 交付面某角色是否偏保守 | `delivery/` 同上 | 容器内 worktree、工具参数 |
-| 当时用哪套定义/模型、哪版 harness | `manifest.json`（pin 与 round SHA） | 宿主脏工作区 |
-| 花了多少 token | `usage.jsonl` | 估算 |
+| Why did the user Accept / abandon? | `persona_trace` and `sim_trace` from `sessions/*.json` | live dashboard |
+| How did the user and product go back and forth? | `harness_steps` in the same file (the existing length limit remains) | the complete transcript inside the harness |
+| Was a demand-surface role overly conservative? | `input.prompt` + `output.structured` in `demand/` | Gitea comments, truncated live log |
+| Was a delivery-surface role overly conservative? | Same in `delivery/` | container worktree, tool arguments |
+| Which definition/model and which harness version were used at the time? | `manifest.json` (pins and round SHAs) | dirty host worktree |
+| How many tokens were spent? | `usage.jsonl` | estimates |
 
-v1 **不能**还原：实现者改过的文件树、完整工具环、被截断前的 harness 工具全文。issue 正文若已写入 Gitea，关票不等于删历史。单例上后一个实验进程若仍强推 v0，当前 Gitea main 不再代表上一实验；审计上一实验必须看该 `run_id` 包与当时记录的 round SHA，不能只看此刻共享仓。
+v1 **cannot** reconstruct: the file tree modified by the implementer, the complete tool loop, or the full harness tool text before truncation. If the issue body has been written to Gitea, closing the issue does not delete its history. In the singleton setup, if a later experiment process still force-pushes v0, the current Gitea main no longer represents the previous experiment; auditing the previous experiment requires the `run_id` package and the round SHAs recorded at that time, not only the current shared repository.
 
-0047 落地后：本包成为该 `experiment_id` 下的 sessions/telemetry；`destroy` 才允许删。本组不实现 0047 CLI。
+After 0047 is deployed: this package becomes sessions/telemetry under `experiment_id`; only `destroy` may delete it. This group does not implement the 0047 CLI.
 
-### 术语（防抢词）
+### Terminology (preventing term capture)
 
-| 本组 | 本组含义 | 不得当成 |
+| This group | Meaning in this group | Must not be treated as |
 |---|---|---|
-| 角色调用 / invocation | 一次 `run_agent_def` 或一次 `run_agent` | 一次 LLM HTTP（usage 事件）；一次工具步 |
-| `run_id` | `AHE_BETA_RUN_ID`，一次闭环进程 | `docker run`；`agent.run`；`data/live/run.json` |
+| role invocation / invocation | One `run_agent_def` or one `run_agent` | One LLM HTTP request (usage event); one tool step |
+| `run_id` | `AHE_BETA_RUN_ID`, one closed-loop process | `docker run`; `agent.run`; `data/live/run.json` |
 | `side` | `demand` \| `delivery` | issue `plane` → `report`/`proposal`/`ready` |
-| `input.prompt` | 需求面 = 填好的 `message`；交付面 = substitute 后的 `task` | 单独再存 `systemprompt.md` |
-| `output.structured` | 需求面 submit 或回显；交付面 `OUTPUT_SCHEMA` dict | OpenAgents 键名 `protocol_output`；0043 artifact |
-| `role_runs/<run_id>` | 一次实验的可还原切片（会话 + 角色调用 + manifest + usage） | `evaluate_role_traces.py` 的合规 JSONL；`harness_runs` 工作副本 |
-| jail 的禁读目录名 | `sessions` / `harness_runs` / `role_runs` | 对外名称仍是「实验切片 / 调用记录」 |
+| `input.prompt` | Demand surface = completed `message`; delivery surface = `task` after substitution | Storing `systemprompt.md` separately |
+| `output.structured` | Demand-surface submit or echo; delivery-surface `OUTPUT_SCHEMA` dict | OpenAgents key name `protocol_output`; 0043 artifact |
+| `role_runs/<run_id>` | Reconstructable slice of one experiment (sessions + role invocations + manifest + usage) | `evaluate_role_traces.py`’s compliant JSONL; `harness_runs` working copy |
+| jail deny-read directory names | `sessions` / `harness_runs` / `role_runs` | The external names remain “experiment slice / invocation record” |
 
-`output.status` 的 `protocol_error` / `backend_error` 沿用 OpenAgents `run_agent` 既有字面量。
+`output.status`’s `protocol_error` / `backend_error` retain the existing literals of OpenAgents `run_agent`.
 
-### 角色调用 schema（demand / delivery）
+### Role invocation schema (demand / delivery)
 
-单位：一次角色调用。v1 **记录**字段与前一版相同：`schema_version`、`invocation_id`、`run_id`、`round`、`side`、`role`、`subject`、`replayable`、`input.{prompt,context,placeholders}`、`output.{structured,status,error}`、`env.{model,agent_def_pin,captured_at}`。
+Unit: one role invocation. v1 **records** the same fields as the previous version: `schema_version`, `invocation_id`, `run_id`, `round`, `side`, `role`, `subject`, `replayable`, `input.{prompt,context,placeholders}`, `output.{structured,status,error}`, `env.{model,agent_def_pin,captured_at}`.
 
-v1 **不记录**：完整 chat transcript、工具参数/命令正文/文件内容、patch hunk、Gitea token、API key。`input` 若误含已知环境变量里的密钥，写出前按精确子串替换为 `${ENV_NAME}`；替换失败则整条 skip（仍 fail-open）。
+v1 **does not record**: complete chat transcripts, tool arguments/command bodies/file contents, patch hunks, Gitea tokens, or API keys. If `input` accidentally contains a secret from known environment variables, replace the exact substring with `${ENV_NAME}` before writing it; if replacement fails, skip the entire record (still fail-open).
 
-用户会话**不**改写成 invocation schema，避免与 SessionStore 双协议。权威仍是 SessionStore 文件，只是根目录迁入本包。
+User sessions are **not** rewritten into the invocation schema, avoiding a second protocol alongside SessionStore. The authority remains the SessionStore files; only the root directory moves into this package.
 
-### 目录
+### Directory
 
 ```
 backend/data/role_runs/
   <run_id>/
-    manifest.json        # 模型名、roster、agent_def pin、round SHA 列表；不含密钥
-    usage.jsonl          # 本 run 的用量事件（AHE_BETA_USAGE_PATH）
-    sessions/            # SessionStore（index.json + <session_id>.json）
-    index.jsonl          # 角色调用索引 {invocation_id, side, role, status, path}
+    manifest.json        # model name, roster, agent_def pin, round SHA list; no secrets
+    usage.jsonl          # usage events for this run (AHE_BETA_USAGE_PATH)
+    sessions/            # SessionStore (index.json + <session_id>.json)
+    index.jsonl          # role invocation index {invocation_id, side, role, status, path}
     demand/
       <utc>_<role>_<invocation_id>.json
     delivery/
       <utc>_<role>_<invocation_id>.json
 ```
 
-`InvocationStore` 在 `ahe_beta/invocation.py`：fail-open、原子写 JSON、index 追加。未设置 `ROLE_RUNS_DIR` 时角色调用 API no-op；会话路径仍必须由 `run.py` 显式传入本包，避免再落到会被删的旧根。
+`InvocationStore` in `ahe_beta/invocation.py`: fail-open, atomically write JSON, append to the index. When `ROLE_RUNS_DIR` is not set, the role invocation API is a no-op; the session path must still be explicitly passed into this package by `run.py` to avoid falling back to the old root that may be deleted.
 
-`run.py` 在导入用量模块之前（或 `main` 最早处）设置：
+`run.py` is set before importing the usage module (or at the earliest point of `main`):
 
 - `AHE_BETA_RUN_ID`
 - `ROLE_RUNS_DIR=<DATA>/role_runs/<run_id>`
 - `AHE_BETA_USAGE_PATH=<ROLE_RUNS_DIR>/usage.jsonl`
 
-`SessionStore` 构造为 `ROLE_RUNS_DIR/sessions`。`data/sessions` 若被看板硬编码，只允许作为指向当前 sessions 的别名，换 run 时改别名。SWE-bench 等同样调用 `_reset_to_initial` / `SessionStore(DATA/sessions)` 的入口必须同一约定（与 `run.py` 同改或共用 helper）；不得再写会被复位清空的共享根。
+`SessionStore` is constructed as `ROLE_RUNS_DIR/sessions`. If `data/sessions` is hard-coded by the dashboard, it may only serve as an alias to the current sessions; change the alias when switching runs. Entrypoints such as SWE-bench that likewise call `_reset_to_initial` / `SessionStore(DATA/sessions)` must follow the same convention (change together with `run.py` or share a helper); they must not write again to a shared root that will be cleared by a reset.
 
-`_reset_to_initial`：不得在 `run_round` / 实验内轮次边界调用。旧单例 `run.py` 若仍在**进程启动**时调用它（共享 Gitea 上开始另一个实验进程），**禁止** `unlink`/`rmtree` `role_runs`，也禁止再按共享 `DATA/sessions/*.json` 删除已迁入本包的会话。`clear_live` 只清当前进程看板投影。目标态（实验运行时）是新实验独立 Gitea + seed pin，不再对别人的仓强推 v0。字段契约仍以 `issue_schema` 为准；本实验进行中的产品状态以该实验的 Gitea 为准。
+`_reset_to_initial`: Must not be invoked at the `run_round` / experiment-round boundary. If the legacy singleton `run.py` is still invoked at **process startup** (starting another experiment process on the shared Gitea), it is **forbidden** to perform `unlink`/`rmtree` `role_runs`, and it is also forbidden to delete sessions that have already been migrated into this package according to shared `DATA/sessions/*.json`. `clear_live` only clears the current process's dashboard projection. The target state (during experiment execution) is a new experiment-specific Gitea + seed pin, with no further force-push of v0 to other people's repositories. The field contract remains governed by `issue_schema`; the product state during this experiment is governed by the experiment's Gitea.
 
-`manifest.json` 由 T2 提供读写；T4 在轮次结束把 orchestrator 已观测的 origin/main SHA 追加进 `rounds`。缺 SHA 时该键为 `null`，不得编造。
+`manifest.json` provides read/write access through T2; at the end of each round, T4 appends the origin/main SHA observed by the orchestrator to `rounds`. When the SHA is unavailable, this key is `null`; it must not be fabricated.
 
-### 需求面挂钩
+### Demand-Side Hooks
 
-只改 `run_agent_def` 一处写存储；四个 driver 只增加 `subject=`（及可选 `replayable=True`）。triage 的 subject 为当前 report 号；architect/divergent/owner 若是整批则 `kind=round` 且 `id=str(round_no)`。不要从 `message` 启发式抽票号。超时写 `status=timeout` 再抛；未调 submit 写 `status=no_submit`。离线重放判断角色只喂 `input.prompt`。
+Only change storage writes in `run_agent_def`; the four drivers only add `subject=` (and optionally `replayable=True`). The triage subject is the current report number; for architect/divergent/owner, if processing a batch, use `kind=round` and `id=str(round_no)`. Do not heuristically extract issue numbers from `message`. On timeout, write `status=timeout` and then re-raise; when submit is not called, write `status=no_submit`. For offline replay, the role should receive only `input.prompt`.
 
-### 交付面挂钩与围堵例外
+### Delivery-Side Hooks and Containment Exception
 
-`run_agent` 的 `finally` fail-open 写出。容器内 `ROLE_RUNS_DIR=/role_runs`，只挂 `…/<run_id>/delivery`。不挂 `sessions/`、`demand/`、父目录。keep-alive 且 `run_id` 变化则重建容器。实现者 `replayable=false`。
+`run_agent` writes out with `finally` fail-open. Inside the container, `ROLE_RUNS_DIR=/role_runs`, mount only `…/<run_id>/delivery`. Do not mount `sessions/`, `demand/`, or the parent directory. Rebuild the container when keep-alive is enabled and `run_id` changes. The implementer `replayable=false`.
 
-### 过拟合隔离
+### Overfitting Isolation
 
-jail 禁读目录名增加 `role_runs`。设计师不得把本包当证据读。
+Add `role_runs` to the directory names that the jail is forbidden to read. The architect must not read this package as evidence.
 
-### 重放
+### Replay
 
-`scripts/replay_role_invocations.py --run-dir data/role_runs/<id> --side demand --role owner --agent-def backend/agent_defs/owner`：只重放 `replayable=true` 的 demand 记录。e2e：`backend/scripts/e2e-spec-0049-role-invocation-io-store.sh`。不替代 `evaluate_role_traces.py`。用户侧审计直接读本包 `sessions/`，不经本脚本。
+`scripts/replay_role_invocations.py --run-dir data/role_runs/<id> --side demand --role owner --agent-def backend/agent_defs/owner`: replay only the demand records of `replayable=true`. e2e: `backend/scripts/e2e-spec-0049-role-invocation-io-store.sh`. Do not replace `evaluate_role_traces.py`. User-side audits read `sessions/` from this package directly, without going through this script.
 
-### Task DAG 与文件分配
+### Task DAG and File Allocation
 
 ```mermaid
 flowchart TD
-  T1[T1 契约]
+  T1[T1 Contract]
   T2[T2 InvocationStore]
-  T3[T3 需求面挂钩]
-  T4[T4 生命周期与会话迁入]
-  T5[T5 离线重放]
-  T6[T6 交付面写出]
+  T3[T3 Demand-plane hooks]
+  T4[T4 Lifecycle and session migration]
+  T5[T5 Offline replay]
+  T6[T6 Delivery-plane output]
   T1 --> T2
   T2 --> T3
   T2 --> T4
@@ -281,48 +281,48 @@ flowchart TD
   T4 --> T6
 ```
 
-T3 与 T4 可并行。T6 在 OpenAgents `ahe-beta/v0.1` 实现写出；本仓黄金夹具与契约测试。
+T3 and T4 can run in parallel. T6 implements the write-out in OpenAgents `ahe-beta/v0.1`; this repository contains the golden fixtures and contract tests.
 
 ## Drawbacks
 
-磁盘：会话全文加角色 prompt，多轮可达数十到数百 MB。操作者自行归档旧 `run_id`。
+Disk: Full session transcripts plus role prompts may reach tens to hundreds of MB over multiple rounds. Operators archive old `run_id` themselves.
 
-密钥与隐私：会话与 issue 正文可能含用户数据；仅做已知 env 精确脱敏。目录 gitignore，当实验产物。
+Secrets and privacy: Session and issue bodies may contain user data; only known env values are redacted precisely. The directory is gitignored as an experiment artifact.
 
-围堵：delivery 子目录 rw 挂载是对零挂载的例外；sessions 不进容器。
+Containment: The rw mount of the delivery subdirectory is an exception to zero mounts; sessions are not passed into the container.
 
-实现者文件树仍不可从 v1 还原。harness 工具摘要仍受既有截断。单例共享 Gitea 被后一实验进程打回 v0 之后，审计者必须按 `run_id` 看包和 SHA，不能只看当前 Gitea main。
+The implementer's file tree still cannot be reconstructed from v1. The harness tool summary remains subject to the existing truncation. After the singleton shared Gitea is rolled back to v0 by a later experiment process, auditors must inspect the package and SHA according to `run_id`, and must not inspect only the current Gitea main.
 
-看板硬编码 `data/sessions` 时依赖别名；别名失败则本轮看板空、本包仍在（fail-open 偏向保存）。
+When the dashboard hardcodes `data/sessions`, it depends on an alias; if the alias fails, the dashboard is empty for this round while the package remains (fail-open favors preservation).
 
 ## Rationale and alternatives
 
-**选用「一个 run_id 一份目录，会话迁入而不是双写」**，因为还原实验需要用户侧与角色侧同寿命、同切片；双写会漂。SessionStore 形状已可审计用户，不必改成 invocation schema。
+**Choose “one directory per run_id, migrate sessions rather than double-write”** because experiment reconstruction requires user-side and role-side data to have the same lifetime and slicing; double-writing would drift. The SessionStore shape is already auditable for users, so it does not need to be changed to an invocation schema.
 
-**实验从种子起，round 从上一 round 的 main 起。** 新实验独立，才需要种子；实验不独立是因为抢同一 Gitea，不是因为 round 没有打回 v0。不能再以删除 sessions 充当隔离。本组在旧单例入口上只保证记录不被误删；消灭共享 Gitea 上的启动强推是实验运行时的事。
+**Start the experiment from the seed, and start each round from the previous round's main.** A new experiment must be independent and therefore needs a seed; experiments are not independent because they contend for the same Gitea, not because a round was not rolled back to v0. Deletion of sessions can no longer serve as isolation. This group guarantees only that records are not accidentally deleted at the legacy singleton entry point; eliminating the startup force-push on shared Gitea is a matter for experiment execution.
 
-备选 A：Gitea 评论当日志。票面不是 prompt；未 submit 不会出现。
+Alternative A: Use Gitea comments as the log. The issue page is not the prompt; an unsubmitted item will not appear.
 
-备选 B：升格 live/history。截断、500 条、每次清空。
+Alternative B: Promote live/history. Truncation, 500 records, cleared each time.
 
-备选 C：完整 transcript。体积与过拟合；交付面已列为非目标。
+Alternative C: Full transcript. Size and overfitting; the delivery surface is explicitly out of scope.
 
-备选 D：只在 OpenAgents worktree 写 jsonl。统一落盘失败。
+Alternative D: Write JSONL only in the OpenAgents worktree. Unified persistence would fail.
 
-备选 E：会话仍写共享 `data/sessions`，仅约定「请先拷走」。软约定无法防止下一个实验进程删除，违反第一性原理。已否决。
+Alternative E: Continue writing sessions to shared `data/sessions`, with only the convention “copy it out first.” A soft convention cannot prevent the next experiment process from deleting it, violating first principles. Rejected.
 
-备选 F：等 0047 实现后再保存会话。0047 未落地期间连续 `./run.sh` 仍会丢用户记录；审计需求等不了。已否决。
+Alternative F: Wait until 0047 is implemented before saving sessions. During the period when 0047 is not deployed, consecutive `./run.sh` would still lose user records; the audit requirement cannot wait. Rejected.
 
-备选 G：schema 键用 `plane` / `protocol` / `task`。抢词。已否决。
+Alternative G: Use `plane` / `protocol` / `task` as schema keys. Namespace collision. Rejected.
 
 ## Prior art
 
-`usage.py` 的 fail-open 与 contextvars 归属。`SessionStore` 已证明会话 JSON 足以审计用户模拟，缺的是寿命。0047 规定每实验独立 sessions 且 `destroy` 才删——本组在旧入口上用 `run_id` 目录先行对齐该寿命模型。0046 用 fresh target 保护冻结交接，不改 `./run.sh`。OpenAgents 将 `protocol_output` 与展示 summary 分列。LangSmith 以 span 保存完整消息；本组更窄。
+`usage.py`'s fail-open behavior and contextvars ownership. `SessionStore` has already demonstrated that session JSON is sufficient to audit user simulations; what is missing is lifetime. 0047 specifies independent sessions for each experiment and that only `destroy` may delete them. This group first aligns the legacy entry point with that lifetime model using the `run_id` directory. 0046 uses a fresh target to protect frozen handoff and does not change `./run.sh`. OpenAgents separates `protocol_output` from the display summary. LangSmith saves complete messages in spans; this group is narrower.
 
 ## Unresolved questions
 
-无。操作者已拍板：日志必须能还原实验；用户会话与角色调用同包持久；存 structured 而非工具环；权威目录在 ahe-beta。keep-alive 与 run_id 变化时重建容器。0047 未落地不构成推迟保存的理由。
+None. The operator has decided: logs must reconstruct the experiment; user sessions and role invocations must persist in the same package; store structured data rather than tool loops; the authoritative directory is ahe-beta. Rebuild the container when keep-alive is enabled and run_id changes. The fact that 0047 is not implemented is not a reason to defer saving.
 
 ## Future possibilities
 
-看板按 `run_id` 浏览历史切片。v2 implementer `diff_stat`。把 demand structured 投影成 `evaluate_role_traces.py` 输入。0047 实验根直接把 `ROLE_RUNS_DIR` 指到 `<experiments-root>/<id>/`。完整 transcript 仅 `ROLE_RUNS_TRANSCRIPT=1`。把 round SHA 对应的 harness 树打成可选 bundle（0047 archive 的 Git bundle），本组 v1 不收录。
+Browse historical slices by `run_id` in the dashboard. v2 implementer `diff_stat`. Project structured demand into `evaluate_role_traces.py` input. Have the 0047 experiment root point `ROLE_RUNS_DIR` to `<experiments-root>/<id>/`. Full transcript only `ROLE_RUNS_TRANSCRIPT=1`. Package the harness tree corresponding to the round SHA as an optional bundle (the Git bundle from the 0047 archive); v1 in this group does not include it.

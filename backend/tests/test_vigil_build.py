@@ -12,8 +12,8 @@ def _script() -> Path:
 def test_build_requires_both_checkout_paths() -> None:
     result = subprocess.run(["bash", str(_script())], capture_output=True, text=True)
     assert result.returncode != 0
-    assert "OpenAgents 仓路径" in result.stderr
-    assert "NexAU 仓路径" in result.stderr
+    assert "OpenAgents-repo-path" in result.stderr
+    assert "NexAU-repo-path" in result.stderr
 
 
 def test_build_validates_checkouts_and_shapes_named_context(tmp_path: Path) -> None:
@@ -72,7 +72,7 @@ def test_hosted_build_requires_an_explicit_non_latest_tag(tmp_path: Path) -> Non
             text=True,
         )
         assert result.returncode != 0
-        assert "禁止 latest" in result.stderr
+        assert "latest is not allowed" in result.stderr
 
 
 def test_hosted_build_validates_actual_image_and_records_dirty_source(tmp_path: Path) -> None:
@@ -163,11 +163,11 @@ elif sys.argv[1] == "run":
     result = subprocess.run(command, env=env, capture_output=True, text=True)
     assert result.returncode != 0
     assert not record.exists()
-    assert "未通过托管证据" in result.stderr
+    assert "failed offline hosted-evidence" in result.stderr
 
     env["CAPABILITIES"] = json.dumps({**capabilities, "encodings": ["gzip", "zip"]})
     env["MUTATE_SOURCE"] = str(source_paths[0] / "reader.py")
     result = subprocess.run(command, env=env, capture_output=True, text=True)
     assert result.returncode != 0
     assert not record.exists()
-    assert "构建期间源码发生变化" in result.stderr
+    assert "Source changed during the build" in result.stderr

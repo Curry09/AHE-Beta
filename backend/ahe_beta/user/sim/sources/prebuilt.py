@@ -45,10 +45,10 @@ class PrebuiltSource:
             return _provision_task(params=spec.params, identity=identity, dest_root=dest_root)
         source_raw = spec.params.get("source")
         if not source_raw:
-            raise ValueError("prebuilt 源需要非空 params.source")
+            raise ValueError("prebuilt source requires non-empty params.source")
         source = Path(str(source_raw)).resolve()
         if not source.is_dir():
-            raise FileNotFoundError(f"prebuilt workspace 不存在：{source}")
+            raise FileNotFoundError(f"prebuilt workspace does not exist: {source}")
 
         base = Path(dest_root) if dest_root else Path(tempfile.mkdtemp(prefix="sim_ws_prebuilt_"))
         dest = base / "repo"
