@@ -1,21 +1,44 @@
-# AHE-Beta
+# Agentic Harness Engineering Beta: Requirement-Centered Evolution of Agent Harnesses
 
-**Evolve coding-agent harnesses through simulated use and structured feedback.**
+<div align="left">
 
-[English](README.md) · [简体中文](README.zh-CN.md) · [Quickstart](docs/QUICKSTART.md) · [Evaluation](evaluation/docs/harbor.md) · [Contributing](CONTRIBUTING.md)
-
-Python 3.12+ · Linux / WSL2 · [MIT](LICENSE)
-
-AHE-Beta evolves coding-agent harnesses by simulating how users try a product, give feedback, and developers improve it. Simulated users work on tasks with the Harness and report problems. Triage and Architect turn that feedback into proposals, and [OpenAgents](https://github.com/Curry09/OpenAgents) implements the code changes. The updated Harness enters the next round of use, continuing the feedback and improvement cycle.
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/harness-evolution-en-dark.svg">
-    <img src="assets/harness-evolution-en-light.svg" alt="An animated sequence highlights round 1, round 2 and the final round in turn. Moving signals highlight each node on arrival. Feedback and OpenAgents delivery update the Harness between rounds; the final trial is followed by independent held-out Harbor evaluation." width="100%">
-  </picture>
+<p align="left">
+  <!-- Replace the placeholder arXiv/PDF links when the paper is posted. -->
+  <a href="https://arxiv.org/abs/XXXX.XXXXX"><img alt="Paper" src="https://img.shields.io/badge/Paper-arXiv-b31b1b.svg?logo=arxiv&logoColor=white"></a>
+  <a href="https://arxiv.org/abs/XXXX.XXXXX"><img alt="PDF" src="https://img.shields.io/badge/PDF-Download-ec1c24.svg?logo=adobeacrobatreader&logoColor=white"></a>
+  <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg">
+  <img alt="Python" src="https://img.shields.io/badge/python-%E2%89%A53.12-blue.svg">
+  <img alt="Managed with uv" src="https://img.shields.io/badge/managed_with-uv-261230?logo=python&logoColor=white">
 </p>
 
-This repository orchestrates experiments, while OpenAgents implements code changes. Each experiment starts with the seed Harness in `backend/harness_template/`, evolves its source code, and saves the Harness version and execution records for each round.
+</div>
+
+<p align="center">
+  <img src="assets/paper-overview.png" alt="AHE-Beta overview: user-driven evaluation, team-based modification, and requirement-driven selection" width="100%">
+</p>
+
+<p align="left">
+  <a href="README.md">English</a> | <a href="README.zh-CN.md">&#x7B80;&#x4F53;&#x4E2D;&#x6587;</a>
+</p>
+
+---
+
+## 🎯 Overview
+
+**AHE-Beta** is a requirement-centered loop for evolving coding-agent harnesses around a fixed base model. Simulated users work with the harness over multiple turns, surface explicit and implicit requirements, and leave evidence-backed issues. A Gitea-based team triages and consolidates those requirements, writes general fixes, and admits only reviewed changes with an evidence package.
+
+### Main results
+
+- **Held-out performance:** on 38 tasks, success rises from **21.9% to 32.5%** and user rating from **2.59 to 3.04**, while execution tokens fall by **41.0%** versus Base Harness.
+- **Strong baselines:** AHE-Beta exceeds Claude Code (**26.3%**) and Meta-Harness (**20.2%**) in success.
+- **Human preference:** in a blind human A/B study, participants prefer AHE-Beta in **31 of 48 valid pairs** and rate it higher on all five user-experience dimensions.
+- **Transfer:** without further evolution, gains transfer to other base models, improving success by **15.8 percentage points on GLM-5.3** and **7.9 points on DeepSeek-V4.1-Flash** over Base Harness.
+
+---
+
+## 🚀 Quick Start
+
+The complete experiment and evaluation workflows are documented below. Start with the offline demo to see the interaction and feedback loop without model APIs or experiment infrastructure.
 
 ## Offline demo
 
