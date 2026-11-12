@@ -2844,102 +2844,91 @@
     },
     {
       "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/agents.json",
-      "disposition": "maintained",
-      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/agents.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired frontend public snapshot; original source identity is preserved in Git history",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "51d68b681e21b06ffbafca119e4db1332c3fed596a30943a4567b73ee5599a7f",
-      "destination_sha256": "51d68b681e21b06ffbafca119e4db1332c3fed596a30943a4567b73ee5599a7f"
+      "source_sha256": "51d68b681e21b06ffbafca119e4db1332c3fed596a30943a4567b73ee5599a7f"
     },
     {
       "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/commits.json",
-      "disposition": "maintained",
-      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/commits.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired frontend public snapshot; original source identity is preserved in Git history",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "90c8287f1b69808dc3ee3e42c6577db63de92c16fc16c1dbc626e07e8b81deed",
-      "destination_sha256": "90c8287f1b69808dc3ee3e42c6577db63de92c16fc16c1dbc626e07e8b81deed"
+      "source_sha256": "90c8287f1b69808dc3ee3e42c6577db63de92c16fc16c1dbc626e07e8b81deed"
     },
     {
       "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/config.json",
-      "disposition": "maintained",
-      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/config.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired frontend public snapshot; original source identity is preserved in Git history",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "8513592c3f795361386b2a0d757dd29bc2b312dd50549e04c43af51d1b44def1",
-      "destination_sha256": "8513592c3f795361386b2a0d757dd29bc2b312dd50549e04c43af51d1b44def1"
+      "source_sha256": "8513592c3f795361386b2a0d757dd29bc2b312dd50549e04c43af51d1b44def1"
     },
     {
       "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/delivery.json",
-      "disposition": "maintained",
-      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/delivery.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired frontend public snapshot; original source identity is preserved in Git history",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "406c2f7df22a23f59fffc549094267c8ed16b1e2b879bd1ab73604b23e912462",
-      "destination_sha256": "406c2f7df22a23f59fffc549094267c8ed16b1e2b879bd1ab73604b23e912462"
+      "source_sha256": "406c2f7df22a23f59fffc549094267c8ed16b1e2b879bd1ab73604b23e912462"
     },
     {
       "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/history.json",
-      "disposition": "maintained",
-      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/history.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired frontend public snapshot; original source identity is preserved in Git history",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "0343639fac1511a32a4c9a92c7655a6e9f9ad3a600fc6f30b5bdad6806160a97",
-      "destination_sha256": "0343639fac1511a32a4c9a92c7655a6e9f9ad3a600fc6f30b5bdad6806160a97"
+      "source_sha256": "0343639fac1511a32a4c9a92c7655a6e9f9ad3a600fc6f30b5bdad6806160a97"
     },
     {
       "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/issues.json",
-      "disposition": "maintained",
-      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/issues.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired frontend public snapshot; original source identity is preserved in Git history",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "ac198bfbbe7d37ab2194634469915da15d876be61500883ec953e3ba7a88cad4",
-      "destination_sha256": "ac198bfbbe7d37ab2194634469915da15d876be61500883ec953e3ba7a88cad4"
+      "source_sha256": "ac198bfbbe7d37ab2194634469915da15d876be61500883ec953e3ba7a88cad4"
     },
     {
       "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/overview.json",
-      "disposition": "maintained",
-      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/overview.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired frontend public snapshot; original source identity is preserved in Git history",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "b251a058856af1fe344cf4921c103e4409237d155993e8fa2016cf5a54fae5aa",
-      "destination_sha256": "b251a058856af1fe344cf4921c103e4409237d155993e8fa2016cf5a54fae5aa"
+      "source_sha256": "b251a058856af1fe344cf4921c103e4409237d155993e8fa2016cf5a54fae5aa"
     },
     {
       "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/api/state.json",
-      "disposition": "maintained",
-      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/api/state.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired frontend public snapshot; original source identity is preserved in Git history",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "5e43ef73934ac15b0656093f0b2ced7d9bc644e6de5a576776cac9711f933f9c",
-      "destination_sha256": "5e43ef73934ac15b0656093f0b2ced7d9bc644e6de5a576776cac9711f933f9c"
+      "source_sha256": "5e43ef73934ac15b0656093f0b2ced7d9bc644e6de5a576776cac9711f933f9c"
     },
     {
       "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/latest.json",
-      "disposition": "maintained",
-      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/latest.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired frontend public snapshot; original source identity is preserved in Git history",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "f09575c458a965a3a318ab2f0cec9d8407a09e4e3b81de2701a0388c5ae92942",
-      "destination_sha256": "f09575c458a965a3a318ab2f0cec9d8407a09e4e3b81de2701a0388c5ae92942"
+      "source_sha256": "f09575c458a965a3a318ab2f0cec9d8407a09e4e3b81de2701a0388c5ae92942"
     },
     {
       "original_path": "frontend/public/experiments/harness-mixed16-20260909-r3/timeline.json",
-      "disposition": "maintained",
-      "destination": "frontend/public/experiments/harness-mixed16-20260909-r3/timeline.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired frontend public snapshot; original source identity is preserved in Git history",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "cde78d095f35ed32cc1453e2cae69df0944bc7dee7182ee01d73b3091d1f63f4",
-      "destination_sha256": "cde78d095f35ed32cc1453e2cae69df0944bc7dee7182ee01d73b3091d1f63f4"
+      "source_sha256": "cde78d095f35ed32cc1453e2cae69df0944bc7dee7182ee01d73b3091d1f63f4"
     },
     {
       "original_path": "frontend/public/experiments/index.json",
-      "disposition": "maintained",
-      "destination": "frontend/public/experiments/index.json",
-      "reason": "Current maintained input, helper or evaluation component",
+      "disposition": "removed",
+      "destination": null,
+      "reason": "Retired frontend public snapshot; original source identity is preserved in Git history",
       "source_commit": "6d213f6f1383f6aed89111ddc83a076ba3f93976",
-      "source_sha256": "3c302dbd28bb989fa598d0cd4d00a135ff7a4db1a28dc6601940194941354c4f",
-      "destination_sha256": "6f48c050038ee9272b2f0e09ad5c55c8f1563cecaf4d10cf41e00d7ceecab2eb"
+      "source_sha256": "3c302dbd28bb989fa598d0cd4d00a135ff7a4db1a28dc6601940194941354c4f"
     },
     {
       "original_path": "run.sh",

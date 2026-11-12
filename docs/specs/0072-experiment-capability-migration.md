@@ -61,7 +61,7 @@ tasks:
   scope: "Fix local single-round execution and explicitly isolate E2B management and execution identities"
   acceptance: "Single rounds complete normally without waiting for Vigil, multiple rounds retain owned readiness; controller/Claude run as non-root with consistent dependencies, artifacts, and stop/collect permissions"
 - id: T4
-  title: "Observation dashboard entrypoint bound to a run"
+  title: "Read-only observation API bound to a run"
   status: done
   priority: P1
   tags: []
@@ -74,8 +74,8 @@ tasks:
   - backend/ahe_beta/web/api.py
   - backend/tests/test_experiment_dashboard.py
   - backend/tests/test_experiment_cli_v2.py
-  scope: "Launch explicit run observation through the unified command, avoiding reads of old default data"
-  acceptance: "Current local sessions/live/usage/role_runs are correctly bound, collected E2B artifacts are viewable, uncollected artifacts produce clear errors, and tokens do not enter receipts or the API"
+  scope: "Launch the read-only JSON observation API through dashboard RUN_ID, avoiding reads of old default data; the retired frontend and static-page hosting are excluded"
+  acceptance: "Current local sessions/live/usage/role_runs are correctly bound, collected E2B artifacts are queryable, uncollected artifacts produce clear errors, tokens do not enter receipts or the API, and the server does not mount frontend assets"
 - id: T5
   title: "Capability matrix, examples, and integration acceptance for both backends"
   status: done
@@ -102,7 +102,6 @@ tasks:
   - docs/architect-grouping.md
   - README.md
   - README.zh-CN.md
-  - frontend/README.md
   - examples/experiments/u1-local.json
   - examples/experiments/u1-e2b.json
   - examples/experiment.env.example
@@ -125,6 +124,8 @@ The old launchers export actual switches, but unified schema 2 has no correspond
 This group fixes omissions with clear consumers and execution errors; multi-task/N4/N8, historical lineage imports, engineering CI runner lifecycles, official scoring, and seed libraries/plain-text input, explicitly deferred by the previous public contract, are not claimed as completed by this group. Owner model review already has a complete pipeline; restore explicit mechanical/llm selection.
 
 ## Guide-level explanation
+
+The frontend application and GitHub Pages deployment are retired. The existing `dashboard RUN_ID` command continues to serve read-only JSON observations at `/api/*`; it does not serve an application page or require Node.js. Historical frontend specifications record earlier implementations and do not require restoring those pages.
 
 Keep schema_version=2 and add optional policies, with defaults for all fields included in the frozen configuration produced by prepare; env files store only credentials/addresses, and same-named host variables still do not implicitly affect experiments.
 
@@ -150,7 +151,7 @@ Uniformly validate plans for round count, session count per round, whether perso
 
 local launch waits for Vigil only for multiple rounds; single-user controller completion does not fail because a delivery process is absent. E2B retains root for resource management, explicitly hands the run's directories over to the non-root user before startup, and makes executable dependencies in bootstrap readable/executable by that user; actual controller/OpenAgents subprocesses run as user. inspect/stop/collect/destroy still run as root and retain resource identity validation. Local delivery processes must also not execute Claude directly as root merely because role_runs is mounted.
 
-The dashboard uses runtime loading to validate the current manifest/materials, then constructs explicit create_app inputs and a tracker from run paths; the UI does not access tokens. E2B binds collected local artifacts and clearly identifies their source, without treating the local API as real-time cloud data. If collect runs again while the service is running, the snapshot time/consistency/terminal state of the data being read and runmeta must stay synchronized; an intermediate replacement state or validation failure returns unavailable, and must not display new data with an old timestamp.
+The observation API uses runtime loading to validate the current manifest/materials, then constructs explicit create_app inputs and a tracker from run paths; API responses do not expose tokens. E2B binds collected local artifacts and clearly identifies their source, without treating the local API as real-time cloud data. If collect runs again while the service is running, the snapshot time/consistency/terminal state of the data being read and runmeta must stay synchronized; an intermediate replacement state or validation failure returns unavailable, and must not expose new data with an old timestamp. The server has no frontend static-file mount, SPA fallback, or Vite development-origin middleware.
 
 ### DAG and file allocation
 

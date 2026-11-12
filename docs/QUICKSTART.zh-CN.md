@@ -94,13 +94,13 @@ uv run --locked --extra experiments python backend/scripts/experiment.py destroy
 
 E2B 控制器可在本地 CLI 退出后继续运行，但后台收集依赖管理主机在线，且当前不会自动延长沙箱租期。示例 `runtime.e2b.timeout_seconds` 为 86400 秒；长实验应关注 `expires_at` 并定期收集。CLI `resume` 要求原沙箱仍在运行；暂停实例需先由操作者恢复，过期或已删除的沙箱标记为 `LOST`。详见[六轮教程](tutorials/evolution32.zh-CN.md#收集停止和恢复)。
 
-## 指定实验的观测看板
+## 指定实验的观测接口
 
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py dashboard "$RUN_ID" --secrets-file .env.experiment
 ```
 
-本地看板读取该 run 的实时产物；E2B 看板读取最近一次 `collect` 的快照，并显示采集时间。再次收集可刷新数据。已构建前端时访问 `http://127.0.0.1:8000`；开发模式下，在另一终端执行 `cd frontend && npm ci && npm run dev`，访问 `http://127.0.0.1:5173`。
+`dashboard` 命令提供只读 JSON 观测 API。在另一终端运行 `curl http://127.0.0.1:8000/api/overview` 查询汇总，或通过 `/api/sessions` 查询会话。本地实验读取实时产物；E2B 读取最近一次 `collect` 的快照及采集时间，再次收集可刷新数据。
 
 ## 在每轮反馈前启用客观验收
 

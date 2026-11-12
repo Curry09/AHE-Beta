@@ -2,6 +2,8 @@
 
 ## Unreleased — open-source preparation
 
+- Remove the frontend application, published dashboard assets, and GitHub Pages deployment; retain CLI and read-only JSON observations.
+
 - Align the project name with AHE-Beta and the architecture role with Architect across code, configuration, documentation and the dashboard.
 
 - Add MIT licensing, contributor/security guidance and joint-release documentation.

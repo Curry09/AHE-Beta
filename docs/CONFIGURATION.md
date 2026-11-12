@@ -259,9 +259,9 @@ Set task-package `interaction: "direct"` for Harness-driven execution; the defau
 
 The plan validates every round's session count and selected persona/task IDs. The selected persona_ids and library IDs remain unique. The ordered session list may repeat personas, tasks, or complete pairs; round/slot gives each its own session ID, client, writable workspace and recovery unit. Reused cards are not independent human samples. If omitted, global slot k=(round_no-1)*sessions_per_round+slot selects persona_ids[k % P] and task_packages[k % T] in their configured order. This simple rotation does not guarantee all persona × task combinations; use an explicit plan for AABB, fixed groups or cross-task coverage. Ordinary `rounds.count: 1` supports user-only trials without waiting for Vigil; multiple rounds and continuation initialization require delivery readiness.
 
-`experiment dashboard RUN_ID` binds that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
+`experiment dashboard RUN_ID` serves a read-only JSON API bound to that run's sessions, live state and usage. Local artifacts are live; E2B requires collect first and reports the snapshot timestamp. Gitea uses the selected run's address and credentials; local artifacts remain readable without a token.
 
-Runtime policies, interaction plans and dashboard settings are frozen with each experiment. Prepare a new run after changing them; recovery retains the original configuration. Task import, archive continuation and grading are described below and in their respective tutorials.
+Runtime policies, interaction plans and observation settings are frozen with each experiment. Prepare a new run after changing them; recovery retains the original configuration. Task import, archive continuation and grading are described below and in their respective tutorials.
 
 ## Local engineering CI
 

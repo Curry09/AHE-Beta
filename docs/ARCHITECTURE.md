@@ -56,6 +56,8 @@ Optional `evaluation.session_grading` acceptance is performed after the task art
 
 ## Main Directories
 
+Experiment observations are available through the CLI and the read-only JSON API in `backend/ahe_beta/web/`. The existing `dashboard RUN_ID` command binds that API to one run. The frontend application and GitHub Pages deployment are retired.
+
 | Directory | Responsibility |
 | --- | --- |
 | `examples/experiments/`, `examples/batches/` | Single-experiment and batch configuration |

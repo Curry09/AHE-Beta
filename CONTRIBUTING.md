@@ -38,14 +38,6 @@ tools/spec-driven-development/spec graph --package-root backend/ahe_beta
 
 Commit the generated changes to `docs/specs/OVERVIEW.md` and `docs/specs/ARCHITECTURE.md` with the source specs. Generate these files through the CLI rather than editing them manually.
 
-For frontend changes, use Node.js 22 and run the following in `frontend/`:
-
-```bash
-npm ci
-npm test
-npm run build
-```
-
 Routine checks do not require model API keys. If a change needs validation with real models, record the model and framework versions, commands, costs and results, and remove private content from any evidence you share. More checks are listed in [Verification](docs/VERIFICATION.md).
 
 ## Submit a pull request

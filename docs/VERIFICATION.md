@@ -2,7 +2,7 @@
 
 English | [简体中文](VERIFICATION.zh-CN.md)
 
-Run these checks from the repository root to validate the current code and public experiment definitions. Pull request CI also performs frontend and cross-repository checks; see [Contributing](../CONTRIBUTING.md) for the development workflow.
+Run these checks from the repository root to validate the current code and public experiment definitions. Pull request CI also performs cross-repository checks; see [Contributing](../CONTRIBUTING.md) for the development workflow.
 
 ```bash
 uv sync --locked --extra experiments --extra dev --extra harbor-evaluation

@@ -83,7 +83,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py collect
 uv run --locked --extra experiments python backend/scripts/experiment.py dashboard "$RUN_ID" --secrets-file .env.experiment
 ```
 
-The selected local dashboard reads live artifacts; E2B shows the most recent collect snapshot with its timestamp. Collect again to refresh it. Session details preserve task/persona/session/round/Harness SHA, and feedback evidence preserves the task origin. Without a tracker token, local collected artifacts are still readable offline and do not claim a connected Gitea view. If using Vite, run `cd frontend && npm ci && npm run dev` in another terminal.
+The `dashboard` command serves the selected run's read-only JSON API. Query `http://127.0.0.1:8000/api/overview` or `/api/sessions` with `curl`. Local runs expose live artifacts; E2B exposes the most recent collect snapshot with its timestamp. Collect again to refresh it. Session details preserve task/persona/session/round/Harness SHA, and feedback evidence preserves the task origin. Without a tracker token, local collected artifacts are still readable offline and do not claim a connected Gitea connection.
 
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py collect "$RUN_ID"

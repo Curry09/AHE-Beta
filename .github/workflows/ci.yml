@@ -71,21 +71,6 @@ jobs:
       - name: Offline demo
         run: uv run --locked --extra experiments --extra dev python backend/scripts/offline_demo.py
 
-  frontend:
-    name: Frontend
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-        working-directory: frontend
-      - run: npm test && npm run build
-        working-directory: frontend
-
   integration:
     name: OpenAgents configuration and evidence contracts
     runs-on: ubuntu-latest
@@ -177,7 +162,7 @@ jobs:
   ci-gate:
     name: CI Gate
     if: always()
-    needs: [nexau-pin, lint, test, frontend, integration, commitlint, spec-validate, spec-conflicts]
+    needs: [nexau-pin, lint, test, integration, commitlint, spec-validate, spec-conflicts]
     runs-on: ubuntu-latest
     steps:
       - name: Check job results
@@ -189,7 +174,6 @@ jobs:
           echo "spec-conflicts: ${{ needs.spec-conflicts.result }}"
           results=(
             "${{ needs.nexau-pin.result }}"
-            "${{ needs.frontend.result }}"
             "${{ needs.integration.result }}"
             "${{ needs.lint.result }}"
             "${{ needs.test.result }}"

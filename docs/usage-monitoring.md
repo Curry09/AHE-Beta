@@ -31,7 +31,7 @@ After binding an experiment, the observation API can be used for queries:
 - `GET /api/usage/summary`: totals and grouped aggregates.
 - `GET /api/usage/sessions/{session_id}`: usage for a specified session.
 
-The first two interfaces support filtering by `run_id`, `round_no`, `session_id`, `instance_id`, `interaction_id`, `turn_no`, `role`, `agent_id`, and `model`. The dashboard displays input, output, role distribution, session usage, and call details. `dashboard RUN_ID` from the unified entry point can explicitly bind the data source; see the [Quickstart](QUICKSTART.md#view-the-selected-experiment) for details.
+The first two interfaces support filtering by `run_id`, `round_no`, `session_id`, `instance_id`, `interaction_id`, `turn_no`, `role`, `agent_id`, and `model`. The API returns input/output totals, role distributions, session usage, and call details. `dashboard RUN_ID` from the unified entry point can explicitly bind the data source; see the [Quickstart](QUICKSTART.md#view-the-selected-experiment) for details.
 
 ## Record Boundaries
 

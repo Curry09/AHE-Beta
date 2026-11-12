@@ -259,9 +259,9 @@ pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 
 
 计划校验每轮 session 数量及已选 persona/task ID。画像选择集合 persona_ids 和库中 ID 仍须唯一；有序会话列表允许重复画像、任务或完整配对。round/slot 为每次执行区分 session ID、client、可写工作区及恢复 unit，复用画像不能解释为独立真人样本。省略计划时，按全局槽 k=(round_no-1)*sessions_per_round+slot，从配置顺序取 persona_ids[k % P] 和 task_packages[k % T]。这种简单轮转不保证覆盖全部 persona × task 组合；AABB、固定分组和交叉任务覆盖请写显式计划。普通实验的 `rounds.count: 1` 可只试用用户，不等待 Vigil；多轮和继承初始化仍须验证交付进程就绪。
 
-`experiment dashboard RUN_ID` 绑定该 run 的 sessions、live 和 usage。local 是实时本地产物；E2B 必须先 collect，显示快照的采集时间。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能看本地产物。
+`experiment dashboard RUN_ID` 提供只读 JSON API，绑定该 run 的 sessions、live 和 usage。local 读取实时本地产物；E2B 必须先 collect，并返回快照的采集时间。Gitea 连接独立读取该 run 的地址和凭证；无 token 时仍能查询本地产物。
 
-运行策略、交互计划和看板设置均随实验固定。修改后应准备新 run；恢复仍使用原配置。任务导入、归档追加及独立评分的配置见下文和对应教程。
+运行策略、交互计划和观测设置均随实验固定。修改后应准备新 run；恢复仍使用原配置。任务导入、归档追加及独立评分的配置见下文和对应教程。
 
 ## 本地工程 CI
 

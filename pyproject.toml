@@ -22,7 +22,7 @@ dependencies = [
     "requests>=2.31",
     # Signed external grading receipts (Spec-0084/T5).
     "cryptography>=44",
-    # Read-only HTTP layer for the frontend observation dashboard.
+    # Read-only experiment observation API.
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
 ]

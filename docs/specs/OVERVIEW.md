@@ -558,8 +558,8 @@ Calibrate feedback across both modes, carry execution conditions throughout, cor
 | 0072 | 0072/T1 | Configuration and consumer environments, authentication, and Owner wiring | done | — | backend/ahe_beta/experiment/config.py<br>backend/ahe_beta/experiment/context.py<br>backend/ahe_beta/experiment/runtime.py<br>backend/ahe_beta/experiment/schemas/experiment-v2.json<br>backend/ahe_beta/experiment/schemas/task-package-v1.json<br>backend/tests/test_experiment_config_v2.py<br>backend/tests/test_experiment_engine.py<br>backend/tests/test_experiment_lifecycle_v2.py |
 | 0072 | 0072/T2 | Freeze explicit plans and direct interactions | done | — | backend/ahe_beta/experiment/materials.py<br>backend/ahe_beta/experiment/controllers/ordinary.py<br>backend/ahe_beta/experiment/controllers/swebench.py<br>backend/tests/test_experiment_materials.py<br>backend/tests/test_run_swebench_closed_loop.py<br>backend/tests/test_run_vigil.py<br>backend/tests/test_experiment_interactions.py |
 | 0072 | 0072/T3 | Backend single-round readiness and non-root delivery execution | done | — | backend/ahe_beta/experiment/backends/local.py<br>backend/ahe_beta/experiment/backends/e2b.py<br>backend/ahe_beta/experiment/backends/e2b_bootstrap.py<br>backend/deploy/vigil/entrypoint.sh<br>backend/tests/test_experiment_local_backend.py<br>backend/tests/test_experiment_e2b_backend.py<br>backend/tests/test_experiment_e2b_bootstrap.py |
-| 0072 | 0072/T4 | Observation dashboard entrypoint bound to a run | done | — | backend/ahe_beta/experiment/dashboard.py<br>backend/ahe_beta/experiment/cli.py<br>backend/ahe_beta/web/api.py<br>backend/tests/test_experiment_dashboard.py<br>backend/tests/test_experiment_cli_v2.py |
-| 0072 | 0072/T5 | Capability matrix, examples, and integration acceptance for both backends | done | T1, T2, T3, T4 | backend/scripts/e2e-spec-0072-capability-migration.sh<br>backend/scripts/check_experiment_repository.py<br>backend/tests/test_experiment_capability_migration.py<br>backend/tests/test_experiment_repository.py<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/QUICKSTART.md<br>docs/QUICKSTART.zh-CN.md<br>docs/tutorials/u1-experiment.md<br>docs/tutorials/u1-experiment.zh-CN.md<br>docs/architect-grouping.md<br>README.md<br>README.zh-CN.md<br>frontend/README.md<br>examples/experiments/u1-local.json<br>examples/experiments/u1-e2b.json<br>examples/experiment.env.example |
+| 0072 | 0072/T4 | Read-only observation API bound to a run | done | — | backend/ahe_beta/experiment/dashboard.py<br>backend/ahe_beta/experiment/cli.py<br>backend/ahe_beta/web/api.py<br>backend/tests/test_experiment_dashboard.py<br>backend/tests/test_experiment_cli_v2.py |
+| 0072 | 0072/T5 | Capability matrix, examples, and integration acceptance for both backends | done | T1, T2, T3, T4 | backend/scripts/e2e-spec-0072-capability-migration.sh<br>backend/scripts/check_experiment_repository.py<br>backend/tests/test_experiment_capability_migration.py<br>backend/tests/test_experiment_repository.py<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/QUICKSTART.md<br>docs/QUICKSTART.zh-CN.md<br>docs/tutorials/u1-experiment.md<br>docs/tutorials/u1-experiment.zh-CN.md<br>docs/architect-grouping.md<br>README.md<br>README.zh-CN.md<br>examples/experiments/u1-local.json<br>examples/experiments/u1-e2b.json<br>examples/experiment.env.example |
 | 0073 | 0073/T1 | Unified task catalog and frozen session plans | done | — | backend/ahe_beta/experiment/config.py<br>backend/ahe_beta/experiment/schemas/experiment-v2.json<br>backend/ahe_beta/experiment/workload.py<br>backend/ahe_beta/experiment/materials.py<br>backend/ahe_beta/experiment/context.py<br>backend/tests/test_experiment_config_v2.py<br>backend/tests/test_experiment_materials.py<br>backend/tests/test_experiment_workload.py |
 | 0073 | 0073/T2 | Local multi-task images and independent session containers | done | T1 | backend/ahe_beta/experiment/backends/local.py<br>backend/scripts/prepare_swebench_runtime_tree.py<br>backend/ahe_beta/user/sim/sources/docker_seed.py<br>backend/tests/test_experiment_local_backend.py<br>backend/tests/user/sim/test_docker_seed_source.py |
 | 0073 | 0073/T3 | E2B multi-task baselines and independent session environments | done | T1 | backend/ahe_beta/experiment/backends/e2b.py<br>backend/ahe_beta/experiment/backends/e2b_bootstrap.py<br>backend/ahe_beta/user/sim/sources/prebuilt.py<br>backend/ahe_beta/user/sim/runtime.py<br>backend/ahe_beta/user/sim/deps.py<br>backend/tests/test_experiment_e2b_backend.py<br>backend/tests/test_experiment_e2b_bootstrap.py<br>backend/tests/user/sim/test_prebuilt_source.py<br>backend/tests/user/sim/test_multitask_workspace.py<br>backend/ahe_beta/harness/launcher.py<br>backend/tests/harness/test_launcher.py |
@@ -1065,7 +1065,7 @@ graph LR
         n0072_T1["T1 Configuration and consumer environments, authentication, and Owner wiring"]
         n0072_T2["T2 Freeze explicit plans and direct interactions"]
         n0072_T3["T3 Backend single-round readiness and non-root delivery execution"]
-        n0072_T4["T4 Observation dashboard entrypoint bound to a run"]
+        n0072_T4["T4 Read-only observation API bound to a run"]
         n0072_T5["T5 Capability matrix, examples, and integration acceptance for both backends"]
     end
     subgraph G0073[0073 multi-task-user-experiments]
@@ -1975,7 +1975,7 @@ graph LR
 | examples/experiment.env.example | 0069, 0071, 0072 |
 | examples/experiments/u1-e2b.json | 0068, 0069, 0071, 0072 |
 | examples/experiments/u1-local.json | 0069, 0071, 0072 |
-| frontend/README.md | 0068, 0071, 0072 |
+| frontend/README.md | 0068, 0071 |
 | frontend/src/App.tsx | 0026, 0029, 0032, 0034, 0038, 0041, 0068, 0071 |
 | frontend/src/api.test.ts | 0068, 0071 |
 | frontend/src/api.ts | 0020, 0025, 0029, 0032, 0041, 0068, 0071 |
@@ -4170,7 +4170,7 @@ graph LR
     nT1["T1 Configuration and consumer environments, authentication, and Owner wiring"]
     nT2["T2 Freeze explicit plans and direct interactions"]
     nT3["T3 Backend single-round readiness and non-root delivery execution"]
-    nT4["T4 Observation dashboard entrypoint bound to a run"]
+    nT4["T4 Read-only observation API bound to a run"]
     nT5["T5 Capability matrix, examples, and integration acceptance for both backends"]
     nT1 --> nT5
     nT2 --> nT5

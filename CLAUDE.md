@@ -93,7 +93,7 @@ Model the Harness as a launchable program with a black-box conversation contract
 
 ### State Storage
 
-- **Issues/PRs → Gitea**: user agents submit through IssueTracker; Gitea owns numbering, states, labels, and comments. vigil takes over through openagents→ready, with PRs in the same repository and dashboard observation through /api/delivery.
+- **Issues/PRs → Gitea**: user agents submit through IssueTracker; Gitea owns numbering, states, labels, and comments. vigil takes over through openagents→ready, with PRs in the same repository and read-only observation through /api/delivery.
 - **Experience + sessions → local storage**: data/sessions/ supplies experience curves and regression baselines.
 
 ### Closed Loop
@@ -102,7 +102,7 @@ loop/orchestrator runs demand processing. Each round runs users against the curr
 
 ### Directory Layout
 
-Backend and frontend are separate, following MiroFish. All backend code is under backend/; frontend/ provides the read-only dashboard. Project documentation, tools, and configuration stay at the root.
+All backend code is under backend/. Observations are available through the CLI and read-only JSON API; the frontend application and GitHub Pages deployment are retired. Project documentation, tools, and configuration stay at the root.
 
 ```text
 backend/                 # Orchestration backend
@@ -118,14 +118,13 @@ backend/                 # Orchestration backend
     demand/              # Triage, Architect, PM, Owner and shared demand processing
     guards/              # workspace_jail + repo_guard + harness_boundary; no built-in developer role
     loop/                # Orchestrator, metrics, checkpoint, run state and runner
-    web/                 # Read-only FastAPI dashboard: /api/overview, /api/delivery, /api/sessions
+    web/                 # Read-only FastAPI observations: /api/overview, /api/delivery, /api/sessions
   tests/                 # Backend tests; root pyproject also includes evaluation/tests
   agent_defs/            # NexAU definitions: user_agent/, triage_agent/, architect/, divergent_pm/, owner/
   harness_template/      # v0 seed program: entry.py, agents/, params.yaml, smoke workflow
   deploy/gitea/          # Gitea + act_runner + egress proxy + dual networks and bootstrap
   deploy/vigil/          # Container containment: Dockerfile, self-cloning entrypoint and build script
   scripts/               # Unified experiment entry, offline demo, exports, CI and build checks
-frontend/                # React + Vite + TS read-only observation dashboard
 docs/specs/             # Project-level spec-driven-development source
 examples/                # Current experiment definitions, task packages, persona library, credential template
 evaluation/              # python -m evaluation; shared harbor/harness/environments and benchmark sources

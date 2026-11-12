@@ -2,6 +2,8 @@
 
 This directory contains the maintained English design specifications for AHE-Beta. The [original Chinese specifications](../specs-zh-CN/README.md) are preserved unchanged in a separate archive. The spec CLI reads and generates views for this directory.
 
+Specifications describing the retired frontend record historical implementations. The current read-only JSON observation API is described in [Spec-0072](0072-experiment-capability-migration.md).
+
 The workflow is managed by the repository's `spec-driven-development` skill, adapted from OpenAgents. Each spec group is one `NNNN-slug.md` file with:
 
 - **YAML frontmatter:** group metadata (`number`, `title`, `issue`, `slug`, `summary`) and a `tasks` list. Each Task declares its identity, status, priority, dependencies, owned files, scope, and acceptance criteria.
