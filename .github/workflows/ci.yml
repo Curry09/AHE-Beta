@@ -86,7 +86,7 @@ jobs:
           python3 - <<'PY'
           import json, os, re
           from pathlib import Path
-          manifest = json.loads(Path('release/compatibility.json').read_text())
+          manifest = json.loads(Path('backend/compatibility.json').read_text())
           reader = manifest['execution_evidence']
           candidate = os.environ.get('CANDIDATE_READER', '')
           ref = candidate or reader.get('reader_release_commit') or reader.get('reader_candidate_commit')

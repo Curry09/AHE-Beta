@@ -14,14 +14,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 @pytest.fixture
 def project(tmp_path):
-    for name in ("pyproject.toml", "uv.lock", "release/compatibility.json"):
+    for name in ("pyproject.toml", "uv.lock", "backend/compatibility.json"):
         dest = tmp_path / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / name, dest)
     return tmp_path
 
 
-def test_git_declaration_lock_release_and_installation_agree(project):
+def test_git_declaration_lock_compatibility_and_installation_agree(project):
     expected = check(project)
     assert expected["repository"] == "https://github.com/hzhua/nexau.git"
     assert expected["revision"] == "28511d9f0362191a6c378fd441b2be55309a9e32"
@@ -45,12 +45,12 @@ def test_lock_revision_must_match_declaration(project):
         check(project)
 
 
-def test_release_manifest_cannot_silently_keep_old_sdk(project):
-    path = project / "release/compatibility.json"
+def test_compatibility_manifest_cannot_silently_keep_old_sdk(project):
+    path = project / "backend/compatibility.json"
     value = json.loads(path.read_text())
     value["nexau"]["commit"] = "a" * 40
     path.write_text(json.dumps(value))
-    with pytest.raises(ValueError, match="release manifest"):
+    with pytest.raises(ValueError, match="compatibility manifest"):
         check(project)
 
 

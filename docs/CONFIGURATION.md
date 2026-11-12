@@ -40,7 +40,7 @@ Container task packages freeze their declared input hashes, image digests, envir
 | `models` | User, Harness, shared demand and Claude Code delivery settings |
 | `evaluation.official_grading` | Must be `false`; configure per-round assessment through `session_grading` |
 | `evaluation.session_grading` | Optional external per-round assessment; frozen plan/key digests and `runner: external` |
-| `source` | Optional credential-free HTTPS repository and full immutable revisions; defaults come from `release/compatibility.json` |
+| `source` | Optional credential-free HTTPS repository and full immutable revisions; defaults come from `backend/compatibility.json` |
 
 Choose one or more task packages. sessions_per_round counts execution slots and may exceed the number of selected personas; max_parallel_users must not exceed sessions_per_round. Both personas and complete persona/task pairs may repeat in one round. Each package supplies its own kind and interaction. Current complete archives with a continuation export support additional rounds in a new run; see [continuation](tutorials/experiment-continuation.md). The U1 examples select one persona, one Triage, one Architect, zero divergent PMs, one delivery worker, and five rounds. The last round runs users and any configured independent assessment, with no requirements or delivery stage.
 
@@ -144,7 +144,7 @@ The current User client, builtin Harness seed and demand definitions actually re
 
 ## Per-round objective assessment
 
-Preparation selects a pinned OpenAgents revision from `execution_evidence` in the [compatibility manifest](../release/compatibility.json): `reader_release_commit` takes priority, followed by `reader_candidate_commit`. An explicit `source.openagents` may select another immutable revision; preflight verifies its execution-evidence capabilities. See the [release guide](RELEASING.md) for paired version updates and validation.
+Preparation selects a pinned OpenAgents revision from `execution_evidence` in the [compatibility manifest](../backend/compatibility.json): `reader_release_commit` takes priority, followed by `reader_candidate_commit`. An explicit `source.openagents` may select another immutable revision; preflight verifies its execution-evidence capabilities. See the [release guide](RELEASING.md) for paired version updates and validation.
 
 By default `evaluation: {"official_grading": false}` records `not_configured`, not a pass or zero. To opt in, use `evaluation.session_grading`:
 

@@ -23,7 +23,7 @@ cd AHE-Beta
 uv sync --locked --extra experiments
 ```
 
-运行环境配方固定 Python、uv 和 Claude Code 的版本，具体值见[兼容清单](../release/compatibility.json)。准备阶段会获取固定版本的 OpenAgents 和 NexAU，无需另行克隆 OpenAgents 或安装个人版 Claude Code。
+运行环境配方固定 Python、uv 和 Claude Code 的版本，具体值见[兼容清单](../backend/compatibility.json)。准备阶段会获取固定版本的 OpenAgents 和 NexAU，无需另行克隆 OpenAgents 或安装个人版 Claude Code。
 
 ## 2. 选择示例，填写凭证
 

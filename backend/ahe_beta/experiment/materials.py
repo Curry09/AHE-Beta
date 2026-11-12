@@ -38,6 +38,7 @@ from ahe_beta.experiment.workload import (
     validate_task_ids,
 )
 
+_COMPATIBILITY_MANIFEST = "backend/compatibility.json"
 _SOURCE_ROOTS = (
     ".gitignore",
     "backend/ahe_beta",
@@ -46,7 +47,7 @@ _SOURCE_ROOTS = (
     "backend/scripts/prepare_swebench_runtime_tree.py",
     "backend/deploy",
     "backend/harness_template",
-    "release",
+    _COMPATIBILITY_MANIFEST,
     "pyproject.toml",
     "uv.lock",
     "LICENSE",
@@ -828,7 +829,7 @@ def _git_source_files(*, root: Path) -> dict[str, str]:
 
 
 def _source_pins(*, config: dict[str, Any], controller: Path) -> dict[str, Any]:
-    compatibility = read_json_document(path=controller / "release/compatibility.json")
+    compatibility = read_json_document(path=controller / _COMPATIBILITY_MANIFEST)
     reader = compatibility.get("observation_transport", {})
     execution_reader = compatibility.get("execution_evidence", {})
     oa_revision = reader.get("reader_release_commit") or reader.get("reader_candidate_commit")
@@ -842,7 +843,7 @@ def _source_pins(*, config: dict[str, Any], controller: Path) -> dict[str, Any]:
     if published_nexau["commit"] != locked_nexau["revision"] or published_nexau[
         "repository"
     ].removesuffix(".git") != locked_nexau["repository"].removesuffix(".git"):
-        raise ConfigError("NexAU release compatibility does not match the controller uv.lock pin")
+        raise ConfigError("NexAU compatibility manifest does not match the controller uv.lock pin")
     requested_nexau = explicit.get("nexau", locked_nexau)
     if requested_nexau["revision"] != locked_nexau["revision"] or requested_nexau[
         "repository"

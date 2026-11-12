@@ -121,7 +121,7 @@ def test_public_examples_only_reference_listed_env_variables():
 
 
 def test_compatibility_and_experiment_extras_are_pinned():
-    compatibility = json.loads((ROOT / "release/compatibility.json").read_text())
+    compatibility = json.loads((ROOT / "backend/compatibility.json").read_text())
     for contract in ("observation_transport", "execution_evidence"):
         reader_config = compatibility[contract]
         reader = (

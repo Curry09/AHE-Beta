@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "openagents": {
+    "repository": "https://github.com/Curry09/OpenAgents"
+  },
+  "nexau": {
+    "repository": "https://github.com/hzhua/nexau",
+    "commit": "28511d9f0362191a6c378fd441b2be55309a9e32"
+  },
+  "observation_transport": {
+    "reader_release_commit": null,
+    "reader_candidate_commit": "165af8b042334ac5a8551f0de97d0250bedbc998"
+  },
+  "execution_evidence": {
+    "reader_release_commit": null,
+    "reader_candidate_commit": "165af8b042334ac5a8551f0de97d0250bedbc998"
+  },
+  "experiment_runtime": {
+    "python": "3.12.13",
+    "uv": "0.11.28",
+    "claude_code": {
+      "version": "2.1.284",
+      "linux_x64_sha256": "5cd90aabd83f8a15136c35aa37bb1d92b348993573316643dc3fe4e04afbf88f"
+    },
+    "e2b": "2.55.0",
+    "pyarrow": "21.0.0"
+  }
+}

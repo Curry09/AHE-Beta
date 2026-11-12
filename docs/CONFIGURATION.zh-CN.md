@@ -40,7 +40,7 @@ U1 示例使用 `examples/personas/u1.json`；U4 从 `examples/personas/library.
 | `models` | User、Harness、共享需求面、Claude Code 交付模型 |
 | `evaluation.official_grading` | 固定为 `false`；逐轮验收另用 `session_grading` 配置 |
 | `evaluation.session_grading` | 可选的外部逐轮验收：冻结计划、公钥摘要及 `runner: external` |
-| `source` | 可选无凭证 HTTPS 仓库地址、完整固定提交；默认取 `release/compatibility.json` |
+| `source` | 可选无凭证 HTTPS 仓库地址、完整固定提交；默认取 `backend/compatibility.json` |
 
 可选一个或多个任务包；sessions_per_round 是执行槽位数量，可超过所选画像数，max_parallel_users 不超过 sessions_per_round。同轮画像、任务及完整配对均可重复，各包自行声明 kind 和 interaction。带 continuation export 的完整当前归档可继承到新 run 追加轮次，见[追加教程](tutorials/experiment-continuation.zh-CN.md)。U1 示例选一位 persona、一个 Triage、一个 Architect、零个 divergent PM、一个交付 worker，共五轮；最后一轮运行用户及已配置的独立验收，不再需求或交付。
 
@@ -144,7 +144,7 @@ U1 示例使用 `examples/personas/u1.json`；U4 从 `examples/personas/library.
 
 ## 每轮客观验收
 
-准备阶段从[兼容清单](../release/compatibility.json)的 `execution_evidence` 选择固定版本的 OpenAgents，优先使用 `reader_release_commit`，未设置时使用 `reader_candidate_commit`。也可通过 `source.openagents` 指定其他不可变提交；预检会验证其执行证据读取能力。版本更新和联合验证见[发布指南](RELEASING.md)。
+准备阶段从[兼容清单](../backend/compatibility.json)的 `execution_evidence` 选择固定版本的 OpenAgents，优先使用 `reader_release_commit`，未设置时使用 `reader_candidate_commit`。也可通过 `source.openagents` 指定其他不可变提交；预检会验证其执行证据读取能力。版本更新和联合验证见[发布指南](RELEASING.md)。
 
 默认 `evaluation: {"official_grading": false}` 记录 `not_configured`，不表示通过，也不记零分。开启时使用 `evaluation.session_grading`：
 

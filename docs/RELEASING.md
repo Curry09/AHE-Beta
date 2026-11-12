@@ -1,6 +1,6 @@
 # Joint Release Guide
 
-AHE-Beta and OpenAgents maintain their versions separately and record their compatibility in the [compatibility manifest](../release/compatibility.json). A joint release should pin the source versions, dependencies, and runtime materials for both projects so users can install and run the same set of components; the version numbers of the two repositories do not need to match.
+AHE-Beta and OpenAgents maintain their versions separately and record their compatibility in the [compatibility manifest](../backend/compatibility.json). A joint release should pin the source versions, dependencies, and runtime materials for both projects so users can install and run the same set of components; the version numbers of the two repositories do not need to match.
 
 ## Pinning Compatible Versions
 
@@ -9,13 +9,13 @@ Before release, check the following sources:
 | Content | Configuration source |
 | --- | --- |
 | Controller and initial Harness | Release commit and `backend/harness_template/` |
-| Compatible OpenAgents version | `release/compatibility.json` and `source.openagents` explicitly specified in the experiment |
+| Compatible OpenAgents version | `backend/compatibility.json` and `source.openagents` explicitly specified in the experiment |
 | NexAU | `pyproject.toml`, `uv.lock`, and the fixed Git commit in the compatibility manifest |
 | Python, uv, Claude Code | `experiment_runtime` in the compatibility manifest and the actual runtime recipe |
 | Task inputs, environment recipes, and images | Task materials manifest, SHA-256, and image digest |
 | Independent evaluation materials | `evaluation/requirements.lock`, task provenance records, and runtime release package |
 
-`baseline_commit` preserves historical baselines; it is not the default for the current run. During experiment preparation, prefer selecting OpenAgents’ `reader_release_commit` from `execution_evidence`; if it is not set, use `reader_candidate_commit`. Only when that configuration section is absent should you use the corresponding field in `observation_transport`. An explicit `source.openagents` can select another immutable commit, but it must pass the same capability checks.
+Experiment preparation uses OpenAgents' `reader_release_commit` from `execution_evidence`, or `reader_candidate_commit` if the release pin is unset. The `observation_transport` pins are the fallback when `execution_evidence` is absent. An explicit `source.openagents` can select another immutable commit; it must pass the same capability checks.
 
 Candidate commits and official release commits should be clearly distinguished. When preparing an official joint release, write the verified compatible commits to the corresponding `reader_release_commit`, synchronize the related transport configuration, and rebuild and validate the runtime images. Use the manifest as the source of truth for versions, rather than copying commit values into tutorials where they can quickly become outdated.
 

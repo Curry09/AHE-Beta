@@ -2,6 +2,8 @@
 
 ## Unreleased — open-source preparation
 
+- Move the experiment compatibility pins into `backend/compatibility.json` and remove the release preparation directory.
+
 - Remove the frontend application, published dashboard assets, and GitHub Pages deployment; retain CLI and read-only JSON observations.
 
 - Align the project name with AHE-Beta and the architecture role with Architect across code, configuration, documentation and the dashboard.

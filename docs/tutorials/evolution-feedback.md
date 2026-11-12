@@ -65,7 +65,7 @@ The generated task uses a 600-second operator quota for this small example. A re
 
 ## 3. Check and prepare
 
-Preparation pins the OpenAgents execution-evidence reader through the [compatibility manifest](../../release/compatibility.json), preferring `execution_evidence.reader_release_commit` and otherwise using `reader_candidate_commit`. An explicit `source.openagents` must also identify an immutable revision supporting the same execution-evidence contract. Preflight checks the actual reader capabilities. See the [release guide](../RELEASING.md) for paired version updates.
+Preparation pins the OpenAgents execution-evidence reader through the [compatibility manifest](../../backend/compatibility.json), preferring `execution_evidence.reader_release_commit` and otherwise using `reader_candidate_commit`. An explicit `source.openagents` must also identify an immutable revision supporting the same execution-evidence contract. Preflight checks the actual reader capabilities. See the [release guide](../RELEASING.md) for paired version updates.
 
 ```bash
 CONFIG="$CASE_DIR/experiment.json"
