@@ -71,7 +71,7 @@ target-version = "py312"
 src = ["backend", "backend/scripts", "backend/tests", "evaluation"]
 # Preserve published bytes of upstream code, task instructions and fixed M04 recipes;
 # material hashes verify them, so automatic formatting excludes these paths.
-extend-exclude = ["tools/spec-driven-development/vendor", "research/archives", "evaluation/harness/meta_artifact", "evaluation/harness/user_engine", "examples/tasks/evolution32/*/instruction.md", "examples/tasks/evolution32/M04/recipes"]
+extend-exclude = ["tools/spec-driven-development/vendor", "evaluation/harness/meta_artifact", "evaluation/harness/user_engine", "examples/tasks/evolution32/*/instruction.md", "examples/tasks/evolution32/M04/recipes"]
 
 [tool.ruff.lint]
 # E/F: pyflakes/pycodestyle; I: import sorting; UP: pyupgrade; B: bugbear;

@@ -154,4 +154,4 @@ uv sync --locked --extra experiments --extra dev --extra harbor-evaluation
 uv run --locked --extra experiments --extra dev --extra harbor-evaluation pytest -q
 ```
 
-The [U1 walkthrough](tutorials/u1-experiment.md) covers expected artifacts and troubleshooting; [configuration](CONFIGURATION.md) covers models, budgets, grouping and delivery policies. For development, see [Contributing](../CONTRIBUTING.md). Reproduce historical experiments using the source revisions recorded in [research](../research/README.md).
+The [U1 walkthrough](tutorials/u1-experiment.md) covers expected artifacts and troubleshooting; [configuration](CONFIGURATION.md) covers models, budgets, grouping and delivery policies. For development, see [Contributing](../CONTRIBUTING.md).

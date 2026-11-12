@@ -52,7 +52,7 @@ def load_config_v2(path: str | Path) -> dict[str, Any]:
     data = read_json_document(path=config_path)
     if not isinstance(data, dict) or data.get("schema_version") != 2:
         raise ConfigError(
-            "Expected schema_version=2; historical configurations require explicit migration using their frozen checkout (research/README.md)"
+            "Expected schema_version=2; historical configurations require explicit migration using their frozen checkout"
         )
     validate_schema(document=data, schema_name="experiment-v2.json")
     _reject_plaintext_credentials(node=data, location="config")

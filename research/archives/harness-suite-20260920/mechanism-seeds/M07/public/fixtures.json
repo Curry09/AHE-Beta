@@ -1,5 +1,0 @@
-[
-  {"tenant_id": "a", "customer_id": "C-42", "email": "a@example.invalid"},
-  {"tenant_id": "a", "account_id": "C-42", "email": "a-new@example.invalid"},
-  {"tenant_id": "b", "account_id": "C-42", "email": "b@example.invalid"}
-]

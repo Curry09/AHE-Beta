@@ -15,7 +15,6 @@ on:
       - 'examples/**'
       - 'tools/dev/**'
       - 'evaluation/**'
-      - 'research/**'
       - 'backend/scripts/check_experiment_repository.py'
       - 'backend/scripts/e2e-spec-0071-experiment-cleanup.sh'
       - 'backend/scripts/e2e-spec-0076-seed-task-import.sh'

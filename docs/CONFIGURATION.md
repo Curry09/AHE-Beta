@@ -207,7 +207,7 @@ The single-run background monitor runs on the management machine and collects pe
 
 Use global `--runs-dir /absolute/path/runs` before the command to select another run root. Always use the same root for subsequent management. Editing the original JSON or source checkout after preparation does not change an existing run. For a changed experiment, prepare a new run.
 
-Use `examples/experiment.env.example` as the experiment credential template. Historical profiles and launchers are indexed in [research](../research/README.md) and require their original checkout; they do not supply current v2 configuration. Developer diagnostics have separate, explicit inputs documented in [tools/dev](../tools/dev/README.md). Prepared runs retain their frozen source and input hashes; `resume` does not upgrade their controller.
+Use `examples/experiment.env.example` as the experiment credential template. Developer diagnostics have separate, explicit inputs documented in [tools/dev](../tools/dev/README.md). Prepared runs retain their frozen source and input hashes; `resume` does not upgrade their controller.
 
 The pvlib recipe includes a build-only shim for its historical Versioneer on Python 3.12. It restores removed `configparser` aliases during editable installation without patching the frozen task source, then removes the shim. The task environment includes hash-pinned pytest for user-side checks.
 

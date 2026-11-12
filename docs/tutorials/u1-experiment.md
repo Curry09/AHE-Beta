@@ -149,7 +149,7 @@ There is no fixed duration guarantee: model latency, retries, task interactions 
 
 The pvlib recipe includes a build-only shim for its historical Versioneer on Python 3.12. It restores removed `configparser` aliases during editable installation without patching the frozen task source, then removes the shim. The task environment includes hash-pinned pytest and pytest-mock for user-side checks. Task-environment checks are separate from official SWE-bench grading; see the [post-run grading tutorial](post-run-grading.md).
 
-Historical experiments and their source revisions are indexed in [research](../../research/README.md). For standalone diagnostics or evidence replay, see [developer tools](../../tools/dev/README.md); their outputs are not another round of this experiment.
+For standalone diagnostics or evidence replay, see [developer tools](../../tools/dev/README.md); their outputs are not another round of this experiment.
 
 ## View the selected experiment
 

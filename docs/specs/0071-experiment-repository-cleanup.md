@@ -676,6 +676,8 @@ tasks:
 
 ## Summary
 
+> The archive layout below records the original cleanup. The current tree no longer ships `research/` or validates its inventory. The archived files and their inventory remain in Git at `e2130a727a95da161d4994a452af276a93c54f89`.
+
 Organize the current open-source working tree around “one public experiment entry point, two runtime backends, explicit development tools, and separate scoring and historical research materials.” Public experiments use only `backend/scripts/experiment.py` and `schema_version=2`, supporting local + localhost Gitea and E2B + Gitea.com. Remove old launch aliases, personal experiment shortcut scripts, and implicit configuration sources; move the ordinary/SWE controllers still in use into the package; organize historical configurations, research scripts, and public presentation data; and prevent them from being mixed back in through directory contract checks.
 
 This is a repository cleanup; it does not extend support for multiple tasks or appending new rounds from historical artifacts. Existing v2 N1 experiment behavior and the ability to recover frozen runs must be preserved. The old N4/N8 research workflows leave the public entry point, but retain a reproduction path through archived materials and explicitly frozen code versions. Implementation and offline acceptance have been completed on the `feat/unified-experiment-entry` branch and remain uncommitted for developer review; see [Verification Methods](../VERIFICATION.zh-CN.md) for currently reproducible checks.

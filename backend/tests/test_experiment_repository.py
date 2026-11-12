@@ -1,6 +1,5 @@
-"""Spec-0071/T6: prevent public-directory and frozen-archive regressions."""
+"""Spec-0071/T6: prevent public-directory and retired-entry regressions."""
 
-import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -13,22 +12,6 @@ spec = importlib.util.spec_from_file_location(
 )
 checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
-
-
-def inventory(root, content=b"historical source\n"):
-    target = root / "research/archives/old/README.md"
-    target.parent.mkdir(parents=True)
-    target.write_bytes(content)
-    row = {
-        "original_path": "evaluation/old/README.md",
-        "disposition": "archived",
-        "destination": target.relative_to(root).as_posix(),
-        "reason": "Frozen historical research",
-        "source_commit": "a" * 40,
-        "source_sha256": hashlib.sha256(content).hexdigest(),
-    }
-    (root / "research/inventory.json").write_text(json.dumps({"files": [row]}))
-    return target
 
 
 def test_current_repository_has_only_supported_public_materials():
@@ -76,83 +59,6 @@ def test_unpublished_task_subcommand_is_rejected(monkeypatch):
     assert "Unexpected public task commands" in result["errors"]
 
 
-def test_archive_content_cannot_be_silently_rewritten(tmp_path):
-    archived = inventory(tmp_path)
-    assert checker.inventory_errors(tmp_path) == []
-    archived.write_text("updated result without the original evidence\n")
-    assert any("Frozen archive content changed" in e for e in checker.inventory_errors(tmp_path))
-
-
-def test_declared_english_translation_retains_source_and_locks_translated_bytes(tmp_path):
-    archived = inventory(tmp_path)
-    manifest_path = tmp_path / "research/inventory.json"
-    manifest = json.loads(manifest_path.read_text())
-    row = manifest["files"][0]
-    original_sha = row["source_sha256"]
-    archived.write_text("English translation of the original research notes\n")
-    row["translation"] = {"language": "en", "source_sha256": original_sha}
-    row["destination_sha256"] = hashlib.sha256(archived.read_bytes()).hexdigest()
-    manifest_path.write_text(json.dumps(manifest))
-    assert checker.inventory_errors(tmp_path) == []
-    assert row["source_sha256"] == original_sha
-    archived.write_text("Unrecorded changes to the English translation\n")
-    assert any("Frozen archive content changed" in e for e in checker.inventory_errors(tmp_path))
-
-
-@pytest.mark.parametrize("invalid", [None, "0" * 64, "not-a-digest"])
-def test_archive_translation_requires_valid_destination_digest(tmp_path, invalid):
-    inventory(tmp_path)
-    path = tmp_path / "research/inventory.json"
-    manifest = json.loads(path.read_text())
-    row = manifest["files"][0]
-    row["translation"] = {"language": "en", "source_sha256": row["source_sha256"]}
-    row["destination_sha256"] = invalid
-    path.write_text(json.dumps(manifest))
-    # An arbitrary digest is rejected either by provenance or by the byte check.
-    assert checker.inventory_errors(tmp_path)
-
-
-def test_archive_translation_cannot_reassign_the_original_source(tmp_path):
-    inventory(tmp_path)
-    path = tmp_path / "research/inventory.json"
-    manifest = json.loads(path.read_text())
-    row = manifest["files"][0]
-    row["translation"] = {"language": "en", "source_sha256": "0" * 64}
-    row["destination_sha256"] = row["source_sha256"]
-    path.write_text(json.dumps(manifest))
-    assert any(
-        "Invalid archive translation provenance" in e for e in checker.inventory_errors(tmp_path)
-    )
-
-
-def test_historical_readme_also_requires_provenance(tmp_path):
-    inventory(tmp_path)
-    unlisted = tmp_path / "research/archives/another/README.md"
-    unlisted.parent.mkdir()
-    unlisted.write_text("Unrecorded historical result\n")
-    assert any("Archive missing provenance" in e for e in checker.inventory_errors(tmp_path))
-
-
-def test_moved_source_cannot_remain_as_a_second_entry(tmp_path):
-    inventory(tmp_path)
-    original = tmp_path / "evaluation/old/README.md"
-    original.parent.mkdir(parents=True)
-    original.write_text("old duplicate")
-    assert any("Obsolete duplicate remains" in e for e in checker.inventory_errors(tmp_path))
-
-
-def test_archive_destination_cannot_escape_via_symlink(tmp_path):
-    archived = inventory(tmp_path)
-    outside = tmp_path.parent / f"{tmp_path.name}-outside.md"
-    outside.write_bytes(archived.read_bytes())
-    archived.unlink()
-    archived.symlink_to(outside)
-    try:
-        assert any("unsafe destination" in e for e in checker.inventory_errors(tmp_path))
-    finally:
-        outside.unlink()
-
-
 @pytest.mark.parametrize(
     "code",
     [
@@ -180,7 +86,6 @@ def test_personal_path_is_rejected_but_guard_policy_is_allowed(tmp_path):
 
 
 def test_new_public_json_is_validated_without_an_allowlist(tmp_path):
-    inventory(tmp_path)
     path = tmp_path / "examples/experiments/unexpected-legacy.json"
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps({"schema_version": 1}))
@@ -191,7 +96,6 @@ def test_new_public_json_is_validated_without_an_allowlist(tmp_path):
 
 def test_new_batch_json_cannot_bypass_public_contract_validation(tmp_path):
     # Spec-0074/T3: every public list is validated, not only the maintained filenames.
-    inventory(tmp_path)
     path = tmp_path / "examples/batches/extra.json"
     path.parent.mkdir(parents=True)
     path.write_text(

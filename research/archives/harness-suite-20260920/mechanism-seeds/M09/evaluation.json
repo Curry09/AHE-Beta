@@ -1,8 +1,0 @@
-{
-  "task_id": "plan-blocked-dependency",
-  "mechanism": "plan/replan",
-  "artifact_requirements": ["pipeline validates and loads the configured CSV", "offline HTML fallback preserves report rows", "renderer boundary remains replaceable", "delivery documents actual format and unavailable dependency"],
-  "process_evidence": ["plan identifies the renderer dependency and its environment constraint", "assistant does not claim unavailable PDF success", "a viable fallback is proposed and executed, or a truthful blocker is reported"],
-  "unknown_rule": "replanning is not_exercised if no dependency decision is needed; proactive discovery is valid evidence",
-  "not_scored_as": ["number of plan headings", "fabricated PDF output", "network installation attempts"]
-}

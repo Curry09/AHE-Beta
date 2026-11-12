@@ -15,7 +15,6 @@ from ahe_beta.experiment import task_import
 from ahe_beta.experiment.config import ConfigError, load_task_package
 from ahe_beta.experiment.task_import import import_seed_tasks, import_text_task
 
-ROOT = Path(__file__).resolve().parents[2]
 SHA = "a" * 40
 
 
@@ -35,26 +34,6 @@ def library_file(*, root: Path, document: object) -> Path:
     path = root / "library.json"
     path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
     return path
-
-
-def test_actual_archived_seven_cards_generate_current_packages(tmp_path):
-    library = ROOT / "research/archives/legacy-materials/seeds.json"
-    originals = json.loads(library.read_bytes())["seeds"]
-    result = import_seed_tasks(library=library, output=tmp_path / "result")
-    assert result["ok"] is True
-    assert result["source_sha256"] == hashlib.sha256(library.read_bytes()).hexdigest()
-    assert len(result["task_packages"]) == len(originals) == 7
-    for original, path in zip(originals, result["task_packages"], strict=True):
-        package = load_task_package(path)
-        assert package["id"] == original["id"]
-        assert package["kind"] == "ordinary" and package["not_in_benchmark"] is True
-        assert package["interaction"] == "simulated_user"
-        assert Path(package["instruction_file"]).read_bytes() == original["task"]["prompt"].encode()
-        assert Path(package["source"]["path"], "README.md").is_file()
-    index = json.loads(Path(result["index_file"]).read_bytes())
-    assert index["task_packages"] == [f"tasks/{record['id']}/task.json" for record in originals]
-    assert all(Path(value).is_absolute() for value in result["task_packages"])
-    assert not list(tmp_path.glob(".task-import-*"))
 
 
 @pytest.mark.parametrize("envelope", [False, True])

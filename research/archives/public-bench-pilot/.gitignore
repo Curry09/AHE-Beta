@@ -1,8 +1,0 @@
-prepared/
-runs/
-artifacts/
-__pycache__/
-.pytest_cache/
-*.pyc
-*.log
-.env
