@@ -396,7 +396,7 @@ def check_execution_publication(*, checkout: Path) -> dict:
                 scope = reader.evidence.prepare(
                     work_dir=root,
                     issue=issue.number,
-                    role="developer",
+                    role="implementer",
                     execution_required=True,
                 )
                 reader.verify_scope(scope=scope, expected=value, digest=handle["sha256"])
@@ -440,7 +440,7 @@ def check_execution_publication(*, checkout: Path) -> dict:
                     reader.evidence.prepare(
                         work_dir=root,
                         issue=issue.number,
-                        role="developer",
+                        role="implementer",
                         execution_required=True,
                     )
                 except reader.evidence.execution_contracts.ExecutionContractUnavailable:

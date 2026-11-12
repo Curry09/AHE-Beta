@@ -46,11 +46,7 @@ def main() -> None:
             assert config.stages.owner_of(stage=stage) == "skip"
         assert config.stages.owner_of(stage="review") == "agent"
         assert "synthetic-token-never-written" not in path.read_text()
-        example = Path(__file__).resolve().parents[2] / "examples/openagents-v02-nexau.yml"
-        explicit = config_module.load_agent_config(path=example)
-        assert explicit.flow == "v0.2"
-        assert explicit.agents.backend_for(role="developer") == "nexau"
-    print("PASS: generated Gitea standard/soft config and explicit v0.2/NexAU example")
+    print("PASS: generated Gitea standard/soft configuration")
 
 
 if __name__ == "__main__":

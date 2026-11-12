@@ -9,11 +9,11 @@
   },
   "observation_transport": {
     "reader_release_commit": null,
-    "reader_candidate_commit": "165af8b042334ac5a8551f0de97d0250bedbc998"
+    "reader_candidate_commit": "358f32d50255736ec4664b2c1d9f544deee7dee8"
   },
   "execution_evidence": {
     "reader_release_commit": null,
-    "reader_candidate_commit": "165af8b042334ac5a8551f0de97d0250bedbc998"
+    "reader_candidate_commit": "358f32d50255736ec4664b2c1d9f544deee7dee8"
   },
   "experiment_runtime": {
     "python": "3.12.13",
