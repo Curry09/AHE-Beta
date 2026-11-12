@@ -149,7 +149,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py resume 
 
 pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 shim，恢复已删除的 `configparser` 别名以完成 editable 安装，不修改冻结任务源码，构建后删除 shim。任务环境同时安装带 hash 的固定版本 pytest 和 pytest-mock，供用户侧检查。任务环境检查与官方 SWE-bench 评分分别进行，评分流程见[事后评分教程](post-run-grading.zh-CN.md)。
 
-历史实验及对应源码版本见[研究索引](../../research/README.zh-CN.md)。独立诊断或证据回放见[开发维护工具](../../tools/dev/README.md)，这些工具的输出不算本实验的新一轮试用。
+独立诊断或证据回放见[开发维护工具](../../tools/dev/README.md)，这些工具的输出不算本实验的新一轮试用。
 
 ## 指定实验的观测看板
 

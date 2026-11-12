@@ -27,7 +27,6 @@ Meta-Harness 快照位于 `evaluation/harness/meta_artifact/`。其[上游 READM
 
 - [迭代任务材料](examples/tasks/evolution32/README.zh-CN.md)包含来自 SWE-bench、Terminal-Bench、TUA-Bench、NL2Repo 及项目自定义的场景。[材料清单](examples/tasks/evolution32/manifest.json)、任务定义和来源记录保存了输入、源码版本、哈希与镜像信息。
 - [Harbor 评测](evaluation/README.zh-CN.md)通过 `evaluation.yaml` 选择任务来源。Harbor Index 的来源信息位于 [evaluation/benchmarks/harbor_index/](evaluation/benchmarks/harbor_index/)，其他 Harbor 任务包保留随包提供的许可条款。
-- [历史研究材料](research/README.zh-CN.md)沿用归档及索引中记录的来源与版本。
 
 材料可以从公开仓库、镜像仓库或 Release 获取，并不等于已获得其再分发授权。使用或分发具体源码、数据集、任务或镜像时，应遵循该材料随附的许可条款。
 

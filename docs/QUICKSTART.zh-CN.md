@@ -154,4 +154,4 @@ uv sync --locked --extra experiments --extra dev --extra harbor-evaluation
 uv run --locked --extra experiments --extra dev --extra harbor-evaluation pytest -q
 ```
 
-[完整 U1 教程](tutorials/u1-experiment.zh-CN.md)进一步说明预期产物和排查方法，[配置说明](CONFIGURATION.zh-CN.md)介绍模型、预算、分组和交付策略。开发贡献见[贡献指南](../CONTRIBUTING.zh-CN.md)。历史实验按[研究索引](../research/README.zh-CN.md)记录的源码版本复现。
+[完整 U1 教程](tutorials/u1-experiment.zh-CN.md)进一步说明预期产物和排查方法，[配置说明](CONFIGURATION.zh-CN.md)介绍模型、预算、分组和交付策略。开发贡献见[贡献指南](../CONTRIBUTING.zh-CN.md)。

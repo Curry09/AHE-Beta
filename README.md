@@ -127,6 +127,6 @@ This workflow evaluates the evolved Harness; its scores do not feed back into ev
 | Development checks and verification commands | [Verification](docs/VERIFICATION.md) |
 | System architecture and design documents | [Architecture](docs/ARCHITECTURE.md) · [Specs](docs/specs/README.md) |
 
-Further workflows cover [importing your own tasks](docs/tutorials/seed-task-import.md), [appending experiment rounds](docs/tutorials/experiment-continuation.md), [grading saved session artifacts](docs/tutorials/post-run-grading.md) and [enabling per-round assessment](docs/tutorials/evolution-feedback.md). Historical experiment materials are indexed under [research](research/README.md).
+Further workflows cover [importing your own tasks](docs/tutorials/seed-task-import.md), [appending experiment rounds](docs/tutorials/experiment-continuation.md), [grading saved session artifacts](docs/tutorials/post-run-grading.md) and [enabling per-round assessment](docs/tutorials/evolution-feedback.md).
 
 To participate in development, see [Contributing](CONTRIBUTING.md). Report security issues as described in [Security](SECURITY.md). Project code is [MIT licensed](LICENSE); third-party licenses and sources are documented in [THIRD_PARTY.md](THIRD_PARTY.md).

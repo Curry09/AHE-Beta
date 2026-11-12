@@ -23,28 +23,35 @@ def prepared_inputs(tmp_path, monkeypatch):
     return base_prepared_inputs.__wrapped__(tmp_path, monkeypatch)
 
 
-def test_actual_historical_cards_freeze_via_existing_workload(prepared_inputs, tmp_path):
-    imported = import_seed_tasks(
-        library=ROOT / "research/archives/legacy-materials/seeds.json",
-        output=tmp_path / "converted",
+def test_imported_seed_cards_freeze_via_existing_workload(prepared_inputs, tmp_path):
+    library = tmp_path / "seed-cards.json"
+    example = json.loads((ROOT / "examples/seed-inputs/library.json").read_text())
+    example["seeds"].append(
+        {
+            "id": "plaintext-summary",
+            "source": {"not_in_benchmark": True},
+            "task": {"prompt": "Summarize each non-empty line and write the result to stdout."},
+        }
     )
+    library.write_text(json.dumps(example))
+    imported = import_seed_tasks(library=library, output=tmp_path / "converted")
     config = json.loads(prepared_inputs.read_text())
     config["workload"].pop("kind")
     config["workload"].pop("task_package")
     config["workload"]["task_packages"] = imported["task_packages"]
-    cards = json.loads((ROOT / "examples/personas/library.json").read_text())[:7]
+    cards = json.loads((ROOT / "examples/personas/library.json").read_text())[:2]
     (tmp_path / "personas.json").write_text(json.dumps(cards))
     config["workload"]["persona_ids"] = [card["id"] for card in cards]
-    config["rounds"] = {"count": 2, "sessions_per_round": 7, "max_parallel_users": 2}
+    config["rounds"] = {"count": 2, "sessions_per_round": 2, "max_parallel_users": 2}
     prepared_inputs.write_text(json.dumps(config))
     preview = materials.check_materials(prepared_inputs)
-    assert len(preview["task_packages"]) == 7
+    assert len(preview["task_packages"]) == 2
     manifest = materials.prepare_materials(prepared_inputs, tmp_path / "runs")
     run_dir = Path(manifest["run_dir"])
     catalog = workload.read_task_catalog(run_dir, manifest)
     original_packages = {Path(path).parent.name: Path(path) for path in imported["task_packages"]}
     plan = workload.read_session_plan(run_dir, manifest)
-    assert len(catalog["tasks"]) == 7 and len(plan["rounds"][0]) == 7
+    assert len(catalog["tasks"]) == 2 and len(plan["rounds"][0]) == 2
     assert {binding["task_id"] for binding in plan["rounds"][0]} == {
         task["id"] for task in catalog["tasks"]
     }

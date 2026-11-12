@@ -207,7 +207,7 @@ E2B 在一个沙箱内运行 controller 与交付进程。已有 v1/v2 源码配
 
 用全局 `--runs-dir /absolute/path/runs` 放在子命令前可改运行根目录，后续管理始终使用同一根目录。prepare 后编辑原 JSON 或源码 checkout 不影响既有 run；改变实验定义应重新 prepare。
 
-实验凭证统一使用 `examples/experiment.env.example` 模板。历史 profile 和 launcher 从[研究索引](../research/README.zh-CN.md)查找，需使用原 checkout，不作为当前 v2 配置来源。[开发维护工具](../tools/dev/README.md)各自要求显式输入。已准备的实验始终使用冻结源码和输入哈希；`resume` 不升级其控制器。
+实验凭证统一使用 `examples/experiment.env.example` 模板。[开发维护工具](../tools/dev/README.md)各自要求显式输入。已准备的实验始终使用冻结源码和输入哈希；`resume` 不升级其控制器。
 
 pvlib 配方对历史 Versioneer 使用仅构建时有效的 Python 3.12 兼容 shim，恢复已删除的 `configparser` 别名以完成 editable 安装，不修改冻结任务源码，构建后删除 shim。任务环境同时安装带 hash 的固定版本 pytest，供用户侧检查。
 

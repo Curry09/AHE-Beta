@@ -127,6 +127,6 @@ python -m evaluation run
 | 开发检查与验证命令 | [验证说明](docs/VERIFICATION.zh-CN.md) |
 | 系统架构与设计文档 | [当前架构](docs/ARCHITECTURE.md) · [设计文档](docs/specs/README.md) |
 
-扩展用法包括[导入自定义任务](docs/tutorials/seed-task-import.zh-CN.md)、[追加实验轮次](docs/tutorials/experiment-continuation.zh-CN.md)、[对已有会话产物评分](docs/tutorials/post-run-grading.zh-CN.md)和[启用逐轮客观验收](docs/tutorials/evolution-feedback.zh-CN.md)。历史实验材料见[研究索引](research/README.zh-CN.md)。
+扩展用法包括[导入自定义任务](docs/tutorials/seed-task-import.zh-CN.md)、[追加实验轮次](docs/tutorials/experiment-continuation.zh-CN.md)、[对已有会话产物评分](docs/tutorials/post-run-grading.zh-CN.md)和[启用逐轮客观验收](docs/tutorials/evolution-feedback.zh-CN.md)。
 
 参与开发请参阅[贡献指南](CONTRIBUTING.zh-CN.md)，安全问题的报告方式见[安全说明](SECURITY.zh-CN.md)。项目代码采用 [MIT 许可证](LICENSE)，第三方材料的许可与来源见[第三方说明](THIRD_PARTY.zh-CN.md)。

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import hashlib
 import json
 import sys
 from pathlib import Path
@@ -50,78 +49,8 @@ RETIRED_PATHS = (
     "evaluation/adapters",
     "evaluation/public-bench-pilot",
     "evaluation/harness-suite-20260920",
+    "research",
 )
-
-
-def inventory_errors(root: Path) -> list[str]:
-    path = root / "research/inventory.json"
-    try:
-        inventory = json.loads(path.read_text())
-        rows = inventory["files"]
-    except (OSError, ValueError, KeyError, TypeError):
-        return ["Missing or malformed research/inventory.json"]
-    errors: list[str] = []
-    seen: set[str] = set()
-    for row in rows:
-        original = row.get("original_path", "")
-        if not original or original in seen:
-            errors.append(f"Duplicate or missing inventory original path: {original}")
-        seen.add(original)
-        if (
-            not row.get("reason")
-            or not row.get("source_commit")
-            or len(row.get("source_sha256", "")) != 64
-        ):
-            errors.append(f"Incomplete provenance: {original}")
-        kind = row.get("disposition")
-        destination = row.get("destination")
-        if kind not in {"maintained", "moved", "archived", "removed"}:
-            errors.append(f"Unknown disposition: {original}")
-        if kind == "removed":
-            if (root / original).exists():
-                errors.append(f"Removed file is present: {original}")
-            continue
-        if not isinstance(destination, str):
-            errors.append(f"Missing inventory destination: {original}")
-            continue
-        target = root / destination
-        if (
-            Path(destination).is_absolute()
-            or ".." in Path(destination).parts
-            or not target.resolve().is_relative_to(root.resolve())
-            or not target.is_file()
-        ):
-            errors.append(f"Missing or unsafe destination: {destination}")
-            continue
-        if kind == "archived":
-            expected = row["source_sha256"]
-            translation = row.get("translation")
-            if translation is not None:
-                # The original source identity stays fixed. An explicitly recorded
-                # English translation has its own locked destination digest.
-                if translation != {"language": "en", "source_sha256": expected} or not (
-                    isinstance(row.get("destination_sha256"), str)
-                    and len(row["destination_sha256"]) == 64
-                    and all(c in "0123456789abcdef" for c in row["destination_sha256"])
-                ):
-                    errors.append(f"Invalid archive translation provenance: {destination}")
-                else:
-                    expected = row["destination_sha256"]
-            if hashlib.sha256(target.read_bytes()).hexdigest() != expected:
-                errors.append(f"Frozen archive content changed: {destination}")
-        if kind in {"archived", "moved"} and destination != original and (root / original).exists():
-            errors.append(f"Obsolete duplicate remains: {original}")
-    # Every archived file must have provenance; README is newly authored explanation.
-    for file in (root / "research/archives").rglob("*"):
-        if (
-            file.is_file()
-            and file != root / "research/archives/README.md"
-            and file.suffix not in {".pyc"}
-        ):
-            relative = file.relative_to(root).as_posix()
-            if not any(row.get("destination") == relative for row in rows):
-                errors.append(f"Archive missing provenance: {relative}")
-    return errors
 
 
 def maintained_import_errors(root: Path) -> list[str]:
@@ -182,7 +111,7 @@ def maintained_import_errors(root: Path) -> list[str]:
 
 
 def check_repository(root: Path) -> dict:
-    errors = inventory_errors(root)
+    errors: list[str] = []
     for relative in RETIRED_PATHS:
         if (root / relative).exists():
             errors.append(f"Retired public path remains: {relative}")

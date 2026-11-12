@@ -17,7 +17,7 @@ tasks:
       - backend/ahe_beta/experiment/task_import.py
       - backend/tests/test_experiment_task_import.py
     scope: "Strictly convert inputs and publish existing task packages and provenance summaries in stages without overwriting"
-    acceptance: "The seven real cards can be imported; Git pin and setup semantics are correct; hidden fields are not output; errors and overwrite attempts produce no successful artifacts"
+    acceptance: "Seed-card libraries can be imported; Git pin and setup semantics are correct; hidden fields are not output; errors and overwrite attempts produce no successful artifacts"
   - id: T2
     title: "Unified task CLI and public command checks"
     status: done
@@ -87,7 +87,7 @@ The legacy flow could read the seed card library directly, with the card's task.
 ## Guide-level explanation
 
 ```bash
-uv run --locked --extra experiments python backend/scripts/experiment.py --json task import-seeds research/archives/legacy-materials/seeds.json --output /absolute/path/to/imported-tasks
+uv run --locked --extra experiments python backend/scripts/experiment.py --json task import-seeds examples/seed-inputs/library.json --output /absolute/path/to/imported-tasks
 uv run --locked --extra experiments python backend/scripts/experiment.py --json task from-text --instruction examples/seed-inputs/instruction.md --id text-example --output /absolute/path/to/text-task --not-in-benchmark
 ```
 
@@ -113,7 +113,7 @@ First write and validate everything in temporary staging under the same parent d
 
 ### Task DAG and file allocation
 
-T1 conversion core, T2 CLI, and T3 bilingual documentation are implemented independently according to this document's stable interface; T4 integrated acceptance depends on all three. The frontmatter is the sole file ownership table, with at most four items in the group. The new task command must update the public command allowlist; do not expand the task schema or copy historical entry points. The dedicated script backend/scripts/e2e-spec-0076-seed-task-import.sh covers real seven-card conversion, mixed Git/text inputs, UTF-8/quoting, no network/model/setup execution, forbidden-field sentinels, overwrite rejection, options, and frozen-production integration. Real Docker scratch setup/file modification/prediction export are accepted separately; when E2B is not tested, record that explicitly and do not present an offline substitute as evidence.
+T1 conversion core, T2 CLI, and T3 bilingual documentation are implemented independently according to this document's stable interface; T4 integrated acceptance depends on all three. The frontmatter is the sole file ownership table, with at most four items in the group. The new task command must update the public command allowlist; do not expand the task schema or copy historical entry points. The dedicated script backend/scripts/e2e-spec-0076-seed-task-import.sh covers seed-card conversion using synthetic examples, mixed Git/text inputs, UTF-8/quoting, no network/model/setup execution, forbidden-field sentinels, overwrite rejection, options, and frozen-production integration. Real Docker scratch setup/file modification/prediction export are accepted separately; when E2B is not tested, record that explicitly and do not present an offline substitute as evidence.
 
 ## Drawbacks
 

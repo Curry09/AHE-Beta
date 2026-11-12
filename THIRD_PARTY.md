@@ -27,7 +27,6 @@ Task packages, benchmark definitions, source repositories, tests, datasets and c
 
 - [Evolution task materials](examples/tasks/evolution32/README.md) include scenarios from SWE-bench, Terminal-Bench, TUA-Bench, NL2Repo and project-specific tasks. Their [manifest](examples/tasks/evolution32/manifest.json), task definitions and provenance records identify the inputs, source revisions, hashes and images.
 - [Harbor evaluation](evaluation/README.md) uses task sources configured through `evaluation.yaml`. Harbor Index source information is recorded under [evaluation/benchmarks/harbor_index/](evaluation/benchmarks/harbor_index/); other Harbor task packages retain the terms supplied with those packages.
-- [Historical research materials](research/README.md) retain the sources and versions recorded in their archives and inventory.
 
 Availability through a public repository, registry or Release does not by itself grant a license to third-party material. Refer to the terms supplied with the specific source code, dataset, task or image when using or redistributing it.
 

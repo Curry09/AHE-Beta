@@ -39,7 +39,7 @@ def load_run_v2(*, run_id: str, root: Path | None = None) -> tuple[Path, dict[st
     manifest = read_manifest(path=directory / "manifest.json")
     if manifest.get("schema_version") != 2 or manifest.get("run_id") != run_id:
         raise ConfigError(
-            "This command requires a matching version-two run manifest; historical v1 runs use their frozen checkout (research/README.md)"
+            "This command requires a matching version-two run manifest; historical v1 runs use their frozen checkout"
         )
     if Path(manifest["run_dir"]).resolve() != directory.resolve():
         raise ConfigError("Run directory moved; explicit recovery import is required")

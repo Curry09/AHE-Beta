@@ -17,7 +17,7 @@ tasks:
       - backend/ahe_beta/experiment/task_import.py
       - backend/tests/test_experiment_task_import.py
     scope: 严格转换输入，阶段式无覆盖发布既有任务包与来源摘要
-    acceptance: 真实七卡可导入；Git pin与setup语义正确；隐藏字段不输出；错误与覆盖不产生成功产物
+    acceptance: 种子卡库可导入；Git pin 与 setup 语义正确；不输出隐藏字段；遇到错误或覆盖请求时不产生成功产物
   - id: T2
     title: 统一任务CLI与公开命令检查
     status: done
@@ -87,7 +87,7 @@ tasks:
 ## Guide-level explanation
 
 ```bash
-uv run --locked --extra experiments python backend/scripts/experiment.py --json task import-seeds research/archives/legacy-materials/seeds.json --output /absolute/path/to/imported-tasks
+uv run --locked --extra experiments python backend/scripts/experiment.py --json task import-seeds examples/seed-inputs/library.json --output /absolute/path/to/imported-tasks
 uv run --locked --extra experiments python backend/scripts/experiment.py --json task from-text --instruction examples/seed-inputs/instruction.md --id text-example --output /absolute/path/to/text-task --not-in-benchmark
 ```
 
@@ -113,7 +113,7 @@ setup 使用现行 TASK_ROOT/TASK_PYTHON/VIRTUAL_ENV/UV_BIN 合同创建任务 v
 
 ### Task DAG 与文件分配
 
-T1 转换核心、T2 CLI 和 T3 双语文档按本文件的稳定接口独立实施；T4 综合验收依赖三者。frontmatter 是唯一文件所有权表，组最多四项。CLI 新 task 命令同步公开命令白名单；不扩张 task schema 或复制历史入口。专项脚本 backend/scripts/e2e-spec-0076-seed-task-import.sh 覆盖真实七卡转换、混合 Git/文本、UTF-8/引号、无网络/模型/setup 执行、禁止字段哨兵、覆盖拒绝、选项与冻结生产集成。真实 Docker scratch setup/文件修改/预测导出单列验收；E2B 未实测时明确记录，不用离线替身冒充。
+T1 转换核心、T2 CLI 和 T3 双语文档按本文件的稳定接口独立实施；T4 综合验收依赖三者。frontmatter 是唯一文件所有权表，组最多四项。CLI 新 task 命令同步公开命令白名单；不扩张 task schema 或复制历史入口。专项脚本 backend/scripts/e2e-spec-0076-seed-task-import.sh 使用合成样例验证种子卡转换，覆盖混合 Git/文本输入、UTF-8 和引号处理、离线转换、隐藏字段过滤、拒绝覆盖、命令选项和实验材料冻结。真实 Docker scratch 环境的初始化、文件修改和预测导出单独验收；E2B 未实测时应明确记录。
 
 ## Drawbacks
 

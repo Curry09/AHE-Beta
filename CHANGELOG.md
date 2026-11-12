@@ -2,6 +2,8 @@
 
 ## Unreleased — open-source preparation
 
+- Remove the historical research directory and its inventory checks. Keep the public experiment examples and task import tests independent of historical inputs.
+
 - Move the experiment compatibility pins into `backend/compatibility.json` and remove the release preparation directory.
 
 - Remove the frontend application, published dashboard assets, and GitHub Pages deployment; retain CLI and read-only JSON observations.
