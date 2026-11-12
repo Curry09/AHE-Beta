@@ -2,7 +2,7 @@
 
 [English](VERIFICATION.md) | 简体中文
 
-在仓库根目录执行以下命令，检查当前代码和公开实验定义。PR 的 CI 还会检查前端及跨仓接口，完整开发流程见[贡献指南](../CONTRIBUTING.zh-CN.md)。
+在仓库根目录执行以下命令，检查当前代码和公开实验定义。PR 的 CI 还会检查跨仓接口，完整开发流程见[贡献指南](../CONTRIBUTING.zh-CN.md)。
 
 ```bash
 uv sync --locked --extra experiments --extra dev --extra harbor-evaluation

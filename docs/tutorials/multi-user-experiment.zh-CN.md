@@ -83,7 +83,7 @@ uv run --locked --extra experiments python backend/scripts/experiment.py collect
 uv run --locked --extra experiments python backend/scripts/experiment.py dashboard "$RUN_ID" --secrets-file .env.experiment
 ```
 
-选定的本地看板读取实时材料；E2B 展示最近 collect 的快照和时间，再次 collect 可刷新。会话详情保留 task/persona/session/round/Harness SHA，反馈证据保留任务来源。没有 tracker token 时，已收集的本地产物仍可离线查看，但不会显示为已连接 Gitea。用 Vite 开发界面时，在另一终端执行 `cd frontend && npm ci && npm run dev`。
+`dashboard` 命令提供选定实验的只读 JSON API。使用 `curl` 查询 `http://127.0.0.1:8000/api/overview` 或 `/api/sessions`。本地实验读取实时材料；E2B 读取最近 collect 的快照和时间，再次 collect 可刷新。会话详情保留 task/persona/session/round/Harness SHA，反馈证据保留任务来源。没有 tracker token 时，已收集的本地产物仍可离线查询，Gitea 连接状态为未连接。
 
 ```bash
 uv run --locked --extra experiments python backend/scripts/experiment.py collect "$RUN_ID"

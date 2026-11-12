@@ -100,7 +100,7 @@ An E2B controller can continue after the local CLI exits, but background collect
 uv run --locked --extra experiments python backend/scripts/experiment.py dashboard "$RUN_ID" --secrets-file .env.experiment
 ```
 
-Local dashboards read the selected run's live artifacts. E2B dashboards show the latest `collect` snapshot and its timestamp; collect again to refresh it. With a frontend build, visit `http://127.0.0.1:8000`. For development, run `cd frontend && npm ci && npm run dev` in another terminal and visit `http://127.0.0.1:5173`.
+The `dashboard` command serves a read-only JSON observation API. Query it from another terminal with `curl http://127.0.0.1:8000/api/overview`; session details are available at `/api/sessions`. Local runs expose live artifacts. E2B runs expose the latest `collect` snapshot and its timestamp; collect again to refresh it.
 
 ## Enable assessment before each round’s feedback
 

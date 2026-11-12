@@ -23,7 +23,7 @@ Candidate commits and official release commits should be clearly distinguished. 
 
 Complete the checks on the target release commit and record the results and scope in the release notes:
 
-- Install dependencies from the lockfile and run the Python, frontend, and independent evaluation checks. See the [contributor guide](../CONTRIBUTING.md) and [verification notes](VERIFICATION.md) for specific commands.
+- Install dependencies from the lockfile and run the Python and independent evaluation checks. See the [contributor guide](../CONTRIBUTING.md) and [verification notes](VERIFICATION.md) for specific commands.
 - Verify the configuration interface and evidence-reading capabilities of the compatible OpenAgents version, including gzip, ZIP, and execution evidence. The cross-repository CI check is in [.github/workflows/ci.yml](../.github/workflows/ci.yml).
 - For the target runtime backend, verify materials preparation, user trials, requirements delivery, the next round of trials, stop/resume, and terminal-state collection. Record the model, runtime environment, commits from both repositories, and image identity alongside the verification results.
 - Check the complete Git history and release assets for sensitive information, address any issues found, and rotate any exposed credentials. See the [third-party notices](../THIRD_PARTY.md) for materials provenance and licenses.

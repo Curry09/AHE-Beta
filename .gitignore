@@ -15,12 +15,6 @@ data/
 # Local OpenAgents runtime state (worktrees and state.json)
 .openagents/
 
-# Frontend build artifacts and dependencies
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-frontend/*.tsbuildinfo
-
 # OS
 .DS_Store
 

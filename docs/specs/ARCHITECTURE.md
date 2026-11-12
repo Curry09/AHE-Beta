@@ -290,7 +290,7 @@ _Web application endpoints and runtime composition._
 | Component | Responsibility (first line of the file docstring) |
 |----|----|
 | `__init__.py` | Web application endpoints and runtime composition. |
-| `api.py` | Read-only HTTP layer for frontend observation dashboard (FastAPI). |
+| `api.py` | Read-only JSON observation API (FastAPI). |
 | `issue_timeline.py` | Spec-0039/T2: Collapse Gitea label timeline into replayable issue state and integrity anomalies. |
 
 ## Import dependency graph

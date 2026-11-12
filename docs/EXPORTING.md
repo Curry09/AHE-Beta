@@ -12,7 +12,7 @@ uv run --locked python backend/scripts/export_experiment_snapshot.py \
   --public-id demo --title "Experiment snapshot"
 ```
 
-Set `EXPERIMENT_ROOT` to the experiment directory containing the existing monitoring records, and `NEW_PUBLIC_DIRECTORY` to a new directory for this export. The script generates an experiment index, the latest status, a timeline, and static API data for the frontend.
+Set `EXPERIMENT_ROOT` to the experiment directory containing the existing monitoring records, and `NEW_PUBLIC_DIRECTORY` to a new directory for this export. The script generates an experiment index, the latest status, a timeline, and JSON observation records for downstream tools.
 
 ## Public Content
 
@@ -24,8 +24,8 @@ The exporter updates the target index but does not delete existing files or repr
 
 ## Snapshot Times and Live Observations
 
-Static pages show the status and time as recorded at collection. For example, `RUNNING` indicates that the run was still in progress when the record was created. `updated_at` in the index comes from `time` in the monitoring data and is displayed in UTC; rebuilding the site or exporting the same data again does not refresh the record time.
+Snapshots retain the status and time as recorded at collection. For example, `RUNNING` indicates that the run was still in progress when the record was created. `updated_at` in the index comes from `time` in the monitoring data; exporting the same data again does not refresh the record time.
 
-To view experiments while they are running, use `backend/scripts/experiment.py status`, `logs`, or `dashboard` bound to that run. The default development API does not automatically select an experiment; the E2B dashboard reads the most recently collected snapshot, so `collect` must be used again to update the data.
+To query experiments while they are running, use `backend/scripts/experiment.py status`, `logs`, or the JSON API served by `dashboard` bound to that run. The default API does not automatically select an experiment; the E2B observation API reads the most recently collected snapshot, so `collect` must be used again to update the data.
 
 Exporting public snapshots and collecting experiment artifacts are separate operations. To save the complete experiment record, use `backend/scripts/experiment.py collect RUN_ID`; see [Quick Start](QUICKSTART.md).

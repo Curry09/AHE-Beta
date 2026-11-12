@@ -1,6 +1,6 @@
-"""Read-only HTTP layer for frontend observation dashboard (FastAPI).
+"""Read-only JSON observation API (FastAPI).
 
-Reuses existing read paths from Metrics/SessionStore/IssueTracker, serialized as JSON for frontend SPA consumption.
+Reuses existing read paths from Metrics/SessionStore/IssueTracker, serialized as JSON for API clients.
 No new storage, no state writes, no benchmark introduction. Endpoints are synchronous def (read local files,
 avoiding ASYNC blocking warnings on event loop). create_app injects dependencies (Fake for testing, real on runtime),
 enabling offline unit tests.
@@ -13,11 +13,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.responses import JSONResponse, Response
-from starlette.types import Scope
+from starlette.responses import JSONResponse
 
 from ahe_beta.demand.issue_schema import (
     DECLINED,
@@ -38,20 +34,6 @@ from ahe_beta.tracker.base import IssueTracker
 from ahe_beta.usage import UsageStore, default_usage_store
 from ahe_beta.user.session_store import SessionStore
 from ahe_beta.web.issue_timeline import build_issue_timeline, unavailable_timeline
-
-
-class _SPAStaticFiles(StaticFiles):
-    """Host SPA: real files (index.html / assets/*) returned as-is; other paths (frontend routes like /agentboard,
-    deep links/refreshes for /sessions/:id) fall back to index.html, delegated to BrowserRouter client routing.
-    /api/* matched by earlier-registered routes takes priority and does not reach here."""
-
-    async def get_response(self, path: str, scope: Scope) -> Response:
-        try:
-            return await super().get_response(path, scope)
-        except StarletteHTTPException as exc:
-            if exc.status_code == 404:
-                return await super().get_response("index.html", scope)
-            raise
 
 
 def _open_issue_count(*, tracker: IssueTracker | None) -> int | None:
@@ -245,7 +227,7 @@ def create_app(
     runmeta: dict[str, object] | None = None,
     observation_guard: Callable[[], tuple[dict[str, object], object]] | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="ahe-beta observation dashboard", version="0.1.0")
+    app = FastAPI(title="ahe-beta observation API", version="0.1.0")
     commits_url = f"{repo_url.rstrip('/')}/commits/branch/main" if repo_url else None
     usage_store = usage_store or default_usage_store()
     # Spec-0072/T4: a selected v2 run supplies its data root independently of sessions.
@@ -281,13 +263,6 @@ def create_app(
                 return response
             except (OSError, ValueError):
                 return unavailable()
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-        allow_methods=["GET"],
-        allow_headers=["*"],
-    )
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
@@ -442,11 +417,6 @@ def create_app(
     @app.get("/api/usage/sessions/{session_id}")
     def session_usage(session_id: str) -> dict[str, object]:
         return usage_store.summary(session_id=session_id)
-
-    # If frontend has been built, FastAPI serves the SPA directly (during development dist does not exist, skip).
-    dist = Path(__file__).resolve().parents[3] / "frontend" / "dist"
-    if dist.is_dir():
-        app.mount("/", _SPAStaticFiles(directory=str(dist), html=True), name="static")
 
     return app
 

@@ -38,14 +38,6 @@ tools/spec-driven-development/spec graph --package-root backend/ahe_beta
 
 生成的 `docs/specs/OVERVIEW.md` 和 `docs/specs/ARCHITECTURE.md` 应与原始 Spec 一并提交。这两个文件由 CLI 生成，请通过修改原始 Spec 更新它们。
 
-修改前端时，使用 Node.js 22，在 `frontend/` 目录运行：
-
-```bash
-npm ci
-npm test
-npm run build
-```
-
 常规检查无需模型 API 密钥。如果修改需要真实模型验证，请记录模型与框架版本、命令、费用和结果，并在分享验证材料前移除私密内容。其他检查命令见[验证说明](docs/VERIFICATION.zh-CN.md)。
 
 ## 提交 PR
