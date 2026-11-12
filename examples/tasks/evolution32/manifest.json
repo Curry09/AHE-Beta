@@ -44,21 +44,21 @@
       "url": "https://github.com/Curry09/AHE-Beta/releases/tag/evolution32-task-materials-v1",
       "status": "published",
       "asset_manifest_url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/materials.lock.json",
-      "asset_manifest_sha256": "4868c752ae4a0bc8ba0bfc1bb53146ecee3f43e19a089b5620580f4ac02bd9a9",
+      "asset_manifest_sha256": "b6a23a467275fbfcf62e87d1baefc2f3535f96b59828d2743706f77d4391afa0",
       "checksum_url": "https://github.com/Curry09/AHE-Beta/releases/download/evolution32-task-materials-v1/SHA256SUMS",
-      "checksum_sha256": "45aebb5783a2136abc3754ee17c801a1496dd7f9ee035782639c1f236d2c2231",
+      "checksum_sha256": "d988fc15e8f280edd171d73e48e99122c25413ab79f4baefa0a50b24cb893d6f",
       "input_asset_count": 37,
-      "release_id": 430367618,
-      "published_at": "2026-11-01T05:04:31Z",
+      "release_id": 442790669,
       "distributed_file_count": 40,
       "input_bytes": 251473655,
       "repository_visibility_at_validation": "private",
       "download_verification": {
         "status": "passed",
-        "method": "authenticated GitHub release asset API",
+        "method": "GitHub SHA-256 digest verification and authenticated sample downloads",
         "file_count": 40,
         "runtime_asset_count": 37,
-        "receipt_sha256": "1ef9be0587c89804fcf83c7f881305764418048e7460499d79d5a16aaa42fab4"
+        "sampled_download_count": 5,
+        "receipt_sha256": "f57239e7107c26e8c1ad66b662292f3b07a0fd91bdd4f6ef655daa32df4c723e"
       },
       "anonymous_download_verification": "deferred_until_repository_is_public"
     },
