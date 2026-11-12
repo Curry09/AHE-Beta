@@ -208,7 +208,7 @@ tasks:
       - backend/tests/test_evolution_feedback_e2e.py
       - backend/tests/test_experiment_public_examples.py
       - backend/tests/test_experiment_repository.py
-      - release/compatibility.json
+      - backend/compatibility.json
       - .github/workflows/ci.yml
       - examples/experiments/evolution-feedback-local.json
       - examples/experiments/evolution-feedback-e2b.json
@@ -377,7 +377,7 @@ Roles continue to have distinct responsibilities: PM reads user-level goals, exp
 
 Proposals and Specs may change existing stopping strategies, but cannot place the original goal, user-cancellation semantics, or unattended-input conditions in non-goals and then claim that they are solved. Conforming to the old Spec only shows implementation consistency; it does not automatically eliminate an ongoing delivery capability gap. It is permissible to reject an unsupported attribution while retaining task_assessment and real acceptance facts for subsequent analysis.
 
-Delivery evidence publication reuses the existing gzip/ZIP, hash, and authorized bundle, adding only versioned safety contract blocks and result references. The corresponding OpenAgents reader must verify provenance and version, and provide bounded conditions directly in the actual contexts of the Spec Writer, Architect, Implementer, and Reviewer, rather than providing only attachment paths. Its separate design resides in the OpenAgents repository; cross-repository joint acceptance for this group must not be marked complete until that reader is available. `release/compatibility.json`, preflight capabilities, and the pinned reader SHA must be updated together; a new publisher must not silently lose fields when paired with an old reader.
+Delivery evidence publication reuses the existing gzip/ZIP, hash, and authorized bundle, adding only versioned safety contract blocks and result references. The corresponding OpenAgents reader must verify provenance and version, and provide bounded conditions directly in the actual contexts of the Spec Writer, Architect, Implementer, and Reviewer, rather than providing only attachment paths. Its separate design resides in the OpenAgents repository; cross-repository joint acceptance for this group must not be marked complete until that reader is available. `backend/compatibility.json`, preflight capabilities, and the pinned reader SHA must be updated together; a new publisher must not silently lose fields when paired with an old reader.
 
 The shared wire contract between the two repositories is the `execution_evidence` object in the existing observation bundle, with required fields `schema_version:1`, `issue`, `execution_contracts`, `assessment_summaries`, and `payload_sha256`. The contract requires `contract_id`, `session_id`, `task_id`, `task_digest`, `followup_input`, `task_budget_seconds` (nullable), `budget_source`, and `public_refs`; each public reference consists of kind/path/sha256. The summary requires `receipt_id`, `session_id`, `contract_id`, `status`, `passed`, nullable score/metric definitions, acceptance type, and a provenance summary. Arrays may be empty, but when required is enabled they must cover all authorized sources for the issue; empty arrays cannot be used to bypass this requirement.
 

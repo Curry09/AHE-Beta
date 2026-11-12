@@ -22,7 +22,7 @@ on:
       - 'backend/scripts/e2e-spec-0077-local-engineering-ci.sh'
       - 'backend/scripts/e2e-spec-0079-experiment-continuation.sh'
       - 'backend/tests/fixtures/continuation/**'
-      - 'release/compatibility.json'
+      - 'backend/compatibility.json'
       - 'pyproject.toml'
       - 'uv.lock'
       - 'backend/scripts/check_nexau_dependency.py'

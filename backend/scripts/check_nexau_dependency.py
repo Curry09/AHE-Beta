@@ -12,8 +12,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 
-def check(project: Path) -> dict[str, str]:
-    """The declaration, lock and release manifest must agree on a full Git commit."""
+def check(project: Path, *, manifest_path: str = "backend/compatibility.json") -> dict[str, str]:
+    """The declaration, lock and compatibility manifest must agree on a full Git commit."""
     config = tomllib.loads((project / "pyproject.toml").read_text())
     lock = tomllib.loads((project / "uv.lock").read_text())
     dependencies = [
@@ -37,13 +37,15 @@ def check(project: Path) -> dict[str, str]:
         raise ValueError("NexAU declaration and lock must agree on a full Git commit")
     if (project / "third_party/nexau").exists():
         raise ValueError("The obsolete embedded NexAU source must be removed")
-    release = project / "release/compatibility.json"
-    if release.is_file():
-        pin = json.loads(release.read_text())["nexau"]
+    manifest = project / manifest_path
+    if manifest.is_file():
+        pin = json.loads(manifest.read_text())["nexau"]
         if pin["commit"] != revision or pin["repository"].removesuffix(
             ".git"
         ) != repository.removesuffix(".git"):
-            raise ValueError("NexAU release manifest disagrees with the locked Git dependency")
+            raise ValueError(
+                "NexAU compatibility manifest disagrees with the locked Git dependency"
+            )
     return {"repository": repository, "revision": revision, "version": package["version"]}
 
 
@@ -71,8 +73,11 @@ def main() -> None:
         p for p in Path(__file__).resolve().parents if (p / "uv.lock").is_file()
     )
     expected = check(project)
-    if args.other_project and check(args.other_project) != expected:
-        raise ValueError("Paired repositories must use the same NexAU Git source and version")
+    if args.other_project:
+        # OpenAgents maintains its compatibility manifest in its own release directory.
+        paired = check(args.other_project, manifest_path="release/compatibility.json")
+        if paired != expected:
+            raise ValueError("Paired repositories must use the same NexAU Git source and version")
     if args.installed:
         check_installed(expected)
     print(json.dumps({**expected, "installed_checked": args.installed}, indent=2))

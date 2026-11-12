@@ -23,7 +23,7 @@ cd AHE-Beta
 uv sync --locked --extra experiments
 ```
 
-Runtime recipes pin Python, uv and Claude Code versions in the [compatibility manifest](../release/compatibility.json). Preparation acquires fixed OpenAgents and NexAU versions; no separate OpenAgents checkout or personal Claude Code installation is required.
+Runtime recipes pin Python, uv and Claude Code versions in the [compatibility manifest](../backend/compatibility.json). Preparation acquires fixed OpenAgents and NexAU versions; no separate OpenAgents checkout or personal Claude Code installation is required.
 
 ## 2. Choose the example and fill credentials
 

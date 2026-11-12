@@ -65,7 +65,7 @@ bash backend/scripts/e2e-spec-0084-evolution-feedback.sh \
 
 ## 3. 检查并准备
 
-准备阶段根据[兼容清单](../../release/compatibility.json)固定 OpenAgents 的执行证据 reader 版本，优先使用 `execution_evidence.reader_release_commit`，未设置时使用 `reader_candidate_commit`。显式 `source.openagents` 也必须指向支持同一执行证据合同的不可变提交。预检会核验实际读取能力；配套版本更新见[发布指南](../RELEASING.md)。
+准备阶段根据[兼容清单](../../backend/compatibility.json)固定 OpenAgents 的执行证据 reader 版本，优先使用 `execution_evidence.reader_release_commit`，未设置时使用 `reader_candidate_commit`。显式 `source.openagents` 也必须指向支持同一执行证据合同的不可变提交。预检会核验实际读取能力；配套版本更新见[发布指南](../RELEASING.md)。
 
 ```bash
 CONFIG="$CASE_DIR/experiment.json"
