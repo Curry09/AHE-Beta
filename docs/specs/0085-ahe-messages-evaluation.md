@@ -18,6 +18,7 @@ tasks:
       - evaluation/harness/ahe.py
       - evaluation/harness/ahe_entry.py
       - evaluation/harness/ahe_bootstrap.py
+      - evaluation/harness/ahe_runtime.lock
       - evaluation/harness/ahe_artifact/**
       - evaluation/configuration.py
       - evaluation/preparation.py
@@ -76,7 +77,7 @@ Materialize AHE with `python -m evaluation.harness.ahe --destination ../harnesse
 
 ## Reference-level explanation
 
-T1 pins `china-qijizhifeng/agentic-harness-engineering` at `182ea06e578df7b1d503eca537503c1e4c5a8a58`, preserving prompts, tools, middleware, memory and the 300-iteration limit. It adds only transport, operating-parameter overrides and observation hooks. AHE uses NexAU `28511d9f0362191a6c378fd441b2be55309a9e32`; its complete package fingerprint prevents reuse of a patched framework wheel. Runtime files have individual hashes and retain licenses. `task_source: harbor_index` and `task_source: harbor` retain their current preparation paths.
+T1 pins `china-qijizhifeng/agentic-harness-engineering` at `182ea06e578df7b1d503eca537503c1e4c5a8a58`, preserving prompts, tools, middleware, memory and the 300-iteration limit. It adds only transport, operating-parameter overrides and observation hooks. AHE uses NexAU `28511d9f0362191a6c378fd441b2be55309a9e32`; its complete package fingerprint prevents reuse of a patched framework wheel. Runtime files have individual hashes and retain licenses. The AHE kit includes a separately pinned dependency lock and a Python archive, allowing AHE-only preparation without private legacy releases. `task_source: harbor_index` and `task_source: harbor` retain their current preparation paths.
 
 T2 distinguishes Messages `max_tokens` termination, merges streaming usage start/delta/cache counts, and marks streams without message_stop incomplete. Signed thinking is replayed by the native SDK without rewriting assistant history. It adds no continuation prompts, score retries or time-budget correction. Detailed raw observations remain private; user feedback excludes internal reasoning. Exact declared missing task artifacts retain the current grading classification.
 

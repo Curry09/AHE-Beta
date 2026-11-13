@@ -6,7 +6,9 @@ Use one [`evaluation.yaml`](../evaluation.yaml), from the repository root. Crede
 
 ## Install
 
-On Linux/WSL with Python 3.12, download `harbor-evaluation-runtime-v1.0.0.zip` from the [framework release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-framework-v1.0.0) and extract it into the repository root, creating `runtime/`. Download `harnesses.zip` from the [harness release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-results-20261030), extracting it next to this repository, or update `paths.harnesses`.
+For AHE-only evaluation, use the self-contained [AHE setup](#ahe-over-anthropic-messages) below; the legacy binary downloads are not needed.
+
+On Linux/WSL with Python 3.12, download `harbor-evaluation-runtime-v1.0.0.zip` from the [framework release](https://github.com/Curry09/AHE-Beta-Legacy/releases/tag/harbor-evaluation-framework-v1.0.0) and extract it into the repository root, creating `runtime/`. Download `harnesses.zip` from the [harness release](https://github.com/Curry09/AHE-Beta-Legacy/releases/tag/harbor-evaluation-results-20261030), extracting it next to this repository, or update `paths.harnesses`.
 
 ```bash
 python3.12 -m venv .venv-evaluation
@@ -26,7 +28,7 @@ Preparation acquires tasks through the selected source and creates one archive p
 
 `ahe` selects the upstream [agentic-harness-engineering evolved harness](https://github.com/china-qijizhifeng/agentic-harness-engineering/tree/182ea06e578df7b1d503eca537503c1e4c5a8a58/experiments/evolved_harness), fixed at `182ea06e578df7b1d503eca537503c1e4c5a8a58`. Prompts, memory, tools, risk middleware and the 300-iteration limit are preserved. Only transport, model operating parameters and observation are adapted; the upstream evolution loop is not invoked.
 
-After installing the base runtime above, install Git and uv, then run from the repository root:
+For AHE-only runs, skip the legacy runtime and harness downloads. Install the Python dependencies as above using uv-managed CPython 3.12 (3.12.13 is recommended), and install Git and uv. Run from the repository root:
 
 ```bash
 python -m evaluation.harness.ahe --destination ../harnesses/ahe --build-runtime
@@ -37,7 +39,7 @@ python -m evaluation prepare
 python -m evaluation run
 ```
 
-The command refuses existing source/runtime destinations. It builds NexAU at `28511d9f0362191a6c378fd441b2be55309a9e32` into `runtime/ahe/`, without changing the controller SDK. Alternatively use `--runtime-wheel PATH` to import an existing native wheel. Package bytes must match the fixed upstream fingerprint; wheel ZIP metadata may vary. Material hashes and the frozen dependency lock are checked again during preparation. The base kit supplies the shared Python archive. Generated kits stay outside Git.
+The command refuses existing source/runtime destinations. It builds NexAU at `28511d9f0362191a6c378fd441b2be55309a9e32` into `runtime/ahe/`, without changing the controller SDK. Alternatively use `--runtime-wheel PATH` to import an existing native wheel. Package bytes must match the fixed upstream fingerprint; wheel ZIP metadata may vary. Material hashes and the frozen dependency lock are checked again during preparation. The kit also includes a Python archive: an existing base archive is reused when present, otherwise the current uv-managed CPython 3.12 installation is packaged. Use --python-archive PATH to supply an existing archive explicitly. AHE-only preparation needs no legacy release assets. Generated kits stay outside Git.
 
 Copy the template to the root before editing: its paths are relative to the root configuration. It starts with one task and one repetition. Select `tasks: published38` or set `execution.repetitions` explicitly when needed. `actor.api_type: anthropic_chat_completion` is supported only with `harnesses: [ahe]`; `actor.base_url` is the native SDK's Messages service root. The user uses a separate OpenAI-compatible endpoint. Store ACTOR_API_KEY, USER_API_KEY, E2B_API_KEY and any required JUDGE_API_KEY in `.env`. The example explicitly selects `reasoning_effort: max`, `max_output_tokens: 65536`, `thinking: true` and native streaming; the provider must support them. Omitting api_type preserves upstream Responses; explicit openai_responses and openai_chat_completion are also supported.
 

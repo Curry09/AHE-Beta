@@ -25,7 +25,7 @@ workspace/
 
 ## 安装和运行
 
-在仓库根目录执行。先从本仓库的 [框架 Release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-framework-v1.0.0) 下载 `harbor-evaluation-runtime-v1.0.0.zip` 并解压到仓库根目录（得到 `runtime/`）。从 [Harness Release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-results-20261030) 下载 `harnesses.zip`，解压到仓库的上一级目录，或修改 `paths.harnesses`。
+在仓库根目录执行。先从本仓库的 [框架 Release](https://github.com/Curry09/AHE-Beta-Legacy/releases/tag/harbor-evaluation-framework-v1.0.0) 下载 `harbor-evaluation-runtime-v1.0.0.zip` 并解压到仓库根目录（得到 `runtime/`）。从 [Harness Release](https://github.com/Curry09/AHE-Beta-Legacy/releases/tag/harbor-evaluation-results-20261030) 下载 `harnesses.zip`，解压到仓库的上一级目录，或修改 `paths.harnesses`。
 
 ```bash
 uv venv --python 3.12.13 --managed-python --seed .venv-evaluation

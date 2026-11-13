@@ -41,13 +41,22 @@ def test_upstream_source_is_fixed_and_extra_code_is_rejected(tmp_path):
         verify_source(source)
 
 
-def test_runtime_import_verifies_native_code_and_never_replaces_output(tmp_path, native_wheel):
+def test_runtime_import_verifies_native_code_and_never_replaces_output(
+    tmp_path, native_wheel, monkeypatch
+):
     verify_native_wheel(native_wheel)
     parent = tmp_path / "runtime"
-    kit = prepare_runtime(parent / "ahe", native_wheel)
+    python_archive = tmp_path / "python312.tar.gz"
+    python_archive.write_bytes(b"separately tested Python archive")
+    kit = prepare_runtime(parent / "ahe", native_wheel, python_archive)
     base = {"runtime_wheel": str(parent / native_wheel.name), "python_sha256": "shared"}
     result = ahe_runtime(base)
-    assert result["python_sha256"] == "shared"
+    assert result["python_sha256"] == hashlib.sha256(python_archive.read_bytes()).hexdigest()
+    assert Path(result["python_archive"]).read_bytes() == python_archive.read_bytes()
+    from evaluation.harness import ahe
+
+    monkeypatch.setattr(ahe, "runtime_directory", lambda: parent)
+    assert ahe_runtime()["python_sha256"] == result["python_sha256"]
     assert result["runtime_sha256"] == hashlib.sha256(native_wheel.read_bytes()).hexdigest()
     with pytest.raises(ValueError, match="must not exist"):
         prepare_runtime(kit, native_wheel)
@@ -97,8 +106,10 @@ def test_ahe_selection_preserves_task_profiles_and_freezing(tmp_path, monkeypatc
     assert config.data["task_source"] == task_source
     assert len(config.task_names()) == 1
     if task_source == "harbor":
-        monkeypatch.setattr(preparation, "runtime_descriptor", lambda: {})
-        monkeypatch.setattr(preparation, "ahe_runtime", lambda base: {"runtime_sha256": "native"})
+        monkeypatch.setattr(
+            preparation, "runtime_descriptor", lambda: pytest.fail("Legacy kit requested")
+        )
+        monkeypatch.setattr(preparation, "ahe_runtime", lambda: {"runtime_sha256": "native"})
         _dataset, cases, _resolved, harnesses = preparation.prepare(config, download=False)
         assert len(cases) == 1 and harnesses[0]["runtime"]["runtime_sha256"] == "native"
 

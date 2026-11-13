@@ -6,7 +6,9 @@
 
 默认 `task_source: harbor_index` 使用固定版本的官方任务；也可选择 `task_source: harbor`，传入已准备好的标准 Harbor 任务包路径。任务名单、下载和裁判规则由对应 profile 解释，配置及执行层不套用 Index 规则；示例见完整教程。
 
-请按完整教程在独立虚拟环境安装 `evaluation/requirements.lock` 和本目录；运行材料从 [Release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-framework-v1.0.0) 下载。
+仅评测 AHE 时，可直接使用下节自包含安装步骤，无需访问 Legacy 的二进制运行材料。
+
+请按完整教程在独立虚拟环境安装 `evaluation/requirements.lock` 和本目录；运行材料从 [Release](https://github.com/Curry09/AHE-Beta-Legacy/releases/tag/harbor-evaluation-framework-v1.0.0) 下载。
 
 ```bash
 python -m evaluation validate
@@ -23,7 +25,7 @@ python -m evaluation report runs/<运行ID>
 
 `ahe` 选择第三方 [agentic-harness-engineering evolved harness](https://github.com/china-qijizhifeng/agentic-harness-engineering/tree/182ea06e578df7b1d503eca537503c1e4c5a8a58/experiments/evolved_harness)，固定到 `182ea06e578df7b1d503eca537503c1e4c5a8a58`。原提示词、记忆、工具、风险中间件和 300 次迭代上限保持原样；适配仅处理传输、模型运行参数与观测，不启动其自进化循环。
 
-先按完整教程安装基础运行材料，并安装 Git 和 uv，再从仓库根目录执行：
+只评测 AHE 时，无需下载旧 runtime 或 harnesses 压缩包。按完整教程使用 uv-managed CPython 3.12（建议 3.12.13）安装 Python 依赖，并安装 Git 和 uv，再从仓库根目录执行：
 
 ```bash
 python -m evaluation.harness.ahe --destination ../harnesses/ahe --build-runtime
@@ -34,7 +36,7 @@ python -m evaluation prepare
 python -m evaluation run
 ```
 
-命令拒绝覆盖已有源码或 runtime 目录。它从固定提交 `28511d9f0362191a6c378fd441b2be55309a9e32` 构建原生 NexAU 到 `runtime/ahe/`，不修改控制器 SDK；也可用 `--runtime-wheel PATH` 导入已有原生 wheel。包内文件必须匹配固定源码指纹，ZIP 构建元数据允许不同。准备阶段再次验证材料哈希和冻结的依赖锁。Python 压缩包复用基础 runtime，生成的 kit 不提交 Git。
+命令拒绝覆盖已有源码或 runtime 目录。它从固定提交 `28511d9f0362191a6c378fd441b2be55309a9e32` 构建原生 NexAU 到 `runtime/ahe/`，不修改控制器 SDK；也可用 `--runtime-wheel PATH` 导入已有原生 wheel。包内文件必须匹配固定源码指纹，ZIP 构建元数据允许不同。准备阶段再次验证材料哈希和冻结的依赖锁。kit 自带 Python 压缩包：存在基础 runtime 时复用其压缩包，否则打包当前 uv-managed CPython 3.12；也可通过 --python-archive PATH 显式提供已有压缩包。仅评 AHE 不依赖 Legacy Release，生成的 kit 不提交 Git。
 
 模板需先复制到根目录，其路径按根目录配置解释。默认一题、一次重复；需要时显式改为 `tasks: published38` 或设置 `execution.repetitions`。`actor.api_type: anthropic_chat_completion` 仅允许与 `harnesses: [ahe]` 配合；`actor.base_url` 填原生 SDK 的 Messages 服务根地址，模拟用户使用独立的 OpenAI 兼容地址。ACTOR_API_KEY、USER_API_KEY、E2B_API_KEY 和题目需要的 JUDGE_API_KEY 放入 `.env`。模板显式设置 max 推理强度、65,536 最大输出、thinking 和原生流式，提供商须支持这些参数。不填写 api_type 保留上游 Responses；也支持显式 openai_responses 和 openai_chat_completion。
 

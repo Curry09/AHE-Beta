@@ -8,7 +8,7 @@ Use one [`evaluation.yaml`](../../evaluation.yaml), from the repository root. Cr
 
 ## Install
 
-On Linux/WSL with Python 3.12, download `harbor-evaluation-runtime-v1.0.0.zip` from the [framework release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-framework-v1.0.0) and extract it into the repository root, creating `runtime/`. Download `harnesses.zip` from the [harness release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-results-20261030), extracting it next to this repository, or update `paths.harnesses`.
+On Linux/WSL with Python 3.12, download `harbor-evaluation-runtime-v1.0.0.zip` from the [framework release](https://github.com/Curry09/AHE-Beta-Legacy/releases/tag/harbor-evaluation-framework-v1.0.0) and extract it into the repository root, creating `runtime/`. Download `harnesses.zip` from the [harness release](https://github.com/Curry09/AHE-Beta-Legacy/releases/tag/harbor-evaluation-results-20261030), extracting it next to this repository, or update `paths.harnesses`.
 
 ```bash
 uv venv --python 3.12.13 --managed-python --seed .venv-evaluation

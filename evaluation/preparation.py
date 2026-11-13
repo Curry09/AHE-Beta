@@ -127,10 +127,10 @@ def runtime_descriptor():
     )
 
 
-def ahe_runtime(base):
-    from .harness.ahe import provenance, verify_native_wheel
+def ahe_runtime(base=None):
+    from .harness.ahe import provenance, runtime_directory, verify_native_wheel
 
-    directory = Path(base["runtime_wheel"]).parent / "ahe"
+    directory = (Path(base["runtime_wheel"]).parent if base else runtime_directory()) / "ahe"
     try:
         expected = json.loads((directory / "manifest.json").read_text())
     except FileNotFoundError as error:
@@ -138,7 +138,7 @@ def ahe_runtime(base):
             "AHE runtime missing; use evaluation.harness.ahe --build-runtime"
         ) from error
     wheel = "nexau-0.4.1-py3-none-any.whl"
-    if set(expected) != {wheel, "runtime.lock"}:
+    if set(expected) not in [{wheel, "runtime.lock"}, {wheel, "runtime.lock", "python312.tar.gz"}]:
         raise ValueError("Invalid AHE runtime manifest")
     for name, digest in expected.items():
         if sha((directory / name).read_bytes()) != digest:
@@ -146,8 +146,17 @@ def ahe_runtime(base):
     if expected["runtime.lock"] != provenance()["runtime_lock_sha256"]:
         raise ValueError("AHE runtime dependency lock changed")
     verify_native_wheel(directory / wheel)
+    if "python312.tar.gz" in expected:
+        inherited = dict(
+            base or {},
+            python_archive=str(directory / "python312.tar.gz"),
+            python_sha256=expected["python312.tar.gz"],
+        )
+    else:
+        # Frozen campaigns used the base kit's Python archive; keep that contract.
+        inherited = base if base is not None else runtime_descriptor()
     return dict(
-        base,
+        inherited,
         runtime_wheel=str(directory / wheel),
         runtime_sha256=expected[wheel],
         runtime_lock=str(directory / "runtime.lock"),
@@ -158,7 +167,8 @@ def ahe_runtime(base):
 def prepare(config, download=True):
     config.validate_sources()
     cache = config.path("cache")
-    runtime = runtime_descriptor()
+    only_ahe = config.data["harnesses"] == ["ahe"]
+    runtime = ahe_runtime() if only_ahe else runtime_descriptor()
     profile = configuration_profile(config.data["task_source"])
     ds, cases = profile.prepare_cases(config, download=download)
     for c in cases:
@@ -201,7 +211,7 @@ def prepare(config, download=True):
                 )
             )
         else:
-            selected_runtime = ahe_runtime(runtime) if name == "ahe" else runtime
+            selected_runtime = ahe_runtime(runtime) if name == "ahe" and not only_ahe else runtime
             harnesses.append(
                 freeze_harness(name, config.path("harnesses") / name, cache, selected_runtime)
             )
