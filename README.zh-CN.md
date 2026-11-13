@@ -1,21 +1,42 @@
-# AHE-Beta
+# Agentic Harness Engineering Beta：以需求为中心的 Agent Harness 演进
 
-**通过模拟使用和结构化反馈，迭代改进编码 Agent 的 Harness。**
+[English](README.md) | **简体中文**
 
-[English](README.md) · [简体中文](README.zh-CN.md) · [快速开始](docs/QUICKSTART.zh-CN.md) · [评测指南](evaluation/docs/harbor.zh-CN.md) · [贡献指南](CONTRIBUTING.zh-CN.md)
+<div align="left">
 
-Python 3.12+ · Linux / WSL2 · [MIT](LICENSE)
-
-AHE-Beta 通过模拟“用户使用、反馈、开发者改进”的过程，推动编码 Agent Harness 持续迭代。模拟用户在任务中使用 Harness 并反馈问题，Triage 与 Architect 据此形成改进提案，再由 [OpenAgents](https://github.com/Curry09/OpenAgents) 完成代码修改。更新后的 Harness 进入下一轮试用，形成持续的反馈与改进循环。
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/harness-evolution-zh-CN-dark.svg">
-    <img src="assets/harness-evolution-zh-CN-light.svg" alt="动画依次高亮第 1 轮、第 2 轮与末轮，光点到达时同步高亮对应节点。用户反馈与 OpenAgents 交付推动轮间更新；末轮只试用，之后独立运行 Harbor 留出评测。" width="100%">
-  </picture>
+<p align="left">
+  <!-- Replace the placeholder arXiv/PDF links when the paper is posted. -->
+  <a href="https://arxiv.org/abs/XXXX.XXXXX"><img alt="Paper" src="https://img.shields.io/badge/Paper-arXiv-b31b1b.svg?logo=arxiv&logoColor=white"></a>
+  <a href="https://arxiv.org/abs/XXXX.XXXXX"><img alt="PDF" src="https://img.shields.io/badge/PDF-Download-ec1c24.svg?logo=adobeacrobatreader&logoColor=white"></a>
+  <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg">
+  <img alt="Python" src="https://img.shields.io/badge/python-%E2%89%A53.12-blue.svg">
+  <img alt="Managed with uv" src="https://img.shields.io/badge/managed_with-uv-261230?logo=python&logoColor=white">
 </p>
 
-本仓负责实验编排，OpenAgents 负责代码交付。实验从 `backend/harness_template/` 提供的初始 Harness 开始，逐轮修改其源码，并保存每轮的 Harness 版本和运行记录。
+</div>
+
+<p align="center">
+  <img src="assets/paper-overview.png" alt="AHE-Beta 概览：用户驱动的评估、团队协作修改和需求驱动的筛选" width="100%">
+</p>
+
+---
+
+## 🎯 项目概览
+
+**AHE-Beta** 在固定基础模型的条件下，通过以需求为中心的循环持续演进编码 Agent 的 Harness。模拟用户与 Harness 进行多轮交互，提出显式和隐式需求，并提交有证据支持的问题。基于 Gitea 的协作团队对这些需求进行分诊和整合，编写通用修复，并仅接纳经过审核、附有证据包的改动。
+
+### 主要结果
+
+- **留出评测表现：** 在 38 项任务上，相比 Base Harness，成功率从 **21.9% 提升至 32.5%**，用户评分从 **2.59 提升至 3.04**，执行 Token 用量下降 **41.0%**。
+- **基线对比：** AHE-Beta 的成功率高于 Claude Code（**26.3%**）和 Meta-Harness（**20.2%**）。
+- **人类偏好：** 在人类盲测 A/B 研究的 **48 组有效配对中，AHE-Beta 获得了 31 组偏好选择**；参与者在全部五个用户体验维度上也给予了更高评分。
+- **迁移效果：** 无需进一步演进，相比 Base Harness，成功率在 **GLM-5.3 上提升 15.8 个百分点**，在 **DeepSeek-V4.1-Flash 上提升 7.9 个百分点**。
+
+---
+
+## 🚀 快速开始
+
+下文介绍完整的实验和评测流程。可以先运行离线演示，在无需模型接口或实验基础设施的情况下了解交互与反馈循环。
 
 ## 离线演示
 
@@ -83,7 +104,7 @@ U4 示例在两项任务上安排四个用户会话，共运行两轮，提供�
 
 迭代完成后，可以通过独立的 Harbor 评测流程测试 Harness 的任务能力。评测统一使用 [`evaluation.yaml`](evaluation.yaml) 配置，通过 `python -m evaluation` 启动，支持在 E2B 上运行 Harbor Index 题目和标准 Harbor 任务包。
 
-可选择已发布的 Harness（`v0`、`u8`、`u8-direct`、`u16`、`u32`），也可选择已接入的 Claude Code、Meta-Harness 或固定版本的上游 AHE evolved harness。`user.enabled: false` 表示 direct 解题；设为 `true` 时，模拟用户会参与后续交互，对回复进行追问或验收。
+可选择已发布的 Harness（`v0`、`u8`、`u8-direct`、`u16`、`u32`），也可选择已接入的 Claude Code、Meta-Harness 或固定到指定上游提交的 AHE 演进版 Harness。`user.enabled: false` 表示 direct 解题；设为 `true` 时，模拟用户会参与后续交互，对回复进行追问或验收。
 
 第三方 AHE 的 Messages 适配使用 `harnesses: [ahe]`，安装步骤见 [AHE 说明](evaluation/README.zh-CN.md#ahe-的-anthropic-messages-适配)，配置见[模板](examples/evaluation/ahe-messages.yaml)。适配保留固定的原始 Agent 策略，并单独校验 runtime 源码。
 
