@@ -99,7 +99,7 @@ run 启动后，云内 supervisor/controller 独立运行；工作机还会启�
 
 `PARTIAL` 归档保留已收集到的记录，供查看和排查。执行 `resume` 时，程序会从原运行环境中的检查点继续实验，不会从归档恢复。要从归档创建新的续跑实验，原实验必须已完成，且[归档须符合续跑条件](experiment-continuation.zh-CN.md)。
 
-如果本地 Docker 重启了，等 `docker info` 能正常返回后，再用 `resume` 恢复实验。如果看到 `Completed Actor awaits explicit finalization repair`，说明 Harness 已结束执行，但 Docker 中断时，产物还没来得及冻结。这种情况下，重复执行 `resume` 无法补上这一步。请保留实验目录和已有归档，便于排查。
+如果本地 Docker 重启了，等 `docker info` 能正常返回后，再用 `resume` 恢复实验。控制器会复用已完成的会话，并尝试从原任务环境补齐尚未收集的产物。如果 Docker 确认原环境已丢失，只用该轮原有的输入和 Harness 版本补跑受影响的会话。如果无法核实原环境，或无法确认收尾脚本是否执行完毕，请保留实验目录和已有归档以便排查。会话结果保存后，清理失败会单独记录，不影响下一轮启动。
 
 当前不会自动延长 E2B 沙箱租期。`runtime.e2b.timeout_seconds: 86400` 设置创建时的租期，与模型输出预算无关。`stop` 停止控制器并保留沙箱，CLI `resume` 要求原沙箱仍在运行；暂停实例需要先通过 provider 恢复，过期或已删除实例标记为 `LOST`。六轮实验可能超过一天，请关注实际 `expires_at`，保持管理主机的收集进程可用，并保留完整归档。
 

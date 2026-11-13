@@ -364,7 +364,7 @@ def test_completed_actor_capture_retry_never_reexecutes_actor_or_publishes_infra
 
 
 @pytest.mark.parametrize("mode", ["direct", "simulated_user"])
-def test_crash_after_observation_publish_and_source_cleanup_reuses_verified_bundle(
+def test_crash_after_observation_publish_reuses_verified_bundle_before_cleanup(
     tmp_path, monkeypatch, mode
 ):
     import json
@@ -449,6 +449,7 @@ def test_crash_after_observation_publish_and_source_cleanup_reuses_verified_bund
     released = []
 
     def release(**values):
+        assert store.load("session").workspace_evidence["observation"]["status"] == "complete"
         released.append(values)
         shutil.rmtree(producer, ignore_errors=True)
 
@@ -464,8 +465,8 @@ def test_crash_after_observation_publish_and_source_cleanup_reuses_verified_bund
     def crash_once():
         if not crashed:
             crashed.append(True)
-            assert released and not producer.exists()
-            raise KeyboardInterrupt("crash after source cleanup, before terminal review")
+            assert not released and producer.exists()
+            raise KeyboardInterrupt("crash after observation publication, before terminal review")
 
     class SimClient(ScriptedPersonaClient):
         def respond(self, system, user):
@@ -521,6 +522,7 @@ def test_crash_after_observation_publish_and_source_cleanup_reuses_verified_bund
         session = run.load_completed_session("session")
     assert session.workspace_evidence["observation"]["status"] == "complete"
     assert len(collect_count) == 1
+    assert len(released) == 1 and not producer.exists()
 
 
 def test_conversational_scratch_has_explicit_no_git_and_bounded_safe_review(tmp_path):

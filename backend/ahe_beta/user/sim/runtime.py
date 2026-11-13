@@ -9,6 +9,7 @@ from __future__ import annotations
 import ctypes
 import hashlib
 import json
+import logging
 import os
 import platform
 import re
@@ -29,10 +30,23 @@ from types import MappingProxyType
 from typing import Any, Protocol, runtime_checkable
 
 _MAX_OUTPUT = 20_000
+_LOG = logging.getLogger(__name__)
 
 
 class InvalidWorkspaceArtifact(ValueError):
     """The Actor's final filesystem cannot supply the declared task artifact."""
+
+
+class CollectionSourceLost(RuntimeError):
+    """The workspace provider confirmed the original capture source no longer exists."""
+
+
+def cleanup_workspace(action: Callable[[], None], *, stage: str, identity: str) -> None:
+    """Report cleanup failures without changing the outcome of an independent operation."""
+    try:
+        action()
+    except Exception as error:
+        _LOG.warning("Workspace cleanup pending: %s %s (%s)", stage, identity, type(error).__name__)
 
 
 def read_bounded_file(root: str, path: str, max_bytes: int) -> bytes:

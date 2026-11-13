@@ -43,7 +43,12 @@ from ahe_beta.models import (
 )
 from ahe_beta.usage import bind_usage_context, current_usage_context
 from ahe_beta.user.sim.deps import ensure_deps
-from ahe_beta.user.sim.runtime import WorkspaceRuntime, as_runtime, make_empty_runtime
+from ahe_beta.user.sim.runtime import (
+    WorkspaceRuntime,
+    as_runtime,
+    cleanup_workspace,
+    make_empty_runtime,
+)
 from ahe_beta.user.sim.workspace import materialize as materialize_workspace
 
 type SessionPair = tuple[Persona, SeedScenario]
@@ -253,7 +258,7 @@ class Orchestrator:
                 with session_lock:
                     successful_sessions += 1
             finally:
-                workspace_dir.close()
+                cleanup_workspace(workspace_dir.close, stage="close", identity=persona.identity)
 
         if prepared:
             with ThreadPoolExecutor(
@@ -631,7 +636,7 @@ class Orchestrator:
                     traceback.print_exc()
                 finally:
                     if workspace_dir is not None:
-                        workspace_dir.close()
+                        cleanup_workspace(workspace_dir.close, stage="close", identity=key)
 
         if pending:
             with ThreadPoolExecutor(

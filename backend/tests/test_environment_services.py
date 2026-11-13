@@ -37,6 +37,19 @@ def test_read_only_docker_inspection_recovers_from_temporary_timeout(monkeypatch
     assert calls == [(["container", "inspect", "task"], 30, False)] * 2
 
 
+def test_docker_transport_error_does_not_prove_task_container_missing(monkeypatch):
+    manager = object.__new__(DockerTaskEnvironmentManager)
+    responses = iter(
+        ["docker endpoint not found", "Error response from daemon: No such container: task"]
+    )
+    monkeypatch.setattr(
+        manager, "_docker", lambda **kwargs: subprocess.CompletedProcess([], 1, "", next(responses))
+    )
+    with pytest.raises(TaskEnvironmentError, match="Cannot inspect"):
+        manager._inspect(kind="container", name="task")
+    assert manager._inspect(kind="container", name="task") is None
+
+
 class FakeManager(DockerTaskEnvironmentManager):
     """Keep lifecycle/journal code real, replace only the Docker transport."""
 
@@ -427,13 +440,16 @@ def test_task_service_readiness_and_relative_finalizer_share_task_workdir(tmp_pa
     assert observed.count((["test", "-f", "ready"], "/app")) == 2
 
 
-def test_incomplete_finalization_cannot_be_adopted_as_collection_or_restart_actor(tmp_path):
+def test_ambiguous_finalization_hook_cannot_be_replayed_or_restart_actor(tmp_path):
     from ahe_beta.experiment.task_environments.docker import resume_collection
 
     m = manager(tmp_path)
     runtime = m.open()
     m.quiesce()
     assert "frozen_at" not in m._record()
-    with pytest.raises(TaskEnvironmentError, match="finalization repair"):
+    record = m._record()
+    record.setdefault("stages", {})["finalize-service-customer"] = "started"
+    m._save(value=record)
+    with pytest.raises(TaskEnvironmentError, match="Interrupted side-effecting environment hook"):
         resume_collection(binding=runtime.collection_binding(), expected_provenance=m.identity)
     assert m.start_count == 1
