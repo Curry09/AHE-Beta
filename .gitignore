@@ -54,6 +54,7 @@ evaluation/datasets/
 /.venv-evaluation/
 /runtime/python312.tar.gz
 /runtime/*.whl
+/runtime/ahe/
 .glm
 .ds
 .silicon

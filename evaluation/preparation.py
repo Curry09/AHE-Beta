@@ -71,10 +71,15 @@ def source_files(source):
 
 def freeze_harness(name, source, cache, runtime):
     files = source_files(source)
+    if name == "ahe":
+        from .harness.ahe import verify_source
+
+        verify_source(source)
     source_hashes = {p: sha(b) for p, b in files.items()}
     # Runtime bootstrap/capture are framework-owned. The original entry is retained verbatim.
     files["_harness_entry.py"] = files.pop("entry.py")
-    files["entry.py"] = (PACKAGE / "harness/runtime_bootstrap.py").read_bytes()
+    bootstrap = "ahe_bootstrap.py" if name == "ahe" else "runtime_bootstrap.py"
+    files["entry.py"] = (PACKAGE / "harness" / bootstrap).read_bytes()
     files["fulltrace.py"] = (PACKAGE / "harness/fulltrace.py").read_bytes()
     identity = digest_json({p: sha(b) for p, b in files.items()})
     folder = cache / "materials" / name / identity
@@ -119,6 +124,34 @@ def runtime_descriptor():
         runtime_lock_sha256=expected["runtime.lock"],
         python_archive=str(directory / "python312.tar.gz"),
         python_sha256=expected["python312.tar.gz"],
+    )
+
+
+def ahe_runtime(base):
+    from .harness.ahe import provenance, verify_native_wheel
+
+    directory = Path(base["runtime_wheel"]).parent / "ahe"
+    try:
+        expected = json.loads((directory / "manifest.json").read_text())
+    except FileNotFoundError as error:
+        raise ValueError(
+            "AHE runtime missing; use evaluation.harness.ahe --build-runtime"
+        ) from error
+    wheel = "nexau-0.4.1-py3-none-any.whl"
+    if set(expected) != {wheel, "runtime.lock"}:
+        raise ValueError("Invalid AHE runtime manifest")
+    for name, digest in expected.items():
+        if sha((directory / name).read_bytes()) != digest:
+            raise ValueError("AHE runtime asset changed: " + name)
+    if expected["runtime.lock"] != provenance()["runtime_lock_sha256"]:
+        raise ValueError("AHE runtime dependency lock changed")
+    verify_native_wheel(directory / wheel)
+    return dict(
+        base,
+        runtime_wheel=str(directory / wheel),
+        runtime_sha256=expected[wheel],
+        runtime_lock=str(directory / "runtime.lock"),
+        runtime_lock_sha256=expected["runtime.lock"],
     )
 
 
@@ -168,7 +201,10 @@ def prepare(config, download=True):
                 )
             )
         else:
-            harnesses.append(freeze_harness(name, config.path("harnesses") / name, cache, runtime))
+            selected_runtime = ahe_runtime(runtime) if name == "ahe" else runtime
+            harnesses.append(
+                freeze_harness(name, config.path("harnesses") / name, cache, selected_runtime)
+            )
     return ds, cases, resolved, harnesses
 
 

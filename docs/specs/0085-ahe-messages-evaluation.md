@@ -12,6 +12,7 @@ tasks:
     depends-on: []
     files:
       - .gitignore
+      - .gitattributes
       - pyproject.toml
       - backend/scripts/check_nexau_dependency.py
       - evaluation/harness/ahe.py
@@ -100,4 +101,3 @@ No new interaction policy is introduced. Separate campaign repetitions and publi
 ## Future possibilities
 
 Additional upstream agents or protocols can follow this material contract after separate validation.
-
