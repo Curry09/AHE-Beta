@@ -77,7 +77,15 @@ uv run --locked --extra experiments python backend/scripts/experiment.py logs "$
 
 prepare 失败时保留已验证缓存；打印 run ID 不等于已经准备成功。模型调用前会校验实际沙箱、Docker/镜像能力，任务初始化/服务就绪发生在每个 attempt 的 Actor 启动前。材料、工具链探针通过与正式六轮完成是不同层次的验证。
 
-准备阶段以文件流上传冻结材料，不会把整个归档读进内存；连接、读写等待时间随文件大小增加。这是有限的 I/O 等待，不是整次上传的严格总时限，也不会改变任务或模型预算。启动进度会显示当前传输的文件。
+启动 E2B 实验时，控制器会逐个上传准备阶段固定下来的文件，边读边传。启动日志会显示当前正在上传的文件。文件越大，上传时留给连接和读写的时间就越长。这些超时只用于单个文件的网络操作，不限制整批上传的总用时，也不影响任务或模型预算。
+
+## 只运行一轮试用
+
+如果只想试跑一轮 U32，可以在原目录下复制一份 `u32-mixed-e2b.json`，这样任务和用户画像的相对路径仍然有效。把副本中的 `rounds.count` 改为 `1`，并在 `workload.interaction_plan` 中只保留第一轮计划。
+
+如果想在本地运行，用 `u4-local.json` 中的 `runtime` 段替换副本中的整个 `runtime` 段，再为本次试跑设置一个不同的仓库前缀。本地运行需要 Docker Engine 和 Compose，实验会自动启动本地 Gitea，无需配置 E2B 或 Gitea.com 凭证。选好运行方式后，把 `CONFIG` 指向副本，按上文的步骤检查配置、准备材料并启动实验。
+
+只跑一轮，可以验证初始 Harness 能否在任务环境中完成用户会话，以及产物能否归档。这一轮也是最后一轮，因此不会进入需求处理和 OpenAgents 交付。如果还想验证交付，可以用规模较小的 U4 示例跑两轮，保留两轮的会话计划。只有首轮产生了获准交付的 Issue，OpenAgents 才会接手。
 
 ## 收集、停止和恢复
 
@@ -88,6 +96,10 @@ uv run --locked --extra experiments python backend/scripts/experiment.py resume 
 ```
 
 run 启动后，云内 supervisor/controller 独立运行；工作机还会启动后台 collector，周期收集状态和产物。退出 logs 不会停止实验。工作机关机后本机 collector 不能继续收集，云端 controller 的存活仍受实际 provider 生命周期约束。
+
+`PARTIAL` 归档保留已收集到的记录，供查看和排查。执行 `resume` 时，程序会从原运行环境中的检查点继续实验，不会从归档恢复。要从归档创建新的续跑实验，原实验必须已完成，且[归档须符合续跑条件](experiment-continuation.zh-CN.md)。
+
+如果本地 Docker 重启了，等 `docker info` 能正常返回后，再用 `resume` 恢复实验。如果看到 `Completed Actor awaits explicit finalization repair`，说明 Harness 已结束执行，但 Docker 中断时，产物还没来得及冻结。这种情况下，重复执行 `resume` 无法补上这一步。请保留实验目录和已有归档，便于排查。
 
 当前不会自动延长 E2B 沙箱租期。`runtime.e2b.timeout_seconds: 86400` 设置创建时的租期，与模型输出预算无关。`stop` 停止控制器并保留沙箱，CLI `resume` 要求原沙箱仍在运行；暂停实例需要先通过 provider 恢复，过期或已删除实例标记为 `LOST`。六轮实验可能超过一天，请关注实际 `expires_at`，保持管理主机的收集进程可用，并保留完整归档。
 

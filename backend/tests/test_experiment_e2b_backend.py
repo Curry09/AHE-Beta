@@ -192,9 +192,61 @@ def test_remote_collection_omits_secrets_and_hashes_archive(tmp_path):
     assert "checkpoints/recovery.json" in receipt["files"]
     assert not any("secrets" in p or ".openagents" in p for p in receipt["files"])
     data = (tmp_path / "runtime/collection.tar.gz").read_bytes()
+    assert len(data) == receipt["archive_size"]
     assert hashlib.sha256(data).hexdigest() == receipt["archive_sha256"]
     with tarfile.open(fileobj=io.BytesIO(data)) as archive:
         assert set(archive.getnames()) == set(receipt["files"])
+        assert {
+            name: hashlib.sha256(archive.extractfile(name).read()).hexdigest()
+            for name in archive.getnames()
+        } == receipt["files"]
+
+
+@pytest.mark.parametrize("change", ["append", "truncate"])
+def test_remote_collection_handles_log_changes_after_sizing(tmp_path, monkeypatch, change):
+    log = tmp_path / "logs/controller.log"
+    log.parent.mkdir()
+    original = b"previous log entry\n" * 2048
+    log.write_bytes(original)
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    published = runtime / "collection.tar.gz"
+    published.write_bytes(b"previous archive")
+    abandoned = runtime / ".collection-abandoned.tar.gz"
+    abandoned.write_bytes(b"interrupted attempt")
+    addfile = tarfile.TarFile.addfile
+
+    def change_log_before_read(archive, entry, reader):
+        if entry.name == "logs/controller.log":
+            assert entry.size == len(original)
+            if change == "append":
+                with log.open("ab") as stream:
+                    stream.write(b"new log entry\n")
+            else:
+                log.write_bytes(original[:100])
+        return addfile(archive, entry, reader)
+
+    monkeypatch.setattr(tarfile.TarFile, "addfile", change_log_before_read)
+    monkeypatch.setattr(sys, "argv", ["collector", str(tmp_path)])
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        if change == "truncate":
+            with pytest.raises(OSError):
+                exec(COLLECTION_PROGRAM, {})
+        else:
+            exec(COLLECTION_PROGRAM, {})
+
+    assert set(runtime.glob(".collection-*.tar.gz")) == {abandoned}
+    if change == "truncate":
+        assert published.read_bytes() == b"previous archive"
+        assert stdout.getvalue() == ""
+    else:
+        receipt = json.loads(stdout.getvalue())
+        assert receipt["consistent"] is False
+        assert receipt["files"] == {"logs/controller.log": hashlib.sha256(original).hexdigest()}
+        with tarfile.open(published) as archive:
+            assert archive.getnames() == ["logs/controller.log"]
+            assert archive.extractfile("logs/controller.log").read() == original
 
 
 def test_portable_bootstrap_program_compiles_and_pins_downloads():
@@ -312,12 +364,22 @@ def test_preserved_collection_reverified_after_compute_destroyed(backend):
         backend.collect()
 
 
+def test_temporary_inspect_error_marks_progress_as_unobserved(backend, monkeypatch):
+    _write(backend.resource_file, {"sandbox_id": "owned", "bootstrap_complete": True})
+    monkeypatch.setattr(backend, "_engine", Mock(side_effect=TimeoutError))
+    receipt = backend.inspect()
+    assert receipt["state"] == "UNKNOWN"
+    assert receipt["observation"] == "UNKNOWN"
+
+
 def test_tampered_download_preserves_previous_snapshot(backend, monkeypatch):
+    from contextlib import nullcontext
+
     snapshot = backend.run_dir / "runtime/cloud-snapshot"
     snapshot.mkdir(parents=True)
     (snapshot / "previous.txt").write_text("valid prior collection")
     sandbox = Mock()
-    sandbox.files.read.return_value = b"changed download"
+    sandbox.files.read.return_value = nullcontext(iter([b"tampered ", b"archive"]))
     monkeypatch.setattr(backend, "_sandbox", lambda: sandbox)
     monkeypatch.setattr(backend, "inspect", lambda: {"state": "RUNNING", "nonce": "same"})
     monkeypatch.setattr(
@@ -326,6 +388,7 @@ def test_tampered_download_preserves_previous_snapshot(backend, monkeypatch):
         lambda *a, **kw: json.dumps(
             {
                 "archive_sha256": hashlib.sha256(b"actual archive").hexdigest(),
+                "archive_size": len(b"tampered archive"),
                 "files": {},
                 "consistent": False,
             }
@@ -493,6 +556,8 @@ def test_worker_launch_and_root_management_use_real_owned_process_and_files(
         "execution_gid": os.getegid(),
         "execution_home": str(remote / "runtime/home"),
     }
+    # A full U32 bootstrap carries task recipes; the ownership command needs only account facts.
+    bootstrap["task_workspaces"] = {"task": {"record": "x" * 140_000}}
     _write(
         backend.resource_file,
         {"bootstrap": bootstrap, "bootstrap_complete": True, "sandbox_id": "owned"},
@@ -508,6 +573,7 @@ def test_worker_launch_and_root_management_use_real_owned_process_and_files(
         destination.write_text(data)
 
     def command(command, *, user, envs, timeout):
+        assert len(command.encode()) < 131_072, "E2B command exceeded Linux single-argument limit"
         observed.append(("command", user))
         argv = shlex.split(command)
         if "-c" not in argv:
@@ -528,7 +594,7 @@ def test_worker_launch_and_root_management_use_real_owned_process_and_files(
         commands=SimpleNamespace(run=command),
         files=SimpleNamespace(
             write=write,
-            read=lambda path, **kwargs: Path(path).read_bytes(),
+            read=lambda path, **kwargs: Path(path).open("rb"),
         ),
     )
     monkeypatch.setattr(backend, "_sandbox", lambda: sandbox)
@@ -578,6 +644,8 @@ time.sleep(60)
         }
 
         def scandir(path):
+            if isinstance(path, int):
+                return original_scandir(path)
             candidate = Path(path)
             scans.append(candidate)
             if any(candidate.is_relative_to(private) for private in private_runtime):

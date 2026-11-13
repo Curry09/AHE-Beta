@@ -6,7 +6,6 @@ import json
 import shutil
 import subprocess
 import threading
-import time
 from dataclasses import replace
 from functools import partial
 from pathlib import Path
@@ -119,6 +118,8 @@ def test_same_task_many_users_have_independent_workspaces_and_bounded_fanout(
     records, provision_contexts = [], []
     active, peak = [0], [0]
     lock = threading.Lock()
+    arrivals = 0
+    first_pair = threading.Barrier(2)
     plan = [
         _binding(f"p-{index}", "ordinary", index, round_no=1, mode="direct")
         for index in range(n_users)
@@ -152,11 +153,15 @@ def test_same_task_many_users_have_independent_workspaces_and_bounded_fanout(
             self.ws = ws
 
         def send(self, message):
+            nonlocal arrivals
             with lock:
+                arrivals += 1
+                initial_pair = arrivals <= 2
                 active[0] += 1
                 peak[0] = max(peak[0], active[0])
             try:
-                time.sleep(0.02)
+                if initial_pair:
+                    first_pair.wait(timeout=10)
                 response = self.ws.run(
                     "python3 -c 'import editable; print(editable.OWNER)'", timeout=5
                 )

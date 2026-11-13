@@ -22,6 +22,21 @@ from ahe_beta.experiment.task_environments.docker import (
 )
 
 
+def test_read_only_docker_inspection_recovers_from_temporary_timeout(monkeypatch):
+    manager = object.__new__(DockerTaskEnvironmentManager)
+    calls = []
+
+    def inspect(*, argv, timeout, check):
+        calls.append((argv, timeout, check))
+        if len(calls) == 1:
+            raise subprocess.TimeoutExpired(argv, timeout)
+        return subprocess.CompletedProcess(argv, 0, stdout='[{"Id": "task"}]', stderr="")
+
+    monkeypatch.setattr(manager, "_docker", inspect)
+    assert manager._inspect(kind="container", name="task") == {"Id": "task"}
+    assert calls == [(["container", "inspect", "task"], 30, False)] * 2
+
+
 class FakeManager(DockerTaskEnvironmentManager):
     """Keep lifecycle/journal code real, replace only the Docker transport."""
 

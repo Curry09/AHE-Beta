@@ -288,7 +288,15 @@ class DockerTaskEnvironmentManager:
         return value
 
     def _inspect(self, *, kind: str, name: str) -> dict | None:
-        value = self._docker(argv=[kind, "inspect", name], timeout=30, check=False)
+        for attempt in range(3):
+            try:
+                value = self._docker(argv=[kind, "inspect", name], timeout=30, check=False)
+                break
+            except subprocess.TimeoutExpired:
+                if attempt == 2:
+                    raise TaskEnvironmentError(
+                        "Docker task resource inspection timed out"
+                    ) from None
         if value.returncode:
             if "no such" in value.stderr.lower() or "not found" in value.stderr.lower():
                 return None

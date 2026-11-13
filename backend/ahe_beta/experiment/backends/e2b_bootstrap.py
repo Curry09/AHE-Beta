@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import shlex
 import sys
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -492,38 +493,51 @@ def _upload_file(sandbox: Any, *, path: Path, remote: str, timeout_seconds: int)
     # e2b 2.55 ignores request_timeout for files.write(binary IO), in both its
     # octet-stream and multipart branches. The public upload URL lets HTTPX stream
     # the binary file with finite connect/read/write waits, without private SDK hooks.
-    try:
-        with (
-            _private_upload_logs(),
-            path.open("rb") as stream,
-            httpx.Client(
-                http2=False,
-                trust_env=False,
-                proxy=sandbox.connection_config.proxy,
-                timeout=timeout_seconds,
-                follow_redirects=False,
-            ) as client,
-        ):
-            url = sandbox.upload_url(remote, user="root")
-            response = client.post(
-                url,
-                files={"file": (path.name, stream, "application/octet-stream")},
-                timeout=timeout_seconds,
+    for attempt in range(1, 4):
+        try:
+            with (
+                _private_upload_logs(),
+                path.open("rb") as stream,
+                httpx.Client(
+                    http2=False,
+                    trust_env=False,
+                    proxy=sandbox.connection_config.proxy,
+                    timeout=timeout_seconds,
+                    follow_redirects=False,
+                ) as client,
+            ):
+                url = sandbox.upload_url(remote, user="root")
+                response = client.post(
+                    url,
+                    files={"file": (path.name, stream, "application/octet-stream")},
+                    timeout=timeout_seconds,
+                )
+                response.raise_for_status()
+                try:
+                    result = response.json()
+                except ValueError:
+                    raise BackendError("E2B input upload returned an invalid receipt") from None
+                if not isinstance(result, list) or not result:
+                    raise BackendError("E2B input upload returned an invalid receipt")
+            return
+        except httpx.RemoteProtocolError:
+            if attempt == 3:
+                raise BackendError("E2B input upload failed (RemoteProtocolError)") from None
+            print(
+                f"[setup] upload connection interrupted; retrying file ({attempt + 1}/3)",
+                file=sys.stderr,
+                flush=True,
             )
-            response.raise_for_status()
-            try:
-                result = response.json()
-            except ValueError:
-                raise BackendError("E2B input upload returned an invalid receipt") from None
-            if not isinstance(result, list) or not result:
-                raise BackendError("E2B input upload returned an invalid receipt")
-    except httpx.HTTPError as error:
-        status = (
-            f", HTTP {error.response.status_code}"
-            if isinstance(error, httpx.HTTPStatusError)
-            else ""
-        )
-        raise BackendError(f"E2B input upload failed ({type(error).__name__}{status})") from None
+            time.sleep(attempt)
+        except httpx.HTTPError as error:
+            status = (
+                f", HTTP {error.response.status_code}"
+                if isinstance(error, httpx.HTTPStatusError)
+                else ""
+            )
+            raise BackendError(
+                f"E2B input upload failed ({type(error).__name__}{status})"
+            ) from None
 
 
 def upload_frozen_inputs(sandbox: Any, *, run_dir: Path, manifest: dict, root: str) -> None:

@@ -640,6 +640,29 @@ def test_failed_input_upload_retains_owned_resource_without_bootstrap_completion
     assert backend.root + "/runtime/bootstrap.py" not in sink.uploads
 
 
+def test_transient_disconnect_replays_the_same_file(transport_run, upload_transport, monkeypatch):
+    root, manifest, _ = transport_run
+    sink = _UploadSink(fail_path=None)
+    original_post = sink.post
+    attempted = []
+
+    def post(url, *, files, timeout):
+        if urlsplit(url).path.endswith("/large.bundle"):
+            attempted.append(urlsplit(url).path)
+            if len(attempted) == 1:
+                assert files["file"][1].read(1024)
+                raise httpx.RemoteProtocolError("peer disconnected")
+        return original_post(url, files=files, timeout=timeout)
+
+    monkeypatch.setattr(sink, "post", post)
+    monkeypatch.setattr(e2b_bootstrap.time, "sleep", lambda _: None)
+    e2b_bootstrap.upload_frozen_inputs(
+        upload_transport(sink), run_dir=root, manifest=manifest, root="/owned/run"
+    )
+    assert attempted == ["/owned/run/materials/large.bundle"] * 2
+    assert sink.uploads[attempted[0]]["content"] == (root / "materials/large.bundle").read_bytes()
+
+
 def test_signed_upload_url_is_absent_from_errors_and_transport_logs(
     transport_run, upload_transport, caplog, monkeypatch
 ):

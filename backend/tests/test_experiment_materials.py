@@ -4,6 +4,8 @@ import json
 import shutil
 import subprocess
 import tarfile
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -68,6 +70,40 @@ def prepared_inputs(tmp_path, monkeypatch):
 
     monkeypatch.setattr(materials, "_checkout_git", checkout)
     return config_path
+
+
+def test_simultaneous_preparations_share_one_openagents_checkout(
+    prepared_inputs, tmp_path, monkeypatch
+):
+    pin = json.loads(prepared_inputs.read_text())["source"]["openagents"]
+    checkout = materials._checkout_git
+    fetching = threading.Event()
+    other_started = threading.Event()
+    calls = []
+
+    def delayed_checkout(**kwargs):
+        calls.append(kwargs["revision"])
+        fetching.set()
+        assert other_started.wait(5)
+        return checkout(**kwargs)
+
+    monkeypatch.setattr(materials, "_checkout_git", delayed_checkout)
+
+    def acquire():
+        return materials._cached_openagents(
+            root=tmp_path / "runs", repository=pin["repository"], revision=pin["revision"]
+        )
+
+    def acquire_while_fetching():
+        assert fetching.wait(5)
+        other_started.set()
+        return acquire()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        one = executor.submit(acquire)
+        two = executor.submit(acquire_while_fetching)
+        assert one.result(timeout=10) == two.result(timeout=10)
+    assert calls == [pin["revision"]]
 
 
 def test_offline_check_has_no_resource_or_directory_side_effects(

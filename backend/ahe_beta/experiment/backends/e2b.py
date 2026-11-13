@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import shlex
+import shutil
 import tarfile
+import tempfile
 import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -482,7 +483,10 @@ for relative,mode in [('',0o700),('secrets',0o700),('secrets/launch.json',0o600)
     if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()): raise RuntimeError('Unsafe execution path')
     os.chown(path,account.pw_uid,account.pw_gid);path.chmod(mode)
 """
-            self._command(sandbox, json_command(ownership, self.root, json.dumps(bootstrap)))
+            identity = {
+                key: bootstrap[key] for key in ("execution_user", "execution_uid", "execution_gid")
+            }
+            self._command(sandbox, json_command(ownership, self.root, json.dumps(identity)))
         program = """import json,os,pathlib,sys
 root=pathlib.Path(sys.argv[1]);sys.path.insert(0,str(root/'source/controller/backend'))
 from ahe_beta.experiment.context import build_controller_environment
@@ -598,6 +602,7 @@ print(json.dumps(launch_controller(run_dir=root,command=controller_command(manif
             lost = str(exc).startswith("LOST:")
             return {
                 "state": "LOST" if lost else "UNKNOWN",
+                "observation": "OBSERVED" if lost else "UNKNOWN",
                 "running": False,
                 "resource_state": "LOST" if lost else "UNKNOWN",
                 "error": str(exc),
@@ -606,6 +611,7 @@ print(json.dumps(launch_controller(run_dir=root,command=controller_command(manif
         except Exception as exc:
             return {
                 "state": "UNKNOWN",
+                "observation": "UNKNOWN",
                 "running": False,
                 "resource_state": "UNKNOWN",
                 "error": type(exc).__name__,
@@ -642,49 +648,46 @@ print(json.dumps(launch_controller(run_dir=root,command=controller_command(manif
                 raise BackendError("Compute was destroyed before an E2B snapshot was collected")
             snapshot = Path(receipt["snapshot_dir"])
             for relative, digest in receipt["files"].items():
-                if hashlib.sha256((snapshot / relative).read_bytes()).hexdigest() != digest:
-                    raise BackendError("Preserved E2B snapshot checksum changed")
+                with (snapshot / relative).open("rb") as file:
+                    if hashlib.file_digest(file, "sha256").hexdigest() != digest:
+                        raise BackendError("Preserved E2B snapshot checksum changed")
             return receipt
         sandbox = self._sandbox()
         before = self.inspect()
         program = COLLECTION_PROGRAM
         result = json.loads(self._command(sandbox, json_command(program, self.root)))
-        data = sandbox.files.read(
-            self.root + "/runtime/collection.tar.gz", format="bytes", user="root"
-        )
-        if hashlib.sha256(data).hexdigest() != result["archive_sha256"]:
-            raise BackendError("E2B collection download checksum differs")
         destination = self.run_dir / "runtime/cloud-snapshot"
         staged = self.run_dir / "runtime" / ("cloud-snapshot-" + uuid.uuid4().hex)
         staged.mkdir(parents=True)
         try:
-            with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
-                for entry in archive.getmembers():
-                    path = Path(entry.name)
-                    if (
-                        path.is_absolute()
-                        or ".." in path.parts
-                        or not (entry.isfile() or entry.isdir())
-                        or entry.issym()
-                        or entry.islnk()
-                    ):
-                        raise BackendError("Unsafe E2B collection archive")
-                archived_files = [entry.name for entry in archive.getmembers() if entry.isfile()]
-                if len(set(archived_files)) != len(archived_files) or set(archived_files) != set(
-                    result["files"]
-                ):
-                    raise BackendError("E2B collection inventory differs from the receipt")
-                archive.extractall(staged, filter="data")
-            for relative, digest in result["files"].items():
-                if hashlib.sha256((staged / relative).read_bytes()).hexdigest() != digest:
-                    raise BackendError("E2B collected file checksum differs")
-            import shutil
-
+            size = result["archive_size"]
+            if type(size) is not int or size <= 0:
+                raise BackendError("Invalid E2B collection archive size")
+            # The SDK's buffered read uses a short total timeout. Stream to
+            # disk with a separate transfer budget; verify before extracting.
+            timeout = min(1800, max(300, size // (32 * 1024) + 60))
+            with tempfile.TemporaryFile(dir=staged.parent) as data:
+                digest = hashlib.sha256()
+                received = 0
+                with sandbox.files.read(
+                    self.root + "/runtime/collection.tar.gz",
+                    format="stream",
+                    user="root",
+                    request_timeout=timeout,
+                ) as stream:
+                    for chunk in stream:
+                        received += len(chunk)
+                        if received > size:
+                            raise BackendError("E2B collection download size differs")
+                        digest.update(chunk)
+                        data.write(chunk)
+                if received != size or digest.hexdigest() != result["archive_sha256"]:
+                    raise BackendError("E2B collection download checksum or size differs")
+                data.seek(0)
+                self._extract_collection(data, staged, result["files"])
             shutil.rmtree(destination, ignore_errors=True)
             staged.rename(destination)
         finally:
-            import shutil
-
             shutil.rmtree(staged, ignore_errors=True)
         after = self.inspect()
         terminal = after["state"] in {"STOPPED", "EXITED"}
@@ -700,6 +703,28 @@ print(json.dumps(launch_controller(run_dir=root,command=controller_command(manif
         }
         _write(self.run_dir / "runtime/e2b-collection.json", receipt)
         return receipt
+
+    @staticmethod
+    def _extract_collection(data, staged: Path, files: dict[str, str]) -> None:
+        with tarfile.open(fileobj=data, mode="r:gz") as archive:
+            for entry in archive.getmembers():
+                path = Path(entry.name)
+                if (
+                    path.is_absolute()
+                    or ".." in path.parts
+                    or not (entry.isfile() or entry.isdir())
+                    or entry.issym()
+                    or entry.islnk()
+                ):
+                    raise BackendError("Unsafe E2B collection archive")
+            archived_files = [entry.name for entry in archive.getmembers() if entry.isfile()]
+            if len(set(archived_files)) != len(archived_files) or set(archived_files) != set(files):
+                raise BackendError("E2B collection inventory differs from the receipt")
+            archive.extractall(staged, filter="data")
+        for relative, digest in files.items():
+            with (staged / relative).open("rb") as file:
+                if hashlib.file_digest(file, "sha256").hexdigest() != digest:
+                    raise BackendError("E2B collected file checksum differs")
 
     def assessment_exchange(self, action: str, payload: dict) -> dict:
         # Spec-0084/T5: reuse verified sandbox ownership and the frozen controller.
@@ -800,8 +825,9 @@ print(json.dumps(launch_controller(run_dir=root,command=controller_command(manif
 
 
 COLLECTION_PROGRAM = r"""
-import hashlib,json,os,pathlib,tarfile,sys
+import hashlib,json,os,pathlib,stat,tarfile,tempfile,sys
 root=pathlib.Path(sys.argv[1]); output=root/'runtime/collection.tar.gz'
+archive_prefix='.collection-'
 excluded={'secrets','.venv','.git','.openagents','__pycache__','source','cloud-snapshot','downloads','bin'}
 private_runtime={('runtime','home'),('runtime','python'),('runtime','uv-cache'),('runtime','task-cache')}
 def paths():
@@ -816,14 +842,60 @@ def paths():
             dirs[:]=sorted(name for name in dirs if name not in excluded and relative.parts+(name,) not in private_runtime and not (parent/name).is_symlink())
             for name in sorted(files):
                 path=parent/name;rel=path.relative_to(root)
-                if path.is_file() and not path.is_symlink() and not any(p in excluded for p in rel.parts) and path!=output and path.name != 'bootstrap.py' and not path.name.endswith('.lock'):
+                temporary_archive=parent==output.parent and name.startswith(archive_prefix) and name.endswith('.tar.gz')
+                if path.is_file() and not path.is_symlink() and not any(p in excluded for p in rel.parts) and path!=output and not temporary_archive and path.name != 'bootstrap.py' and not path.name.endswith('.lock'):
                     area_paths.append(path)
         result.extend(sorted(area_paths))
     return result
-files={str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths()}
-descriptor=os.open(output,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600);os.fchmod(descriptor,0o600)
-with os.fdopen(descriptor,'wb') as stream,tarfile.open(fileobj=stream,mode='w:gz',dereference=True) as tar:
-    for name in files: tar.add(root/name,arcname=name,recursive=False)
-consistent=all((root/name).is_file() and hashlib.sha256((root/name).read_bytes()).hexdigest()==digest for name,digest in files.items())
-print(json.dumps({'files':files,'consistent':consistent,'archive_sha256':hashlib.sha256(output.read_bytes()).hexdigest()}))
+def open_source(path):
+    return os.fdopen(os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK),'rb')
+def sha(path):
+    try:
+        with open_source(path) as stream:
+            if stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                return hashlib.file_digest(stream,'sha256').hexdigest()
+    except FileNotFoundError:
+        pass
+
+class HashingReader:
+    def __init__(self,source):
+        self.source=source
+        self.digest=hashlib.sha256()
+    def read(self,size):
+        data=self.source.read(size)
+        self.digest.update(data)
+        return data
+
+# Hash the bytes tar actually reads. Use the size of the opened file so
+# appends do not change this member; a short read aborts the whole archive.
+# Publish only after the archive is closed and its receipt is ready.
+files={}; missed=False
+descriptor,name=tempfile.mkstemp(dir=output.parent,prefix=archive_prefix,suffix='.tar.gz')
+temporary=pathlib.Path(name)
+try:
+    with os.fdopen(descriptor,'wb') as stream:
+        with tarfile.open(fileobj=stream,mode='w:gz') as archive:
+            for source in paths():
+                try:
+                    original=open_source(source)
+                except FileNotFoundError:
+                    missed=True; continue
+                with original:
+                    opened=os.fstat(original.fileno())
+                    if not stat.S_ISREG(opened.st_mode):
+                        missed=True; continue
+                    entry=tarfile.TarInfo(source.relative_to(root).as_posix())
+                    entry.size=opened.st_size
+                    reader=HashingReader(original)
+                    archive.addfile(entry,reader)
+                    files[entry.name]=reader.digest.hexdigest()
+        stream.flush()
+        os.fsync(stream.fileno())
+    current={str(p.relative_to(root)):sha(p) for p in paths()}
+    receipt={'files':files,'consistent':not missed and files==current,
+             'archive_sha256':sha(temporary),'archive_size':temporary.stat().st_size}
+    temporary.replace(output)
+    print(json.dumps(receipt))
+finally:
+    temporary.unlink(missing_ok=True)
 """
