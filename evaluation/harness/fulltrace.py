@@ -81,7 +81,7 @@ def headers(value):
 
 
 def request_start(request):
-    if not re.search(r"/(?:chat/completions|messages)/?$", request.url.path):
+    if not re.search(r"/(?:chat/completions|messages|responses)/?$", request.url.path):
         return None
     ident = uuid.uuid4().hex
     try:
@@ -140,6 +140,7 @@ def install(role="actor", directory=None):
                         tail = (tail + data)[-256:]
                         terminal_seen = terminal_seen or bool(
                             re.search(rb"(?:^|\n)data: *\[DONE\](?:\r?\n|$)", tail)
+                            or re.search(rb'"type"\s*:\s*"message_stop"', tail)
                         )
                         f.write(data)
                         f.flush()
@@ -189,6 +190,7 @@ def install(role="actor", directory=None):
                         tail = (tail + data)[-256:]
                         terminal_seen = terminal_seen or bool(
                             re.search(rb"(?:^|\n)data: *\[DONE\](?:\r?\n|$)", tail)
+                            or re.search(rb'"type"\s*:\s*"message_stop"', tail)
                         )
                         f.write(data)
                         f.flush()

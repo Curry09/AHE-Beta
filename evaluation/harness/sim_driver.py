@@ -118,6 +118,11 @@ def main():
                     if budget.remaining() <= 0
                     else "HarnessSelfTimeout"
                     if reply.timed_out
+                    else "ModelOutputLimit"
+                    if any(
+                        e.get("type") == "reply" and e.get("failure_kind") == "model_output_limit"
+                        for e in reply.events
+                    )
                     else "HarnessExecutionError"
                 )
                 break

@@ -70,6 +70,11 @@ def main() -> int:
                     "normal_reply": not reply.failed,
                     "termination_reason": "HarnessSelfTimeout"
                     if reply.timed_out
+                    else "ModelOutputLimit"
+                    if any(
+                        e.get("type") == "reply" and e.get("failure_kind") == "model_output_limit"
+                        for e in reply.events
+                    )
                     else "HarnessExecutionError"
                     if reply.failed
                     else None,

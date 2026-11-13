@@ -28,7 +28,12 @@ def grade_issues(case: dict, rewards: dict | None, logs: Path) -> list[str]:
             if entry.get("status") != "failed":
                 continue
             missing = "FileNotFoundException: path '" + entry["source"] + "' does not exist"
-            if missing not in evidence:
+            e2b_missing = (
+                "FileNotFoundException: path not found: lstat "
+                + entry["source"]
+                + ": no such file or directory"
+            )
+            if missing not in evidence and e2b_missing not in evidence:
                 issues.append("Task artifact collection incomplete: " + entry["source"])
     reward_file = next(
         (p for p in (logs / "reward.json", logs / "reward.txt") if p.is_file()), None
