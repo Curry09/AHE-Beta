@@ -21,6 +21,7 @@ from ahe_beta.usage import monotonic_ms, provider_wait_scope, record_usage
 
 PERSONA_MAX_CONTEXT_TOKENS = 256000
 PERSONA_MAX_OUTPUT_TOKENS = 32768
+_TERMINAL_REVIEW_TIMEOUT_SECONDS = 300.0
 
 try:  # Align with NexAU: read repo root .env (USER_LLM_BASE_URL / USER_LLM_API_KEY / USER_LLM_MODEL)
     from dotenv import load_dotenv
@@ -142,9 +143,25 @@ class ApiPersonaClient:
             kwargs["base_url"] = base_url
         self.client = OpenAI(**kwargs)
 
-    def _create(self, messages: list[dict], max_tokens: int):
-        """Backoff retry (429 / transient gateway errors). Each attempt first tries enable_thinking=False; if rejected,
-        retry without that option."""
+    def _request(self, messages: list[dict], max_tokens: int) -> dict:
+        request = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+            "max_tokens": max_tokens,
+        }
+        reasoning_effort = os.getenv("USER_LLM_REASONING_EFFORT", "").strip()
+        if reasoning_effort:
+            request["reasoning_effort"] = reasoning_effort
+        # GLM deployments retain the provider's default thinking configuration.
+        model_family = self.model.rsplit("/", 1)[-1].lower().replace("-", "")
+        if not reasoning_effort and not model_family.startswith(
+            ("glm5.2", "glm5.3", "glm52", "glm53")
+        ):
+            request["extra_body"] = {"enable_thinking": False}
+        return request
+
+    def _check_context(self, messages: list[dict]) -> None:
         estimated_tokens = _estimate_context_tokens(messages)
         # Spec-0084/T2: consume the checked operator threshold, without dynamic compression.
         limit = int(os.getenv("USER_LLM_MAX_CONTEXT_TOKENS", str(PERSONA_MAX_CONTEXT_TOKENS)))
@@ -152,27 +169,16 @@ class ApiPersonaClient:
             raise ValueError("USER_LLM_MAX_CONTEXT_TOKENS must be positive")
         if estimated_tokens > limit:
             raise PersonaContextLimitError(estimated_tokens, limit)
+
+    def _create(self, messages: list[dict], max_tokens: int):
+        """Retry transient gateway errors; also support gateways rejecting extra_body."""
+        self._check_context(messages)
+        request = self._request(messages, max_tokens)
         delay = 2.0
         last: Exception | None = None
         for _ in range(5):
             started = monotonic_ms()
             try:
-                request = {
-                    "model": self.model,
-                    "messages": messages,
-                    "temperature": self.temperature,
-                    "max_tokens": max_tokens,
-                }
-                reasoning_effort = os.getenv("USER_LLM_REASONING_EFFORT", "").strip()
-                if reasoning_effort:
-                    request["reasoning_effort"] = reasoning_effort
-                # GLM deployments also use glm53_* / glm53-flash-* names and
-                # provider-qualified IDs. Preserve their server thinking default.
-                model_family = self.model.rsplit("/", 1)[-1].lower().replace("-", "")
-                if not reasoning_effort and not model_family.startswith(
-                    ("glm5.2", "glm5.3", "glm52", "glm53")
-                ):
-                    request["extra_body"] = {"enable_thinking": False}
                 with provider_wait_scope():
                     response = self.client.chat.completions.create(**request)
                 record_usage(
@@ -195,14 +201,7 @@ class ApiPersonaClient:
                 started = monotonic_ms()
                 try:  # Flag may be rejected by gateway -> try once without it
                     with provider_wait_scope():
-                        retry_request = {
-                            "model": self.model,
-                            "messages": messages,
-                            "temperature": self.temperature,
-                            "max_tokens": max_tokens,
-                        }
-                        if reasoning_effort:
-                            retry_request["reasoning_effort"] = reasoning_effort
+                        retry_request = {k: v for k, v in request.items() if k != "extra_body"}
                         response = self.client.chat.completions.create(**retry_request)
                     record_usage(
                         usage=getattr(response, "usage", None),
@@ -304,6 +303,46 @@ class ApiPersonaClient:
         if not text:
             text = self._text(self._create(messages, max_tokens))
         return text
+
+    def complete_terminal_review(self, messages: list[dict]) -> str:
+        """One tool-free API request after the actor stops, with its own wall limit."""
+        import asyncio
+
+        from openai import AsyncOpenAI
+
+        self._check_context(messages)
+        request = self._request(messages, PERSONA_MAX_OUTPUT_TOKENS)
+
+        async def complete():
+            async with (
+                asyncio.timeout(_TERMINAL_REVIEW_TIMEOUT_SECONDS),
+                AsyncOpenAI(
+                    api_key=self.client.api_key, base_url=self.client.base_url, max_retries=0
+                ) as client,
+            ):
+                return await client.chat.completions.create(**request)
+
+        started = monotonic_ms()
+        try:
+            with provider_wait_scope():
+                response = asyncio.run(complete())
+        except Exception as error:
+            record_usage(
+                provider="openai-compatible",
+                model=self.model,
+                latency_ms=monotonic_ms() - started,
+                success=False,
+                error=error,
+            )
+            raise
+        record_usage(
+            usage=getattr(response, "usage", None),
+            provider="openai-compatible",
+            model=self.model,
+            latency_ms=monotonic_ms() - started,
+            request_id=getattr(response, "id", None),
+        )
+        return self._text(response)
 
     def classify_action(self, system: str, ret: dict, space: list[str]) -> str:
         """Option B: model self-assessment classification when action=='free'.
@@ -736,6 +775,8 @@ def _validate_stage_output(
         score = obj.get("score")
         if isinstance(score, bool) or not isinstance(score, int) or not 1 <= score <= 4:
             return "invalid_score"
+        if "issue" in obj and not isinstance(obj["issue"], str):
+            return "invalid_issue"
         return None if str(obj.get("reason") or "").strip() else "missing_reason"
     if stage == "direct_review":
         if obj.get("task_assessment") not in {"fulfilled", "unfulfilled", "unknown"}:
@@ -924,10 +965,12 @@ class AgenticPersonaClient:
         max_inner_steps: int = 8,
         timeout: float = 10.0,
         sandbox_factory=None,
+        terminal_review_llm=None,
     ) -> None:
         from .sandbox import Sandbox
 
         self._llm = llm
+        self._terminal_review_llm = terminal_review_llm
         self.max_inner_steps = max_inner_steps
         self.timeout = timeout
         self._sandbox_factory = sandbox_factory or Sandbox
@@ -980,6 +1023,19 @@ class AgenticPersonaClient:
             "n": len(self._issue_notes),
             "note": "issue noted; conversation continues — you are not obligated to stop",
         }
+
+    def respond_for_terminal_review(self, system: str, user: str) -> dict:
+        """Read the frozen evidence in the prompt, without live tools or format retries."""
+        if self._terminal_review_llm is None:
+            return self.respond(system, user)
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        raw = self._terminal_review_llm(messages) or ""
+        parsed = _parse_json(raw)
+        _push_call_trace(self, system=system, user=user, raw=raw, parsed=parsed, steps=None)
+        stage = _stage_from_user(user)
+        if code := _validate_stage_output(stage, parsed, user, tools_allowed=False):
+            raise PersonaProtocolError(stage, code)
+        return parsed
 
     def _call_without_tools(self, system: str, user: str, stage: str) -> dict:
         """Spec-0048/T2: in the no-tools phase, retry strictly per phase contract, never accept tool JSON."""

@@ -155,6 +155,14 @@ class _HarnessHandle:
         return self._task_budget.seconds
 
     @property
+    def task_deadline_reached(self) -> bool:
+        """The wall clock or an explicit Harness terminal receipt ended this task's budget."""
+        return self._task_budget.expired() or bool(
+            self.request_outcomes
+            and self.request_outcomes[-1]["termination_reason"] == "task_budget_exhausted"
+        )
+
+    @property
     def in_flight(self) -> bool:
         """Backward compatibility alias: whether we are still waiting for a reply since the last message write (soft state, does not block writes/reads)."""
         return self._awaiting_reply
@@ -435,17 +443,21 @@ class _HarnessHandle:
         task_deadline = self._task_budget.deadline
         activity = self._pending_requests.get(self._request_id, {}).get("activity_deadline")
         deadlines = [value for value in (task_deadline, activity) if value is not None]
-        if deadlines:
-            active_deadline = min(deadlines)
+        active_deadline = min(deadlines, default=None)
+        if active_deadline is not None:
             if now >= active_deadline and self._deadline_interrupt_sent != active_deadline:
-                self._write(
-                    {
-                        **self._interrupt_frame(),
-                        "reason": "task_budget_exhausted"
-                        if task_deadline == active_deadline
-                        else "message_activity_exhausted",
-                    }
-                )
+                try:
+                    self._write(
+                        {
+                            **self._interrupt_frame(),
+                            "reason": "task_budget_exhausted"
+                            if task_deadline == active_deadline
+                            else "message_activity_exhausted",
+                        }
+                    )
+                except BrokenPipeError:
+                    # The process may have closed stdin while publishing its terminal reply.
+                    pass
                 self._deadline_interrupt_sent = active_deadline
             expired = now >= active_deadline + self._limits.grace_seconds
         else:
@@ -453,10 +465,16 @@ class _HarnessHandle:
         if expired:
             self._kill_group(signal.SIGKILL)
             self._finish_request(
-                "timed_out", origin="infrastructure", reason="termination_grace_exhausted"
+                "timed_out",
+                origin="infrastructure",
+                reason="task_budget_exhausted"
+                if task_deadline is not None and active_deadline == task_deadline
+                else "termination_grace_exhausted",
             )
             self._pending_requests.clear()
             self._awaiting_reply = False
+            if task_deadline is not None and active_deadline == task_deadline:
+                raise RuntimeError("Task time limit exhausted; Harness did not stop within grace")
             raise RuntimeError(
                 "harness task exceeded its infrastructure deadline (termination grace exhausted)"
             )
@@ -546,6 +564,12 @@ class _HarnessHandle:
             if remaining <= 0:
                 base = self._t0 if self._awaiting_reply and self._t0 > 0 else t_poll0
                 return ("pending", time.monotonic() - base)
+            task_deadline = self._task_budget.deadline if self._awaiting_reply else None
+            if task_deadline is not None:
+                boundary = task_deadline
+                if self._deadline_interrupt_sent == task_deadline:
+                    boundary += self._limits.grace_seconds
+                remaining = min(remaining, max(0.0, boundary - time.monotonic()))
             try:
                 item = self._line_q.get(timeout=min(_POLL_INTERVAL, remaining))
             except queue.Empty:
@@ -608,6 +632,7 @@ class _HarnessHandle:
             try:
                 item = self._line_q.get_nowait()
             except queue.Empty:
+                self._check_deadlines()
                 return None
             if item is _EOF:
                 self._awaiting_reply = False

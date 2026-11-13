@@ -8,7 +8,7 @@ The examples start a new run from the current seed. Input files, runtime recipes
 
 ## Contents
 
-- `manifest.json`: ordered task keys, original benchmark identifiers, instruction hashes, persona bindings, and material publication status.
+- `manifest.json`: ordered task keys, original benchmark identifiers, hashes of the current task definitions and instructions, persona bindings, and material publication status.
 - `<task-key>/instruction.md`: the original task request, with a terminal newline added when needed.
 - `<task-key>/task.json`: executable schema-3 environment and artifact declarations, with pinned image digests and input checksums.
 - `recipes/initialize.py`: restore a genuine original Git baseline and verified ignored input files.
@@ -18,6 +18,8 @@ The examples start a new run from the current seed. Input files, runtime recipes
 - `recipes/freeze_initial_git.py`: record declared initial files in the prepared Git baseline before execution.
 
 Publication and validation status are recorded in `manifest.json`. The [versioned material Release](https://github.com/Curry09/AHE-Beta/releases/tag/evolution32-task-materials-v1) contains 37 input assets plus `materials.lock.json`, `SHA256SUMS`, and a README. Preparation downloads only the selected tasks' assets and verifies their hashes and file inventories. The repository is currently private; authenticated download is checked separately, and anonymous material download will be verified after it becomes public. No GitHub authentication is added to the generic task-material loader.
+
+Use the manifest in your checkout to verify its task definitions. The Release's `materials.lock.json` records the definitions at the Release tag, and its `SHA256SUMS` verifies the downloadable files. Later changes to execution settings can reuse the same inputs and images.
 
 All 32 task images use `ghcr.io/mmjzmy/ahe-beta-tasks:<lowercase-task-key>-v<version>`, such as `m04-v1`, `o03-v1`, and `kv-live-surgery-v1`. Executable task definitions pin the image digest; source revisions, dependency versions, and build recipes remain in the manifest.
 

@@ -1022,7 +1022,9 @@ EXPERIENCE_SCALE = (
 )
 
 
-def build_direct_review_turn(task: str, reply: str, patch: str) -> str:
+def build_direct_review_turn(
+    task: str, reply: str, patch: str, *, task_deadline_reached: bool = False
+) -> str:
     """Spec-0084/T2: terminal subjective review uses the same scale, with zero-report allowed."""
     return "\n\n".join(
         [
@@ -1035,6 +1037,14 @@ def build_direct_review_turn(task: str, reply: str, patch: str) -> str:
             "return an empty opportunities array. A nonblocking suggestion is kind=feature; "
             "an unresolved failure with uncertain cause is kind=diagnostic and must say the cause "
             "is unconfirmed. Never invent a complaint to fill the array.",
+            *(
+                [
+                    "The declared task time limit ended execution. Review the partial result; "
+                    "do not infer why the task remained incomplete."
+                ]
+                if task_deadline_reached
+                else []
+            ),
             EXPERIENCE_SCALE,
             f"<task>\n{task}\n</task>",
             f"<harness_reply>\n{reply}\n</harness_reply>",
@@ -1048,12 +1058,14 @@ def build_direct_review_turn(task: str, reply: str, patch: str) -> str:
     )
 
 
-def build_rating_turn(task: str, history_lines: list[str], state: State) -> str:
-    """Self-assessment request at end of conversation: let persona step out and give a 1–4 score (similar to CC satisfaction rating) based on their own experience.
-
-    This phase requires only {"score", "reason"}, no message / action selection.
-    """
+def build_rating_turn(
+    task: str, history_lines: list[str], state: State, *, task_deadline_reached: bool = False
+) -> str:
+    """Rate the experience; after the task deadline, allow one optional issue."""
     hist = "\n".join(history_lines) if history_lines else "(empty)"
+    fields = '"score": <integer 1-4>, "reason": "<one short sentence, in your own voice>"'
+    if task_deadline_reached:
+        fields += ', "issue": "<observed problem worth reporting, or empty>"'
     return "\n\n".join(
         [
             "<rate_experience>",
@@ -1063,11 +1075,19 @@ def build_rating_turn(task: str, history_lines: list[str], state: State) -> str:
             "ATTRIBUTION: If you interrupted/stopped the tool yourself, do not phrase the "
             "reason as 'it kept interrupting' — that was you. Rate the underlying progress "
             "(or lack of it), not your own stop button.",
+            *(
+                [
+                    "The declared task time limit ended the interaction. Review only the evidence "
+                    "below. You may report a problem in your own words. Leave issue empty if "
+                    "there is nothing to report. The deadline alone does not establish a Harness bug."
+                ]
+                if task_deadline_reached
+                else []
+            ),
             f"<task>\n{task}\n</task>",
             f"<history>\n{hist}\n</history>",
             f"<mood>\n{_mood_tag(state)}\n</mood>",
-            "Return EXACTLY ONE JSON object and nothing else: "
-            '{"score": <integer 1-4>, "reason": "<one short sentence, in your own voice>"}',
+            "Return EXACTLY ONE JSON object and nothing else: {" + fields + "}",
             "</rate_experience>",
         ]
     )

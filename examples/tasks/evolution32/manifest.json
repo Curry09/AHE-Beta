@@ -2276,7 +2276,7 @@
       "original_tar_sha256": "8938213291862779f99f683fe023564f5e2a6f04455d33e921e182f25c9fd8c6",
       "original_instruction_sha256": "1418451612d0b0ab078027b31a53e3a7866f9afafbdc454679e5fc0879706124",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "1d40660e67af5f2092593fbab848238e9c8920d50e06aef2c00400939704b754",
+      "task_definition_sha256": "e5a8e64de32f51d1ea1fb46ee9e042f89108bdad54f77c67df0941287edf2eb5",
       "package_file": "O09/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2455,7 +2455,7 @@
       "original_tar_sha256": "fb9c0bd4d2764792bf735e215c33d4484463d6fa3f3b9adb1625c7c26d798e6a",
       "original_instruction_sha256": "808aaf91b765febd4c86258b38aa28482bcb7388e6dd60536841d77221c69291",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "0aca0bf9c61f0a1f6630bf329d7590840726dbe4535edaa4164282796bae6309",
+      "task_definition_sha256": "a562f2a7a52146c1e38a7302568e3cc75aeef27a29ce88ad104e5f873369b4bd",
       "package_file": "kv-live-surgery/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2687,7 +2687,7 @@
       "original_tar_sha256": "98771f5113a5670e531a11b8c618879e82b0dc86a13e24e2337710cf8d244fb7",
       "original_instruction_sha256": "e5ea9c8393ac826e18ff241397b77fe3a59c2560e646cae34484db0a6eaf4a99",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "4cb1ce1bb5745ed8593f1cb98646848e1d0c3f9207422503040cfd96db14dc0a",
+      "task_definition_sha256": "4655810fd3a9c2afd4f7381bb8d490e4a17bda261126873c778d07fba74acafa",
       "package_file": "vf2-speedup-networkx/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -2869,7 +2869,7 @@
           "actor_task_execution_performed": false
         }
       },
-      "task_definition_sha256": "8b534bc78f706a11d2ac7e78c36759d1eba4402e1b440e81d70c94c2160ab63b",
+      "task_definition_sha256": "06cf43964e95352c4a62ff3512f2987c5db33c59e4c063ea2b45f29084135e05",
       "package_file": "pretrain-shard-corruption/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3214,7 +3214,7 @@
       "original_tar_sha256": "1152c3d3415d26ed6ac0ae3a3d57abf4ff2648feaf3c92d743b92d58b063eba0",
       "original_instruction_sha256": "84dc2f6a5a94013c90706ca393aef6c026881b7ae8331258d4c8bb7226f3099f",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "57caf566047430397667ae925bf6a32cbe6c9c8eca73fc64869c7d521b469c68",
+      "task_definition_sha256": "57b479980273e26628b0a16600fde665ec186d5ef0714a4223ea16e6c40e70b7",
       "package_file": "payments-pipeline-fix/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3239,7 +3239,7 @@
       "original_tar_sha256": "ed72a0065addf11bf531c07674756e0c713ec1677a3a4206890752087f4f5e53",
       "original_instruction_sha256": "9630da6851926f7aada9229e4e39a2759f9efe88973b2bdeab57b59d7a05d8f6",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "fa5e66f85d94e76c13ee5b5c5df5d14d4cd32b48577d7d0a3c922c9c8866fac2",
+      "task_definition_sha256": "b901d43c3612e4ec5f37da7d9d566ba57238eda69b3df504e229a48cc8559110",
       "package_file": "wal-recovery-ordering/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3264,7 +3264,7 @@
       "original_tar_sha256": "4f4b0486525706c9fea22d249364a5f7bff9b4782cbfd1eedce0a57ee75459ce",
       "original_instruction_sha256": "c9bee6dd42ab974c99f1d02a3bd069c14686c5ddaf7cbfd503f4c6e337f92c25",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "63e320932abf1d6cb1b0ba67f4d1643b9c0bb47cfe6e9b8faffbe5a02e4b3525",
+      "task_definition_sha256": "0dcd005d076ce3b0f202cc62657f61ed27a7a9cf304156c78498ef23b17631ac",
       "package_file": "vba-userform-port/task.json",
       "package_schema_version": 3,
       "environment_validation": {
@@ -3289,7 +3289,7 @@
       "original_tar_sha256": "e8588431e5cc121aa170a60c559ed544a342a436980970b0abbf30b9a952c44f",
       "original_instruction_sha256": "6e16c343f85a840bd2ef3369a0f1bde2dc1c6da7e56fa2f0bb4743bd8fba12d0",
       "instruction_transform": "preserve original text; append terminal newline only when missing",
-      "task_definition_sha256": "266e4bc9b8d9100e50c8b5541aac042f2ca0d44b9c9c2343c77fb2b59402ba06",
+      "task_definition_sha256": "68372a026c3ef5930261f3ffd3cec19710402bee31a8a5459393106c926a0434",
       "package_file": "react-lead-form/task.json",
       "package_schema_version": 3,
       "environment_validation": {

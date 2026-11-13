@@ -197,7 +197,7 @@ def main() -> int:
     api = ApiPersonaClient()
 
     def client_factory() -> AgenticPersonaClient:
-        return AgenticPersonaClient(api.complete)
+        return AgenticPersonaClient(api.complete, terminal_review_llm=api.complete_terminal_review)
 
     sim_persona_list = card_to_personas(PersonaLibrary(Path(os.environ["PERSONA_LIBRARY"])))
     from ahe_beta.experiment.context import frozen_workload

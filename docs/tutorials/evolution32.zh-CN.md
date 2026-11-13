@@ -55,6 +55,8 @@ Gitea.com 需有新建仓库名额。每个 run 使用独立仓库，destroy 默
 
 ## 检查和启动一组
 
+其中 8 项任务按各自的任务说明设置了 1、2 或 8 小时的执行时限。从第一条任务消息开始计时，环境准备和结束后的评阅不计入。追加消息不会重置计时。到时后，控制器停止 Harness，先保存已有产物，再发起一次最多等待 300 秒的用户评阅；没有具体问题可以不提 Issue。其余任务在这些示例中没有设置总时限。
+
 ```bash
 CONFIG=examples/experiments/u8-mixed-e2b.json
 # 也可选 u8-direct-e2b.json、u16-mixed-e2b.json 或 u32-mixed-e2b.json。

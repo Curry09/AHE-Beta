@@ -1084,6 +1084,10 @@ def make_direct_run_session_fn(
         reply, harness_error = actor["reply"], actor["harness_error"]
         execution_record, harness_steps = actor["execution_record"], actor["harness_steps"]
         execution_contract = payload["execution_contract"]
+        deadline = any(
+            row.get("termination_reason") == "task_budget_exhausted"
+            for row in actor["request_outcomes"]
+        )
         snapshot, workspace_evidence = _capture_completed_actor(
             packet=packet,
             store=store,
@@ -1113,10 +1117,20 @@ def make_direct_run_session_fn(
                 round_no=round_no,
                 operation="direct_review",
             ):
+                respond = (
+                    getattr(review_client, "respond_for_terminal_review", review_client.respond)
+                    if deadline
+                    else review_client.respond
+                )
                 review = dict(
-                    review_client.respond(
+                    respond(
                         review_system,
-                        build_direct_review_turn(scenario.description, reply, snapshot.read_diff()),
+                        build_direct_review_turn(
+                            scenario.description,
+                            reply,
+                            snapshot.read_diff(),
+                            task_deadline_reached=deadline,
+                        ),
                     )
                     or {}
                 )
@@ -1181,7 +1195,13 @@ def make_direct_run_session_fn(
             if opportunity["kind"] == "diagnostic":
                 body += "\n\nAttribution: an observed task gap; the root cause is unconfirmed."
             drafts.append(IssueDraft(title=opportunity["title"][:80], body=body, labels=labels))
-        status = "infrastructure_failure" if harness_error else "completed"
+        status = (
+            "task_budget_exhausted"
+            if deadline
+            else "infrastructure_failure"
+            if harness_error
+            else "completed"
+        )
         session = Session(
             persona=persona,
             scenario=scenario,

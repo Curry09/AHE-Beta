@@ -604,11 +604,11 @@ def test_real_unified_main_uses_frozen_catalog_and_terminal_user_only_plan(
     monkeypatch.setattr("ahe_beta.tracker.gitea.GiteaTracker", lambda **kwargs: tracker)
     monkeypatch.setattr(
         "ahe_beta.user.sim.persona_client.ApiPersonaClient",
-        lambda: SimpleNamespace(complete=None),
+        lambda: SimpleNamespace(complete=None, complete_terminal_review=None),
     )
     monkeypatch.setattr(
         "ahe_beta.user.sim.persona_client.AgenticPersonaClient",
-        lambda complete: RecordingClient(calls),
+        lambda complete, *, terminal_review_llm: RecordingClient(calls),
     )
     monkeypatch.setattr("ahe_beta.guards.repo_guard.snapshot_repo", lambda **kwargs: ("test", ""))
     monkeypatch.setattr("ahe_beta.guards.repo_guard.verify_unchanged", lambda **kwargs: None)

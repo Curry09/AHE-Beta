@@ -36,6 +36,7 @@ _OBSERVATION_ATTRS = frozenset(
         "last_visible_events",
         "visible_events",
         "last_request_status",
+        "task_deadline_reached",
         "help_text",
     }
 )

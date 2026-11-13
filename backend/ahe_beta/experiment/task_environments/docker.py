@@ -91,7 +91,7 @@ echo verified
 """
 
 _QUIESCE = r"""
-import json,os,signal,sys,time
+import errno,json,os,signal,sys,time
 from pathlib import Path
 def proc(pid):
     try:
@@ -130,18 +130,22 @@ def candidates():
             if row and row['state']!='Z':rows.append(row)
     owners=listener_owners(rows)
     return [row for row in rows if row['pid'] not in protected and row['sid'] not in sessions and row['pid'] not in owners]
+open_pidfd=getattr(os,'pidfd_open',None)
+signal_pidfd=getattr(signal,'pidfd_send_signal',None)
 for sig in (signal.SIGTERM,signal.SIGKILL):
     for row in candidates():
         try:
-            fd=os.pidfd_open(row['pid'])
+            if not open_pidfd or not signal_pidfd:
+                raise OSError(errno.ENOSYS,'Python lacks pidfd support')
+            fd=open_pidfd(row['pid'])
             try:
                 current=proc(row['pid'])
                 if current and current['start_ticks']==row['start_ticks']:
-                    signal.pidfd_send_signal(fd,sig)
+                    signal_pidfd(fd,sig)
             finally:os.close(fd)
         except ProcessLookupError:pass
         except OSError as error:
-            if error.errno not in (1,22,38):raise
+            if error.errno not in (errno.EPERM,errno.EINVAL,errno.ENOSYS):raise
             current=proc(row['pid'])
             if current and current['start_ticks']==row['start_ticks']:
                 try:os.kill(row['pid'],sig)

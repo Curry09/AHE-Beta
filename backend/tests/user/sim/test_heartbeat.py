@@ -5,6 +5,8 @@ Spec-0037/T2: follow tempo patiently; process involvement may add stuck_extra; d
 
 from __future__ import annotations
 
+import pytest
+
 from ahe_beta.user.sim.dimensions import (
     D1Eval,
     D2Depth,
@@ -340,6 +342,58 @@ def test_structured_timeout_reply_ends_session_before_next_persona_turn() -> Non
     assert len(res.turns) == 1
     assert res.pending_harness_output == timeout_text
     assert "HARNESS_TERMINAL: timed_out" in res.signals
+
+
+@pytest.mark.parametrize("outcome", ["issue", "no_issue", "review_unavailable"])
+def test_task_deadline_freezes_partial_result_before_optional_feedback(outcome) -> None:
+    class DeadlineHarness(HeartbeatHarness):
+        @property
+        def task_deadline_reached(self) -> bool:
+            return self._pi >= 1
+
+    harness = DeadlineHarness(
+        [("pending", 1.0), ("reply", "Saved the partial implementation.")],
+        reply_statuses=["incomplete"],
+    )
+    stages = []
+
+    class DeadlineClient(WaitStubClient):
+        def respond_for_terminal_review(self, _system: str, prompt: str) -> dict:
+            assert stages == ["checkpoint", "freeze"]
+            assert "Saved the partial implementation." in prompt
+            assert '"issue":' in prompt
+            stages.append("review")
+            if outcome == "review_unavailable":
+                raise TimeoutError("feedback provider timed out")
+            return {
+                "score": 2,
+                "reason": "Ran out of time.",
+                "issue": "No progress updates while waiting." if outcome == "issue" else "",
+            }
+
+    client = DeadlineClient(actions=["send_message"], acts=[])
+
+    def checkpoint(terminal):
+        assert terminal["result"]["end_reason"] == "task_budget_exhausted"
+        assert terminal["result"]["pending_harness_output"] == "Saved the partial implementation."
+        stages.append("checkpoint")
+
+    result = run_session(
+        _persona(),
+        client,
+        harness,
+        TASK,
+        on_actor_complete=checkpoint,
+        before_terminal_review=lambda: stages.append("freeze"),
+    )
+
+    assert stages == ["checkpoint", "freeze", "review"]
+    assert harness.begun == ["x"] and not harness.emitted
+    assert not client.judge_prompts
+    assert result.end_reason == "task_budget_exhausted"
+    assert bool(result.issue_artifact) is (outcome == "issue")
+    if outcome == "review_unavailable":
+        assert result.experience["status"] == "unavailable"
 
 
 def test_open_intent_gap_comes_from_act_not_enum() -> None:

@@ -55,6 +55,8 @@ Gitea.com needs available repository capacity. Each run has its own repository, 
 
 ## Check and start one experiment
 
+Eight tasks have a 1-, 2-, or 8-hour execution limit, as stated in their instructions. The clock starts with the first task message. Setup and terminal review are outside that window, and follow-up messages do not reset it. At the deadline, the controller stops the Harness and saves the available outputs. It then makes one request for user feedback, with a 300-second limit. The other tasks have no task-wide limit in these examples.
+
 ```bash
 CONFIG=examples/experiments/u8-mixed-e2b.json
 # Alternatives: u8-direct-e2b.json, u16-mixed-e2b.json, u32-mixed-e2b.json.

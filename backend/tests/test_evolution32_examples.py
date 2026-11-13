@@ -89,6 +89,9 @@ def test_catalog_contains_exactly_the_original_thirty_two_inputs():
         assert row["id"] == task_id
         assert row["persona_id"] == persona
         assert row["default_interaction"] == ("simulated_user" if persona else "direct")
+        definition = TASKS / row["package_file"]
+        assert definition == TASKS / key / "task.json"
+        assert hashlib.sha256(definition.read_bytes()).hexdigest() == row["task_definition_sha256"]
         instruction = (TASKS / row["instruction_file"]).resolve()
         assert instruction.is_relative_to(TASKS.resolve()) and instruction.is_file()
         assert hashlib.sha256(instruction.read_bytes()).hexdigest() == row["instruction_sha256"]
@@ -280,13 +283,32 @@ def test_m02_keeps_the_operator_confirmed_incomplete_original_input():
     }
 
 
-def test_original_absence_of_total_budget_is_not_replaced_by_wrapper_1800():
+def test_only_frozen_instructions_with_explicit_completion_limits_set_a_budget():
+    timed_tasks = {
+        "O09": 3600,
+        "payments-pipeline-fix": 7200,
+        "kv-live-surgery": 28800,
+        "pretrain-shard-corruption": 28800,
+        "react-lead-form": 28800,
+        "vba-userform-port": 28800,
+        "vf2-speedup-networkx": 28800,
+        "wal-recovery-ordering": 28800,
+    }
     for key, _, _ in ORIGINAL:
         task = package(key)
-        assert "execution" not in task
         declaration = execution_declaration(task, fallback_seconds=None)
-        assert declaration["task_budget_seconds"] is None
-        assert declaration["budget_source"] == "undeclared"
+        expected = timed_tasks.get(key)
+        assert declaration["task_budget_seconds"] == expected
+        if expected is None:
+            assert "execution" not in task
+            assert declaration["budget_source"] == "undeclared"
+        else:
+            assert declaration["budget_source"] == "operator_quota"
+            assert f"You have {expected} seconds" in Path(task["instruction_file"]).read_text()
+            assert (
+                execution_declaration(task, fallback_seconds=1800)["task_budget_seconds"]
+                == expected
+            )
 
 
 def test_four_group_batch_reuses_complete_run_configs():

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
+import openai
 import pytest
 
 from ahe_beta.user.sim import persona_client as module
@@ -135,3 +137,37 @@ def test_complete_empty_retry_never_exceeds_persona_output_budget() -> None:
     assert client.complete([{"role": "user", "content": "hi"}]) == "done"
     calls = client.client.chat.completions.calls
     assert [call["max_tokens"] for call in calls] == [32768, 32768]
+
+
+def test_terminal_review_does_not_retry_stalled_provider(monkeypatch) -> None:
+    events = []
+    requests = []
+    client = _client()
+    client.client.api_key = "unused-test-credential"
+    client.client.base_url = "https://example.invalid/v1"
+
+    class StalledProvider:
+        def __init__(self, *, api_key, base_url, max_retries):
+            assert base_url == client.client.base_url
+            assert max_retries == 0
+            self.chat = SimpleNamespace(completions=self)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_):
+            pass
+
+        async def create(self, **request):
+            requests.append(request)
+            await asyncio.Future()
+
+    monkeypatch.setattr(openai, "AsyncOpenAI", StalledProvider)
+    monkeypatch.setattr(module, "_TERMINAL_REVIEW_TIMEOUT_SECONDS", 0.02)
+    monkeypatch.setattr(module, "record_usage", lambda **event: events.append(event))
+    with pytest.raises(TimeoutError):
+        client.complete_terminal_review([{"role": "user", "content": "review partial work"}])
+
+    assert len(requests) == len(events) == 1
+    assert requests[0].get("stream", False) is False
+    assert not events[0]["success"]
