@@ -1,6 +1,8 @@
 # Harbor Index 评测框架
 
 只编辑根目录 `evaluation.yaml`。API 密钥写入 `.env`；运行参数快照、任务配置和运行记录由框架生成，不需要维护其他实验配置文件。
+固定版本 AHE 的 Messages 适配、源码与 runtime 准备及配置模板见 [AHE 安装说明](../README.zh-CN.md#ahe-的-anthropic-messages-适配)。AHE 必须关闭 time_adaptation，官方任务预算及两种任务源的原有约定不变。
+
 
 ## 目录
 
@@ -17,13 +19,13 @@ workspace/
     └── runs/                   # 启动后自动生成
 ```
 
-当前直接支持已有七种 Harness。新的第三方 Harness 需要另写适配器，并非填写任意目录即可执行。
+当前直接支持八种 Harness，包括固定版本的第三方 AHE。新的第三方 Harness 需要另写适配器，并非填写任意目录即可执行。
 
 框架运行在 Linux / WSL，Python 3.12。Windows 上的目录可通过 WSL 使用。
 
 ## 安装和运行
 
-在仓库根目录执行。先从本仓库的 [框架 Release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-framework-v1.0.0) 下载 `harbor-evaluation-runtime-v1.0.0.zip` 并解压到仓库根目录（得到 `runtime/`）。从 [Harness Release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-results-20261030) 下载 `harnesses.zip`，解压到仓库的上一级目录，或修改 `paths.harnesses`。
+在仓库根目录执行。先从本仓库的 [框架 Release](https://github.com/Curry09/AHE-Beta-Legacy/releases/tag/harbor-evaluation-framework-v1.0.0) 下载 `harbor-evaluation-runtime-v1.0.0.zip` 并解压到仓库根目录（得到 `runtime/`）。从 [Harness Release](https://github.com/Curry09/AHE-Beta-Legacy/releases/tag/harbor-evaluation-results-20261030) 下载 `harnesses.zip`，解压到仓库的上一级目录，或修改 `paths.harnesses`。
 
 ```bash
 uv venv --python 3.12.13 --managed-python --seed .venv-evaluation
@@ -55,7 +57,7 @@ python -m evaluation regrade runs/<运行ID> --trial <题目运行ID>
 
 - `task_source` 选择任务源。默认 `harbor_index` 的目录、裁判和准备规则都由对应 profile 提供，通用配置层不解释这些规则。
 - 在 `task_source: harbor_index` 下，`tasks: published38` 对应已发布的 38 道题；也可填题目 ID 列表或 `all`。`all` 包含 E2B 可能无法承载的题目，环境失败会单独记录。
-- `harnesses` 支持 `v0`、`u8`、`u8-direct`、`u16`、`u32`、`claude-code`、`meta-harness`。
+- `harnesses` 支持 `v0`、`u8`、`u8-direct`、`u16`、`u32`、`claude-code`、`meta-harness`、`ahe`。
 - `actor` 配置解题模型。默认显式 `reasoning_effort: max`、最大输出 65,536；所选提供商必须支持这些参数，框架不静默降低强度或输出上限。
 - `stream: native` 保留 Harness 原生行为。自有 Harness 可显式设为 `true` / `false`；固定版本 Meta-Harness 只消费完整返回，Claude Code 由其原生 CLI 控制。
 - `user.enabled: true` 开启用户模拟。固定 persona 与原评测一致：接收完整交付回复和公开 git diff，可以反馈、追问和验收，不能执行命令或修改代码。首条请求固定为官方题目原文。用户模型、地址和密钥变量可在 `user` 内指定。

@@ -12,7 +12,9 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 
-def check(project: Path, *, manifest_path: str | None = "backend/compatibility.json") -> dict[str, str]:
+def check(
+    project: Path, *, manifest_path: str | None = "backend/compatibility.json"
+) -> dict[str, str]:
     """The declaration, lock and compatibility manifest must agree on a full Git commit."""
     config = tomllib.loads((project / "pyproject.toml").read_text())
     lock = tomllib.loads((project / "uv.lock").read_text())

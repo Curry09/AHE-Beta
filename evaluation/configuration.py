@@ -11,7 +11,7 @@ import yaml
 
 from .benchmarks import DEFAULT_SOURCE, configuration_profile
 
-HARNESS_NAMES = ("v0", "u8", "u8-direct", "u16", "u32", "claude-code", "meta-harness")
+HARNESS_NAMES = ("v0", "u8", "u8-direct", "u16", "u32", "claude-code", "meta-harness", "ahe")
 
 
 class ConfigurationError(ValueError):
@@ -130,9 +130,20 @@ class Configuration:
                 "max_output_tokens",
                 "stream",
                 "thinking",
+                "api_type",
             },
             "actor",
         )
+        if "api_type" in actor:
+            if names != ["ahe"]:
+                raise ConfigurationError("actor.api_type is supported only for harnesses: [ahe]")
+            if not isinstance(actor["api_type"], str) or actor["api_type"] not in {
+                "native",
+                "openai_responses",
+                "openai_chat_completion",
+                "anthropic_chat_completion",
+            }:
+                raise ConfigurationError("Invalid AHE actor.api_type")
         actor.setdefault("model", "glm-5.3-flash")
         if not isinstance(actor["model"], str) or not actor["model"]:
             raise ConfigurationError("actor.model required")
@@ -221,6 +232,10 @@ class Configuration:
         positive(execution["repetitions"], "execution.repetitions")
         execution.setdefault("time_adaptation", False)
         boolean(execution["time_adaptation"], "execution.time_adaptation")
+        if "ahe" in names and execution["time_adaptation"]:
+            raise ConfigurationError(
+                "AHE has no remaining-time adapter; set time_adaptation: false"
+            )
         exp = fields(x.setdefault("experience", {}), {"timeout_seconds"}, "experience")
         exp.setdefault("timeout_seconds", 600)
         positive(exp["timeout_seconds"], "experience.timeout_seconds")

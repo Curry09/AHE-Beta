@@ -1,0 +1,27 @@
+{
+  "repository": "https://github.com/china-qijizhifeng/agentic-harness-engineering",
+  "revision": "182ea06e578df7b1d503eca537503c1e4c5a8a58",
+  "artifact": "experiments/evolved_harness",
+  "upstream_files": {
+    "systemprompt.md": "333353c602919a540e2e53ca8dc52ded2d8b0cd43bdfdf6361c91e4c44454525",
+    "nexau.json": "93c4f49f231a97441e6e18a23d3ffb0ddef47ea056c35430fc72230e66a932cc",
+    "ShortTermMEMORY.md": "00c2a307956f5d26e0d8c4fb86061a8d65a84cafef11a75e0026db93ae5467c4",
+    "start.py": "4b7814a5e279e1d2663665fcfb1b08a39280640491c1572b5cfb40ba17cbd53e",
+    "code_agent.yaml": "3b8e6fd3d1a7d6f48c159d8aad28dec786621e93af08cc0f1b0884bc26d32e2a",
+    ".gitignore": "ac2de72f51a815d5d4c3b2c16f8aa800a4c817c4b4f5e054218e300c661b47fa",
+    "README.md": "9da14131c77ae92fd25eda69d54d75be7d26fdfb8e792d802940978dc1e5b01a",
+    "LongTermMEMORY.md": "19aaf8dec1a8b98528fae5548219cec13ffdf1bb6a4b99f9c88f61642190eec5",
+    "tool_descriptions/run_shell_command.tool.yaml": "55decaa0e90dcff62e6c327e069160523326af0b2903314cdf4f72e18bbbe57c",
+    "middleware/__init__.py": "d93bef8d31fe1ef0b63a33a25fc2e2ec9e0eb0e3f3bd8db91752fcf03c904793",
+    "middleware/execution_risk_hints.py": "b3d40bcb2b8f52c24484a50daae3848337ccc3f3fd064be1ac7fafc04c96b331",
+    "tools/__init__.py": "9aeae3cffad46c4dff0a21a9003f1fea2a41e17759472faff773e43fc0e48abb",
+    "tools/shell_tools/__init__.py": "5ef1ddb7002fcb4e8564c5d44345ed5cbd0ca191c276cc7e247c15d5710baec4",
+    "tools/shell_tools/run_shell_command.py": "19653785e7d66cf275e224fc39efc24dbd0dc5a00f93134f2acf05e556518553"
+  },
+  "nexau_repository": "https://github.com/hzhua/nexau",
+  "nexau_revision": "28511d9f0362191a6c378fd441b2be55309a9e32",
+  "nexau_package_sha256": "3f044ad246650c75a575d75eb2db57b126bcf996d251d561638c1c67f4ea869e",
+  "runtime_lock_sha256": "64511673852a667ac74ab62ae9442a5a03ff7bc5df05ada14dc17552cb799e2a",
+  "license_sha256": "d1404dcdb97e84a6f990ed3d205226d481d2bbb857b13f00585c3b863e217d35",
+  "nexau_license_sha256": "793b7448f5beb1535d9197bd3d2fd2f167c22322e3457465eec50159d96d7858"
+}

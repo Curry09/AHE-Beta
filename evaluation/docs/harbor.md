@@ -1,12 +1,14 @@
 # Unified Harbor Index evaluation
 
 [简体中文](harbor.zh-CN.md)
+For the fixed AHE Messages adapter, source/runtime preparation and its validated template, see [AHE setup](../README.md#ahe-over-anthropic-messages). Keep time_adaptation disabled for AHE; task budgets and both task sources retain their existing contracts.
 
-Use one [`evaluation.yaml`](../../evaluation.yaml), from the repository root. Credentials belong in the ignored `.env` file. Supported harnesses: v0, u8, u8-direct, u16, u32, Claude Code 2.1.119 and pinned Meta-Harness. Both direct and simulated-user execution are available; arbitrary third-party harnesses require an adapter.
+
+Use one [`evaluation.yaml`](../../evaluation.yaml), from the repository root. Credentials belong in the ignored `.env` file. Supported harnesses: v0, u8, u8-direct, u16, u32, Claude Code 2.1.119, pinned Meta-Harness and pinned AHE. Both direct and simulated-user execution are available; arbitrary third-party harnesses require an adapter.
 
 ## Install
 
-On Linux/WSL with Python 3.12, download `harbor-evaluation-runtime-v1.0.0.zip` from the [framework release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-framework-v1.0.0) and extract it into the repository root, creating `runtime/`. Download `harnesses.zip` from the [harness release](https://github.com/Curry09/AHE-Beta/releases/tag/harbor-evaluation-results-20261030), extracting it next to this repository, or update `paths.harnesses`.
+On Linux/WSL with Python 3.12, download `harbor-evaluation-runtime-v1.0.0.zip` from the [framework release](https://github.com/Curry09/AHE-Beta-Legacy/releases/tag/harbor-evaluation-framework-v1.0.0) and extract it into the repository root, creating `runtime/`. Download `harnesses.zip` from the [harness release](https://github.com/Curry09/AHE-Beta-Legacy/releases/tag/harbor-evaluation-results-20261030), extracting it next to this repository, or update `paths.harnesses`.
 
 ```bash
 uv venv --python 3.12.13 --managed-python --seed .venv-evaluation
