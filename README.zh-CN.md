@@ -1,7 +1,5 @@
 # Agentic Harness Engineering Beta：以需求为中心的 Agent Harness 演进
 
-[English](README.md) | **简体中文**
-
 <div align="left">
 
 <p align="left">
@@ -18,6 +16,8 @@
 <p align="center">
   <img src="assets/paper-overview.png" alt="AHE-Beta 概览：用户驱动的评估、团队协作修改和需求驱动的筛选" width="100%">
 </p>
+
+[English](README.md) | **简体中文**
 
 ---
 
