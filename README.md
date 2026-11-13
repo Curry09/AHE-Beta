@@ -1,7 +1,5 @@
 # Agentic Harness Engineering Beta: Requirement-Centered Evolution of Agent Harnesses
 
-**English** | [简体中文](README.zh-CN.md)
-
 <div align="left">
 
 <p align="left">
@@ -18,6 +16,8 @@
 <p align="center">
   <img src="assets/paper-overview.png" alt="AHE-Beta overview: user-driven evaluation, team-based modification, and requirement-driven selection" width="100%">
 </p>
+
+**English** | [简体中文](README.zh-CN.md)
 
 ---
 
