@@ -55,6 +55,8 @@ Gitea.com needs available repository capacity. Each run has its own repository, 
 
 ## Check and start one experiment
 
+Eight tasks have a 1-, 2-, or 8-hour execution limit, as stated in their instructions. The clock starts with the first task message. Setup and terminal review are outside that window, and follow-up messages do not reset it. At the deadline, the controller stops the Harness and saves the available outputs. It then makes one request for user feedback, with a 300-second limit. The other tasks have no task-wide limit in these examples.
+
 ```bash
 CONFIG=examples/experiments/u8-mixed-e2b.json
 # Alternatives: u8-direct-e2b.json, u16-mixed-e2b.json, u32-mixed-e2b.json.
@@ -77,7 +79,15 @@ uv run --locked --extra experiments python backend/scripts/experiment.py logs "$
 
 A failed prepare retains verified caches. Printing a run ID does not mean preparation succeeded. Before model requests, the runtime checks actual sandbox, Docker and image capabilities; each attempt initializes its task and checks service readiness before starting its Actor. Materials, toolchain probes and a complete model-driven six-round experiment are separate validation claims.
 
-Preparation streams frozen files instead of reading an entire archive into memory. Upload connection, read and write waits increase with file size. These are finite I/O waits, not a strict deadline for the entire transfer, and they do not change task or model budgets. Setup progress identifies each file being transferred.
+When an E2B run starts, the controller streams the files saved during preparation, one at a time. The startup log shows which file is uploading. Larger files get longer connection, read, and write timeouts. These timeouts apply to network operations for each file; they do not cap the total upload time or change task and model budgets.
+
+## Try a single round
+
+To try U32 for a single round, make a copy of `u32-mixed-e2b.json` in the same directory so the relative paths to tasks and personas still work. In the copy, set `rounds.count` to `1` and keep only the first round in `workload.interaction_plan`.
+
+To run locally, replace the copy's entire `runtime` section with the one from `u4-local.json` and choose a different repository prefix for this run. Local runs need Docker Engine and Compose and start their own Gitea, so no E2B or Gitea.com credentials are needed. For either runtime, point `CONFIG` to the copied file and follow the steps above to check the configuration, prepare the inputs, and start the run.
+
+A single round lets you check whether the seed Harness can complete user sessions in the task environments and whether the run can collect the resulting artifacts. Since this is also the final round, it skips requirements processing and OpenAgents delivery. To test delivery, use a smaller two-round example such as U4 and keep both session plans. OpenAgents picks up work only if the first round produces an issue approved for delivery.
 
 ## Collect, stop and resume
 
@@ -88,6 +98,10 @@ uv run --locked --extra experiments python backend/scripts/experiment.py resume 
 ```
 
 The cloud supervisor/controller runs independently after launch. A separate background collector on the management machine periodically collects status and artifacts. Exiting log-following does not stop the experiment. Shutting down the management machine prevents local collection; cloud execution remains subject to the provider lifecycle.
+
+A `PARTIAL` archive preserves the evidence collected so far for inspection. `resume` uses the original run and its checkpoints in the original environment; it does not restore from the archive. Starting a new run from an archive requires a [completed experiment with a continuation-ready archive](experiment-continuation.md).
+
+If local Docker restarts, wait until `docker info` succeeds before running `resume`. The controller reuses completed sessions and tries to finish collecting any missing outputs from the original task environment. If Docker confirms that the original environment is gone, only the affected session is retried with the same round inputs and Harness version. If the controller cannot verify the original environment or determine whether a finalization script finished, keep the run directory and its archives for diagnosis. Once a session's result is saved, a cleanup failure is recorded separately and does not block the next round.
 
 E2B sandbox leases are not automatically renewed. `runtime.e2b.timeout_seconds: 86400` sets the creation lease and is independent of model output budgets. `stop` stops the controller and retains the sandbox; CLI `resume` requires the original sandbox to be running. Restore paused instances through the provider first; expired or deleted instances are marked `LOST`. Six-round experiments may exceed a day, so monitor actual `expires_at`, keep management-host collection available and retain complete archives.
 

@@ -50,11 +50,13 @@ from ahe_beta.user.sim.loop import SessionResult
 from ahe_beta.user.sim.loop import run_session as sim_run_session
 from ahe_beta.user.sim.persona_client import PersonaClient
 from ahe_beta.user.sim.runtime import (
+    CollectionSourceLost,
     InvalidWorkspaceArtifact,
     ReviewSnapshot,
     Workspace,
     as_runtime,
     capture_review_snapshot,
+    cleanup_workspace,
     utc_now,
 )
 from ahe_beta.user.sim.workspace import materialize as materialize_workspace
@@ -124,21 +126,6 @@ def _capture_completed_actor(*, packet, store, session_id, provenance, observati
         )
         evidence.update(value["evidence"])
     else:
-        if workspace is None and payload["workspace_present"]:
-            if binding is None:
-                raise EnvironmentInfrastructureError(
-                    "Completed Actor has no recoverable task environment"
-                )
-            from ahe_beta.user.sim.seed_source import resume_collection
-
-            workspace = resume_collection(
-                binding=binding,
-                expected_provenance={**provenance, "session_id": session_id},
-                spec=scenario.workspace,
-            )
-            workspace.evidence.update(evidence)
-        if workspace is not None:
-            workspace.evidence["collection_pending"] = True
 
         def save_capture(snapshot):
             store.stage_actor_capture(
@@ -156,6 +143,21 @@ def _capture_completed_actor(*, packet, store, session_id, provenance, observati
             )
 
         try:
+            if workspace is None and payload["workspace_present"]:
+                if binding is None:
+                    raise EnvironmentInfrastructureError(
+                        "Completed Actor has no recoverable task environment"
+                    )
+                from ahe_beta.user.sim.seed_source import resume_collection
+
+                workspace = resume_collection(
+                    binding=binding,
+                    expected_provenance={**provenance, "session_id": session_id},
+                    spec=scenario.workspace,
+                )
+                workspace.evidence.update(evidence)
+            if workspace is not None:
+                workspace.evidence["collection_pending"] = True
             snapshot = _freeze_actor_outputs(
                 workspace=workspace,
                 scenario=scenario,
@@ -205,17 +207,9 @@ def _capture_completed_actor(*, packet, store, session_id, provenance, observati
             if verified is None:
                 raise EnvironmentInfrastructureError("Published Actor observation is missing")
             evidence["observation"] = verified
-    if binding is not None:
-        from ahe_beta.user.sim.seed_source import release_collection
-
-        release_collection(
-            binding=binding,
-            expected_provenance={**provenance, "session_id": session_id},
-            spec=scenario.workspace,
-        )
-        evidence.update(
-            environment_phase="closed", collection_pending=False, retained_for_observations=False
-        )
+    # These flags describe evidence collection, not the later resource release.
+    evidence.pop("collection_pending", None)
+    evidence.pop("retained_for_observations", None)
     return snapshot, evidence
 
 
@@ -367,7 +361,8 @@ def _freeze_actor_outputs(
             workspace.evidence["collection_pending"] = False
         return snapshot
     finally:
-        workspace.close()
+        if not callable(getattr(workspace, "collection_binding", None)):
+            cleanup_workspace(workspace.close, stage="close", identity=session_id)
         for key, value in dict(getattr(workspace, "evidence", {}) or {}).items():
             if key not in {"prediction", "diff_sha256", "diff_bytes"}:
                 evidence[key] = value
@@ -466,12 +461,65 @@ def _publish_reports(session: Session, *, tracker, store) -> Session:
         return session
 
 
-def _save_and_publish(session: Session, *, tracker, store) -> Session:
+def _release_saved_workspace(session: Session, *, store, packet=None) -> None:
+    from ahe_beta.user.sim.seed_source import release_collection
+
+    packet = packet or store.load_actor_checkpoint(
+        session.session_id, expected_provenance=session.session_provenance or {}
+    )
+    if packet is None or (binding := packet["payload"].get("collection_binding")) is None:
+        return
+    if (
+        store.load_actor_capture(
+            session.session_id, expected_provenance=session.session_provenance or {}
+        )
+        is None
+    ):
+        raise EnvironmentInfrastructureError("Saved session has no bound Actor capture")
+    cleanup_workspace(
+        lambda: release_collection(
+            binding=binding,
+            expected_provenance={**session.session_provenance, "session_id": session.session_id},
+            spec=session.scenario.workspace,
+        ),
+        stage="release",
+        identity=session.session_id,
+    )
+
+
+def _save_and_publish(session: Session, *, tracker, store, packet) -> Session:
     from ahe_beta.demand.evidence_contract import build_evidence_envelope
 
     session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
     store.save(session)
+    _release_saved_workspace(session, store=store, packet=packet)
     return _publish_reports(session, tracker=tracker, store=store)
+
+
+def _reconcile_saved_session(session: Session, *, tracker, store) -> Session:
+    _release_saved_workspace(session, store=store)
+    return _publish_reports(session, tracker=tracker, store=store)
+
+
+def _recover_pending_actor(*, packet, store, complete) -> Session | None:
+    try:
+        return complete()
+    except CollectionSourceLost:
+        # Only the durable orchestrator can launch a replacement with a new attempt identity.
+        binding = packet["payload"].get("collection_binding")
+        attempt = (binding or {}).get("identity", {}).get("attempt")
+        current = current_usage_context()
+        if (
+            current.session_id != packet["session_id"]
+            or type(current.attempt) is not int
+            or type(attempt) is not int
+            or current.attempt <= attempt
+        ):
+            raise
+        store.retire_lost_actor(
+            packet["session_id"], provenance=packet["provenance"], attempt=attempt
+        )
+        return None
 
 
 def _export_prediction(
@@ -775,7 +823,7 @@ def make_sim_run_session_fn(
             ),
         )
         validate_session_provenance(session, provenance)
-        _save_and_publish(session, tracker=tracker, store=store)
+        _save_and_publish(session, tracker=tracker, store=store, packet=packet)
         if on_turn is not None:
             # Wrap-up: mark running=False, include session_id for dashboard archival to correlate full session.
             on_turn(persona.identity, sim_persona, res, False, session_id=session.session_id)
@@ -821,7 +869,7 @@ def make_sim_run_session_fn(
         provenance = bound_session_provenance()
         recovered = store.reconcile(session_id, expected_provenance=provenance)
         if recovered is not None:
-            return _publish_reports(recovered, tracker=tracker, store=store)
+            return _reconcile_saved_session(recovered, tracker=tracker, store=store)
         pending = store.load_actor_checkpoint(session_id, expected_provenance=provenance)
         if pending is not None:
             return complete_actor(pending)
@@ -886,6 +934,8 @@ def make_sim_run_session_fn(
                     observation=_observation_binding(harness),
                 ),
             )
+            if ws is not None and packet["payload"]["collection_binding"] is not None:
+                ws.evidence["collection_pending"] = True
 
         def freeze_before_review() -> None:
             nonlocal actor_closed, workspace_evidence
@@ -895,7 +945,7 @@ def make_sim_run_session_fn(
             connector.close()
             if packet is None:
                 if ws is not None:
-                    ws.close()
+                    cleanup_workspace(ws.close, stage="close", identity=session_id)
                 return
             snapshot, workspace_evidence = _capture_completed_actor(
                 packet=packet,
@@ -945,13 +995,15 @@ def make_sim_run_session_fn(
         provenance = bound_session_provenance()
         session = store.reconcile(session_id, expected_provenance=provenance)
         if session is not None:
-            return _publish_reports(session, tracker=tracker, store=store)
+            return _reconcile_saved_session(session, tracker=tracker, store=store)
         pending = store.load_actor_checkpoint(session_id, expected_provenance=provenance)
         if pending is None:
             return None
         if pending["payload"]["mode"] != "simulated_user":
             raise EnvironmentInfrastructureError("Actor checkpoint interaction mode differs")
-        return complete_actor(pending)
+        return _recover_pending_actor(
+            packet=pending, store=store, complete=lambda: complete_actor(pending)
+        )
 
     run.load_completed_session = load_completed_session
     return run
@@ -1032,6 +1084,10 @@ def make_direct_run_session_fn(
         reply, harness_error = actor["reply"], actor["harness_error"]
         execution_record, harness_steps = actor["execution_record"], actor["harness_steps"]
         execution_contract = payload["execution_contract"]
+        deadline = any(
+            row.get("termination_reason") == "task_budget_exhausted"
+            for row in actor["request_outcomes"]
+        )
         snapshot, workspace_evidence = _capture_completed_actor(
             packet=packet,
             store=store,
@@ -1061,10 +1117,20 @@ def make_direct_run_session_fn(
                 round_no=round_no,
                 operation="direct_review",
             ):
+                respond = (
+                    getattr(review_client, "respond_for_terminal_review", review_client.respond)
+                    if deadline
+                    else review_client.respond
+                )
                 review = dict(
-                    review_client.respond(
+                    respond(
                         review_system,
-                        build_direct_review_turn(scenario.description, reply, snapshot.read_diff()),
+                        build_direct_review_turn(
+                            scenario.description,
+                            reply,
+                            snapshot.read_diff(),
+                            task_deadline_reached=deadline,
+                        ),
                     )
                     or {}
                 )
@@ -1129,7 +1195,13 @@ def make_direct_run_session_fn(
             if opportunity["kind"] == "diagnostic":
                 body += "\n\nAttribution: an observed task gap; the root cause is unconfirmed."
             drafts.append(IssueDraft(title=opportunity["title"][:80], body=body, labels=labels))
-        status = "infrastructure_failure" if harness_error else "completed"
+        status = (
+            "task_budget_exhausted"
+            if deadline
+            else "infrastructure_failure"
+            if harness_error
+            else "completed"
+        )
         session = Session(
             persona=persona,
             scenario=scenario,
@@ -1180,7 +1252,7 @@ def make_direct_run_session_fn(
             ),
         )
         validate_session_provenance(session, provenance)
-        return _save_and_publish(session, tracker=tracker, store=store)
+        return _save_and_publish(session, tracker=tracker, store=store, packet=packet)
 
     def run(
         persona: Persona,
@@ -1195,7 +1267,7 @@ def make_direct_run_session_fn(
         provenance = bound_session_provenance()
         recovered = store.reconcile(session_id, expected_provenance=provenance)
         if recovered is not None:
-            return _publish_reports(recovered, tracker=tracker, store=store)
+            return _reconcile_saved_session(recovered, tracker=tracker, store=store)
         pending = store.load_actor_checkpoint(session_id, expected_provenance=provenance)
         if pending is not None:
             return complete_actor(pending, None)
@@ -1249,6 +1321,8 @@ def make_direct_run_session_fn(
                     observation=_observation_binding(harness),
                 ),
             )
+            if workspace_dir is not None and packet["payload"]["collection_binding"] is not None:
+                workspace_dir.evidence["collection_pending"] = True
             connector.close()
         return complete_actor(packet, workspace_dir)
 
@@ -1256,13 +1330,15 @@ def make_direct_run_session_fn(
         provenance = bound_session_provenance()
         session = store.reconcile(session_id, expected_provenance=provenance)
         if session is not None:
-            return _publish_reports(session, tracker=tracker, store=store)
+            return _reconcile_saved_session(session, tracker=tracker, store=store)
         pending = store.load_actor_checkpoint(session_id, expected_provenance=provenance)
         if pending is None:
             return None
         if pending["payload"]["mode"] != "direct":
             raise EnvironmentInfrastructureError("Actor checkpoint interaction mode differs")
-        return complete_actor(pending, None)
+        return _recover_pending_actor(
+            packet=pending, store=store, complete=lambda: complete_actor(pending, None)
+        )
 
     run.load_completed_session = load_completed_session
     return run

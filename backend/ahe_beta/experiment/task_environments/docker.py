@@ -20,6 +20,7 @@ from pathlib import Path, PurePosixPath
 
 from ahe_beta.user.sim.runtime import (
     _MAX_OUTPUT,
+    CollectionSourceLost,
     DockerWorkspaceRuntime,
     list_review_files,
     read_bounded_file,
@@ -67,10 +68,30 @@ if config['action']=='keepers':
             if row and (row['pid']==1 or (row['ppid']==1 and Path(item,'cmdline').read_bytes().split(b'\x00')[:2]==[b'sleep',b'infinity'])):values.append(row)
     print(json.dumps(values))
 elif config['action']=='inspect':print(json.dumps(proc(config['pid'])))
+elif config['action']=='verify':
+    for expected in config['processes']:
+        actual=proc(expected['pid'])
+        if not actual or actual['state']=='Z' or actual['start_ticks']!=expected['start_ticks']:
+            print('lost');sys.exit(0)
+    print('verified')
+"""
+
+_VERIFY_NATIVE_PROCESSES = r"""
+set -eu
+for identity in "$@"; do
+    pid=${identity%:*}; expected=${identity#*:}
+    if ! line=$(cat "/proc/$pid/stat" 2>/dev/null); then echo lost; exit 0; fi
+    set -- ${line##*) }
+    [ "$#" -ge 20 ] || exit 1
+    if [ "$1" = Z ]; then echo lost; exit 0; fi
+    shift 19
+    if [ "$1" != "$expected" ]; then echo lost; exit 0; fi
+done
+echo verified
 """
 
 _QUIESCE = r"""
-import json,os,signal,sys,time
+import errno,json,os,signal,sys,time
 from pathlib import Path
 def proc(pid):
     try:
@@ -109,10 +130,26 @@ def candidates():
             if row and row['state']!='Z':rows.append(row)
     owners=listener_owners(rows)
     return [row for row in rows if row['pid'] not in protected and row['sid'] not in sessions and row['pid'] not in owners]
+open_pidfd=getattr(os,'pidfd_open',None)
+signal_pidfd=getattr(signal,'pidfd_send_signal',None)
 for sig in (signal.SIGTERM,signal.SIGKILL):
     for row in candidates():
-        try:os.kill(row['pid'],sig)
+        try:
+            if not open_pidfd or not signal_pidfd:
+                raise OSError(errno.ENOSYS,'Python lacks pidfd support')
+            fd=open_pidfd(row['pid'])
+            try:
+                current=proc(row['pid'])
+                if current and current['start_ticks']==row['start_ticks']:
+                    signal_pidfd(fd,sig)
+            finally:os.close(fd)
         except ProcessLookupError:pass
+        except OSError as error:
+            if error.errno not in (errno.EPERM,errno.EINVAL,errno.ENOSYS):raise
+            current=proc(row['pid'])
+            if current and current['start_ticks']==row['start_ticks']:
+                try:os.kill(row['pid'],sig)
+                except ProcessLookupError:pass
     time.sleep(.15)
 if candidates():raise RuntimeError('task writers remain active')
 print(json.dumps({'actor_stopped':True,'protected_services':len(sessions),'handoff_processes':list(observed.values())}))
@@ -288,9 +325,24 @@ class DockerTaskEnvironmentManager:
         return value
 
     def _inspect(self, *, kind: str, name: str) -> dict | None:
-        value = self._docker(argv=[kind, "inspect", name], timeout=30, check=False)
+        for attempt in range(3):
+            try:
+                value = self._docker(argv=[kind, "inspect", name], timeout=30, check=False)
+                break
+            except subprocess.TimeoutExpired:
+                if attempt == 2:
+                    raise TaskEnvironmentError(
+                        "Docker task resource inspection timed out"
+                    ) from None
         if value.returncode:
-            if "no such" in value.stderr.lower() or "not found" in value.stderr.lower():
+            error = value.stderr.strip().lower()
+            # Only a provider response for this resource is evidence of absence. A missing
+            # Docker socket or an unreachable endpoint must not authorize an Actor rerun.
+            if (
+                f"no such {kind}: {name.lower()}" in error
+                or f"no such object: {name.lower()}" in error
+                or (kind == "network" and f"network {name.lower()} not found" in error)
+            ):
                 return None
             raise TaskEnvironmentError("Cannot inspect Docker task resources")
         return json.loads(value.stdout)[0]
@@ -299,6 +351,12 @@ class DockerTaskEnvironmentManager:
         info = self._inspect(kind=kind, name=name)
         if info is None:
             raise TaskEnvironmentError("LOST: recorded task resource is absent")
+        self._verify_owner(info=info, kind=kind)
+        if running and not info.get("State", {}).get("Running"):
+            raise TaskEnvironmentError("Task container is stopped; explicit recovery is required")
+        return info
+
+    def _verify_owner(self, *, info: dict, kind: str) -> None:
         labels = (
             info.get("Labels", {})
             if kind == "network"
@@ -306,9 +364,6 @@ class DockerTaskEnvironmentManager:
         )
         if any(labels.get(k) != v for k, v in self.labels.items()):
             raise TaskEnvironmentError("Docker task resource ownership differs")
-        if running and not info.get("State", {}).get("Running"):
-            raise TaskEnvironmentError("Task container is stopped; explicit recovery is required")
-        return info
 
     def _exec_in(
         self,
@@ -426,6 +481,7 @@ class DockerTaskEnvironmentManager:
             raise TaskEnvironmentError("Task container image differs from its declared material")
         entry["id"] = info["Id"]
         entry["image_id"] = info["Image"]
+        entry.setdefault("started_at", info.get("State", {}).get("StartedAt"))
         self._save(value=record)
         if "keepers" not in entry:
             if identifier != "task":
@@ -765,13 +821,95 @@ class DockerTaskEnvironmentManager:
                 self._save(value=record)
                 raise
 
-    def quiesce(self) -> None:
+    def _verify_finalization_source(self, *, record: dict) -> None:
+        """Check continuity under the same lock as the resumed finalization step."""
+        stages = record.get("stages", {})
+        self._require_known_finalizers(record=record)
+        for name, entry in record["resources"]["containers"].items():
+            info = self._inspect(kind="container", name=entry["id"])
+            if info is None:
+                raise CollectionSourceLost("Original task environment container is absent")
+            self._verify_owner(info=info, kind="container")
+            if info["Id"] != entry["id"] or info["Image"] != entry["image_id"]:
+                raise TaskEnvironmentError("Finalization recovery resource identity changed")
+            state = info["State"]
+            if name != "task" and record.get("companion_stop", {}).get(name) in {
+                "started",
+                "complete",
+            }:
+                if not state["Running"]:
+                    continue  # Finalization already reached the stop step for this companion.
+                if record["companion_stop"][name] == "complete":
+                    raise TaskEnvironmentError("Finalized companion restarted unexpectedly")
+            if not state["Running"] or (
+                entry.get("started_at") and state.get("StartedAt") != entry["started_at"]
+            ):
+                raise CollectionSourceLost("Original task process lifetime ended")
+            if not entry.get("started_at"):
+                raise TaskEnvironmentError(
+                    "Cannot verify the original process lifetime for finalization"
+                )
+            processes = list(entry["keepers"])
+            if name == "task" and not processes:
+                raise TaskEnvironmentError("Finalization recovery lacks original keeper identity")
+            processes.extend(
+                row["process"]
+                for service, row in record["services"].items()
+                if row["container"] == name
+                and "process" in row
+                and stages.get("finalize-service-" + service) != "complete"
+            )
+            if not processes:
+                continue
+            result = self._exec_in(
+                container=entry["id"],
+                argv=(
+                    [
+                        self.harness_python,
+                        "-c",
+                        _PROCESS_STATE,
+                        json.dumps({"action": "verify", "processes": processes}),
+                    ]
+                    if name == "task"
+                    else [
+                        "/bin/sh",
+                        "-c",
+                        _VERIFY_NATIVE_PROCESSES,
+                        "verify",
+                        *(f"{row['pid']}:{row['start_ticks']}" for row in processes),
+                    ]
+                ),
+                cwd="/",
+                user="root",
+                environment={},
+                timeout=15,
+            )
+            if result.stdout.strip() == "lost":
+                raise CollectionSourceLost("Original task process identity no longer exists")
+            if result.stdout.strip() != "verified":
+                raise TaskEnvironmentError(
+                    "Original finalization process identity was not verified"
+                )
+
+    @staticmethod
+    def _require_known_finalizers(*, record: dict) -> None:
+        if any(
+            key.startswith("finalize-") and state == "started"
+            for key, state in record.get("stages", {}).items()
+        ):
+            raise TaskEnvironmentError(
+                "Interrupted side-effecting environment hook requires recovery"
+            )
+
+    def quiesce(self, *, recovering: bool = False) -> None:
         with self._lock():
             record = self._record()
             if record["phase"] in {"quiesced", "frozen"}:
                 return
             if record["phase"] != "ready":
                 raise TaskEnvironmentError("Task Actor cannot be frozen from its current phase")
+            if recovering:
+                self._verify_finalization_source(record=record)
             for name, entry in record["resources"]["containers"].items():
                 if name != "task":
                     # Companions contain no Actor. Keep the whole workload alive for finalization.
@@ -806,7 +944,7 @@ class DockerTaskEnvironmentManager:
             record["quiesced_at"] = utc_now()
             self._save(value=record)
 
-    def finalize(self) -> None:
+    def finalize(self, *, recovering: bool = False) -> None:
         with self._lock():
             record = self._record()
             if record["phase"] == "frozen":
@@ -815,6 +953,8 @@ class DockerTaskEnvironmentManager:
                 raise TaskEnvironmentError(
                     "Services cannot be finalized before the Actor is quiescent"
                 )
+            if recovering:
+                self._verify_finalization_source(record=record)
             try:
                 for row in reversed(self._services()):
                     if row["mode"] == "oneshot":
@@ -844,10 +984,24 @@ class DockerTaskEnvironmentManager:
                 )
                 for name, entry in record["resources"]["containers"].items():
                     if name != "task":
-                        self._owned(kind="container", name=entry["id"], running=True)
-                        self._docker(
-                            argv=["stop", "--time", "2", entry["id"]], timeout=20, check=True
-                        )
+                        stops = record.setdefault("companion_stop", {})
+                        info = self._owned(kind="container", name=entry["id"], running=False)
+                        if not info["State"]["Running"] and name not in stops:
+                            raise TaskEnvironmentError(
+                                "Companion stopped before recorded finalization"
+                            )
+                        if info["State"]["Running"]:
+                            if stops.get(name) == "complete":
+                                raise TaskEnvironmentError(
+                                    "Finalized companion restarted unexpectedly"
+                                )
+                            stops[name] = "started"
+                            self._save(value=record)
+                            self._docker(
+                                argv=["stop", "--time", "2", entry["id"]], timeout=20, check=True
+                            )
+                        stops[name] = "complete"
+                        self._save(value=record)
                         continue
                     self._exec_in(
                         container=entry["id"],
@@ -1114,36 +1268,36 @@ class DockerTaskEnvironmentManager:
     def close(self, *, retain: bool) -> None:
         with self._lock():
             record = self._record()
-            if record["phase"] == "closed":
-                return
-            for entry in reversed(list(record["resources"]["containers"].values())):
-                info = self._inspect(kind="container", name=entry.get("id") or entry["name"])
-                if info is None:
-                    continue
-                self._owned(kind="container", name=info["Id"], running=False)
-                if retain:
-                    if info.get("State", {}).get("Running"):
-                        self._docker(
-                            argv=["stop", "--time", "2", info["Id"]], timeout=20, check=True
-                        )
-                else:
-                    self._docker(argv=["rm", "-f", info["Id"]], timeout=30, check=True)
-            network = record["resources"].get("network")
-            if (
-                not retain
-                and network
-                and self._inspect(kind="network", name=network.get("id") or network["name"])
-            ):
-                info = self._owned(
-                    kind="network", name=network.get("id") or network["name"], running=False
-                )
+            self._close_owned(record=record, retain=retain)
+
+    def _close_owned(self, *, record: dict, retain: bool) -> None:
+        if record["phase"] == "closed":
+            return
+        for entry in reversed(list(record["resources"]["containers"].values())):
+            info = self._inspect(kind="container", name=entry.get("id") or entry["name"])
+            if info is None:
+                continue
+            self._verify_owner(info=info, kind="container")
+            if retain:
+                if info.get("State", {}).get("Running"):
+                    self._docker(argv=["stop", "--time", "2", info["Id"]], timeout=20, check=True)
+            else:
+                self._docker(argv=["rm", "-f", info["Id"]], timeout=30, check=True)
+        network = record["resources"].get("network")
+        if not retain and network:
+            info = self._inspect(kind="network", name=network.get("id") or network["name"])
+            if info is not None:
+                self._verify_owner(info=info, kind="network")
                 self._docker(argv=["network", "rm", info["Id"]], timeout=30, check=True)
-            if record["phase"] != "stopped":
-                record["stopped_from_phase"] = record["phase"]
-            record["phase"] = "stopped" if retain else "closed"
-            record["closed_at"] = utc_now()
-            record["retained"] = retain
-            self._save(value=record)
+        if record["phase"] != "stopped":
+            record["stopped_from_phase"] = record["phase"]
+        record["phase"] = "stopped" if retain else "closed"
+        record["closed_at"] = utc_now()
+        record["retained"] = retain
+        if not retain:
+            record.pop("release_pending", None)
+            record.pop("release_error", None)
+        self._save(value=record)
 
 
 class ContainerTaskRuntime(DockerWorkspaceRuntime):
@@ -1252,11 +1406,11 @@ class ContainerTaskRuntime(DockerWorkspaceRuntime):
         }
 
     def quiesce(self) -> None:
-        self.manager.quiesce()
+        self.manager.quiesce(recovering=getattr(self, "_collection_only", False))
         self.evidence["environment_phase"] = "quiesced"
 
     def finalize_task(self) -> None:
-        self.manager.finalize()
+        self.manager.finalize(recovering=getattr(self, "_collection_only", False))
         self.manager.capture_management()
         self.evidence["environment_phase"] = "frozen"
 
@@ -1269,7 +1423,13 @@ class ContainerTaskRuntime(DockerWorkspaceRuntime):
     def close(self) -> None:
         if self._closed:
             return
+        if self.evidence.get("collection_pending") is True:
+            # Recovery owns this environment until capture and terminal review are durable.
+            # In particular, stopping an unfinished task would discard its live services.
+            return
         state = self.manager._record()
+        if state["phase"] == "closed" or state.get("release_pending"):
+            return
         outputs = state.get("management_outputs", {})
         missing_management = any(
             outputs.get(output["handle"], {}).get("status") != "collected"
@@ -1280,7 +1440,6 @@ class ContainerTaskRuntime(DockerWorkspaceRuntime):
         retain = (
             state["phase"] != "frozen"
             or missing_management
-            or self.evidence.get("collection_pending") is True
             or bool(self.evidence.get("observation", {}).get("retain_source"))
         )
         self.manager.close(retain=retain)
@@ -1310,20 +1469,18 @@ def _collection_manager(*, binding: dict, expected_provenance: dict):
         if identity.get(name) != expected_provenance.get(name):
             raise TaskEnvironmentError("Collection recovery logical session differs")
     manager = DockerTaskEnvironmentManager._from_record(value=value, registry_root=root)
-    if manager.key != key or not value.get("frozen_at"):
-        raise TaskEnvironmentError("Completed Actor awaits explicit finalization repair")
-    return manager, value
+    if manager.key != key:
+        raise TaskEnvironmentError("Collection recovery environment key changed")
+    return manager
 
 
 def resume_collection(*, binding: dict, expected_provenance: dict) -> ContainerTaskRuntime:
-    """Adopt already-frozen resources; restart only their inert keeper, never services or Actor."""
-    reconciler, record = _collection_manager(
-        binding=binding, expected_provenance=expected_provenance
-    )
-    if record["phase"] not in {"frozen", "stopped"} or (
-        record["phase"] == "stopped" and record.get("stopped_from_phase") != "frozen"
-    ):
-        raise TaskEnvironmentError("Collection recovery requires an already-frozen environment")
+    """Adopt original resources for capture only; never restart services or Actor."""
+    reconciler = _collection_manager(binding=binding, expected_provenance=expected_provenance)
+    record = reconciler._record()
+    base = binding.get("patch_base_commit")
+    if base is not None and not re.fullmatch(r"[a-f0-9]{40}|[a-f0-9]{64}", base):
+        raise TaskEnvironmentError("Invalid frozen collection Git base")
     manager = DockerTaskEnvironmentManager(
         environment=record["environment"],
         identity=record["identity"],
@@ -1333,23 +1490,35 @@ def resume_collection(*, binding: dict, expected_provenance: dict) -> ContainerT
         expected_git_revision=record.get("expected_git_revision"),
     )
     with manager._lock():
-        for name, entry in record["resources"]["containers"].items():
-            info = manager._owned(kind="container", name=entry["id"], running=False)
-            if info["Image"] != entry["image_id"]:
-                raise TaskEnvironmentError("Frozen collection image changed")
-            if name != "task":
-                if info["State"]["Running"]:
-                    raise TaskEnvironmentError("Frozen native companion restarted unexpectedly")
-                continue
-            if not info["State"]["Running"]:
-                manager._docker(argv=["start", entry["id"]], timeout=30, check=True)
-        record["phase"] = "frozen"
-        record["collection_recovered_at"] = utc_now()
-        manager._save(value=record)
+        record = manager._record()
+        if record["phase"] in {"ready", "quiesced"} and not record.get("frozen_at"):
+            manager._verify_finalization_source(record=record)
+        elif record.get("frozen_at") and (
+            record["phase"] == "frozen"
+            or (record["phase"] == "stopped" and record.get("stopped_from_phase") == "frozen")
+        ):
+            for name, entry in record["resources"]["containers"].items():
+                info = manager._inspect(kind="container", name=entry["id"])
+                if info is None:
+                    raise CollectionSourceLost("Original frozen task container is absent")
+                manager._verify_owner(info=info, kind="container")
+                if info["Id"] != entry["id"] or info["Image"] != entry["image_id"]:
+                    raise TaskEnvironmentError("Frozen collection resource changed")
+                if name != "task":
+                    if info["State"]["Running"]:
+                        raise TaskEnvironmentError("Frozen native companion restarted unexpectedly")
+                    continue
+                if not info["State"]["Running"]:
+                    manager._docker(argv=["start", entry["id"]], timeout=30, check=True)
+            record["phase"] = "frozen"
+            record["collection_recovered_at"] = utc_now()
+            manager._save(value=record)
+        elif record["phase"] in {"closed", "stopped"}:
+            manager._require_known_finalizers(record=record)
+            raise CollectionSourceLost("Original unfrozen task environment is no longer running")
+        else:
+            raise TaskEnvironmentError("Completed Actor awaits explicit finalization repair")
     runtime = ContainerTaskRuntime(manager=manager, record=record)
-    base = binding.get("patch_base_commit")
-    if base is not None and not re.fullmatch(r"[a-f0-9]{40}|[a-f0-9]{64}", base):
-        raise TaskEnvironmentError("Invalid frozen collection Git base")
     runtime._patch_base_commit = base
     runtime._patch_base_failed = binding.get("patch_base_failed", False) is True
     runtime._collection_only = True
@@ -1358,7 +1527,30 @@ def resume_collection(*, binding: dict, expected_provenance: dict) -> ContainerT
 
 def release_collection(*, binding: dict, expected_provenance: dict) -> None:
     """Release retained frozen resources only after their required private bytes were captured."""
-    manager, record = _collection_manager(binding=binding, expected_provenance=expected_provenance)
+    manager = _collection_manager(binding=binding, expected_provenance=expected_provenance)
+    _release_frozen(manager=manager, request=True)
+
+
+def _release_frozen(*, manager: DockerTaskEnvironmentManager, request: bool = False) -> None:
+    with manager._lock():
+        record = manager._record()
+        if record["phase"] == "closed" or not (request or record.get("release_pending")):
+            return
+        if not record.get("frozen_at"):
+            raise TaskEnvironmentError("Cannot release an unfrozen collection")
+        if not record.get("release_pending"):
+            record["release_pending"] = True
+            manager._save(value=record)
+        try:
+            _require_management_outputs(manager=manager, record=record)
+            manager._close_owned(record=record, retain=False)
+        except Exception as error:
+            record["release_error"] = {"type": type(error).__name__, "at": utc_now()}
+            manager._save(value=record)
+            raise
+
+
+def _require_management_outputs(*, manager: DockerTaskEnvironmentManager, record: dict) -> None:
     outputs = record.get("management_outputs", {})
     if any(
         outputs.get(output["handle"], {}).get("status") != "collected"
@@ -1367,7 +1559,6 @@ def release_collection(*, binding: dict, expected_provenance: dict) -> None:
         if output["visibility"] == "management"
     ):
         raise TaskEnvironmentError("Cannot release uncaptured management evidence")
-    manager.close(retain=False)
 
 
 def _registered(
@@ -1419,6 +1610,11 @@ def inspect_registered(*, registry_root: Path, run_id: str, config_hash: str) ->
                     "environment_key": manager.key,
                     "identity": manager.identity,
                     "phase": record["phase"],
+                    **(
+                        {"release_pending": True, "release_error": record.get("release_error")}
+                        if record.get("release_pending")
+                        else {}
+                    ),
                     "containers": containers,
                     "services": {
                         identifier: {"phase": value["phase"]}
@@ -1433,7 +1629,9 @@ def stop_registered(*, registry_root: Path, run_id: str, config_hash: str) -> di
     """Stop only journal-owned containers; preserve interrupted attempt data."""
     for manager in _registered(registry_root=registry_root, run_id=run_id, config_hash=config_hash):
         record = manager._record()
-        if record["phase"] != "closed":
+        if record.get("release_pending"):
+            _release_frozen(manager=manager)
+        elif record["phase"] != "closed":
             manager.close(retain=True)
     return inspect_registered(registry_root=registry_root, run_id=run_id, config_hash=config_hash)
 

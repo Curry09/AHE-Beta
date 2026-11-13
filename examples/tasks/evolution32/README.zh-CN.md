@@ -8,7 +8,7 @@
 
 ## 文件组成
 
-- `manifest.json`：任务顺序、原 benchmark 标识、指令 hash、persona 绑定和材料发布状态。
+- `manifest.json`：任务顺序、原 benchmark 标识、当前任务定义和指令的校验和、persona 绑定及材料发布状态。
 - `<task-key>/instruction.md`：原始任务请求；缺少文件末尾换行时只补一个换行。
 - `<task-key>/task.json`：可执行的 schema 3 环境与产物声明，固定镜像 digest 和输入校验和。
 - `recipes/initialize.py`：恢复真实的初始 Git 版本，并补入已校验、原本被 Git 忽略的输入文件。
@@ -18,6 +18,8 @@
 - `recipes/freeze_initial_git.py`：在执行前，将声明的初始文件记录进准备版 Git 基线。
 
 发布和验证状态以 `manifest.json` 为准。[固定版本材料 Release](https://github.com/Curry09/AHE-Beta/releases/tag/evolution32-task-materials-v1) 包含 37 项输入资产，以及 `materials.lock.json`、`SHA256SUMS` 和 README。准备阶段只下载所选任务需要的资产，逐项检查哈希及文件清单。主仓当前仍为私有，带身份下载单独验证；匿名材料下载待主仓公开后再验证，通用材料下载器不加入 GitHub 身份认证逻辑。
+
+校验当前 checkout 的任务定义时，使用同一 checkout 的 `manifest.json`。Release 中的 `materials.lock.json` 记录发布标签对应的任务定义，`SHA256SUMS` 用来校验下载的文件。后续只调整执行设置时，可以继续使用同一批输入材料和镜像。
 
 32 项任务镜像统一使用 `ghcr.io/mmjzmy/ahe-beta-tasks:<任务 key 小写>-v<version>`，例如 `m04-v1`、`o03-v1`、`kv-live-surgery-v1`。实际任务定义锁定镜像 digest；源码、依赖版本与构建配方记录在清单中。
 

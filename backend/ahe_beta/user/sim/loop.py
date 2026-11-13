@@ -238,6 +238,18 @@ def _harness_terminal_status(harness) -> str:
     return status if status in _HARNESS_TERMINAL_STATUSES else ""
 
 
+def _task_deadline_reached(harness) -> bool:
+    return getattr(harness, "task_deadline_reached", False) is True
+
+
+def _end_at_task_deadline(result: SessionResult, history: list[str], clock: _SessionClock) -> None:
+    result.end_reason = "task_budget_exhausted"
+    result.signals.append("HARNESS_TERMINAL: task_budget_exhausted")
+    clock.stamp(
+        history, "The declared task time limit elapsed. Work stopped before terminal review."
+    )
+
+
 def _write_harness_message(harness, message: str) -> None:
     """Unified stdin write (Spec-0036): prefer write_message, compatible with legacy begin/emit_message aliases."""
     for name in ("write_message", "begin", "emit_message"):
@@ -1202,6 +1214,10 @@ def _await_harness(
             ledger.close_open_as_answered()
             return str(val), time.monotonic() - t0, None, None
 
+        if _task_deadline_reached(harness):
+            # During the cancellation grace period only collect the terminal receipt.
+            continue
+
         # —— HeartbeatOnce（timer）——
         waited = float(val)  # type: ignore[arg-type]
         clock.observe(begin_at + waited)
@@ -1253,6 +1269,8 @@ def _await_harness(
                 f"PERSONA_PROTOCOL_WARNING: stage={exc.stage} code={exc.code} "
                 f"attempts={exc.attempts} heartbeat={heartbeats}"
             )
+            if _task_deadline_reached(harness):
+                continue
             # No fake intent/action, no patience mutation, and no harness write on
             # a malformed decision. Keep polling once so a later harness reply can
             # still be judged. Repeated failure becomes a distinct safe terminal.
@@ -1276,7 +1294,12 @@ def _await_harness(
                 return "", time.monotonic() - t0, "protocol_stalled", None
             continue
         # A reply may have entered the buffer during decision-making: verify before executing the action; if one is present, void the waiting action and hand control back to the main loop.
-        ready = _try_ready_reply(harness)
+        try:
+            ready = _try_ready_reply(harness)
+        except RuntimeError as exc:
+            if not _task_deadline_reached(harness):
+                raise
+            ready = f"{HARNESS_ERROR_PREFIX}{type(exc).__name__}: {exc}"
         if ready is not None:
             clock.stamp(
                 history,
@@ -1288,6 +1311,9 @@ def _await_harness(
             clock.observe(begin_at + (time.monotonic() - t0))
             ledger.close_open_as_answered()
             return ready, time.monotonic() - t0, None, None
+        if _task_deadline_reached(harness):
+            # Let the launcher collect the cancellation reply or force a stop.
+            continue
         # Any action ends the current heartbeat; below we only perform the I/O side effects, then either return to the main loop or go back to AwaitEvent.
         if action == "send_message":
             try:
@@ -1360,6 +1386,9 @@ def run_session(
     started_at = time.monotonic()
 
     while state.turn < MAX_TURNS:
+        if _task_deadline_reached(harness):
+            _end_at_task_deadline(result, history, clock)
+            break
         if deadline_seconds is not None and time.monotonic() - started_at >= deadline_seconds:
             result.end_reason = "official_deadline"
             break
@@ -1391,6 +1420,9 @@ def run_session(
         except PersonaProtocolError as exc:
             result.persona_tail.extend(_take_persona_calls(client, exc.stage))
             _take_protocol_events(client, result)
+            if _task_deadline_reached(harness):
+                _end_at_task_deadline(result, history, clock)
+                break
             result.interaction_status = "protocol_unrecoverable"
             result.evaluation_status = "invalid"
             result.evaluation_error = {
@@ -1438,6 +1470,9 @@ def run_session(
             action_id, message = resolve_action(ret, space, persona)
         except (PersonaProtocolError, ActionResolutionError) as exc:
             result.persona_tail.extend(decide_calls)
+            if _task_deadline_reached(harness):
+                _end_at_task_deadline(result, history, clock)
+                break
             result.interaction_status = "protocol_unrecoverable"
             if isinstance(exc, PersonaProtocolError):
                 result.persona_tail.extend(_take_persona_calls(client, exc.stage))
@@ -1459,6 +1494,9 @@ def run_session(
             result.end_reason = "evaluator_invalid"
             result.goal_ledger = goal_ledger.snapshot()
             result.goal_audit = goal_ledger.audit()
+            break
+        if _task_deadline_reached(harness):
+            _end_at_task_deadline(result, history, clock)
             break
         spec = CATALOG[action_id]
 
@@ -1672,14 +1710,14 @@ def run_session(
                         "harness activity: " + "; ".join(titles)[:240],
                     )
             # Spec-0024/T6: answers are written to the next beat's TurnLog; history still carries a short human-readable preview.
+            preview = nxt.partition("\n")[0][:80]
             if user_control:
                 clock.stamp(
                     history,
-                    "YOU interrupted (Ctrl+C); harness acknowledged: "
-                    f"{nxt.splitlines()[0][:80]}...",
+                    f"YOU interrupted (Ctrl+C); harness acknowledged: {preview}...",
                 )
             else:
-                clock.stamp(history, f"harness -> you: {nxt.splitlines()[0][:80]}...")
+                clock.stamp(history, f"harness -> you: {preview}...")
             # Push the harness reply to the observation layer as soon as it arrives (without waiting for the persona's next round); otherwise the dashboard conversation is missing half of the dialogue during long tasks
             result.pending_harness_output = nxt
             result.pending_harness_steps = harness_steps
@@ -1688,6 +1726,9 @@ def run_session(
                 on_progress(result)
             # timeout/crash is the terminal state of an invalidated workspace session. Reply text remains as pending
             # evidence is retained, but cannot enter the next round of persona decision-making, and certainly cannot write messages to the dead container.
+            if _task_deadline_reached(harness):
+                _end_at_task_deadline(result, history, clock)
+                break
             terminal_status = _harness_terminal_status(harness)
             if terminal_status:
                 result.end_reason = f"harness_{terminal_status}"
@@ -1783,7 +1824,20 @@ def _finish_terminal_review(*, persona, client, result, history, state, task) ->
     # ① LLM self-evaluation: persona rates "this experience" 1–4 in-character + rationale (spec-0001/T3 output method)
     set_usage_context(interaction_id=None, turn_no=None, operation="rate")
     try:
-        rating = client.respond(system, build_rating_turn(task, history, state))
+        deadline = result.end_reason == "task_budget_exhausted"
+        rating_prompt = build_rating_turn(task, history, state, task_deadline_reached=deadline)
+        if deadline:
+            bounded = getattr(client, "respond_for_terminal_review", None)
+            rating = (
+                bounded(system, rating_prompt)
+                if callable(bounded)
+                else client.respond(system, rating_prompt)
+            )
+            issue = rating.get("issue")
+            if isinstance(issue, str) and issue.strip():
+                result.issue_artifact = emit_issue_artifact(persona, result.turns, issue)
+        else:
+            rating = client.respond(system, rating_prompt)
         result.persona_tail.extend(_take_persona_calls(client, "rate"))
         _take_protocol_events(client, result)
         result.feeling = parse_feeling_llm(rating)

@@ -9,6 +9,11 @@
     "instance_id": "production-planning",
     "revision": "941ea5556797d055b93e98bd898d9d15fe01e9191821bd51202c3614c15c21c4"
   },
+  "execution": {
+    "budget_seconds": 3600,
+    "budget_source": "operator_quota",
+    "quota_override_reason": "Use the completion limit stated in the frozen task instruction."
+  },
   "environment": {
     "kind": "container",
     "image": "ghcr.io/mmjzmy/ahe-beta-tasks@sha256:54b85575736165727e754c88b7c64be0556ee73d782ee04ad8caf8a199fcf9c7",

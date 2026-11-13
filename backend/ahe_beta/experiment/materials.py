@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import shutil
@@ -310,23 +311,9 @@ def prepare_materials(
         source_pins = _source_pins(config=config, controller=controller)
         openagents = source_pins["openagents"]
         oa_source = stage / "source/openagents"
-        cache = root / ".cache/openagents" / openagents["revision"]
-        if not cache.exists():
-            cache.parent.mkdir(parents=True, exist_ok=True)
-            temporary_cache = Path(tempfile.mkdtemp(prefix=".fetch-", dir=cache.parent))
-            shutil.rmtree(temporary_cache)
-            try:
-                _checkout_git(
-                    url=openagents["repository"],
-                    revision=openagents["revision"],
-                    destination=temporary_cache,
-                )
-                temporary_cache.rename(cache)
-            finally:
-                if temporary_cache.exists():
-                    shutil.rmtree(temporary_cache)
-        if _git_head(root=cache) != openagents["revision"] or _git_dirty(root=cache):
-            raise ConfigError("Cached OpenAgents source does not match its immutable revision")
+        cache = _cached_openagents(
+            root=root, repository=openagents["repository"], revision=openagents["revision"]
+        )
         oa_source.mkdir()
         oa_files = _git_source_files(root=cache)
         _copy_snapshot(root=cache, files=oa_files, destination=oa_source)
@@ -804,6 +791,23 @@ def _git(*, root: Path, args: list[str]) -> str:
         raise ConfigError(
             "Git operation failed; verify repository permissions (gh auth setup-git for private GitHub repositories), network access, and fixed revision"
         ) from exc
+
+
+def _cached_openagents(*, root: Path, repository: str, revision: str) -> Path:
+    cache = root / ".cache/openagents" / revision
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    with cache.with_suffix(".lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not cache.exists():
+            temporary = Path(tempfile.mkdtemp(prefix=".fetch-", dir=cache.parent))
+            try:
+                _checkout_git(url=repository, revision=revision, destination=temporary / "repo")
+                (temporary / "repo").rename(cache)
+            finally:
+                shutil.rmtree(temporary)
+        if _git_head(root=cache) != revision or _git_dirty(root=cache):
+            raise ConfigError("Cached OpenAgents source does not match its immutable revision")
+    return cache
 
 
 def _checkout_git(*, url: str, revision: str, destination: Path) -> None:

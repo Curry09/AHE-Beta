@@ -137,3 +137,51 @@ def test_direct_harness_failure_is_persisted_as_infrastructure_failure(tmp_path:
     assert session.user_outcome["status"] == "infrastructure_failure"
     assert "gateway unavailable" in session.user_outcome["error"]
     assert session.issue_refs
+
+
+def test_direct_deadline_preserves_actor_result_and_runs_bounded_review(tmp_path: Path) -> None:
+    calls = []
+
+    class DeadlineHarness(_Harness):
+        def send(self, message: str) -> str:
+            self.messages.append(message)
+            self.request_outcomes = [
+                {"status": "incomplete", "termination_reason": "task_budget_exhausted"}
+            ]
+            return "Saved a partial patch."
+
+        def close(self) -> None:
+            calls.append("close")
+
+    class DeadlineReview(_ReviewClient):
+        def respond(self, system: str, user: str) -> dict:
+            raise AssertionError("Deadline must use the bounded review")
+
+        def respond_for_terminal_review(self, system: str, user: str) -> dict:
+            assert calls == ["close"]
+            assert "Saved a partial patch." in user
+            calls.append("review")
+            return {
+                "task_assessment": "unknown",
+                "feedback": "The patch was not verified.",
+                "score": 2,
+                "reason": "Ran out of time.",
+                "opportunities": [],
+            }
+
+    store = SessionStore(tmp_path / "sessions")
+    run = make_direct_run_session_fn(
+        client_factory=DeadlineReview, tracker=FakeTracker(), store=store, sim_personas={}
+    )
+    harness = DeadlineHarness()
+    session = run(
+        Persona("direct", "n/a", "benchmark", "deliver", "one-shot"),
+        SeedScenario("one shot", WorkspaceSpec(kind="prebuilt", params={"task_key": "example"})),
+        harness,
+    )
+    assert calls == ["close", "review"]
+    assert harness.messages == ["one shot"]
+    assert session.user_outcome["status"] == "task_budget_exhausted"
+    assert session.user_outcome["review_status"] == "completed"
+    assert session.issue_refs == []
+    assert store.load(session.session_id).request_outcomes == harness.request_outcomes

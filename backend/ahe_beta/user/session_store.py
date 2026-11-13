@@ -139,6 +139,37 @@ class SessionStore:
             session_id=session_id, part="capture", expected_provenance=expected_provenance
         )
 
+    def retire_lost_actor(self, session_id: str, *, provenance: dict, attempt: int) -> None:
+        """Keep a lost attempt's checkpoint and unpublished prediction before a replacement."""
+        directory = self._root / "actor-checkpoints"
+        with self._lock, (directory / ".lock").open("a+b") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            packet = self.load_actor_checkpoint(session_id, expected_provenance=provenance)
+            if (
+                packet is None
+                or packet["payload"]["collection_binding"]["identity"]["attempt"] != attempt
+                or self.load_actor_capture(session_id, expected_provenance=provenance) is not None
+                or (self._root / f"{session_id}.json").exists()
+            ):
+                raise SessionConflictError(
+                    "Only an unpublished Actor without a capture can be retired"
+                )
+            previous = directory / f"{session_id}.attempt-{attempt}"
+            prediction = self._root.parent / "predictions" / f"{session_id}.patch"
+            if any(path.is_symlink() for path in (previous, prediction, prediction.parent)):
+                raise SessionConflictError("Linked lost Actor archive")
+            previous.mkdir(exist_ok=True, mode=0o700)
+            saved_prediction = previous / "prediction.patch"
+            if prediction.exists():
+                if saved_prediction.exists() or saved_prediction.is_symlink():
+                    raise SessionConflictError("Lost Actor prediction archive already exists")
+                prediction.replace(saved_prediction)
+            # Move the authoritative checkpoint last, so an interrupted retirement can retry.
+            saved_actor = previous / "actor.json"
+            if saved_actor.exists() or saved_actor.is_symlink():
+                raise SessionConflictError("Lost Actor archive already exists")
+            (directory / f"{session_id}.actor.json").replace(saved_actor)
+
     def record_actor_capture_failure(
         self, session_id: str, *, provenance: dict, evidence: dict, error: str
     ) -> None:

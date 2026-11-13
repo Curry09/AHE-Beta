@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from ahe_beta.experiment.task_environments.contract import (
     environment_identity,
 )
 from ahe_beta.experiment.task_environments.docker import (
+    _QUIESCE,
     _START_NATIVE_SERVICE,
     _START_SERVICE,
     LABEL,
@@ -20,6 +22,87 @@ from ahe_beta.experiment.task_environments.docker import (
     destroy_registered,
     inspect_registered,
 )
+
+
+def test_quiesce_stops_owned_writer_without_python_pidfd_support():
+    # Model calls run in a separate PID namespace. Run the same script with
+    # an isolated synthetic process table here so no host process can be signalled.
+    fixture = """
+import os, signal, sys, time
+from pathlib import Path
+
+table = {1: ("1", "S"), 12: ("42", "S"), 16: ("43", "S")}
+sent = []
+
+class ProcessPath:
+    def __init__(self, *parts):
+        self.parts = parts
+        self.name = parts[-1]
+
+    def iterdir(self):
+        return [ProcessPath("/proc", str(pid)) for pid in table]
+
+    def read_text(self):
+        pid = int(self.parts[1])
+        if pid not in table:
+            raise FileNotFoundError
+        started, state = table[pid]
+        return f"{pid} (test) " + " ".join([state, "1", str(pid), str(pid)] + ["0"] * 15 + [started])
+
+def kill(pid, signum):
+    sent.append((pid, signum))
+    del table[pid]
+
+Path = ProcessPath
+os.kill = kill
+time.sleep = lambda _: None
+if hasattr(os, "pidfd_open"):
+    del os.pidfd_open
+"""
+    # Replace the import of Path; leave the real filtering and signal logic intact.
+    code = fixture + _QUIESCE.replace("from pathlib import Path\n", "", 1)
+    code += "\nassert sent == [(16, signal.SIGTERM)]\n"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            code,
+            json.dumps({"protected": [{"pid": 12, "start_ticks": "42"}]}),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert json.loads(result.stdout)["actor_stopped"]
+
+
+def test_read_only_docker_inspection_recovers_from_temporary_timeout(monkeypatch):
+    manager = object.__new__(DockerTaskEnvironmentManager)
+    calls = []
+
+    def inspect(*, argv, timeout, check):
+        calls.append((argv, timeout, check))
+        if len(calls) == 1:
+            raise subprocess.TimeoutExpired(argv, timeout)
+        return subprocess.CompletedProcess(argv, 0, stdout='[{"Id": "task"}]', stderr="")
+
+    monkeypatch.setattr(manager, "_docker", inspect)
+    assert manager._inspect(kind="container", name="task") == {"Id": "task"}
+    assert calls == [(["container", "inspect", "task"], 30, False)] * 2
+
+
+def test_docker_transport_error_does_not_prove_task_container_missing(monkeypatch):
+    manager = object.__new__(DockerTaskEnvironmentManager)
+    responses = iter(
+        ["docker endpoint not found", "Error response from daemon: No such container: task"]
+    )
+    monkeypatch.setattr(
+        manager, "_docker", lambda **kwargs: subprocess.CompletedProcess([], 1, "", next(responses))
+    )
+    with pytest.raises(TaskEnvironmentError, match="Cannot inspect"):
+        manager._inspect(kind="container", name="task")
+    assert manager._inspect(kind="container", name="task") is None
 
 
 class FakeManager(DockerTaskEnvironmentManager):
@@ -412,13 +495,16 @@ def test_task_service_readiness_and_relative_finalizer_share_task_workdir(tmp_pa
     assert observed.count((["test", "-f", "ready"], "/app")) == 2
 
 
-def test_incomplete_finalization_cannot_be_adopted_as_collection_or_restart_actor(tmp_path):
+def test_ambiguous_finalization_hook_cannot_be_replayed_or_restart_actor(tmp_path):
     from ahe_beta.experiment.task_environments.docker import resume_collection
 
     m = manager(tmp_path)
     runtime = m.open()
     m.quiesce()
     assert "frozen_at" not in m._record()
-    with pytest.raises(TaskEnvironmentError, match="finalization repair"):
+    record = m._record()
+    record.setdefault("stages", {})["finalize-service-customer"] = "started"
+    m._save(value=record)
+    with pytest.raises(TaskEnvironmentError, match="Interrupted side-effecting environment hook"):
         resume_collection(binding=runtime.collection_binding(), expected_provenance=m.identity)
     assert m.start_count == 1

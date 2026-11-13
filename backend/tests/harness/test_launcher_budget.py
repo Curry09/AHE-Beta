@@ -169,9 +169,34 @@ def test_deadline_stops_then_grace_only_allows_termination(handle, monkeypatch):
             h.write_message("continue")
         assert not killed
         now[0] = 171
-        with pytest.raises(RuntimeError, match="termination grace"):
-            h._check_deadlines()
+        with pytest.raises(RuntimeError, match="did not stop within grace"):
+            h.try_reply()
         assert killed and h.last_request_status == "timed_out"
+        assert h.request_outcomes[-1]["termination_reason"] == "task_budget_exhausted"
+
+
+def test_task_deadline_collects_graceful_partial_reply(tmp_path):
+    entry = """
+import json, sys
+message = json.loads(sys.stdin.readline())
+interrupt = json.loads(sys.stdin.readline())
+assert interrupt["reason"] == "task_budget_exhausted"
+print(json.dumps({
+    "type": "reply", "task_id": message["task_id"], "message_id": message["message_id"],
+    "text": "partial work", "status": "incomplete", "termination_reason": interrupt["reason"],
+}), flush=True)
+"""
+    h = _launcher(tmp_path, entry).launch("main")
+    try:
+        h.bind_execution_contract(contract(1))
+        assert h.send("do the task") == "partial work"
+        assert h.task_deadline_reached
+        outcome = h.request_outcomes[-1]
+        assert outcome["status"] == "incomplete"
+        assert outcome["termination_source"] == "harness_reply"
+        assert outcome["termination_reason"] == "task_budget_exhausted"
+    finally:
+        h.close()
 
 
 def test_unknown_contract_budget_does_not_invent_1800_seconds(handle):
