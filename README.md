@@ -106,7 +106,9 @@ Each configuration fixes its task packages, persona pairings and round schedule.
 
 After evolution, use the independent Harbor evaluation workflow to assess the Harness on benchmark tasks. Configure it in [`evaluation.yaml`](evaluation.yaml) and launch it with `python -m evaluation`. It supports Harbor Index tasks and standard Harbor task packages on E2B.
 
-Choose a released Harness (`v0`, `u8`, `u8-direct`, `u16` or `u32`), or an integrated agent (Claude Code or Meta-Harness). Set `user.enabled: false` for direct solving. With `true`, a simulated user participates in follow-up interaction and can ask questions or assess the response.
+Choose a released Harness (`v0`, `u8`, `u8-direct`, `u16` or `u32`), or an integrated agent (Claude Code, Meta-Harness or the pinned upstream AHE evolved harness). Set `user.enabled: false` for direct solving. With `true`, a simulated user participates in follow-up interaction and can ask questions or assess the response.
+
+For the third-party AHE Messages adapter (`harnesses: [ahe]`), follow the [AHE setup](evaluation/README.md#ahe-over-anthropic-messages) and [configuration template](examples/evaluation/ahe-messages.yaml). Original agent policy is fixed; runtime code is independently verified.
 
 Download the pinned runtime and Harness archives described in the [evaluation guide](evaluation/docs/harbor.md), then create a separate evaluation environment:
 

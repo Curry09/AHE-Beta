@@ -83,7 +83,9 @@ U4 示例在两项任务上安排四个用户会话，共运行两轮，提供�
 
 迭代完成后，可以通过独立的 Harbor 评测流程测试 Harness 的任务能力。评测统一使用 [`evaluation.yaml`](evaluation.yaml) 配置，通过 `python -m evaluation` 启动，支持在 E2B 上运行 Harbor Index 题目和标准 Harbor 任务包。
 
-可选择已发布的 Harness（`v0`、`u8`、`u8-direct`、`u16`、`u32`），也可选择已接入的 Claude Code 或 Meta-Harness。`user.enabled: false` 表示 direct 解题；设为 `true` 时，模拟用户会参与后续交互，对回复进行追问或验收。
+可选择已发布的 Harness（`v0`、`u8`、`u8-direct`、`u16`、`u32`），也可选择已接入的 Claude Code、Meta-Harness 或固定版本的上游 AHE evolved harness。`user.enabled: false` 表示 direct 解题；设为 `true` 时，模拟用户会参与后续交互，对回复进行追问或验收。
+
+第三方 AHE 的 Messages 适配使用 `harnesses: [ahe]`，安装步骤见 [AHE 说明](evaluation/README.zh-CN.md#ahe-的-anthropic-messages-适配)，配置见[模板](examples/evaluation/ahe-messages.yaml)。适配保留固定的原始 Agent 策略，并单独校验 runtime 源码。
 
 先按[评测指南](evaluation/docs/harbor.zh-CN.md)下载固定版本的运行时和 Harness 压缩包，再创建独立的评测环境：
 

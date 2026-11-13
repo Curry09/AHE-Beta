@@ -11,6 +11,7 @@
 | NexAU | [hzhua/nexau](https://github.com/hzhua/nexau)，提交 `28511d9f0362191a6c378fd441b2be55309a9e32` | [Apache-2.0](https://github.com/hzhua/nexau/blob/28511d9f0362191a6c378fd441b2be55309a9e32/LICENSE)。通过固定提交的 Git 依赖安装，保留其许可证及相关声明。 |
 | 内置 Spec 工具 | [Curry09/OpenAgents](https://github.com/Curry09/OpenAgents)，位于 `tools/spec-driven-development/` | MIT。内置副本保留了 [OpenAgents 许可证](tools/spec-driven-development/vendor/LICENSE)。 |
 | Meta-Harness 实验产物 | [stanford-iris-lab/meta-harness-tbench2-artifact](https://github.com/stanford-iris-lab/meta-harness-tbench2-artifact)，提交 `57fefdb2ff84af3fd81b69d67814acbe69bd0743` | 内置快照未附单独的许可证文件，包元数据也未声明许可证。本项目的 MIT 许可证不授予这些上游文件的使用或分发权利。来源和修改记录见下文。 |
+| AHE evolved harness | [china-qijizhifeng/agentic-harness-engineering](https://github.com/china-qijizhifeng/agentic-harness-engineering)，提交 `182ea06e578df7b1d503eca537503c1e4c5a8a58`，`experiments/evolved_harness` | MIT，版权归 Jiahang Lin。保留原始[许可证](evaluation/harness/ahe_artifact/LICENSE)及[源码哈希](evaluation/harness/ahe_artifact/provenance.json)。传输与运行观测由独立适配文件提供，上游提示词、工具和中间件保留原样。 |
 | 其他 Python 依赖 | 版本和来源记录在 [uv.lock](uv.lock) 和 [evaluation/requirements.lock](evaluation/requirements.lock) | 各依赖保留自己的许可证；安装或打包依赖不会将其许可改为 MIT。 |
 
 Meta-Harness 快照位于 `evaluation/harness/meta_artifact/`。其[上游 README](evaluation/harness/meta_artifact/README.md)注明基于 KRAFTON AI 的 Terminus-KIRA 和 Harbor 的 Terminus-2 框架。[来源记录](evaluation/harness/meta_artifact/provenance.json)保存了上游提交、文件哈希及本项目所做的兼容性调整。

@@ -250,6 +250,9 @@ Unify acceptance artifacts for direct and simulated interactions, retain existin
 ### 0084 Feedback, Execution Contracts, and Per-Round Acceptance for Autonomous and Interactive Evolution
 Calibrate feedback across both modes, carry execution conditions throughout, correct the Seed baseline run boundary, and conduct independent acceptance before feedback in each round; retain cross-round error correction without adding a candidate elimination gate.
 
+### 0085 Pinned AHE Messages evaluation adapter
+Evaluate the pinned upstream AHE harness through Anthropic Messages with native SDK isolation, reproducible materials, complete capture, and correct usage and failure accounting.
+
 ## Task board
 
 | Group | Task | Title | Status | Dependencies | Files |
@@ -615,6 +618,9 @@ Calibrate feedback across both modes, carry execution conditions throughout, cor
 | 0084 | 0084/T4 | Preserve Trustworthy Usage Conditions Across the Requirements and Delivery Chain | done | T1, T2, T3 | backend/ahe_beta/demand/evidence_contract.py<br>backend/ahe_beta/demand/session_timeline.py<br>backend/ahe_beta/demand/agent_runtime.py<br>backend/ahe_beta/demand/triage.py<br>backend/ahe_beta/demand/divergent.py<br>backend/ahe_beta/demand/architect.py<br>backend/ahe_beta/demand/grouped_architect.py<br>backend/ahe_beta/demand/owner.py<br>backend/ahe_beta/demand/proposal_view.py<br>backend/ahe_beta/demand/delivery_evidence.py<br>backend/agent_defs/triage_agent/systemprompt.md<br>backend/agent_defs/divergent_pm/systemprompt.md<br>backend/agent_defs/architect/systemprompt.md<br>backend/agent_defs/owner/systemprompt.md<br>backend/tests/demand/test_evidence_contract.py<br>backend/tests/demand/test_proposal_view.py<br>backend/tests/demand/test_triage.py<br>backend/tests/demand/test_divergent_gate.py<br>backend/tests/demand/test_owner.py<br>backend/tests/demand/test_grouped_architect.py<br>backend/tests/demand/test_delivery_evidence.py |
 | 0084 | 0084/T5 | Per-Round Independent Acceptance and External Grading Endpoint | done | T1 | backend/ahe_beta/evaluation/service.py<br>backend/ahe_beta/evaluation/contracts.py<br>backend/ahe_beta/evaluation/adapters/custom.py<br>backend/ahe_beta/evaluation/adapters/swebench.py<br>backend/ahe_beta/evaluation/adapters/terminal_bench.py<br>backend/ahe_beta/evaluation/adapters/tua_bench.py<br>backend/ahe_beta/evaluation/adapters/nl2repo.py<br>backend/ahe_beta/evaluation/artifacts.py<br>backend/ahe_beta/experiment/assessment_worker.py<br>backend/ahe_beta/loop/round_assessment.py<br>backend/ahe_beta/experiment/grading.py<br>backend/ahe_beta/experiment/continuation/evidence.py<br>backend/ahe_beta/experiment/grading_inputs.py<br>backend/ahe_beta/experiment/materials.py<br>backend/ahe_beta/experiment/runtime.py<br>backend/ahe_beta/experiment/cli.py<br>backend/ahe_beta/experiment/controllers/unified.py<br>backend/ahe_beta/experiment/collection.py<br>backend/ahe_beta/experiment/manifest.py<br>backend/ahe_beta/experiment/backends/base.py<br>backend/ahe_beta/experiment/backends/local.py<br>backend/ahe_beta/experiment/backends/e2b.py<br>backend/ahe_beta/loop/orchestrator.py<br>backend/ahe_beta/loop/feedback_pipeline.py<br>backend/ahe_beta/loop/recovery.py<br>backend/tests/test_experiment_round_grading.py<br>backend/tests/test_assessment_plan_preflight.py<br>backend/tests/test_experiment_continuation_evidence.py<br>backend/tests/test_unified_assessment_recovery.py<br>backend/tests/test_assessment_receipt_recovery.py<br>backend/tests/test_experiment_local_backend.py<br>backend/tests/test_experiment_assessment_worker.py<br>backend/tests/test_experiment_grading.py<br>backend/tests/test_experiment_grading_plan.py<br>backend/tests/loop/test_feedback_pipeline.py<br>backend/tests/loop/test_recovery.py<br>backend/tests/test_experiment_engine.py<br>backend/tests/test_experiment_lifecycle_v2.py<br>pyproject.toml<br>uv.lock |
 | 0084 | 0084/T6 | Joint Acceptance, Configuration Examples, and Bilingual Documentation | in-progress | T4, T5 | backend/scripts/e2e-spec-0084-evolution-feedback.sh<br>backend/scripts/check_observation_contract.py<br>backend/scripts/check_experiment_repository.py<br>backend/tests/test_evolution_feedback_e2e.py<br>backend/tests/test_experiment_public_examples.py<br>backend/tests/test_experiment_repository.py<br>backend/compatibility.json<br>.github/workflows/ci.yml<br>examples/experiments/evolution-feedback-local.json<br>examples/experiments/evolution-feedback-e2b.json<br>docs/tutorials/evolution-feedback.md<br>docs/tutorials/evolution-feedback.zh-CN.md<br>docs/ARCHITECTURE.md<br>docs/specs/0048-user-sim-final-check-convergence.md<br>docs/CONFIGURATION.md<br>docs/CONFIGURATION.zh-CN.md<br>docs/QUICKSTART.md<br>docs/QUICKSTART.zh-CN.md<br>CLAUDE.md<br>backend/tests/fixtures/execution_evidence_contract.json<br>tools/dev/delivery/__init__.py<br>tools/dev/delivery/run_openagents_validation.py<br>backend/tests/test_run_openagents_validation.py<br>backend/ahe_beta/experiment/controllers/runtime.py<br>tools/dev/delivery/prepare_openagents_from_summary.py<br>tools/dev/delivery/prepare_openagents_validation.py<br>backend/tests/test_prepare_openagents_from_summary.py<br>backend/tests/test_prepare_openagents_validation.py |
+| 0085 | 0085/T1 | Pin and install AHE with an isolated native SDK runtime | done | — | .gitignore<br>pyproject.toml<br>backend/scripts/check_nexau_dependency.py<br>evaluation/harness/ahe.py<br>evaluation/harness/ahe_entry.py<br>evaluation/harness/ahe_bootstrap.py<br>evaluation/harness/ahe_artifact/**<br>evaluation/configuration.py<br>evaluation/preparation.py |
+| 0085 | 0085/T2 | Preserve Messages capture, usage and termination semantics | done | T1 | evaluation/harness/fulltrace.py<br>evaluation/harness/driver.py<br>evaluation/harness/sim_driver.py<br>evaluation/usage.py<br>evaluation/harbor/grading.py<br>evaluation/tests/test_ahe.py<br>evaluation/tests/test_ahe_messages.py<br>evaluation/tests/test_ahe_materials.py |
+| 0085 | 0085/T3 | Publish bilingual instructions and a validated configuration example | done | T1, T2 | README.md<br>README.zh-CN.md<br>THIRD_PARTY.md<br>THIRD_PARTY.zh-CN.md<br>evaluation/README.md<br>evaluation/README.zh-CN.md<br>evaluation/docs/harbor.md<br>evaluation/docs/harbor.zh-CN.md<br>examples/evaluation/ahe-messages.yaml |
 
 ## Cross-feature relationships
 
@@ -1145,6 +1151,11 @@ graph LR
         n0084_T5["T5 Per-Round Independent Acceptance and External Grading Endpoint"]
         n0084_T6["T6 Joint Acceptance, Configuration Examples, and Bilingual Documentation"]
     end
+    subgraph G0085[0085 ahe-messages-evaluation]
+        n0085_T1["T1 Pin and install AHE with an isolated native SDK runtime"]
+        n0085_T2["T2 Preserve Messages capture, usage and termination semantics"]
+        n0085_T3["T3 Publish bilingual instructions and a validated configuration example"]
+    end
     n0001_T2 --> n0001_T1
     n0001_T3 --> n0001_T1
     n0001_T3 --> n0001_T2
@@ -1546,6 +1557,9 @@ graph LR
     n0084_T5 --> n0084_T1
     n0084_T6 --> n0084_T4
     n0084_T6 --> n0084_T5
+    n0085_T2 --> n0085_T1
+    n0085_T3 --> n0085_T1
+    n0085_T3 --> n0085_T2
     n0005_T1 -.extends.-> n0001_T1
     n0005_T4 -.extends.-> n0001_T1
     n0005_T4 -.note.-> n0001_T3
@@ -1604,15 +1618,16 @@ graph LR
 |----|----|
 | .github/workflows/ci.yml | 0070, 0071, 0084 |
 | .github/workflows/experiment-contract.yml | 0069, 0071, 0076, 0077, 0079, 0081 |
-| .gitignore | 0069, 0071 |
+| .gitignore | 0069, 0071, 0085 |
 | CLAUDE.md | 0032, 0033, 0050, 0051, 0060, 0062, 0063, 0068, 0069, 0071, 0073, 0075, 0076, 0077, 0079, 0081, 0083, 0084 |
 | OpenAgents/openagents/recipes/stages.py | 0032, 0061, 0063 |
 | OpenAgents/openagents/recipes/vigil.py | 0032, 0040, 0061, 0063 |
 | OpenAgents/openagents/runtime/context.py | 0032, 0061, 0063 |
 | OpenAgents/openagents/runtime/engine.py | 0049, 0061, 0063 |
 | OpenAgents/openagents/utils/gitea.py | 0032, 0061 |
-| README.md | 0068, 0069, 0071, 0072, 0073, 0074, 0075, 0076, 0077, 0079, 0081, 0083 |
-| README.zh-CN.md | 0068, 0069, 0071, 0072, 0073, 0074, 0075, 0076, 0077, 0079, 0081, 0083 |
+| README.md | 0068, 0069, 0071, 0072, 0073, 0074, 0075, 0076, 0077, 0079, 0081, 0083, 0085 |
+| README.zh-CN.md | 0068, 0069, 0071, 0072, 0073, 0074, 0075, 0076, 0077, 0079, 0081, 0083, 0085 |
+| THIRD_PARTY.md | 0069, 0085 |
 | backend/agent_defs/architect/agent.yaml | 0016, 0024, 0027, 0029, 0043, 0061, 0068, 0082 |
 | backend/agent_defs/architect/systemprompt.md | 0016, 0024, 0027, 0029, 0042, 0043, 0052, 0055, 0060, 0061, 0068, 0084 |
 | backend/agent_defs/architect/tools/get_harness_beat.tool.yaml | 0024, 0068 |
@@ -1972,6 +1987,7 @@ graph LR
 | docs/tutorials/u1-experiment.md | 0069, 0071, 0072, 0073 |
 | docs/tutorials/u1-experiment.zh-CN.md | 0069, 0071, 0072, 0073 |
 | docs/usage-monitoring.md | 0041, 0068 |
+| evaluation/README.md | 0071, 0085 |
 | examples/experiment.env.example | 0069, 0071, 0072 |
 | examples/experiments/u1-e2b.json | 0068, 0069, 0071, 0072 |
 | examples/experiments/u1-local.json | 0069, 0071, 0072 |
@@ -1995,7 +2011,7 @@ graph LR
 | frontend/src/lib/issueMeta.ts | 0025, 0029, 0032, 0039, 0068 |
 | frontend/src/styles.css | 0026, 0034, 0038, 0039, 0041, 0068, 0071 |
 | frontend/src/types.ts | 0020, 0025, 0026, 0029, 0032, 0034, 0038, 0039, 0041, 0068, 0073, 0084 |
-| pyproject.toml | 0051, 0069, 0071, 0081, 0084 |
+| pyproject.toml | 0051, 0069, 0071, 0081, 0084, 0085 |
 | release/compatibility.json | 0069, 0070 |
 | research/inventory.json | 0071, 0073 |
 | tools/dev/README.md | 0071, 0081 |
@@ -4567,4 +4583,29 @@ graph LR
     class v_T4_1 st_done;
     class v_T5_1 st_done;
     class v_T6_1 st_in_progress;
+```
+
+### 0085 Pinned AHE Messages evaluation adapter(issue #0)
+
+```mermaid
+graph LR
+    nT1["T1 Pin and install AHE with an isolated native SDK runtime"]
+    nT2["T2 Preserve Messages capture, usage and termination semantics"]
+    nT3["T3 Publish bilingual instructions and a validated configuration example"]
+    nT1 --> nT2
+    nT1 --> nT3
+    nT2 --> nT3
+```
+
+Evolution graph:
+
+```mermaid
+graph LR
+    v_T1_1["T1 v1"]
+    v_T2_1["T2 v1"]
+    v_T3_1["T3 v1"]
+    classDef st_done fill:#b7e4c7;
+    class v_T1_1 st_done;
+    class v_T2_1 st_done;
+    class v_T3_1 st_done;
 ```
