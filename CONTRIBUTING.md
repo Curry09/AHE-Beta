@@ -24,9 +24,11 @@ Use Python 3.12+ and run the following from the repository root. The dependency 
 uv sync --locked --extra experiments --extra dev --extra harbor-evaluation
 .venv/bin/ruff check .
 .venv/bin/ruff format --check .
-.venv/bin/python -m pytest -q
-.venv/bin/python backend/scripts/check_experiment_repository.py
+.venv/bin/python -m pytest -q backend/tests
+PYTHONPATH=. .venv/bin/python -m pytest -q -c /dev/null -p no:cacheprovider evaluation/tests
 ```
+
+CI runs the backend suites in parallel. Run the evaluation suite separately so it uses the user engine bundled with the evaluator.
 
 After editing specs, validate them and regenerate the indexes:
 

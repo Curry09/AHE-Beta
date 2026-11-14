@@ -24,9 +24,11 @@
 uv sync --locked --extra experiments --extra dev --extra harbor-evaluation
 .venv/bin/ruff check .
 .venv/bin/ruff format --check .
-.venv/bin/python -m pytest -q
-.venv/bin/python backend/scripts/check_experiment_repository.py
+.venv/bin/python -m pytest -q backend/tests
+PYTHONPATH=. .venv/bin/python -m pytest -q -c /dev/null -p no:cacheprovider evaluation/tests
 ```
+
+CI 并行运行各组后端测试。评测测试单独运行，以使用评测模块随附的用户模拟引擎。
 
 修改 Spec 后，执行校验并重新生成索引：
 

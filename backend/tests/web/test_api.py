@@ -1,4 +1,4 @@
-"""Unit test for frontend dashboard read-only API: TestClient + temporary SessionStore + FakeTracker, no network access."""
+"""Read-only observation API tests using a temporary SessionStore and fake tracker."""
 
 from __future__ import annotations
 
@@ -690,7 +690,7 @@ def test_delivery_lists_pulls_and_counts_needs_human(tmp_path: Path) -> None:
 
 
 def test_delivery_degrades_without_capability(tmp_path: Path) -> None:
-    # FakeTracker lacks list_pulls observation support → connected=False (frontend fallback placeholder, no 500).
+    # A tracker without pull request support returns connected=False instead of an error.
     client = _client(tmp_path, tracker=FakeTracker())
     body = client.get("/api/delivery").json()
     assert body == {"connected": False, "pulls": [], "needs_human": 0}
