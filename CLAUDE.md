@@ -117,7 +117,7 @@ backend/                 # Orchestration backend
     tracker/             # IssueTracker, Gitea/PR observation and fake tracker
     demand/              # Triage, Architect, PM, Owner and shared demand processing
     guards/              # workspace_jail + repo_guard + harness_boundary; no built-in developer role
-    loop/                # Orchestrator, metrics, checkpoint, run state and runner
+    loop/                # Orchestrator, stage recovery, and experiment metrics
     web/                 # Read-only FastAPI observations: /api/overview, /api/delivery, /api/sessions
   tests/                 # Backend tests; root pyproject also includes evaluation/tests
   agent_defs/            # NexAU definitions: user_agent/, triage_agent/, architect/, divergent_pm/, owner/

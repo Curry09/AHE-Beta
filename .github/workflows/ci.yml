@@ -47,29 +47,67 @@ jobs:
           .venv/bin/ruff check .
           .venv/bin/ruff format --check .
 
-  test:
-    name: Test
+  backend-tests:
+    name: Backend tests (${{ matrix.suite }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [core, experiments, batch-and-grading]
     steps:
       - uses: actions/checkout@v4
-
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
           python-version: '3.12.13'
       - name: Install locked dependencies
-        run: uv sync --locked --extra experiments --extra dev --extra harbor-evaluation
-      - name: Verify installed SDK commit
-        run: uv run --locked --extra experiments --extra dev --extra harbor-evaluation python backend/scripts/check_nexau_dependency.py --installed
-      - name: Standalone evaluation tests with the frozen user engine
-        run: PYTHONPATH=. uv run --locked --extra experiments --extra dev --extra harbor-evaluation python -m pytest -v -c /dev/null -p no:cacheprovider --durations=20 --timeout=120 --timeout-method=thread evaluation/tests
-      - name: Backend and evaluation tests
-        run: uv run --locked --extra experiments --extra dev --extra harbor-evaluation pytest -v --durations=20 --timeout=120 --timeout-method=thread -o faulthandler_timeout=60
-      - name: Public experiment directory contract
-        run: uv run --locked --extra experiments --extra dev python backend/scripts/check_experiment_repository.py
+        run: uv sync --locked --extra experiments --extra dev
+      - name: Run backend suite
+        env:
+          SUITE: ${{ matrix.suite }}
+        shell: bash
+        run: |
+          case "$SUITE" in
+            core)
+              args=(backend/tests --ignore=backend/tests/experiment '--ignore-glob=backend/tests/test_experiment_*.py')
+              ;;
+            experiments)
+              args=(backend/tests/experiment)
+              for file in backend/tests/test_experiment_*.py; do
+                case "$file" in
+                  backend/tests/test_experiment_batch*.py|backend/tests/test_experiment_grading*.py)
+                    ;;
+                  *) args+=("$file") ;;
+                esac
+              done
+              ;;
+            batch-and-grading)
+              args=(backend/tests/test_experiment_batch*.py backend/tests/test_experiment_grading*.py)
+              ;;
+            *)
+              echo "Unknown backend suite: $SUITE" >&2
+              exit 2
+              ;;
+          esac
+          .venv/bin/pytest -q --durations=15 --timeout=120 --timeout-method=thread -o faulthandler_timeout=60 "${args[@]}"
       - name: Offline demo
-        run: uv run --locked --extra experiments --extra dev python backend/scripts/offline_demo.py
+        if: matrix.suite == 'core'
+        run: .venv/bin/python backend/scripts/offline_demo.py
+
+  evaluation-tests:
+    name: Standalone evaluation tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: '3.12.13'
+      - run: uv sync --locked --extra dev --extra harbor-evaluation
+      # Ignore the root pytest configuration so the tests use the packaged user engine.
+      - run: PYTHONPATH=. .venv/bin/python -m pytest -q -c /dev/null -p no:cacheprovider --durations=15 --timeout=120 --timeout-method=thread -o faulthandler_timeout=60 evaluation/tests
 
   integration:
     name: OpenAgents configuration and evidence contracts
@@ -162,13 +200,14 @@ jobs:
   ci-gate:
     name: CI Gate
     if: always()
-    needs: [nexau-pin, lint, test, integration, commitlint, spec-validate, spec-conflicts]
+    needs: [nexau-pin, lint, backend-tests, evaluation-tests, integration, commitlint, spec-validate, spec-conflicts]
     runs-on: ubuntu-latest
     steps:
       - name: Check job results
         run: |
           echo "lint:           ${{ needs.lint.result }}"
-          echo "test:           ${{ needs.test.result }}"
+          echo "backend-tests:  ${{ needs.backend-tests.result }}"
+          echo "evaluation:     ${{ needs.evaluation-tests.result }}"
           echo "commitlint:     ${{ needs.commitlint.result }}"
           echo "spec-validate:  ${{ needs.spec-validate.result }}"
           echo "spec-conflicts: ${{ needs.spec-conflicts.result }}"
@@ -176,7 +215,8 @@ jobs:
             "${{ needs.nexau-pin.result }}"
             "${{ needs.integration.result }}"
             "${{ needs.lint.result }}"
-            "${{ needs.test.result }}"
+            "${{ needs.backend-tests.result }}"
+            "${{ needs.evaluation-tests.result }}"
             "${{ needs.commitlint.result }}"
             "${{ needs.spec-validate.result }}"
             "${{ needs.spec-conflicts.result }}"

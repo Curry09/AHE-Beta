@@ -187,7 +187,6 @@ _Conversation-loop coordination, tracing, and lifecycle management._
 | Component | Responsibility (first line of the file docstring) |
 |----|----|
 | `__init__.py` | Conversation-loop coordination, tracing, and lifecycle management. |
-| `checkpoint.py` | checkpoint save/load (spec-0004/T1): package self-contained STATE_DIR as downloadable artifact, reverse restore. |
 | `feedback_pipeline.py` | Spec-0079/T3: one recoverable feedback and delivery cycle. |
 | `live.py` | Stream each agent's runtime state to the multi-agent activity registry in data/live/. |
 | `live_tracer.py` | StepTracer: transform nexau agent runtime process flow into structured events visible on the dashboard. |
@@ -197,8 +196,6 @@ _Conversation-loop coordination, tracing, and lifecycle management._
 | `roster.py` | Roster: quantities of each class of agent, serving as the single source of truth between "backend orchestration" and "frontend town rooms". |
 | `round_assessment.py` | Sealed-session grading exchange and round recovery (Spec-0084/T5). |
 | `round_gate.py` | Wait until this round's admitted issues reach a delivery terminal state. |
-| `run_state.py` | run_state (spec-0004/T1): orchestration cursor + three-side intermediate state markers, as fallback beyond "unobservable from artifacts". |
-| `runner.py` | Resumable Harbor runner (Spec-0004/T2, Spec-0064/T2). |
 | `sim_user.py` | Connect the spec-0005 simulated user to the spec-0003/0007 evolution loop. |
 
 ### ahe_beta.observations
@@ -387,7 +384,6 @@ graph LR
     nahe_beta_harness_launcher["harness.launcher"]
     nahe_beta_invocation["ahe_beta.invocation"]
     nahe_beta_loop["ahe_beta.loop"]
-    nahe_beta_loop_checkpoint["loop.checkpoint"]
     nahe_beta_loop_feedback_pipeline["loop.feedback_pipeline"]
     nahe_beta_loop_live["loop.live"]
     nahe_beta_loop_live_tracer["loop.live_tracer"]
@@ -397,8 +393,6 @@ graph LR
     nahe_beta_loop_roster["loop.roster"]
     nahe_beta_loop_round_assessment["loop.round_assessment"]
     nahe_beta_loop_round_gate["loop.round_gate"]
-    nahe_beta_loop_run_state["loop.run_state"]
-    nahe_beta_loop_runner["loop.runner"]
     nahe_beta_loop_sim_user["loop.sim_user"]
     nahe_beta_models["ahe_beta.models"]
     nahe_beta_nexau_runtime["ahe_beta.nexau_runtime"]
@@ -816,9 +810,6 @@ graph LR
     nahe_beta_loop_round_assessment --> nahe_beta_experiment_config
     nahe_beta_loop_round_assessment --> nahe_beta_experiment_workload
     nahe_beta_loop_round_assessment --> nahe_beta_loop_recovery
-    nahe_beta_loop_runner --> nahe_beta_loop_checkpoint
-    nahe_beta_loop_runner --> nahe_beta_loop_orchestrator
-    nahe_beta_loop_runner --> nahe_beta_loop_run_state
     nahe_beta_loop_sim_user --> nahe_beta_demand_evidence_contract
     nahe_beta_loop_sim_user --> nahe_beta_demand_issue_schema
     nahe_beta_loop_sim_user --> nahe_beta_evaluation_artifacts
