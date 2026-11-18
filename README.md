@@ -27,10 +27,10 @@
 
 ### Main results
 
-- **Held-out performance:** on 38 tasks, success rises from **21.9% to 32.5%** and user rating from **2.59 to 3.04**, while execution tokens fall by **41.0%** versus Base Harness.
-- **Strong baselines:** AHE-Beta exceeds Claude Code (**26.3%**) and Meta-Harness (**20.2%**) in success.
-- **Human preference:** in a blind human A/B study, participants prefer AHE-Beta in **31 of 48 valid pairs** and rate it higher on all five user-experience dimensions.
-- **Transfer:** without further evolution, gains transfer to other base models, improving success by **15.8 percentage points on GLM-5.3** and **7.9 points on DeepSeek-V4.1-Flash** over Base Harness.
+- **Held-out performance:** on 38 held-out tasks with GLM-5.3-Flash, averaged over three runs, pass@1 rises from **21.9% to 33.3%** and user rating from **2.59 to 3.04** over Base Harness, with **41.0%** fewer tokens.
+- **Strong baselines:** AHE-Beta exceeds Claude Code (**27.2%**), AHE (**23.7%**) and Meta-Harness (**21.1%**) in pass@1.
+- **Human preference:** in a blind human A/B test, real users prefer AHE-Beta in **31 of 48 valid pairs** and rate it higher on all five dimensions.
+- **Transfer:** without further evolution, pass@1 improves over Base Harness by **15.8 percentage points on GLM-5.3** and **5.3 points on DeepSeek-V4.1-Flash**.
 
 ---
 
