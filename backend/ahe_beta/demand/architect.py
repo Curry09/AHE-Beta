@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ahe_beta.demand.agent_runtime import read_submit, run_agent_def
+from ahe_beta.demand.artifact import append_artifact_section
 from ahe_beta.demand.issue_schema import (
     DIVERGENT,
     FROM_ARCHITECT,
@@ -253,7 +254,7 @@ class Architect:
                 continue
             source_ids = set(prop.artifact["source_proposals"])
             covers = tuple(n for n in prop.covers if n in coverable and n not in merged_sources)
-            body = render_synthesis_artifact(prop.artifact)
+            body = append_artifact_section(render_synthesis_artifact(prop.artifact))
             source_sessions = evidence_session_ids(
                 [item for item in [*ready, *proposals_open] if item.number in source_ids]
             )

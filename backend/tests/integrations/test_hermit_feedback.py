@@ -24,7 +24,13 @@ def test_feedback_recovery_does_not_republish_or_rebind_tested_source(tmp_path, 
     git("config", "user.name", "Test")
     git("config", "user.email", "test@example.invalid")
     (repo / "ADAPTER.md").write_text("Implement and verify the task.")
-    git("add", "ADAPTER.md")
+    meta = repo / ".hermit"
+    meta.mkdir()
+    (meta / "adapter.yaml").write_text(
+        "template:\n  id: fixture\n  version: '1'\nstructure:\n  learnable:\n  - path: ADAPTER.md\n  fixed:\n  - path: README.md\ncheck: .hermit/check.py:check\n"
+    )
+    (meta / "EVOLVER.md").write_text("# Fixture Adapter contract\n")
+    git("add", "ADAPTER.md", ".hermit")
     git("commit", "-m", "fixture")
     git("remote", "add", "origin", str(repo))
     cfg = params(tmp_path, "direct")

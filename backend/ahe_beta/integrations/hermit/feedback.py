@@ -11,7 +11,8 @@ import subprocess
 import threading
 from pathlib import Path
 
-from ahe_beta.demand.artifact import bind_artifact_guidance
+from ahe_beta.demand.artifact import bind_artifact_handoff
+from ahe_beta.integrations.hermit.contract import read_adapter_contract
 from ahe_beta.experiment.controllers.feedback import assemble_feedback_roles
 from ahe_beta.loop.feedback_pipeline import FeedbackPipeline
 from ahe_beta.loop.recovery import RecoveryIdentity, RecoveryStore
@@ -19,17 +20,6 @@ from ahe_beta.loop.round_gate import wait_round_delivery
 from ahe_beta.loop.sim_user import publish_session_reports
 from ahe_beta.models import Session
 from ahe_beta.user.session_store import SessionStore
-
-ADAPTER_GUIDANCE = """The evolving product is a Hermit adapter deployed to an unchanged Codex host.
-Read .hermit/adapter.yaml and .hermit/STRUCTURE.md to identify learnable and fixed files.
-Propose changes only within that surface: instructions, declared skills, helper scripts,
-roles and hooks supported by the chosen template. The AHE controller, user simulator,
-Codex binary, task inputs, task verifier and evaluation scores are outside this scope.
-Feedback describes user experience; do not generalize a task-specific stopping rule to
-all requests without evidence. Preserve both direct tasks and interactive use.
-The delivery repository contains the adapter itself, not the NexAU seed Harness.
-"""
-
 
 def _git(repo, *args):
     return subprocess.check_output(["git", "-C", str(repo), *args], text=True).strip()
@@ -56,6 +46,7 @@ def feedback_round(
     the shared adapter or starting a delivery round.
     """
     root, repo = Path(root), Path(repo)
+    contract = read_adapter_contract(repo, tested_sha=user_sha)
     cohort = [Session.from_dict(row) for row in sessions]
     if not cohort or len({s.session_id for s in cohort}) != len(cohort):
         raise ValueError("feedback requires a nonempty, unique session cohort")
@@ -135,7 +126,7 @@ def feedback_round(
         grounding_repo=str(repo),
     )
     pipeline.mark_stage(round_no=round_no, stage="feedback_imported", input_value=plan)
-    with bind_artifact_guidance(ADAPTER_GUIDANCE):
+    with bind_artifact_handoff(contract.handoff()):
         sealed_sha = pipeline.run(round_no=round_no, user_sha=user_sha)
     receipt = {
         "schema_version": 1,
