@@ -20,16 +20,20 @@
 
 ---
 
-## 🎯 Overview
-
-**AHE-Beta** is a requirement-centered loop for evolving coding-agent harnesses around a fixed base model. Simulated users work with the harness over multiple turns, surface explicit and implicit requirements, and leave evidence-backed issues. A Gitea-based team triages and consolidates those requirements, writes general fixes, and admits only reviewed changes with an evidence package.
-
-### Main results
+## 📊 Main results
 
 - **Held-out performance:** on 38 held-out tasks with GLM-5.3-Flash, averaged over three runs, pass@1 rises from **21.9% to 33.3%** and user rating from **2.59 to 3.04** over Base Harness, with **40.8%** fewer tokens.
 - **Strong baselines:** AHE-Beta exceeds Claude Code (**27.2%**), AHE (**23.7%**) and Meta-Harness (**21.1%**) in pass@1.
 - **Human preference:** in a blind human A/B test, real users prefer AHE-Beta in **31 of 48 valid pairs** and rate it higher on all five dimensions.
 - **Transfer:** without further evolution, pass@1 improves over Base Harness by **15.8 percentage points on GLM-5.3** and **5.3 points on DeepSeek-V4.1-Flash**.
+
+## 🎯 Overview
+
+**AHE-Beta** is a requirement-centered loop for evolving coding-agent harnesses around a fixed base model. Existing harness evolution methods let a single evolver patch one failure at a time and accept changes by benchmark score, which yields narrow patches and benchmark-specific local optima. AHE-Beta instead brings real-world engineering practice into the loop, which runs in three steps:
+
+1. **User-driven evaluation.** A user simulator works with the harness over multiple turns, surfaces explicit and implicit requirements, and files evidence-backed issues.
+2. **Team-based modification.** A Gitea-based team turns those issues into general fixes. Triage filters invalid and task-specific issues, Architect consolidates related issues by root cause into an RFC, PM mines unstated needs across users and sessions, and Developers implement the fix.
+3. **Requirement-driven selection.** A change merges only when it resolves a verified requirement and passes review with an evidence package. Benchmarks are used only for evaluation after evolution.
 
 ---
 
