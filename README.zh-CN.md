@@ -3,9 +3,8 @@
 <div align="left">
 
 <p align="left">
-  <!-- Replace the placeholder arXiv/PDF links when the paper is posted. -->
-  <a href="https://arxiv.org/abs/XXXX.XXXXX"><img alt="Paper" src="https://img.shields.io/badge/Paper-arXiv-b31b1b.svg?logo=arxiv&logoColor=white"></a>
-  <a href="https://arxiv.org/abs/XXXX.XXXXX"><img alt="PDF" src="https://img.shields.io/badge/PDF-Download-ec1c24.svg?logo=adobeacrobatreader&logoColor=white"></a>
+  <a href="https://arxiv.org/abs/2611.24924"><img alt="Paper" src="https://img.shields.io/badge/Paper-arXiv-b31b1b.svg?logo=arxiv&logoColor=white"></a>
+  <a href="https://arxiv.org/pdf/2611.24924"><img alt="PDF" src="https://img.shields.io/badge/PDF-Download-ec1c24.svg?logo=adobeacrobatreader&logoColor=white"></a>
   <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-yellow.svg">
   <img alt="Python" src="https://img.shields.io/badge/python-%E2%89%A53.12-blue.svg">
   <img alt="Managed with uv" src="https://img.shields.io/badge/managed_with-uv-261230?logo=python&logoColor=white">
