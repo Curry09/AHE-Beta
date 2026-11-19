@@ -32,7 +32,7 @@
 **AHE-Beta** is a requirement-centered loop for evolving coding-agent harnesses around a fixed base model. Existing harness evolution methods let a single evolver patch one failure at a time and accept changes by benchmark score, which yields narrow patches and benchmark-specific local optima. AHE-Beta instead brings real-world engineering practice into the loop, which runs in three steps:
 
 1. **User-driven evaluation.** A user simulator works with the harness over multiple turns, surfaces explicit and implicit requirements, and files evidence-backed issues.
-2. **Team-based modification.** A Gitea-based team turns those issues into general fixes. Triage filters invalid and task-specific issues, Architect consolidates related issues by root cause into an RFC, PM mines unstated needs across users and sessions, and Developers implement the fix.
+2. **Team-based modification.** A Gitea-based team turns those issues into general fixes. Triage filters invalid and task-specific issues, Architect consolidates related issues by root cause into an RFC, PM mines unstated needs across users and sessions, and Developers implement the fix. Delivery runs through [OpenAgents](https://github.com/Curry09/OpenAgents), a multi-agent system that turns admitted requirements into reviewed pull requests.
 3. **Requirement-driven selection.** A change merges only when it resolves a verified requirement and passes review with an evidence package. Benchmarks are used only for evaluation after evolution.
 
 ---

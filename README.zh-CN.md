@@ -32,7 +32,7 @@
 **AHE-Beta** 在固定基础模型的条件下，通过以需求为中心的循环持续演进编码 Agent 的 Harness。现有 Harness 演进方法由单个 evolver 逐条修补失败轨迹，并按 benchmark 分数接受改动，容易产生局部补丁并陷入 benchmark 特定的局部最优。AHE-Beta 把真实世界的工程实践引入演进循环，每轮分三步：
 
 1. **用户驱动的评估。** user simulator 与 Harness 多轮交互，提出显式和隐式需求，并提交有证据支持的 issue。
-2. **团队协作修改。** 基于 Gitea 的团队把 issue 转化为通用修复。Triage 过滤无效和任务特定的 issue，Architect 按根因把相关 issue 整合为 RFC，PM 跨用户和会话挖掘未说出的需求，Developers 实现修复。
+2. **团队协作修改。** 基于 Gitea 的团队把 issue 转化为通用修复。Triage 过滤无效和任务特定的 issue，Architect 按根因把相关 issue 整合为 RFC，PM 跨用户和会话挖掘未说出的需求，Developers 实现修复。交付由 [OpenAgents](https://github.com/Curry09/OpenAgents) 完成，它把已采纳的需求转化为经过评审的 PR。
 3. **需求驱动的筛选。** 只有解决经过验证的需求并附证据包通过审核的改动才会合并。benchmark 只用于演进之后的评测。
 
 ---
