@@ -12,14 +12,15 @@ import threading
 from pathlib import Path
 
 from ahe_beta.demand.artifact import bind_artifact_handoff
-from ahe_beta.integrations.hermit.contract import read_adapter_contract
 from ahe_beta.experiment.controllers.feedback import assemble_feedback_roles
+from ahe_beta.integrations.hermit.contract import read_adapter_contract
 from ahe_beta.loop.feedback_pipeline import FeedbackPipeline
 from ahe_beta.loop.recovery import RecoveryIdentity, RecoveryStore
 from ahe_beta.loop.round_gate import wait_round_delivery
 from ahe_beta.loop.sim_user import publish_session_reports
 from ahe_beta.models import Session
 from ahe_beta.user.session_store import SessionStore
+
 
 def _git(repo, *args):
     return subprocess.check_output(["git", "-C", str(repo), *args], text=True).strip()
