@@ -18,6 +18,7 @@ from jsonschema import Draft202012Validator
 
 from ahe_beta.demand.agent_contract import dispositions_input_schema
 from ahe_beta.demand.agent_runtime import read_submit, run_agent_def
+from ahe_beta.demand.artifact import append_artifact_section
 from ahe_beta.demand.evidence_contract import build_evidence_envelope, project_for_role
 from ahe_beta.demand.issue_schema import (
     DECLINED,
@@ -140,6 +141,7 @@ def _retryable_tracker_error(exc: Exception) -> bool:
 def _proposal_body(*, normalized: str, evidence: dict | None = None) -> str:
     """proposal default context contains only normalized conclusions; specific cases progressively sourced from comments/timeline."""
     body = f"## Triage normalized proposal (implementation target: harness)\n\n{normalized.strip()}"
+    body = append_artifact_section(body)
     # Keep only source references in the proposal.  The detailed user evidence
     # remains in SessionStore and is retrieved through the gated timeline tools.
     if evidence:

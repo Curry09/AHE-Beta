@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ahe_beta.demand.agent_runtime import read_submit, run_agent_def
+from ahe_beta.demand.artifact import append_artifact_section
 from ahe_beta.demand.evidence_contract import build_evidence_envelope, project_for_role
 from ahe_beta.demand.issue_schema import (
     FROM_DIVERGENT,
@@ -152,7 +153,7 @@ class Divergent:
                 continue
             if validate_pm(item, known_sessions=known_sessions):
                 continue
-            body = render_pm_artifact(item)
+            body = append_artifact_section(render_pm_artifact(item))
             labels = [PROPOSAL, FROM_DIVERGENT]
             if isinstance(round_no, int) and round_no > 0:
                 labels.append(round_label(round_no))

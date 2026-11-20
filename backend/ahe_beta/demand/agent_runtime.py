@@ -176,8 +176,12 @@ def run_agent_def(
     Spec-0055: optional evidence metadata is synced to disk for offline boundary replay.
     """
 
+    from ahe_beta.demand.artifact import artifact_guidance
     from ahe_beta.demand.source import current_harness_source
 
+    guidance = artifact_guidance()
+    if guidance:
+        message += "\n\n## Evolution artifact contract\n" + guidance
     source = current_harness_source()
     if source is not None:
         repo = source.snapshot()
