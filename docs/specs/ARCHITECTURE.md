@@ -27,6 +27,7 @@ _Product discovery, proposal synthesis, and admission decision roles._
 | `agent_contract.py` | Generate each producer's submit tool input_schema from issue_schema.SCHEMAS—contract and schema share one source, |
 | `agent_runtime.py` | Common logic previously duplicated across four drivers (triage / architect / divergent / owner) is consolidated here: |
 | `architect.py` | Architect driver. |
+| `artifact.py` | Optional, integration-neutral handoff context for demand roles. |
 | `delivery_evidence.py` | Publish issue-scoped opaque evidence through the existing forge boundary. |
 | `divergent.py` | Divergent (capability discovery) driver. |
 | `evidence_contract.py` | Goal-aware evidence contracts for demand-side roles. |
@@ -180,6 +181,28 @@ _Evaluation harness integration and execution support._
 | `interface.py` | Multi-turn harness protocol HarnessInterface and test backend FakeHarness (spec-0001/T2). |
 | `launcher.py` | Launch a harness version as spec-0001's HarnessInterface (spec-0003/T1). |
 
+### ahe_beta.integrations
+
+_Optional integrations with external rollout and evolution hosts._
+
+| Component | Responsibility (first line of the file docstring) |
+|----|----|
+| `__init__.py` | Optional integrations with external rollout and evolution hosts. |
+
+### ahe_beta.integrations.hermit
+
+_AHE session and material contracts for Hermit's example-side Codex bridge._
+
+| Component | Responsibility (first line of the file docstring) |
+|----|----|
+| `__init__.py` | AHE session and material contracts for Hermit's example-side Codex bridge. |
+| `contract.py` | Read and render the Hermit Adapter contract for feedback handoffs. |
+| `conversation.py` | Adapt a host-owned conversation to the existing simulated-user interface. |
+| `export.py` | Export frozen AHE task recipes and cohort assignments as local Harbor tasks. |
+| `feedback.py` | One complete AHE demand/delivery cycle for a frozen external adapter cohort. |
+| `session.py` | Run the native AHE user loop inside a host-owned Actor conversation. |
+| `workspace.py` | Native AHE workspace operations over the host's run/read/write boundary. |
+
 ### ahe_beta.loop
 
 _Conversation-loop coordination, tracing, and lifecycle management._
@@ -299,6 +322,7 @@ graph LR
     nahe_beta_demand_agent_contract["demand.agent_contract"]
     nahe_beta_demand_agent_runtime["demand.agent_runtime"]
     nahe_beta_demand_architect["demand.architect"]
+    nahe_beta_demand_artifact["demand.artifact"]
     nahe_beta_demand_delivery_evidence["demand.delivery_evidence"]
     nahe_beta_demand_divergent["demand.divergent"]
     nahe_beta_demand_evidence_contract["demand.evidence_contract"]
@@ -382,6 +406,14 @@ graph LR
     nahe_beta_harness_connector["harness.connector"]
     nahe_beta_harness_interface["harness.interface"]
     nahe_beta_harness_launcher["harness.launcher"]
+    nahe_beta_integrations["ahe_beta.integrations"]
+    nahe_beta_integrations_hermit["integrations.hermit"]
+    nahe_beta_integrations_hermit_contract["hermit.contract"]
+    nahe_beta_integrations_hermit_conversation["hermit.conversation"]
+    nahe_beta_integrations_hermit_export["hermit.export"]
+    nahe_beta_integrations_hermit_feedback["hermit.feedback"]
+    nahe_beta_integrations_hermit_session["hermit.session"]
+    nahe_beta_integrations_hermit_workspace["hermit.workspace"]
     nahe_beta_invocation["ahe_beta.invocation"]
     nahe_beta_loop["ahe_beta.loop"]
     nahe_beta_loop_feedback_pipeline["loop.feedback_pipeline"]
@@ -448,6 +480,7 @@ graph LR
     nahe_beta_web_api["web.api"]
     nahe_beta_web_issue_timeline["web.issue_timeline"]
     nahe_beta_demand_agent_contract --> nahe_beta_demand_issue_schema
+    nahe_beta_demand_agent_runtime --> nahe_beta_demand_artifact
     nahe_beta_demand_agent_runtime --> nahe_beta_demand_evidence_contract
     nahe_beta_demand_agent_runtime --> nahe_beta_demand_observation_provider
     nahe_beta_demand_agent_runtime --> nahe_beta_demand_session_timeline
@@ -459,6 +492,7 @@ graph LR
     nahe_beta_demand_agent_runtime --> nahe_beta_usage
     nahe_beta_demand_agent_runtime --> nahe_beta_user_session_store
     nahe_beta_demand_architect --> nahe_beta_demand_agent_runtime
+    nahe_beta_demand_architect --> nahe_beta_demand_artifact
     nahe_beta_demand_architect --> nahe_beta_demand_issue_schema
     nahe_beta_demand_architect --> nahe_beta_demand_proposal_view
     nahe_beta_demand_architect --> nahe_beta_demand_role_contract
@@ -475,6 +509,7 @@ graph LR
     nahe_beta_demand_delivery_evidence --> nahe_beta_observations_publication
     nahe_beta_demand_delivery_evidence --> nahe_beta_observations_transport
     nahe_beta_demand_divergent --> nahe_beta_demand_agent_runtime
+    nahe_beta_demand_divergent --> nahe_beta_demand_artifact
     nahe_beta_demand_divergent --> nahe_beta_demand_evidence_contract
     nahe_beta_demand_divergent --> nahe_beta_demand_issue_schema
     nahe_beta_demand_divergent --> nahe_beta_demand_proposal_view
@@ -521,6 +556,7 @@ graph LR
     nahe_beta_demand_session_timeline --> nahe_beta_user_session_store
     nahe_beta_demand_triage --> nahe_beta_demand_agent_contract
     nahe_beta_demand_triage --> nahe_beta_demand_agent_runtime
+    nahe_beta_demand_triage --> nahe_beta_demand_artifact
     nahe_beta_demand_triage --> nahe_beta_demand_evidence_contract
     nahe_beta_demand_triage --> nahe_beta_demand_issue_schema
     nahe_beta_demand_triage --> nahe_beta_demand_role_contract
@@ -783,6 +819,31 @@ graph LR
     nahe_beta_harness_launcher --> nahe_beta_harness_interface
     nahe_beta_harness_launcher --> nahe_beta_observations_publication
     nahe_beta_harness_launcher --> nahe_beta_user_sim_runtime
+    nahe_beta_integrations_hermit_contract --> nahe_beta_demand_artifact
+    nahe_beta_integrations_hermit_conversation --> nahe_beta_user_sim_runtime
+    nahe_beta_integrations_hermit_export --> nahe_beta_experiment_config
+    nahe_beta_integrations_hermit_export --> nahe_beta_experiment_task_environments_materials
+    nahe_beta_integrations_hermit_export --> nahe_beta_experiment_workload
+    nahe_beta_integrations_hermit_feedback --> nahe_beta_demand_artifact
+    nahe_beta_integrations_hermit_feedback --> nahe_beta_experiment_controllers_feedback
+    nahe_beta_integrations_hermit_feedback --> nahe_beta_integrations_hermit_contract
+    nahe_beta_integrations_hermit_feedback --> nahe_beta_loop_feedback_pipeline
+    nahe_beta_integrations_hermit_feedback --> nahe_beta_loop_recovery
+    nahe_beta_integrations_hermit_feedback --> nahe_beta_loop_round_gate
+    nahe_beta_integrations_hermit_feedback --> nahe_beta_loop_sim_user
+    nahe_beta_integrations_hermit_feedback --> nahe_beta_models
+    nahe_beta_integrations_hermit_feedback --> nahe_beta_tracker_gitea
+    nahe_beta_integrations_hermit_feedback --> nahe_beta_usage
+    nahe_beta_integrations_hermit_feedback --> nahe_beta_user_session_store
+    nahe_beta_integrations_hermit_session --> nahe_beta_integrations_hermit_conversation
+    nahe_beta_integrations_hermit_session --> nahe_beta_integrations_hermit_workspace
+    nahe_beta_integrations_hermit_session --> nahe_beta_loop_sim_user
+    nahe_beta_integrations_hermit_session --> nahe_beta_models
+    nahe_beta_integrations_hermit_session --> nahe_beta_usage
+    nahe_beta_integrations_hermit_session --> nahe_beta_user_session_store
+    nahe_beta_integrations_hermit_session --> nahe_beta_user_sim_persona_client
+    nahe_beta_integrations_hermit_session --> nahe_beta_user_sim_persona_io
+    nahe_beta_integrations_hermit_workspace --> nahe_beta_user_sim_runtime
     nahe_beta_invocation --> nahe_beta_usage
     nahe_beta_loop_feedback_pipeline --> nahe_beta_demand_source
     nahe_beta_loop_feedback_pipeline --> nahe_beta_loop_recovery

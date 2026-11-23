@@ -414,13 +414,17 @@ def _report_plan(drafts: list[IssueDraft], session_id: str) -> list[dict]:
     ]
 
 
-def _publish_reports(session: Session, *, tracker, store) -> Session:
-    """Spec-0084/T2: immutable complete plan + per-report receipts, then one handoff enrichment."""
+def publish_session_reports(session: Session, *, tracker, store) -> Session:
+    """Publish a complete report plan once, or defer it when no tracker is bound.
+
+    External rollout hosts persist the native plan and publish only after their
+    complete cohort is valid. Existing tracker-backed sessions publish immediately.
+    """
     from ahe_beta.demand.evidence_contract import build_evidence_envelope
     from ahe_beta.execution_contract import canonical_sha256
     from ahe_beta.user.session_store import _atomic_json
 
-    if session.report_plan is None:
+    if tracker is None or session.report_plan is None:
         return session
     directory = store.root / "reports"
     directory.mkdir(parents=True, exist_ok=True)
@@ -493,12 +497,12 @@ def _save_and_publish(session: Session, *, tracker, store, packet) -> Session:
     session.user_feedback_envelope = build_evidence_envelope(session).to_dict()
     store.save(session)
     _release_saved_workspace(session, store=store, packet=packet)
-    return _publish_reports(session, tracker=tracker, store=store)
+    return publish_session_reports(session, tracker=tracker, store=store)
 
 
 def _reconcile_saved_session(session: Session, *, tracker, store) -> Session:
     _release_saved_workspace(session, store=store)
-    return _publish_reports(session, tracker=tracker, store=store)
+    return publish_session_reports(session, tracker=tracker, store=store)
 
 
 def _recover_pending_actor(*, packet, store, complete) -> Session | None:
@@ -721,7 +725,7 @@ def _issue_draft_from_body(body: str, *, round_no: int | None = None) -> IssueDr
 def make_sim_run_session_fn(
     *,
     client_factory: Callable[[], PersonaClient],
-    tracker: IssueTracker,
+    tracker: IssueTracker | None,
     store: SessionStore,
     sim_personas: dict[str, SimPersona],
     on_turn: SimTurnHook | None = None,
@@ -1028,7 +1032,7 @@ def _direct_execution_record(harness) -> tuple[dict, list[dict]]:
                 steps.append(step)
     return {
         "contract_version": 1,
-        "source": "launcher_received",
+        "source": getattr(harness, "execution_record_source", "launcher_received"),
         "storage_policy": "received_full",
         "reviewer_visibility": "terminal_reply_only",
         "events": events,
@@ -1043,7 +1047,7 @@ def _direct_execution_record(harness) -> tuple[dict, list[dict]]:
 def make_direct_run_session_fn(
     *,
     client_factory: Callable[[], PersonaClient],
-    tracker: IssueTracker,
+    tracker: IssueTracker | None,
     store: SessionStore,
     sim_personas: dict[str, SimPersona],
     round_provider: Callable[[], int | None] | None = None,
@@ -1347,7 +1351,7 @@ def make_direct_run_session_fn(
 def make_mixed_run_session_fn(
     *,
     client_factory: Callable[[], PersonaClient],
-    tracker: IssueTracker,
+    tracker: IssueTracker | None,
     store: SessionStore,
     sim_personas: dict[str, SimPersona],
     on_turn: SimTurnHook | None = None,
